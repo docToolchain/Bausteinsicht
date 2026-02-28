@@ -330,6 +330,23 @@ During forward sync, new elements receive their visual style from a template.
 The `bausteinsicht_template` attribute identifies which element kind this template applies to.
 The style, width, and height are copied to new elements of that kind.
 
+==== Connector Template
+
+Relationship connectors also use template styles. The connector template is identified by `bausteinsicht_template="relationship"` on the `<mxCell>`:
+
+[source,xml]
+----
+<!-- In the template file -->
+<mxCell bausteinsicht_template="relationship"
+        style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;
+               endArrow=block;endFill=1;strokeColor=#666666;"
+        edge="1" parent="1">
+  <mxGeometry relative="1" as="geometry" />
+</mxCell>
+----
+
+NOTE: Unlike element templates which use `<object>` wrappers, the connector template is a bare `<mxCell>` since connectors do not need custom metadata attributes.
+
 === Edge Cases
 
 ==== Element appears in multiple views
