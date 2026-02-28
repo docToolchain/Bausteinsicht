@@ -5,16 +5,20 @@ import (
 )
 
 // GenerateLabel creates an HTML label for draw.io elements.
-// Format: <b>Title</b><br><font color="#666666">Technology</font>
-// If technology is empty, just: <b>Title</b>
+// Format: <b>Title</b><br><font color="#666666">[Technology]</font><br><font color="#999999">Description</font>
+// Technology is wrapped in square brackets per C4 convention.
+// Empty technology or description lines are omitted.
 // The returned string is unescaped HTML; etree handles XML attribute escaping.
-func GenerateLabel(title, technology string) string {
-	escaped := escapeHTML(title)
-	if technology == "" {
-		return "<b>" + escaped + "</b>"
+func GenerateLabel(title, technology, description string) string {
+	var b strings.Builder
+	b.WriteString("<b>" + escapeHTML(title) + "</b>")
+	if technology != "" {
+		b.WriteString("<br><font color=\"#666666\">[" + escapeHTML(technology) + "]</font>")
 	}
-	escapedTech := escapeHTML(technology)
-	return "<b>" + escaped + "</b><br><font color=\"#666666\">" + escapedTech + "</font>"
+	if description != "" {
+		b.WriteString("<br><font color=\"#999999\">" + escapeHTML(description) + "</font>")
+	}
+	return b.String()
 }
 
 // GenerateActorLabel creates a label for actor elements (just the title, no technology line).
@@ -22,42 +26,97 @@ func GenerateActorLabel(title string) string {
 	return "<b>" + escapeHTML(title) + "</b>"
 }
 
-// ParseLabel extracts title and technology from an HTML label.
-// Expected format: <b>Title</b><br><font color="#666666">Technology</font>
-// If the label doesn't match, return the full text as title with empty technology.
-func ParseLabel(html string) (title, technology string) {
-	// Try to match <b>...</b><br><font ...>...</font>
-	if strings.HasPrefix(html, "<b>") {
-		rest := html[len("<b>"):]
-		closeB := strings.Index(rest, "</b>")
-		if closeB >= 0 {
-			titlePart := rest[:closeB]
-			after := rest[closeB+len("</b>"):]
-
-			if after == "" {
-				return unescapeHTML(titlePart), ""
-			}
-
-			// Check for <br><font ...>...</font>
-			if strings.HasPrefix(after, "<br>") {
-				fontPart := after[len("<br>"):]
-				if strings.HasPrefix(fontPart, "<font") {
-					fontClose := strings.Index(fontPart, ">")
-					if fontClose >= 0 {
-						techRest := fontPart[fontClose+1:]
-						endFont := strings.Index(techRest, "</font>")
-						if endFont >= 0 {
-							tech := techRest[:endFont]
-							return unescapeHTML(titlePart), unescapeHTML(tech)
-						}
-					}
-				}
-			}
-		}
+// ParseLabel extracts title, technology and description from an HTML label.
+// Expected format: <b>Title</b><br><font color="#666666">[Technology]</font><br><font color="#999999">Description</font>
+// Also handles legacy format without brackets around technology.
+// If the label doesn't match, return the full text as title.
+func ParseLabel(html string) (title, technology, description string) {
+	if !strings.HasPrefix(html, "<b>") {
+		return stripTags(html), "", ""
 	}
 
-	// Fallback: strip all HTML tags and return plain text as title
-	return stripTags(html), ""
+	rest := html[len("<b>"):]
+	closeB := strings.Index(rest, "</b>")
+	if closeB < 0 {
+		return stripTags(html), "", ""
+	}
+
+	titlePart := rest[:closeB]
+	after := rest[closeB+len("</b>"):]
+
+	if after == "" {
+		return unescapeHTML(titlePart), "", ""
+	}
+
+	// Parse remaining <br><font ...>...</font> segments
+	segments := parseFontSegments(after)
+
+	switch len(segments) {
+	case 1:
+		seg := segments[0]
+		if seg.color == "#999999" {
+			// Description only (no technology)
+			return unescapeHTML(titlePart), "", unescapeHTML(seg.text)
+		}
+		// Technology (with or without brackets)
+		return unescapeHTML(titlePart), unescapeHTML(trimBrackets(seg.text)), ""
+	case 2:
+		tech := unescapeHTML(trimBrackets(segments[0].text))
+		desc := unescapeHTML(segments[1].text)
+		return unescapeHTML(titlePart), tech, desc
+	default:
+		return unescapeHTML(titlePart), "", ""
+	}
+}
+
+type fontSegment struct {
+	color string
+	text  string
+}
+
+// parseFontSegments extracts consecutive <br><font color="...">...</font> segments.
+func parseFontSegments(s string) []fontSegment {
+	var segments []fontSegment
+	for strings.HasPrefix(s, "<br>") {
+		s = s[len("<br>"):]
+		if !strings.HasPrefix(s, "<font") {
+			break
+		}
+		// Extract color attribute
+		colorStart := strings.Index(s, `color="`)
+		if colorStart < 0 {
+			break
+		}
+		colorStart += len(`color="`)
+		colorEnd := strings.Index(s[colorStart:], `"`)
+		if colorEnd < 0 {
+			break
+		}
+		color := s[colorStart : colorStart+colorEnd]
+
+		// Extract text content
+		tagClose := strings.Index(s, ">")
+		if tagClose < 0 {
+			break
+		}
+		textStart := tagClose + 1
+		endFont := strings.Index(s[textStart:], "</font>")
+		if endFont < 0 {
+			break
+		}
+		text := s[textStart : textStart+endFont]
+		segments = append(segments, fontSegment{color: color, text: text})
+		s = s[textStart+endFont+len("</font>"):]
+	}
+	return segments
+}
+
+// trimBrackets removes surrounding square brackets if present.
+func trimBrackets(s string) string {
+	if strings.HasPrefix(s, "[") && strings.HasSuffix(s, "]") {
+		return s[1 : len(s)-1]
+	}
+	return s
 }
 
 // escapeHTML escapes special HTML characters in text content.

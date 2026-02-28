@@ -46,7 +46,7 @@ func TestCreateElement(t *testing.T) {
 		t.Errorf("tooltip: got %q, want %q", got, "Handles all API requests")
 	}
 
-	expectedLabel := GenerateLabel("API Gateway", "Spring Boot")
+	expectedLabel := GenerateLabel("API Gateway", "Spring Boot", "Handles all API requests")
 	if got := obj.SelectAttrValue("label", ""); got != expectedLabel {
 		t.Errorf("label: got %q, want %q", got, expectedLabel)
 	}
@@ -163,7 +163,7 @@ func TestUpdateElement(t *testing.T) {
 		t.Fatal("element not found after update")
 	}
 
-	expectedLabel := GenerateLabel("New Title", "MySQL")
+	expectedLabel := GenerateLabel("New Title", "MySQL", "New description")
 	if got := obj.SelectAttrValue("label", ""); got != expectedLabel {
 		t.Errorf("label after update: got %q, want %q", got, expectedLabel)
 	}

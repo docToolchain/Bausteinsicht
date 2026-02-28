@@ -40,7 +40,7 @@ func (p *Page) CreateElement(data ElementData, style string) error {
 	}
 
 	obj := root.CreateElement("object")
-	obj.CreateAttr("label", GenerateLabel(data.Title, data.Technology))
+	obj.CreateAttr("label", GenerateLabel(data.Title, data.Technology, data.Description))
 	obj.CreateAttr("id", cellID)
 	obj.CreateAttr("bausteinsicht_id", data.ID)
 	obj.CreateAttr("bausteinsicht_kind", data.Kind)
@@ -105,7 +105,7 @@ func (p *Page) UpdateElement(id string, data ElementData) {
 		return
 	}
 
-	setAttr(obj, "label", GenerateLabel(data.Title, data.Technology))
+	setAttr(obj, "label", GenerateLabel(data.Title, data.Technology, data.Description))
 	setAttr(obj, "tooltip", data.Description)
 	setAttr(obj, "link", data.Link)
 	if data.Technology != "" {
