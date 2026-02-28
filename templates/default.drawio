@@ -81,6 +81,7 @@
 
         <!-- Relationship connector template -->
         <mxCell id="template-relationship"
+                bausteinsicht_template="relationship"
                 value="label"
                 style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=10;"
                 edge="1"
