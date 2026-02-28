@@ -170,7 +170,7 @@ func TestValidate_AutoDetect(t *testing.T) {
 	if err := os.Chdir(dir); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { os.Chdir(origDir) })
+	t.Cleanup(func() { _ = os.Chdir(origDir) })
 
 	out, cmdErr := executeValidateCmd("validate")
 	if cmdErr != nil {
@@ -191,7 +191,7 @@ func TestValidate_AutoDetect_NoFile(t *testing.T) {
 	if err := os.Chdir(dir); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { os.Chdir(origDir) })
+	t.Cleanup(func() { _ = os.Chdir(origDir) })
 
 	_, cmdErr := executeValidateCmd("validate")
 	if cmdErr == nil {

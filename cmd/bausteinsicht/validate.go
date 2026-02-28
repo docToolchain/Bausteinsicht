@@ -66,7 +66,9 @@ func outputJSON(cmd *cobra.Command, errs []model.ValidationError) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintln(cmd.OutOrStdout(), string(data))
+	if _, err := fmt.Fprintln(cmd.OutOrStdout(), string(data)); err != nil {
+		return err
+	}
 	if !result.Valid {
 		return exitWithCode(fmt.Errorf("validation failed"), 1)
 	}
@@ -75,11 +77,13 @@ func outputJSON(cmd *cobra.Command, errs []model.ValidationError) error {
 
 func outputText(cmd *cobra.Command, errs []model.ValidationError) error {
 	if len(errs) == 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), "Model is valid.")
-		return nil
+		_, err := fmt.Fprintln(cmd.OutOrStdout(), "Model is valid.")
+		return err
 	}
 	for _, e := range errs {
-		fmt.Fprintf(cmd.OutOrStdout(), "ERROR: [%s] %s\n", e.Path, e.Message)
+		if _, err := fmt.Fprintf(cmd.OutOrStdout(), "ERROR: [%s] %s\n", e.Path, e.Message); err != nil {
+			return err
+		}
 	}
 	return exitWithCode(fmt.Errorf("validation failed"), 1)
 }
