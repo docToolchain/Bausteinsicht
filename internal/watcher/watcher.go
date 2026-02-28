@@ -34,7 +34,7 @@ func New(files []string, debounce time.Duration, onChange OnChange) (*Watcher, e
 
 	for _, f := range files {
 		if err := fsw.Add(f); err != nil {
-			fsw.Close()
+			_ = fsw.Close()
 			return nil, err
 		}
 	}
@@ -56,7 +56,7 @@ func (w *Watcher) Start() error {
 // Stop signals the watcher to shut down and closes the underlying fsnotify watcher.
 func (w *Watcher) Stop() {
 	close(w.done)
-	w.fsWatcher.Close()
+	_ = w.fsWatcher.Close()
 }
 
 // SetSyncing sets the syncing flag. While true, file change events are ignored
