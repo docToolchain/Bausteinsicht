@@ -1,0 +1,104 @@
+:jbake-title: Context and Scope
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: arc42
+:jbake-order: 3
+:filename: /chapters/03_context_and_scope.adoc
+ifndef::imagesdir[:imagesdir: ../../images]
+
+:toc:
+
+[[section-context-and-scope]]
+== Context and Scope
+
+=== Business Context
+
+Bausteinsicht sits between the architecture model (JSON files) and draw.io diagrams, synchronizing both bidirectionally.
+
+[plantuml, business-context, png]
+....
+@startuml
+skinparam actorStyle awesome
+
+actor "Software Architect" as architect
+actor "Developer" as dev
+actor "LLM Agent" as llm
+
+rectangle "Bausteinsicht" as bs
+
+file "Architecture Model\n(JSONC files)" as model
+file "draw.io Diagrams\n(.drawio XML)" as drawio
+file "Templates\n(.drawio XML)" as templates
+
+architect --> drawio : edits visually
+architect --> model : edits DSL
+dev --> drawio : reads diagrams
+llm --> bs : CLI commands
+
+bs --> model : reads / writes
+bs --> drawio : generates / reads
+bs --> templates : reads styling
+
+model <--> drawio : bidirectional sync\nvia Bausteinsicht
+@enduml
+....
+
+[cols="1,2,2"]
+|===
+| Communication Partner | Input | Output
+
+| Software Architect
+| Edits to architecture model (JSONC) or draw.io diagrams
+| Synchronized model and diagrams
+
+| Developer
+| —
+| Up-to-date architecture diagrams in draw.io
+
+| LLM Agent
+| CLI commands (add element, sync, validate)
+| Updated model files, validation results
+
+| draw.io
+| Visual edits to diagram elements and relationships
+| Generated/updated diagram XML
+
+| IDE (VS Code, IntelliJ, etc.)
+| JSON Schema
+| Autocompletion, validation, hover docs for model files
+
+| Git
+| Version-controlled model and diagram files
+| Diff-friendly text-based file changes
+|===
+
+=== Technical Context
+
+[cols="1,1,2"]
+|===
+| Interface | Technology | Description
+
+| Architecture Model
+| JSONC files on filesystem
+| The model is stored as `.jsonc` files in the project directory. Validated against a JSON Schema.
+
+| draw.io Diagrams
+| mxGraph XML files on filesystem
+| Standard `.drawio` files that can be opened in draw.io desktop, VS Code extension, or draw.io online.
+
+| Templates
+| mxGraph XML files on filesystem
+| draw.io files containing styled reference elements for each element kind.
+
+| CLI
+| Go binary (stdin/stdout)
+| Command-line interface for sync, validate, watch, and model manipulation commands.
+
+| File System Watcher
+| OS-native (inotify/FSEvents/ReadDirectoryChanges)
+| Watches model and diagram files for changes in watch mode.
+
+| JSON Schema
+| Published schema file (local or SchemaStore.org)
+| Enables IDE support without Bausteinsicht-specific plugins.
+|===

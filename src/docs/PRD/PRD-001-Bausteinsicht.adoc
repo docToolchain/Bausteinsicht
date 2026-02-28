@@ -1,0 +1,161 @@
+= PRD-001: Bausteinsicht — Product Requirements Document
+
+== Vision
+
+Bausteinsicht is an architecture-as-code tool that bridges the gap between structured architecture models and the widely adopted draw.io diagramming tool.
+It enables developers and architects to maintain a single source of truth for their software architecture through a JSON-based DSL, while using draw.io as the visual editing frontend with full bidirectional synchronization.
+
+== Problem Statement
+
+Existing architecture-as-code tools (Structurizr, LikeC4) have significant limitations:
+
+* They do not support draw.io, the most widely used free diagramming tool
+* Structurizr enforces a rigid 4-level hierarchy (Context, Container, Component, Code) that does not fit all architectures
+* Structurizr lacks stable IDs for elements, making synchronization fragile
+* No existing tool offers bidirectional sync between a model DSL and a visual editor
+* Architects must choose between code-based models (powerful but invisible) and visual diagrams (visible but unstructured)
+
+== Target Audience
+
+Developers and software architects who:
+
+* Already use or are willing to use draw.io for architecture diagrams
+* Want a structured, version-controlled architecture model
+* Value AI-assisted architecture maintenance via CLI
+* Work in teams where architecture documentation must be accessible and visual
+
+== Core Concepts
+
+=== Architecture Model (JSON DSL)
+
+* Single source of truth for all architecture elements, relationships, and metadata
+* JSON-based format with JSON Schema for validation and IDE support (see ADR-001)
+* Flexible, user-defined element hierarchy (not limited to 4 C4 levels)
+* Every element has a unique variable name (ID) for stable synchronization
+* Relationships between elements with labels and optional metadata
+
+=== draw.io Integration
+
+* draw.io serves as the visual frontend for viewing and editing architecture diagrams
+* Templates define the visual styling (shapes, colors, icons) — fully customizable by the user
+* Bausteinsicht generates draw.io XML from the model
+* Bausteinsicht reads draw.io XML back into the model (bidirectional sync)
+
+=== Views
+
+* Views are projections of the model at different levels of detail
+* Multiple views can exist for the same model (context, container, component, etc.)
+* View names and hierarchy levels are user-defined — not restricted to C4 terminology
+
+== Functional Requirements
+
+=== FR-1: Model Definition
+
+* Users define architecture models in JSONC files
+* Elements have: ID (variable name), kind, title, description, technology, tags, metadata
+* Elements can be nested to arbitrary depth (component of component is valid)
+* Relationships connect elements with: from, to, label, optional metadata
+* A specification section defines available element kinds and relationship kinds
+
+=== FR-2: draw.io Generation
+
+* Bausteinsicht generates draw.io XML files from the model
+* A template mechanism maps element kinds to draw.io shapes and styles
+* The template is a draw.io file itself — users style it visually in draw.io
+* Element kind mapping uses labeled bounding boxes or similar markers in the template
+* New elements are placed side by side (no automatic layout)
+* The user manually arranges elements in draw.io
+
+=== FR-3: Bidirectional Synchronization
+
+==== Model → draw.io (forward sync)
+
+* Changes to the model (new elements, updated descriptions, renamed elements) are reflected in draw.io views
+* New elements appear in relevant views with a visual marker indicating they need manual positioning
+* Existing elements retain their position (layout is preserved)
+* Deleted elements are removed from views
+
+==== draw.io → Model (reverse sync)
+
+* New elements added in draw.io are detected and added to the model
+* Changes to element names, descriptions, and labels in draw.io are synced back to the model
+* New relationships (arrows) drawn in draw.io are added to the model
+* Sync conflicts (concurrent changes in both directions) produce warnings initially
+
+==== Synchronization IDs
+
+* Every element in the model has a unique variable name serving as its ID
+* The ID is stored in the draw.io XML as a custom property on the mxCell
+* IDs are the stable anchor for matching model elements to diagram elements
+
+=== FR-4: Relationship Handling
+
+* Relationships are represented as arrows/connectors in draw.io
+* Connectors attach to element centers (not edges) so they route correctly when elements are moved
+* Relationship labels, directions, and metadata are synchronized
+
+=== FR-5: Navigation and Drill-Down
+
+* All views can reside on a single draw.io page
+* Zoom-based navigation: click on an element to zoom into its detailed view
+* The parent view remains visible (small, above) for orientation and navigation back
+* Alternative: multi-page support where each view is a separate draw.io tab with linking
+
+=== FR-6: CLI Interface
+
+* `bausteinsicht sync` — run synchronization between model and draw.io
+* `bausteinsicht validate` — validate the model against the JSON Schema
+* `bausteinsicht watch` — watch mode for continuous synchronization on file changes
+* CLI commands for model manipulation (add element, add relationship) to support LLM-driven workflows
+
+=== FR-7: Template System
+
+* Templates are draw.io files containing styled example elements for each element kind
+* Element kinds are identified by markers (e.g., labeled groups, custom properties)
+* Users create and customize templates entirely within draw.io
+* Multiple templates can coexist (e.g., formal C4 style, informal sketch style)
+
+== Non-Functional Requirements
+
+=== NFR-1: Technology Stack
+
+* Implementation language: Go (see ADR-002)
+* Single binary distribution — no runtime dependencies
+* Cross-platform: Linux, macOS, Windows
+
+=== NFR-2: LLM Friendliness
+
+* The JSON model format is natively readable and writable by LLMs
+* CLI commands enable AI agents to query and modify the architecture model
+* The tool's Go codebase is designed for agentic coding workflows
+
+=== NFR-3: IDE Support
+
+* JSON Schema provides autocompletion, validation, and hover documentation
+* Publication on SchemaStore.org for automatic schema recognition
+* Works with VS Code, IntelliJ, Neovim, and any editor supporting JSON Schema
+
+=== NFR-4: Version Control
+
+* All files (model JSON, draw.io XML, templates) are text-based and Git-friendly
+* The draw.io XML diff should be meaningful (layout changes separate from content changes)
+
+== Future Considerations (Out of Scope for v1)
+
+* **As-Is / To-Be Architecture**: modeling current and target architecture side by side
+* **Validation rules**: custom rules to enforce architectural constraints
+* **Diagram export**: PNG/SVG export of views for documentation pipelines
+* **CI/CD integration**: architecture validation in build pipelines
+* **Structurizr/LikeC4 import**: migration path from existing tools
+
+== Decisions Made
+
+* ADR-001: DSL format — JSON with JSON Schema (JSONC)
+* ADR-002: Implementation language — Go
+
+== Open Questions
+
+* Exact template mechanism: how are element kinds marked in draw.io templates?
+* draw.io XML structure: detailed analysis of mxCell attributes, styles, and custom properties needed
+* JSON Schema design: exact structure of specification, model, relationships, and views sections
+* How to handle the zoom-based single-page navigation in draw.io technically

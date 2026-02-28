@@ -1,0 +1,86 @@
+:jbake-title: Introduction and Goals
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: arc42
+:jbake-order: 1
+:filename: /chapters/01_introduction_and_goals.adoc
+ifndef::imagesdir[:imagesdir: ../../images]
+
+:toc:
+
+[[section-introduction-and-goals]]
+== Introduction and Goals
+
+Bausteinsicht is an architecture-as-code tool that uses draw.io as its visual frontend.
+It maintains a structured architecture model in a JSON-based DSL and synchronizes it bidirectionally with draw.io diagrams.
+
+=== Requirements Overview
+
+Bausteinsicht addresses the gap between structured architecture models and widely adopted visual diagramming tools.
+
+[cols="1,3"]
+|===
+| Requirement | Description
+
+| Architecture Model
+| A JSON-based DSL serves as single source of truth for all architecture elements, relationships, and metadata.
+
+| draw.io Integration
+| draw.io serves as the visual frontend. Templates define the styling, fully customizable by the user.
+
+| Bidirectional Sync
+| Changes in the model are reflected in draw.io views and vice versa. New elements, updated descriptions, and relationships are synchronized in both directions.
+
+| Flexible Hierarchy
+| Element hierarchy is user-defined and not limited to the 4 C4 levels. Components of components are valid.
+
+| CLI & Watch Mode
+| A CLI provides commands for sync, validation, and watching. CLI commands also enable LLM-driven architecture maintenance.
+
+| Template System
+| Templates are draw.io files containing styled example elements. Users create and customize templates entirely within draw.io.
+|===
+
+See link:../../PRD/PRD-001-Bausteinsicht.adoc[PRD-001] for the full product requirements.
+
+=== Quality Goals
+
+The top three quality goals driving architectural decisions:
+
+[cols="1,1,3"]
+|===
+| Priority | Quality Goal | Scenario
+
+| 1
+| Learnability
+| A developer unfamiliar with Bausteinsicht creates a working architecture model with draw.io views within 30 minutes using only the documentation and IDE autocompletion.
+
+| 2
+| IDE Support
+| When editing the JSON model in VS Code, IntelliJ, or Neovim, the editor provides autocompletion, validation, and hover documentation without installing any Bausteinsicht-specific plugin.
+
+| 3
+| LLM Friendliness
+| An LLM agent (e.g., Claude) can read the architecture model, add a new element with relationships, and trigger synchronization using only CLI commands — without human intervention.
+|===
+
+See <<section-quality-scenarios, Chapter 10>> for the full quality requirements and scenarios.
+
+=== Stakeholders
+
+[options="header",cols="1,2,2"]
+|===
+| Role/Name | Contact | Expectations
+
+| Software Architect
+| Primary user
+| Maintains architecture models visually in draw.io with a structured model behind the scenes. Expects flexible hierarchy and easy template customization.
+
+| Developer
+| Team member
+| Consults architecture diagrams in draw.io. Expects diagrams to always reflect the current model state.
+
+| LLM Agent
+| AI assistant (e.g., Claude)
+| Modifies architecture models via CLI commands. Expects a machine-readable JSON format and predictable CLI behavior.
+|===

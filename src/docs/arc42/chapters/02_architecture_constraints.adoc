@@ -1,0 +1,69 @@
+:jbake-title: Architecture Constraints
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: arc42
+:jbake-order: 2
+:filename: /chapters/02_architecture_constraints.adoc
+ifndef::imagesdir[:imagesdir: ../../images]
+
+:toc:
+
+[[section-architecture-constraints]]
+== Architecture Constraints
+
+=== Technical Constraints
+
+[cols="1,3"]
+|===
+| Constraint | Description
+
+| Go as implementation language
+| The tool is implemented in Go to enable single-binary distribution without runtime dependencies. See link:../ADRs/ADR-002-Implementation-Language.adoc[ADR-002].
+
+| JSON as model format
+| The architecture model uses JSON (JSONC) with JSON Schema for validation. See link:../ADRs/ADR-001-DSL-Format.adoc[ADR-001].
+
+| draw.io XML as output format
+| The visual representation uses draw.io's mxGraph XML format. This constrains layout capabilities to what draw.io supports.
+
+| No JavaScript/Node.js
+| JavaScript and Node.js are excluded from the technology stack due to security concerns with npm package managers.
+
+| Cross-platform
+| The tool must run on Linux, macOS, and Windows.
+|===
+
+=== Organizational Constraints
+
+[cols="1,3"]
+|===
+| Constraint | Description
+
+| Open Source
+| The project is developed as open source software.
+
+| Documentation in English
+| All documentation is written in English.
+
+| Documentation in AsciiDoc
+| Architecture documentation uses arc42 template in AsciiDoc format.
+
+| ADR format
+| Architecture decisions follow the Nygard ADR format with a weighted Pugh matrix for option evaluation.
+|===
+
+=== Conventions
+
+[cols="1,3"]
+|===
+| Convention | Description
+
+| Version control
+| All files (model JSON, draw.io XML, templates) are text-based and Git-friendly.
+
+| Version numbering
+| The tool displays a version number. Semantic versioning is used.
+
+| ADR naming
+| ADRs follow the pattern `ADR-NNN-Name.adoc` in `src/docs/arc42/ADRs/`.
+|===
