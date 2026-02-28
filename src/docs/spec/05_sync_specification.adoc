@@ -1,3 +1,9 @@
+:jbake-title: Sync Specification
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: Specification
+:jbake-order: 5
+
 = Sync Specification
 
 :toc:

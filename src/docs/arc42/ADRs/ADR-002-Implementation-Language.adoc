@@ -1,3 +1,9 @@
+:jbake-title: ADR-002: Implementation Language
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: ADR
+:jbake-order: 2
+
 = ADR-002: Choice of Implementation Language
 
 == Status

@@ -1,3 +1,9 @@
+:jbake-title: PRD-001: Bausteinsicht
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: PRD
+:jbake-order: 1
+
 = PRD-001: Bausteinsicht — Product Requirements Document
 
 == Vision

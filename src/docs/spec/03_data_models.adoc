@@ -1,3 +1,9 @@
+:jbake-title: Data Models
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: Specification
+:jbake-order: 3
+
 = Data Models
 
 :toc:

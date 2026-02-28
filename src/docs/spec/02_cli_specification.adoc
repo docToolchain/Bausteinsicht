@@ -1,3 +1,9 @@
+:jbake-title: CLI Specification
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: Specification
+:jbake-order: 2
+
 = CLI Specification
 
 :toc:

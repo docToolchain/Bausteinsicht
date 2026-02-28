@@ -1,3 +1,9 @@
+:jbake-title: Acceptance Criteria
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: Specification
+:jbake-order: 4
+
 = Acceptance Criteria
 
 :toc:
