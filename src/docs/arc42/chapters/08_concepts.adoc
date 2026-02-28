@@ -4,13 +4,15 @@
 :jbake-menu: arc42
 :jbake-order: 8
 
-= Cross-cutting Concepts
+ifndef::imagesdir[:imagesdir: ../../images]
 
 :toc:
 
-== Error Handling
+== Cross-cutting Concepts
 
-=== Strategy
+=== Error Handling
+
+==== Strategy
 
 Bausteinsicht uses Go's explicit error handling pattern consistently. Errors propagate upward and are only formatted for the user at the CLI layer.
 
@@ -25,7 +27,7 @@ Bausteinsicht uses Go's explicit error handling pattern consistently. Errors pro
 | Catch errors, format them for the user (plain text or JSON depending on `--format`), and set the exit code.
 |===
 
-=== Exit Codes
+==== Exit Codes
 
 [cols="1,3"]
 |===
@@ -36,7 +38,7 @@ Bausteinsicht uses Go's explicit error handling pattern consistently. Errors pro
 | 2 | File not found or I/O error
 |===
 
-=== Structured Error Output
+==== Structured Error Output
 
 With `--format json`, errors are returned as:
 
@@ -52,9 +54,9 @@ With `--format json`, errors are returned as:
 
 This enables LLM agents to parse and react to errors programmatically.
 
-== Testing Strategy
+=== Testing Strategy
 
-=== Test Levels
+==== Test Levels
 
 [cols="1,2,2"]
 |===
@@ -73,7 +75,7 @@ This enables LLM agents to parse and react to errors programmatically.
 | Run the compiled binary with test input files. Verify output files and exit codes. Use `testscript` or shell-based test runner.
 |===
 
-=== Test Fixtures
+==== Test Fixtures
 
 Each package has a `testdata/` directory with representative input files:
 
@@ -99,7 +101,7 @@ internal/sync/testdata/
     └── ...
 ....
 
-=== Golden File Testing
+==== Golden File Testing
 
 For sync scenarios, the test runs a sync cycle and compares the output against expected files. If the output changes intentionally, update the golden files with a flag:
 
@@ -108,9 +110,9 @@ For sync scenarios, the test runs a sync cycle and compares the output against e
 go test ./internal/sync/ -update-golden
 ----
 
-== Logging and Output
+=== Logging and Output
 
-=== User-Facing Output
+==== User-Facing Output
 
 Normal output goes to **stdout** in one of two formats:
 
@@ -119,7 +121,7 @@ Normal output goes to **stdout** in one of two formats:
 
 Warnings and errors go to **stderr**.
 
-=== Verbose Mode
+==== Verbose Mode
 
 With `--verbose`, additional details are printed to stderr:
 
@@ -134,11 +136,11 @@ With `--verbose`, additional details are printed to stderr:
 [INFO]  Sync complete: 2 forward changes, 1 reverse change
 ....
 
-=== No Logging Framework
+==== No Logging Framework
 
 Bausteinsicht uses Go's standard `log` package for verbose output and `fmt` for normal output. No external logging framework is needed for a CLI tool.
 
-== Version Management
+=== Version Management
 
 The binary version is set at build time via `ldflags`:
 
@@ -155,7 +157,7 @@ bausteinsicht version 0.1.0
 
 GoReleaser handles this automatically for tagged releases.
 
-== JSONC Handling
+=== JSONC Handling
 
 Standard Go `encoding/json` does not support comments. Bausteinsicht strips comments before parsing:
 
@@ -166,7 +168,7 @@ Standard Go `encoding/json` does not support comments. Bausteinsicht strips comm
 
 NOTE: Preserving user comments across sync cycles is a future enhancement. For v1, comments in the model file are stripped on write.
 
-== File Atomicity
+=== File Atomicity
 
 When writing files, Bausteinsicht uses a write-to-temp-then-rename pattern:
 
@@ -176,7 +178,7 @@ When writing files, Bausteinsicht uses a write-to-temp-then-rename pattern:
 
 This prevents corrupted files if the process is interrupted during write.
 
-== Configuration Discovery
+=== Configuration Discovery
 
 Bausteinsicht uses convention over configuration:
 

@@ -4,11 +4,13 @@
 :jbake-menu: arc42
 :jbake-order: 6
 
-= Runtime View
+ifndef::imagesdir[:imagesdir: ../../images]
 
 :toc:
 
-== Sync Command
+== Runtime View
+
+=== Sync Command
 
 The most important runtime scenario. Shows what happens when the user runs `bausteinsicht sync`.
 
@@ -85,14 +87,14 @@ deactivate cmd
 @enduml
 ....
 
-=== Key Observations
+==== Key Observations
 
 * The sync engine receives all data as parameters — it performs no I/O itself
 * Forward sync runs before reverse sync in the same cycle
 * The state file is only written after both directions complete successfully
 * If any step fails, no files are written (atomic operation)
 
-== Watch Mode
+=== Watch Mode
 
 Shows the continuous sync loop triggered by file changes.
 
@@ -130,11 +132,11 @@ deactivate cmd
 @enduml
 ....
 
-=== Debounce Strategy
+==== Debounce Strategy
 
 File editors often trigger multiple save events in rapid succession (write + metadata update). The watcher debounces events with a 300ms window: after the first change event, it waits 300ms for additional events before triggering a sync.
 
-== Init Command
+=== Init Command
 
 [plantuml, runtime-init, png]
 ....
@@ -165,7 +167,7 @@ deactivate cmd
 @enduml
 ....
 
-== LLM-Driven Modification
+=== LLM-Driven Modification
 
 Shows how an LLM agent uses CLI commands to modify the architecture.
 
@@ -201,6 +203,6 @@ note right: Separate command to\nupdate draw.io diagram
 @enduml
 ....
 
-=== Design Decision: Separate Add and Sync
+==== Design Decision: Separate Add and Sync
 
 The `add` commands only modify the JSON model. They do **not** trigger a sync automatically. This keeps commands predictable (single responsibility) and allows LLMs to batch multiple model changes before syncing.

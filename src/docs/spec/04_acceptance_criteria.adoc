@@ -4,18 +4,20 @@
 :jbake-menu: Specification
 :jbake-order: 4
 
-= Acceptance Criteria
+ifndef::imagesdir[:imagesdir: ../../images]
 
 :toc:
 
-== Conventions
+== Acceptance Criteria
+
+=== Conventions
 
 Acceptance criteria are written in Gherkin format (Given-When-Then).
 They are grouped by feature area and reference the corresponding use cases from `01_use_cases.adoc`.
 
-== Model Initialization (UC-1)
+=== Model Initialization (UC-1)
 
-=== AC-1.1: Default model creation
+==== AC-1.1: Default model creation
 
 [source,gherkin]
 ----
@@ -38,9 +40,9 @@ Feature: Initialize architecture model
     And no existing files are modified
 ----
 
-== Element Definition (UC-2)
+=== Element Definition (UC-2)
 
-=== AC-2.1: Element creation with unique IDs
+==== AC-2.1: Element creation with unique IDs
 
 [source,gherkin]
 ----
@@ -71,7 +73,7 @@ Feature: Define architecture elements
     And all 5 levels are represented correctly
 ----
 
-=== AC-2.2: Relationship definition
+==== AC-2.2: Relationship definition
 
 [source,gherkin]
 ----
@@ -89,9 +91,9 @@ Feature: Define relationships
     Then the relationship correctly references the nested element using dot notation
 ----
 
-== Forward Sync — Model to draw.io (UC-3)
+=== Forward Sync — Model to draw.io (UC-3)
 
-=== AC-3.1: Initial diagram generation
+==== AC-3.1: Initial diagram generation
 
 [source,gherkin]
 ----
@@ -116,7 +118,7 @@ Feature: Generate draw.io diagrams from model
     Then "webshop" appears as a blue rounded rectangle in the draw.io output
 ----
 
-=== AC-3.2: Incremental sync preserving layout
+==== AC-3.2: Incremental sync preserving layout
 
 [source,gherkin]
 ----
@@ -145,9 +147,9 @@ Feature: Incremental forward sync
     And connectors that referenced "legacy_db" are removed
 ----
 
-== Reverse Sync — draw.io to Model (UC-4)
+=== Reverse Sync — draw.io to Model (UC-4)
 
-=== AC-4.1: Detect changes from draw.io
+==== AC-4.1: Detect changes from draw.io
 
 [source,gherkin]
 ----
@@ -179,7 +181,7 @@ Feature: Reverse sync from draw.io to model
     Then the model file is not modified
 ----
 
-=== AC-4.2: Conflict handling
+==== AC-4.2: Conflict handling
 
 [source,gherkin]
 ----
@@ -194,9 +196,9 @@ Feature: Sync conflict handling
     And no silent overwrite occurs
 ----
 
-== Watch Mode (UC-5)
+=== Watch Mode (UC-5)
 
-=== AC-5.1: Continuous synchronization
+==== AC-5.1: Continuous synchronization
 
 [source,gherkin]
 ----
@@ -220,9 +222,9 @@ Feature: Watch mode
     Then only 1 sync operation is performed
 ----
 
-== CLI Interface (UC-6)
+=== CLI Interface (UC-6)
 
-=== AC-6.1: Validation
+==== AC-6.1: Validation
 
 [source,gherkin]
 ----
@@ -245,7 +247,7 @@ Feature: Model validation
     Then the current version number is displayed
 ----
 
-=== AC-6.2: LLM-friendly CLI
+==== AC-6.2: LLM-friendly CLI
 
 [source,gherkin]
 ----
@@ -267,9 +269,9 @@ Feature: LLM-driven model manipulation
     Then the output is valid JSON with structured validation results
 ----
 
-== Navigation and Drill-Down (UC-7)
+=== Navigation and Drill-Down (UC-7)
 
-=== AC-7.1: Zoom-based navigation
+==== AC-7.1: Zoom-based navigation
 
 [source,gherkin]
 ----

@@ -4,14 +4,16 @@
 :jbake-menu: Specification
 :jbake-order: 2
 
-= CLI Specification
+ifndef::imagesdir[:imagesdir: ../../images]
 
 :toc:
+
+== CLI Specification
 
 NOTE: This specification will be detailed after the draw.io XML analysis. +
 See link:01_use_cases.adoc[Use Cases] for the functional overview of all CLI commands.
 
-== Command Overview
+=== Command Overview
 
 [cols="2,3,1"]
 |===
@@ -46,7 +48,7 @@ See link:01_use_cases.adoc[Use Cases] for the functional overview of all CLI com
 | Planned
 |===
 
-== Global Flags
+=== Global Flags
 
 [cols="2,3"]
 |===
@@ -65,7 +67,7 @@ See link:01_use_cases.adoc[Use Cases] for the functional overview of all CLI com
 | Verbose output for debugging
 |===
 
-== Exit Codes
+=== Exit Codes
 
 [cols="1,3"]
 |===
@@ -81,6 +83,6 @@ See link:01_use_cases.adoc[Use Cases] for the functional overview of all CLI com
 | File not found or I/O error
 |===
 
-== Detailed Command Specifications
+=== Detailed Command Specifications
 
 TODO: Detail each command with full flag descriptions, input/output examples, and edge cases after draw.io XML analysis.

@@ -4,11 +4,13 @@
 :jbake-menu: arc42
 :jbake-order: 4
 
-= Solution Strategy
+ifndef::imagesdir[:imagesdir: ../../images]
 
 :toc:
 
-== Technology Decisions
+== Solution Strategy
+
+=== Technology Decisions
 
 [cols="1,2,2"]
 |===
@@ -35,7 +37,7 @@
 | Cross-platform file system events, no polling overhead
 |===
 
-== Top-Level Decomposition
+=== Top-Level Decomposition
 
 Bausteinsicht follows a **pipes-and-filters** architecture with a clear separation between data formats:
 
@@ -64,7 +66,7 @@ Bausteinsicht follows a **pipes-and-filters** architecture with a clear separati
 
 This decomposition ensures that model format changes (e.g., switching from JSONC to YAML) or draw.io format changes do not ripple across the codebase.
 
-== Quality Goal Strategies
+=== Quality Goal Strategies
 
 [cols="1,3"]
 |===
@@ -80,16 +82,16 @@ This decomposition ensures that model format changes (e.g., switching from JSONC
 | All CLI commands support `--format json` for structured output. `add element` and `add relationship` commands allow LLMs to modify the model without parsing JSON directly. The JSONC format is natively understood by all major LLMs.
 |===
 
-== Key Design Patterns
+=== Key Design Patterns
 
-=== Three-Way Merge for Bidirectional Sync
+==== Three-Way Merge for Bidirectional Sync
 
 Rather than simple overwrite, Bausteinsicht uses a `.bausteinsicht-sync` state file to detect which side changed. This prevents data loss when both the model and draw.io are edited between syncs. See link:../../spec/05_sync_specification.html[Sync Specification] for details.
 
-=== Template-Based Styling
+==== Template-Based Styling
 
 Visual styles are not hardcoded. A draw.io template file defines the appearance of each element kind via `bausteinsicht_template` attributes. Users can customize templates without modifying source code.
 
-=== Thin CLI, Rich Library
+==== Thin CLI, Rich Library
 
 The `cmd/` layer contains only argument parsing and output formatting. All logic lives in `internal/` packages that can be tested independently and reused (e.g., for a future LSP server or web API).
