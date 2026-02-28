@@ -194,6 +194,7 @@ func TestBuildState_CorrectSnapshot(t *testing.T) {
 		t.Errorf("expected sha256 drawio hash, got %q", state.DrawioHash)
 	}
 
+	// FlattenElements returns both "webshop" and "webshop.api"
 	if len(state.Elements) != 2 {
 		t.Errorf("expected 2 elements, got %d", len(state.Elements))
 	}
