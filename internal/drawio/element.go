@@ -9,6 +9,7 @@ import (
 // ElementData holds the data needed to create or update an element.
 type ElementData struct {
 	ID          string  // bausteinsicht_id (e.g., "webshop.api")
+	CellID      string  // draw.io cell ID (file-wide unique); defaults to ID if empty
 	Kind        string  // bausteinsicht_kind (e.g., "container")
 	Title       string  // display title
 	Technology  string  // technology string
@@ -33,9 +34,14 @@ func (p *Page) CreateElement(data ElementData, style string) error {
 		parentID = "1"
 	}
 
+	cellID := data.CellID
+	if cellID == "" {
+		cellID = data.ID
+	}
+
 	obj := root.CreateElement("object")
 	obj.CreateAttr("label", GenerateLabel(data.Title, data.Technology))
-	obj.CreateAttr("id", data.ID)
+	obj.CreateAttr("id", cellID)
 	obj.CreateAttr("bausteinsicht_id", data.ID)
 	obj.CreateAttr("bausteinsicht_kind", data.Kind)
 	if data.Technology != "" {

@@ -7,6 +7,10 @@ import (
 	"github.com/docToolchain/Bauteinsicht/internal/model"
 )
 
+func findConnectorCount(page *drawio.Page) int {
+	return len(page.FindAllConnectors())
+}
+
 // modelWithViews returns a model with two top-level elements, a child, and two views.
 func modelWithViews() *model.BausteinsichtModel {
 	return &model.BausteinsichtModel{
@@ -123,20 +127,20 @@ func TestApplyForward_RelationshipOnlyOnPageWithBothEndpoints(t *testing.T) {
 
 	ApplyForward(cs, doc, ts, m)
 
-	// Context page: customer→webshop connector should exist.
+	// Context page: customer→webshop connector should exist (using scoped cell IDs).
 	contextPage := doc.GetPage("view-context")
-	if contextPage.FindConnector("customer", "webshop") == nil {
+	if contextPage.FindConnector("context--customer", "context--webshop") == nil {
 		t.Error("expected connector customer→webshop on context page")
 	}
 
 	// Context page: api→db connector should NOT exist (endpoints not on this page).
-	if contextPage.FindConnector("webshop.api", "webshop.db") != nil {
-		t.Error("connector api→db should NOT be on context page")
+	if findConnectorCount(contextPage) > 1 {
+		t.Error("context page should only have one connector")
 	}
 
-	// Container page: api→db connector should exist.
+	// Container page: api→db connector should exist (using scoped cell IDs).
 	containerPage := doc.GetPage("view-containers")
-	if containerPage.FindConnector("webshop.api", "webshop.db") == nil {
+	if containerPage.FindConnector("containers--webshop.api", "containers--webshop.db") == nil {
 		t.Error("expected connector api→db on container page")
 	}
 }
