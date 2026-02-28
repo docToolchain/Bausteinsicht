@@ -145,6 +145,145 @@ func TestApplyForward_RelationshipOnlyOnPageWithBothEndpoints(t *testing.T) {
 	}
 }
 
+// TestApplyForward_RelationshipLifting verifies that relationships are lifted
+// to parent elements when the original endpoint is not on the page.
+// Example: customer → webshop.frontend should render as customer → webshop
+// on the context page where only customer and webshop are present.
+func TestApplyForward_RelationshipLifting(t *testing.T) {
+	doc := drawio.NewDocument()
+	doc.AddPage("view-context", "System Context")
+	doc.AddPage("view-containers", "Container View")
+	ts := minimalTemplates(t)
+
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"customer": {Kind: "actor", Title: "Customer"},
+			"webshop": {Kind: "system", Title: "Online Shop", Children: map[string]model.Element{
+				"frontend": {Kind: "container", Title: "Frontend"},
+				"api":      {Kind: "container", Title: "API"},
+			}},
+		},
+		Relationships: []model.Relationship{
+			{From: "customer", To: "webshop.frontend", Label: "uses"},
+			{From: "webshop.frontend", To: "webshop.api", Label: "calls"},
+		},
+		Views: map[string]model.View{
+			"context": {
+				Title:   "System Context",
+				Include: []string{"customer", "webshop"},
+			},
+			"containers": {
+				Title:   "Container View",
+				Scope:   "webshop",
+				Include: []string{"customer", "webshop.*"},
+			},
+		},
+	}
+
+	cs := &ChangeSet{
+		ModelElementChanges: []ElementChange{
+			{ID: "customer", Type: Added},
+			{ID: "webshop", Type: Added},
+			{ID: "webshop.frontend", Type: Added},
+			{ID: "webshop.api", Type: Added},
+		},
+		ModelRelationshipChanges: []RelationshipChange{
+			{From: "customer", To: "webshop.frontend", Type: Added, NewValue: "uses"},
+			{From: "webshop.frontend", To: "webshop.api", Type: Added, NewValue: "calls"},
+		},
+	}
+
+	ApplyForward(cs, doc, ts, m)
+
+	// Context page: customer → webshop.frontend should be lifted to customer → webshop
+	contextPage := doc.GetPage("view-context")
+	if contextPage == nil {
+		t.Fatal("context page not found")
+	}
+
+	conns := contextPage.FindAllConnectors()
+	if len(conns) == 0 {
+		t.Fatal("expected at least one connector on context page (lifted relationship)")
+	}
+
+	// Should have a connector from customer to webshop (lifted from webshop.frontend)
+	found := false
+	for _, c := range conns {
+		src := c.SelectAttrValue("source", "")
+		tgt := c.SelectAttrValue("target", "")
+		if src == "context--customer" && tgt == "context--webshop" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected lifted connector customer→webshop on context page")
+	}
+
+	// Container page: customer → webshop.frontend should NOT be lifted (frontend is on the page)
+	containerPage := doc.GetPage("view-containers")
+	if containerPage == nil {
+		t.Fatal("container page not found")
+	}
+	if containerPage.FindConnector("containers--customer", "containers--webshop.frontend") == nil {
+		t.Error("expected original connector customer→webshop.frontend on container page")
+	}
+}
+
+// TestApplyForward_RelationshipLiftingDedup verifies that when multiple child
+// relationships lift to the same parent pair, only one connector is created.
+func TestApplyForward_RelationshipLiftingDedup(t *testing.T) {
+	doc := drawio.NewDocument()
+	doc.AddPage("view-context", "System Context")
+	ts := minimalTemplates(t)
+
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"a": {Kind: "system", Title: "A", Children: map[string]model.Element{
+				"x": {Kind: "container", Title: "X"},
+				"y": {Kind: "container", Title: "Y"},
+			}},
+			"b": {Kind: "system", Title: "B", Children: map[string]model.Element{
+				"z": {Kind: "container", Title: "Z"},
+			}},
+		},
+		Relationships: []model.Relationship{
+			{From: "a.x", To: "b.z", Label: "calls"},
+			{From: "a.y", To: "b.z", Label: "reads"},
+		},
+		Views: map[string]model.View{
+			"context": {
+				Title:   "System Context",
+				Include: []string{"a", "b"},
+			},
+		},
+	}
+
+	cs := &ChangeSet{
+		ModelElementChanges: []ElementChange{
+			{ID: "a", Type: Added},
+			{ID: "b", Type: Added},
+			{ID: "a.x", Type: Added},
+			{ID: "a.y", Type: Added},
+			{ID: "b.z", Type: Added},
+		},
+		ModelRelationshipChanges: []RelationshipChange{
+			{From: "a.x", To: "b.z", Type: Added, NewValue: "calls"},
+			{From: "a.y", To: "b.z", Type: Added, NewValue: "reads"},
+		},
+	}
+
+	ApplyForward(cs, doc, ts, m)
+
+	contextPage := doc.GetPage("view-context")
+	conns := contextPage.FindAllConnectors()
+
+	// Both relationships lift to a→b, but only one connector should be created.
+	if len(conns) != 1 {
+		t.Errorf("expected 1 connector (deduped), got %d", len(conns))
+	}
+}
+
 // TestApplyForward_NoViewsFallback verifies backward compatibility:
 // when no views are defined, elements go to the first page.
 func TestApplyForward_NoViewsFallback(t *testing.T) {
