@@ -41,22 +41,31 @@ ifndef::imagesdir[:imagesdir: ../../images]
 
 Bausteinsicht follows a **pipes-and-filters** architecture with a clear separation between data formats:
 
+[plantuml, solution-decomposition, png]
 ....
- ┌─────────┐     ┌─────────────┐     ┌───────────┐
- │  JSON   │────▶│  Sync       │────▶│  draw.io  │
- │  Model  │◀────│  Engine     │◀────│  XML      │
- └─────────┘     └─────────────┘     └───────────┘
-       ▲               │                    ▲
-       │               ▼                    │
-       │         ┌───────────┐              │
-       │         │  Sync     │              │
-       │         │  State    │              │
-       │         └───────────┘              │
-       │                                    │
-  ┌─────────┐                        ┌───────────┐
-  │  JSON   │                        │  Template  │
-  │  Schema │                        │  (.drawio) │
-  └─────────┘                        └───────────┘
+@startuml
+!include <C4/C4_Container>
+
+System_Boundary(bs, "Bausteinsicht") {
+  Container(model_pkg, "Model Package", "Go", "Reads/writes JSONC architecture model")
+  Container(sync_pkg, "Sync Engine", "Go", "Bidirectional three-way merge")
+  Container(drawio_pkg, "DrawIO Package", "Go", "Reads/writes mxGraph XML")
+}
+
+ContainerDb(jsonc, "JSON Model", "JSONC", "Architecture model files")
+ContainerDb(drawiofile, "draw.io XML", "mxGraph", "Diagram files")
+ContainerDb(syncstate, "Sync State", "JSON", ".bausteinsicht-sync")
+ContainerDb(template, "Template", ".drawio", "Visual style templates")
+ContainerDb(schema, "JSON Schema", "JSON Schema", "Model validation")
+
+Rel(model_pkg, jsonc, "Reads / writes")
+Rel(drawio_pkg, drawiofile, "Reads / writes")
+Rel(drawio_pkg, template, "Reads")
+Rel(sync_pkg, syncstate, "Reads / writes")
+Rel(sync_pkg, model_pkg, "Reads / writes model")
+Rel(sync_pkg, drawio_pkg, "Reads / writes XML")
+Rel(schema, jsonc, "Validates")
+@enduml
 ....
 
 * **Model package** reads/writes the JSON model. Knows nothing about draw.io XML.
