@@ -1,0 +1,17 @@
+{
+  "specification": {
+    "elements": {
+      "system": {
+        "notation": "System"
+      }
+    }
+  },
+  "model": {
+    "root": {
+      "kind": "system",
+      "title": "Root"
+    }
+  },
+  "relationships": [],
+  "views": {}
+}

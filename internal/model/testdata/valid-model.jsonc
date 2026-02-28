@@ -1,0 +1,47 @@
+{
+  // This is a valid model with comments and trailing commas
+  "$schema": "https://example.com/schema.json",
+  "specification": {
+    "elements": {
+      "system": {
+        "notation": "System", // a software system
+        "description": "A software system",
+        "container": false,
+      },
+      "container": {
+        "notation": "Container",
+        "container": true, // containers hold other elements
+      },
+    },
+    "relationships": {
+      "uses": {
+        "notation": "uses",
+        "dashed": false,
+      },
+    },
+  },
+  "model": {
+    "mySystem": {
+      "kind": "system",
+      "title": "My System",
+      "description": "The main system", // trailing comma below
+    },
+    "myContainer": {
+      "kind": "container",
+      "title": "My Container",
+    },
+  },
+  "relationships": [
+    {
+      "from": "myContainer",
+      "to": "mySystem",
+      "label": "part of",
+    },
+  ],
+  "views": {
+    "main": {
+      "title": "Main View",
+      "scope": "mySystem",
+    },
+  },
+}
