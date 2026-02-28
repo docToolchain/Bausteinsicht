@@ -61,7 +61,7 @@ func applyForwardToPage(
 		result.Warnings = append(result.Warnings, "no page found in document")
 		return
 	}
-	applyChangesToPage(cs, page, templates, flat, elemFilter, result)
+	applyChangesToPage(cs, page, templates, flat, elemFilter, "", result)
 }
 
 // applyForwardPerView iterates over model views and applies changes per page.
@@ -95,20 +95,31 @@ func applyForwardPerView(
 			elemSet[id] = true
 		}
 
-		applyChangesToPage(cs, page, templates, flat, elemSet, result)
+		applyChangesToPage(cs, page, templates, flat, elemSet, viewID, result)
 	}
+}
+
+// scopedCellID returns a page-scoped cell ID to ensure file-wide uniqueness.
+// If viewID is empty, returns the raw element ID (legacy mode).
+func scopedCellID(viewID, elemID string) string {
+	if viewID == "" {
+		return elemID
+	}
+	return viewID + "--" + elemID
 }
 
 // applyChangesToPage applies element and relationship changes to a single page.
 // If elemFilter is nil, all changes are applied. Otherwise only elements in the
 // filter set are processed, and relationships are only created when both
 // endpoints are in the filter set.
+// viewID is used to scope cell IDs for file-wide uniqueness (empty = legacy).
 func applyChangesToPage(
 	cs *ChangeSet,
 	page *drawio.Page,
 	templates *drawio.TemplateSet,
 	flat map[string]*model.Element,
 	elemFilter map[string]bool,
+	viewID string,
 	result *ForwardResult,
 ) {
 	pl := computePlacement(page)
@@ -119,7 +130,7 @@ func applyChangesToPage(
 		}
 		switch ch.Type {
 		case Added:
-			applyElementAdded(ch.ID, page, templates, flat, &pl, result)
+			applyElementAdded(ch.ID, viewID, page, templates, flat, &pl, result)
 		case Modified:
 			applyElementModified(ch, page, flat, result)
 		case Deleted:
@@ -134,7 +145,7 @@ func applyChangesToPage(
 		}
 		switch ch.Type {
 		case Added:
-			applyRelAdded(ch, page, templates, result)
+			applyRelAdded(ch, viewID, page, templates, result)
 		case Modified:
 			page.UpdateConnectorLabel(ch.From, ch.To, ch.NewValue)
 			result.ConnectorsUpdated++
@@ -190,6 +201,7 @@ func computePlacement(page *drawio.Page) placement {
 // applyElementAdded creates a new element on page with a visual new-element marker.
 func applyElementAdded(
 	id string,
+	viewID string,
 	page *drawio.Page,
 	templates *drawio.TemplateSet,
 	flat map[string]*model.Element,
@@ -221,6 +233,7 @@ func applyElementAdded(
 
 	data := drawio.ElementData{
 		ID:          id,
+		CellID:      scopedCellID(viewID, id),
 		Kind:        elem.Kind,
 		Title:       elem.Title,
 		Technology:  elem.Technology,
@@ -267,15 +280,18 @@ func applyElementModified(
 // applyRelAdded creates a new connector on page.
 func applyRelAdded(
 	ch RelationshipChange,
+	viewID string,
 	page *drawio.Page,
 	templates *drawio.TemplateSet,
 	result *ForwardResult,
 ) {
 	style := templates.GetConnectorStyle()
 	data := drawio.ConnectorData{
-		From:  ch.From,
-		To:    ch.To,
-		Label: ch.NewValue,
+		From:      ch.From,
+		To:        ch.To,
+		Label:     ch.NewValue,
+		SourceRef: scopedCellID(viewID, ch.From),
+		TargetRef: scopedCellID(viewID, ch.To),
 	}
 	page.CreateConnector(data, style)
 	result.ConnectorsCreated++

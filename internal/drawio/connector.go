@@ -8,9 +8,11 @@ import (
 
 // ConnectorData holds data for creating/updating connectors.
 type ConnectorData struct {
-	From  string // source element ID
-	To    string // target element ID
-	Label string // display label on the connector
+	From      string // source bausteinsicht_id
+	To        string // target bausteinsicht_id
+	Label     string // display label on the connector
+	SourceRef string // source cell ID (defaults to From if empty)
+	TargetRef string // target cell ID (defaults to To if empty)
 }
 
 // connectorID returns the canonical ID for a connector between two elements.
@@ -26,13 +28,22 @@ func (p *Page) CreateConnector(data ConnectorData, style string) {
 		return
 	}
 
+	srcRef := data.SourceRef
+	if srcRef == "" {
+		srcRef = data.From
+	}
+	tgtRef := data.TargetRef
+	if tgtRef == "" {
+		tgtRef = data.To
+	}
+
 	cell := root.CreateElement("mxCell")
-	cell.CreateAttr("id", connectorID(data.From, data.To))
+	cell.CreateAttr("id", connectorID(srcRef, tgtRef))
 	cell.CreateAttr("value", data.Label)
 	cell.CreateAttr("style", style)
 	cell.CreateAttr("edge", "1")
-	cell.CreateAttr("source", data.From)
-	cell.CreateAttr("target", data.To)
+	cell.CreateAttr("source", srcRef)
+	cell.CreateAttr("target", tgtRef)
 	cell.CreateAttr("parent", "1")
 
 	geom := cell.CreateElement("mxGeometry")
