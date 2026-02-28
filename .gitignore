@@ -1,0 +1,29 @@
+# Build output
+build/
+dist/
+
+# Gradle
+.gradle/
+
+# Go
+/bausteinsicht
+/bausteinsicht.exe
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets / local config
+*.env
+*.secret
+.env.*
+
+# Temporary files
+*.tmp
