@@ -1,0 +1,267 @@
+package sync
+
+import (
+	"strconv"
+	"strings"
+	"testing"
+
+	"github.com/docToolchain/Bauteinsicht/internal/drawio"
+	"github.com/docToolchain/Bauteinsicht/internal/model"
+)
+
+// minimalTemplates returns a TemplateSet loaded from a small inline template.
+func minimalTemplates(t *testing.T) *drawio.TemplateSet {
+	t.Helper()
+	xml := `<?xml version="1.0" encoding="UTF-8"?>
+<mxfile>
+  <diagram id="t1" name="templates">
+    <mxGraphModel>
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <object bausteinsicht_template="container" label="" id="tpl-container">
+          <mxCell style="shape=mxgraph.c4;c4Type=container;" vertex="1" parent="1">
+            <mxGeometry width="120" height="60" as="geometry"/>
+          </mxCell>
+        </object>
+        <mxCell bausteinsicht_template="relationship" style="endArrow=block;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>`
+	ts, err := drawio.LoadTemplateFromBytes([]byte(xml))
+	if err != nil {
+		t.Fatalf("LoadTemplateFromBytes: %v", err)
+	}
+	return ts
+}
+
+// modelWithElem returns a model containing a single element.
+func modelWithElem(id, kind, title string) *model.BausteinsichtModel {
+	return &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			id: {Kind: kind, Title: title},
+		},
+		Relationships: []model.Relationship{},
+	}
+}
+
+// fwdModelWithRel returns a model with two elements and one relationship.
+func fwdModelWithRel(fromID, toID string) *model.BausteinsichtModel {
+	return &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			fromID: {Kind: "container", Title: "From"},
+			toID:   {Kind: "container", Title: "To"},
+		},
+		Relationships: []model.Relationship{
+			{From: fromID, To: toID, Label: "calls"},
+		},
+	}
+}
+
+// TestApplyForward_NewElement verifies that an Added element change creates the element.
+func TestApplyForward_NewElement(t *testing.T) {
+	doc := emptyDoc()
+	ts := minimalTemplates(t)
+	m := modelWithElem("api", "container", "API")
+
+	cs := &ChangeSet{
+		ModelElementChanges: []ElementChange{
+			{ID: "api", Type: Added},
+		},
+	}
+
+	result := ApplyForward(cs, doc, ts, m)
+
+	if result.ElementsCreated != 1 {
+		t.Fatalf("expected 1 element created, got %d", result.ElementsCreated)
+	}
+
+	page := doc.Pages()[0]
+	obj := page.FindElement("api")
+	if obj == nil {
+		t.Fatal("element 'api' not found in document")
+	}
+	if len(result.Warnings) > 0 {
+		t.Errorf("unexpected warnings: %v", result.Warnings)
+	}
+}
+
+// TestApplyForward_NewElementVisualMarker verifies the new-element style marker is applied.
+func TestApplyForward_NewElementVisualMarker(t *testing.T) {
+	doc := emptyDoc()
+	ts := minimalTemplates(t)
+	m := modelWithElem("api", "container", "API")
+
+	cs := &ChangeSet{
+		ModelElementChanges: []ElementChange{{ID: "api", Type: Added}},
+	}
+	ApplyForward(cs, doc, ts, m)
+
+	page := doc.Pages()[0]
+	obj := page.FindElement("api")
+	if obj == nil {
+		t.Fatal("element 'api' not found")
+	}
+	cell := obj.FindElement("mxCell")
+	if cell == nil {
+		t.Fatal("mxCell not found under element")
+	}
+	style := cell.SelectAttrValue("style", "")
+	if style == "" {
+		t.Fatal("style is empty")
+	}
+	if !strings.Contains(style, "strokeColor=#FF0000") {
+		t.Errorf("expected visual marker in style, got: %s", style)
+	}
+}
+
+// TestApplyForward_UpdatedTitle verifies that a Modified/title change updates the label.
+func TestApplyForward_UpdatedTitle(t *testing.T) {
+	doc := docWithElem("api", "Old Title", "", "")
+	ts := minimalTemplates(t)
+	m := modelWithElem("api", "container", "New Title")
+
+	cs := &ChangeSet{
+		ModelElementChanges: []ElementChange{
+			{ID: "api", Type: Modified, Field: "title", OldValue: "Old Title", NewValue: "New Title"},
+		},
+	}
+
+	result := ApplyForward(cs, doc, ts, m)
+
+	if result.ElementsUpdated != 1 {
+		t.Fatalf("expected 1 element updated, got %d", result.ElementsUpdated)
+	}
+
+	page := doc.Pages()[0]
+	obj := page.FindElement("api")
+	if obj == nil {
+		t.Fatal("element 'api' not found")
+	}
+	label := obj.SelectAttrValue("label", "")
+	if !strings.Contains(label, "New Title") {
+		t.Errorf("expected label to contain 'New Title', got: %s", label)
+	}
+}
+
+// TestApplyForward_DeletedElement verifies that a Deleted change removes the element.
+func TestApplyForward_DeletedElement(t *testing.T) {
+	doc := docWithElem("api", "API", "", "")
+	ts := minimalTemplates(t)
+	m := emptyModel()
+
+	cs := &ChangeSet{
+		ModelElementChanges: []ElementChange{
+			{ID: "api", Type: Deleted},
+		},
+	}
+
+	result := ApplyForward(cs, doc, ts, m)
+
+	if result.ElementsDeleted != 1 {
+		t.Fatalf("expected 1 element deleted, got %d", result.ElementsDeleted)
+	}
+
+	page := doc.Pages()[0]
+	if page.FindElement("api") != nil {
+		t.Fatal("element 'api' should have been removed")
+	}
+}
+
+// TestApplyForward_NewRelationship verifies that an Added relationship creates a connector.
+func TestApplyForward_NewRelationship(t *testing.T) {
+	doc := emptyDoc()
+	ts := minimalTemplates(t)
+	m := fwdModelWithRel("frontend", "backend")
+
+	cs := &ChangeSet{
+		ModelRelationshipChanges: []RelationshipChange{
+			{From: "frontend", To: "backend", Type: Added, NewValue: "calls"},
+		},
+	}
+
+	result := ApplyForward(cs, doc, ts, m)
+
+	if result.ConnectorsCreated != 1 {
+		t.Fatalf("expected 1 connector created, got %d", result.ConnectorsCreated)
+	}
+
+	page := doc.Pages()[0]
+	if page.FindConnector("frontend", "backend") == nil {
+		t.Fatal("connector 'frontend→backend' not found")
+	}
+}
+
+// TestApplyForward_MultipleNewElementsNoOverlap verifies placement doesn't overlap elements.
+func TestApplyForward_MultipleNewElementsNoOverlap(t *testing.T) {
+	doc := emptyDoc()
+	ts := minimalTemplates(t)
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"a": {Kind: "container", Title: "A"},
+			"b": {Kind: "container", Title: "B"},
+		},
+		Relationships: []model.Relationship{},
+	}
+
+	cs := &ChangeSet{
+		ModelElementChanges: []ElementChange{
+			{ID: "a", Type: Added},
+			{ID: "b", Type: Added},
+		},
+	}
+
+	result := ApplyForward(cs, doc, ts, m)
+
+	if result.ElementsCreated != 2 {
+		t.Fatalf("expected 2 elements created, got %d", result.ElementsCreated)
+	}
+
+	page := doc.Pages()[0]
+	xA := elementX(page, "a")
+	xB := elementX(page, "b")
+	if xA == xB {
+		t.Errorf("elements 'a' and 'b' have the same X position (%g), expected no overlap", xA)
+	}
+}
+
+// TestApplyForward_NoPageWarning verifies a warning is emitted when the document has no pages.
+func TestApplyForward_NoPageWarning(t *testing.T) {
+	doc := drawio.NewDocument()
+	ts := minimalTemplates(t)
+	m := emptyModel()
+	cs := &ChangeSet{}
+
+	result := ApplyForward(cs, doc, ts, m)
+
+	if len(result.Warnings) == 0 {
+		t.Fatal("expected a warning for document with no pages")
+	}
+}
+
+// helpers
+
+// elementX returns the X position of an element by bausteinsicht_id, or -1 if not found.
+func elementX(page *drawio.Page, id string) float64 {
+	obj := page.FindElement(id)
+	if obj == nil {
+		return -1
+	}
+	cell := obj.FindElement("mxCell")
+	if cell == nil {
+		return -1
+	}
+	geo := cell.FindElement("mxGeometry")
+	if geo == nil {
+		return -1
+	}
+	val := geo.SelectAttrValue("x", "-1")
+	f, err := strconv.ParseFloat(val, 64)
+	if err != nil {
+		return -1
+	}
+	return f
+}
