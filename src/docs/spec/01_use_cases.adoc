@@ -4,11 +4,13 @@
 :jbake-menu: Specification
 :jbake-order: 1
 
-= Use Cases
+ifndef::imagesdir[:imagesdir: ../../images]
 
 :toc:
 
-== Actors
+== Use Cases
+
+=== Actors
 
 [cols="1,3"]
 |===
@@ -24,16 +26,16 @@
 | AI assistant that manipulates the architecture model via CLI commands. Reads and writes JSON model files.
 |===
 
-== UC-1: Initialize Architecture Model
+=== UC-1: Initialize Architecture Model
 
-=== Description
+==== Description
 A software architect creates a new architecture model for a project.
 
-=== Preconditions
+==== Preconditions
 * Bausteinsicht CLI is installed
 * A project directory exists
 
-=== Flow
+==== Flow
 
 [plantuml, uc01-init, png]
 ....
@@ -55,24 +57,24 @@ stop
 @enduml
 ....
 
-=== Postconditions
+==== Postconditions
 * A valid JSON model file exists with specification and example content
 * A default draw.io template file exists
 * JSON Schema is referenced for IDE support
 
-=== Error Scenarios
+==== Error Scenarios
 * Model files already exist → Bausteinsicht warns and aborts (no overwrite)
 
-== UC-2: Define Architecture Elements
+=== UC-2: Define Architecture Elements
 
-=== Description
+==== Description
 A software architect adds elements (systems, containers, components) to the architecture model.
 
-=== Preconditions
+==== Preconditions
 * An initialized architecture model exists
 * IDE has JSON Schema support active
 
-=== Flow
+==== Flow
 
 [plantuml, uc02-define-elements, png]
 ....
@@ -95,25 +97,25 @@ stop
 @enduml
 ....
 
-=== Postconditions
+==== Postconditions
 * Model contains new elements with unique IDs
 * Relationships reference valid element IDs
 
-=== Error Scenarios
+==== Error Scenarios
 * Duplicate element ID → JSON Schema validation error in IDE
 * Relationship references non-existent element → validation warning on sync
 
-== UC-3: Generate draw.io Diagrams (Forward Sync)
+=== UC-3: Generate draw.io Diagrams (Forward Sync)
 
-=== Description
+==== Description
 The architect generates or updates draw.io diagrams from the model.
 
-=== Preconditions
+==== Preconditions
 * A valid architecture model exists
 * A draw.io template exists
 * (Optional) Existing draw.io diagrams with manual layout
 
-=== Flow
+==== Flow
 
 [plantuml, uc03-forward-sync, png]
 ....
@@ -150,27 +152,27 @@ stop
 @enduml
 ....
 
-=== Postconditions
+==== Postconditions
 * draw.io file reflects current model state
 * Existing element positions are preserved
 * New elements are visually marked for manual positioning
 * Relationship connectors are attached to element centers
 
-=== Error Scenarios
+==== Error Scenarios
 * Invalid model → validation errors displayed, sync aborted
 * Template file missing → error with instructions to create one
 * draw.io file locked by another process → warning
 
-== UC-4: Edit in draw.io and Reverse Sync
+=== UC-4: Edit in draw.io and Reverse Sync
 
-=== Description
+==== Description
 An architect or developer edits elements in draw.io, and the changes are synced back to the model.
 
-=== Preconditions
+==== Preconditions
 * draw.io diagrams were previously generated from the model
 * Elements in draw.io carry Bausteinsicht IDs
 
-=== Flow
+==== Flow
 
 [plantuml, uc04-reverse-sync, png]
 ....
@@ -223,25 +225,25 @@ stop
 @enduml
 ....
 
-=== Postconditions
+==== Postconditions
 * Model reflects changes made in draw.io
 * New elements have IDs (generated or user-assigned)
 * Layout changes (element positions) do NOT modify the model
 
-=== Error Scenarios
+==== Error Scenarios
 * Element in draw.io has no ID and cannot be auto-matched → warning with manual resolution instructions
 * Conflicting changes in both model and draw.io → warning displayed, no silent overwrite
 
-== UC-5: Watch Mode
+=== UC-5: Watch Mode
 
-=== Description
+==== Description
 Bausteinsicht continuously watches for file changes and synchronizes automatically.
 
-=== Preconditions
+==== Preconditions
 * An initialized architecture model exists
 * draw.io diagrams exist
 
-=== Flow
+==== Flow
 
 [plantuml, uc05-watch, png]
 ....
@@ -266,23 +268,23 @@ stop
 @enduml
 ....
 
-=== Postconditions
+==== Postconditions
 * Model and draw.io diagrams are kept in sync continuously
 
-=== Error Scenarios
+==== Error Scenarios
 * Rapid successive changes → debounce to avoid conflicts
 * File watcher fails on network drives → fallback to polling with warning
 
-== UC-6: LLM-Driven Architecture Modification
+=== UC-6: LLM-Driven Architecture Modification
 
-=== Description
+==== Description
 An LLM agent modifies the architecture model using CLI commands.
 
-=== Preconditions
+==== Preconditions
 * An initialized architecture model exists
 * LLM agent has access to the Bausteinsicht CLI
 
-=== Flow
+==== Flow
 
 [plantuml, uc06-llm, png]
 ....
@@ -310,25 +312,25 @@ stop
 @enduml
 ....
 
-=== Postconditions
+==== Postconditions
 * Model is valid and updated
 * draw.io diagrams reflect the changes
 * New elements are marked for manual positioning
 
-=== Error Scenarios
+==== Error Scenarios
 * LLM generates invalid JSON → validate catches it before sync
 * LLM uses non-existent element ID in relationship → validation error
 
-== UC-7: Drill-Down Navigation
+=== UC-7: Drill-Down Navigation
 
-=== Description
+==== Description
 An architect navigates between different abstraction levels within a single draw.io diagram using zoom-based drill-down.
 
-=== Preconditions
+==== Preconditions
 * Multiple views exist at different hierarchy levels
 * Views are placed on a single draw.io page with appropriate spacing
 
-=== Flow
+==== Flow
 
 [plantuml, uc07-drilldown, png]
 ....
@@ -360,9 +362,9 @@ stop
 @enduml
 ....
 
-=== Postconditions
+==== Postconditions
 * User can navigate between abstraction levels via click
 * Parent views remain visible for orientation
 
-=== Error Scenarios
+==== Error Scenarios
 * Target view does not exist → element is not clickable (no link generated)

@@ -4,11 +4,13 @@
 :jbake-menu: Specification
 :jbake-order: 3
 
-= Data Models
+ifndef::imagesdir[:imagesdir: ../../images]
 
 :toc:
 
-== Overview
+== Data Models
+
+=== Overview
 
 Bausteinsicht works with three data formats that must be kept in sync:
 
@@ -29,7 +31,7 @@ Bausteinsicht works with three data formats that must be kept in sync:
 | `*.drawio` files in project directory (uncompressed XML)
 |===
 
-== JSON Model Structure
+=== JSON Model Structure
 
 The model consists of four top-level sections:
 
@@ -136,7 +138,7 @@ The model consists of four top-level sections:
 }
 ----
 
-=== Element Properties
+==== Element Properties
 
 [cols="1,1,1,3"]
 |===
@@ -181,7 +183,7 @@ The model consists of four top-level sections:
 The **key** of each element in the model object (e.g., `"customer"`, `"api"`) serves as its unique ID.
 Nested elements are referenced using dot notation: `"webshop.api.auth"`.
 
-=== Relationship Properties
+==== Relationship Properties
 
 [cols="1,1,1,3"]
 |===
@@ -213,7 +215,7 @@ Nested elements are referenced using dot notation: `"webshop.api.auth"`.
 | Detailed description
 |===
 
-=== View Properties
+==== View Properties
 
 [cols="1,1,1,3"]
 |===
@@ -245,11 +247,11 @@ Nested elements are referenced using dot notation: `"webshop.api.auth"`.
 | View description
 |===
 
-== draw.io XML Structure
+=== draw.io XML Structure
 
 Bausteinsicht generates and reads **uncompressed** draw.io XML (`compressed="false"`) for Git-friendliness.
 
-=== File Structure
+==== File Structure
 
 [source,xml]
 ----
@@ -274,7 +276,7 @@ Bausteinsicht generates and reads **uncompressed** draw.io XML (`compressed="fal
 </mxfile>
 ----
 
-=== Mandatory Base Cells
+==== Mandatory Base Cells
 
 Every page requires exactly two base cells:
 
@@ -283,7 +285,7 @@ Every page requires exactly two base cells:
 
 These are **never modified** by Bausteinsicht.
 
-=== Elements as `<object>` with Custom Properties
+==== Elements as `<object>` with Custom Properties
 
 Every Bausteinsicht element is wrapped in an `<object>` element to carry custom metadata.
 The nested `<mxCell>` has no `id` — the `<object>` owns the ID.
@@ -333,7 +335,7 @@ Custom properties on `<object>`:
 | Drill-down navigation link (see Navigation section)
 |===
 
-=== HTML Labels
+==== HTML Labels
 
 Labels use HTML formatting with `html=1` in the style. HTML is XML-entity-escaped in the `label` attribute:
 
@@ -358,7 +360,7 @@ Entity escaping rules:
 | `&` | `&amp;`
 |===
 
-=== Containers (Nested Elements)
+==== Containers (Nested Elements)
 
 Systems and containers that hold children use the `swimlane` style.
 Child elements set `parent` to the container's ID.
@@ -393,7 +395,7 @@ Child coordinates are **relative** to the container's top-left corner (below the
 </object>
 ----
 
-=== Connectors (Relationships)
+==== Connectors (Relationships)
 
 Connectors use `edge="1"` and reference source/target by their IDs.
 Connectors always use `parent="1"` (the layer), even when connecting shapes inside containers.
@@ -419,7 +421,7 @@ By **omitting** `exitX`/`exitY`/`entryX`/`entryY` style properties, draw.io auto
 **Connector ID convention:** `rel-<from>-<to>` (e.g., `rel-customer-webshop.api`).
 Dots in element IDs are preserved in the connector ID.
 
-=== Cross-Page Navigation (Drill-Down)
+==== Cross-Page Navigation (Drill-Down)
 
 Elements link to detail views using the `link` attribute on `<object>`:
 
@@ -451,7 +453,7 @@ Back-navigation buttons are generated in detail views:
 </object>
 ----
 
-=== Multi-Page Structure
+==== Multi-Page Structure
 
 Each view is a separate `<diagram>` element. The `id` attribute is the view key from the model.
 The `name` attribute is the view title displayed as the tab label.
@@ -471,7 +473,7 @@ The `name` attribute is the view title displayed as the tab label.
 Cell IDs are **page-local** — the same base cells `id="0"` and `id="1"` exist on every page.
 Bausteinsicht element IDs (e.g., `webshop.api`) may appear on multiple pages if the element is included in multiple views.
 
-== Go Struct Mappings
+=== Go Struct Mappings
 
 [source,go]
 ----
