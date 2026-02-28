@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/docToolchain/Bauteinsicht/internal/model"
 )
 
 func TestSyncAfterInit(t *testing.T) {
@@ -130,6 +132,19 @@ func TestSyncDetectsModelChanges(t *testing.T) {
 		t.Fatalf("add element failed: %v", err)
 	}
 
+	// Add newservice to the context view so forward sync picks it up.
+	m, err := model.Load("architecture.jsonc")
+	if err != nil {
+		t.Fatalf("load model: %v", err)
+	}
+	if v, ok := m.Views["context"]; ok {
+		v.Include = append(v.Include, "newservice")
+		m.Views["context"] = v
+	}
+	if err := model.Save("architecture.jsonc", m); err != nil {
+		t.Fatalf("save model: %v", err)
+	}
+
 	// Sync should detect the new element.
 	oldStdout := os.Stdout
 	r, w, _ := os.Pipe()
@@ -137,7 +152,7 @@ func TestSyncDetectsModelChanges(t *testing.T) {
 
 	cmd3 := NewRootCmd()
 	cmd3.SetArgs([]string{"sync", "--format", "json"})
-	err := cmd3.Execute()
+	err = cmd3.Execute()
 
 	_ = w.Close()
 	os.Stdout = oldStdout

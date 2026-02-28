@@ -27,6 +27,8 @@ type ForwardResult struct {
 
 // ApplyForward applies ModelElementChanges and ModelRelationshipChanges from cs
 // to doc, using templates for styles and m for element data.
+// When the model defines views, elements and relationships are placed on their
+// corresponding view pages. Without views, falls back to the first page.
 func ApplyForward(
 	cs *ChangeSet,
 	doc *drawio.Document,
@@ -36,18 +38,88 @@ func ApplyForward(
 	result := &ForwardResult{}
 	flat := model.FlattenElements(m)
 
-	page := firstPage(doc)
-	if page == nil {
-		result.Warnings = append(result.Warnings, "no page found in document")
+	if len(m.Views) == 0 {
+		applyForwardToPage(cs, doc, templates, flat, nil, result)
 		return result
 	}
 
-	placement := computePlacement(page)
+	applyForwardPerView(cs, doc, templates, flat, m, result)
+	return result
+}
+
+// applyForwardToPage applies all changes to a single page (legacy/no-views mode).
+func applyForwardToPage(
+	cs *ChangeSet,
+	doc *drawio.Document,
+	templates *drawio.TemplateSet,
+	flat map[string]*model.Element,
+	elemFilter map[string]bool,
+	result *ForwardResult,
+) {
+	page := firstPage(doc)
+	if page == nil {
+		result.Warnings = append(result.Warnings, "no page found in document")
+		return
+	}
+	applyChangesToPage(cs, page, templates, flat, elemFilter, result)
+}
+
+// applyForwardPerView iterates over model views and applies changes per page.
+func applyForwardPerView(
+	cs *ChangeSet,
+	doc *drawio.Document,
+	templates *drawio.TemplateSet,
+	flat map[string]*model.Element,
+	m *model.BausteinsichtModel,
+	result *ForwardResult,
+) {
+	for viewID, view := range m.Views {
+		pageID := "view-" + viewID
+		page := doc.GetPage(pageID)
+		if page == nil {
+			result.Warnings = append(result.Warnings,
+				"no page found for view: "+viewID)
+			continue
+		}
+
+		viewCopy := view
+		resolved, err := model.ResolveView(m, &viewCopy)
+		if err != nil {
+			result.Warnings = append(result.Warnings,
+				"resolving view "+viewID+": "+err.Error())
+			continue
+		}
+
+		elemSet := make(map[string]bool, len(resolved))
+		for _, id := range resolved {
+			elemSet[id] = true
+		}
+
+		applyChangesToPage(cs, page, templates, flat, elemSet, result)
+	}
+}
+
+// applyChangesToPage applies element and relationship changes to a single page.
+// If elemFilter is nil, all changes are applied. Otherwise only elements in the
+// filter set are processed, and relationships are only created when both
+// endpoints are in the filter set.
+func applyChangesToPage(
+	cs *ChangeSet,
+	page *drawio.Page,
+	templates *drawio.TemplateSet,
+	flat map[string]*model.Element,
+	elemFilter map[string]bool,
+	result *ForwardResult,
+) {
+	pl := computePlacement(page)
 
 	for _, ch := range cs.ModelElementChanges {
+		if elemFilter != nil && !elemFilter[ch.ID] {
+			continue
+		}
 		switch ch.Type {
 		case Added:
-			applyElementAdded(ch.ID, page, templates, flat, &placement, result)
+			applyElementAdded(ch.ID, page, templates, flat, &pl, result)
 		case Modified:
 			applyElementModified(ch, page, flat, result)
 		case Deleted:
@@ -57,6 +129,9 @@ func ApplyForward(
 	}
 
 	for _, ch := range cs.ModelRelationshipChanges {
+		if elemFilter != nil && (!elemFilter[ch.From] || !elemFilter[ch.To]) {
+			continue
+		}
 		switch ch.Type {
 		case Added:
 			applyRelAdded(ch, page, templates, result)
@@ -68,8 +143,6 @@ func ApplyForward(
 			result.ConnectorsDeleted++
 		}
 	}
-
-	return result
 }
 
 // firstPage returns the first page in doc, or nil if there are none.
