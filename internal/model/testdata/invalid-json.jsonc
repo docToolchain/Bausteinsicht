@@ -1,0 +1,9 @@
+{
+  "specification": {
+    "elements": {
+      INVALID_KEY_NO_QUOTES: {
+        "notation": "System"
+      }
+    }
+  }
+}
