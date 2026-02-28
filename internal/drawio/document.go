@@ -40,16 +40,16 @@ func SaveDocument(path string, doc *Document) error {
 	tmpName := tmp.Name()
 
 	if _, err := doc.tree.WriteTo(tmp); err != nil {
-		tmp.Close()
-		os.Remove(tmpName)
+		_ = tmp.Close()
+		_ = os.Remove(tmpName)
 		return fmt.Errorf("SaveDocument write: %w", err)
 	}
 	if err := tmp.Close(); err != nil {
-		os.Remove(tmpName)
+		_ = os.Remove(tmpName)
 		return fmt.Errorf("SaveDocument close: %w", err)
 	}
 	if err := os.Rename(tmpName, path); err != nil {
-		os.Remove(tmpName)
+		_ = os.Remove(tmpName)
 		return fmt.Errorf("SaveDocument rename: %w", err)
 	}
 	return nil
