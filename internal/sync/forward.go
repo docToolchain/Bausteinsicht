@@ -62,7 +62,7 @@ func applyForwardToPage(
 		result.Warnings = append(result.Warnings, "no page found in document")
 		return
 	}
-	applyChangesToPage(cs, page, templates, flat, elemFilter, "", result)
+	applyChangesToPage(cs, page, templates, flat, elemFilter, "", "", result)
 }
 
 // applyForwardPerView iterates over model views and applies changes per page.
@@ -96,7 +96,12 @@ func applyForwardPerView(
 			elemSet[id] = true
 		}
 
-		applyChangesToPage(cs, page, templates, flat, elemSet, viewID, result)
+		scopeID := view.Scope
+		if scopeID != "" {
+			createScopeBoundary(scopeID, viewID, page, templates, flat, result)
+		}
+
+		applyChangesToPage(cs, page, templates, flat, elemSet, viewID, scopeID, result)
 	}
 }
 
@@ -107,6 +112,12 @@ func scopedCellID(viewID, elemID string) string {
 		return elemID
 	}
 	return viewID + "--" + elemID
+}
+
+// isChildOf returns true if id is a direct or nested child of parentID.
+// Example: isChildOf("shop.api", "shop") → true
+func isChildOf(id, parentID string) bool {
+	return strings.HasPrefix(id, parentID+".")
 }
 
 // liftEndpoint returns id if it is in elemFilter. Otherwise it walks up the
@@ -128,11 +139,68 @@ func liftEndpoint(id string, elemFilter map[string]bool) string {
 	}
 }
 
+// createScopeBoundary creates a boundary/swimlane element for the scope element
+// of a view (e.g., the parent system in a container view).
+func createScopeBoundary(
+	scopeID string,
+	viewID string,
+	page *drawio.Page,
+	templates *drawio.TemplateSet,
+	flat map[string]*model.Element,
+	result *ForwardResult,
+) {
+	// Skip if already present on the page.
+	if page.FindElement(scopeID) != nil {
+		return
+	}
+
+	elem, ok := flat[scopeID]
+	if !ok {
+		result.Warnings = append(result.Warnings, "scope element not found in model: "+scopeID)
+		return
+	}
+
+	boundaryKind := elem.Kind + "_boundary"
+	ts, ok := templates.GetBoundaryStyle(boundaryKind)
+	if !ok {
+		ts = drawio.TemplateStyle{Width: 400, Height: 300}
+		result.Warnings = append(result.Warnings, "no boundary template for kind: "+boundaryKind)
+	}
+
+	style := ts.Style
+	width := ts.Width
+	if width == 0 {
+		width = 400
+	}
+	height := ts.Height
+	if height == 0 {
+		height = 300
+	}
+
+	data := drawio.ElementData{
+		ID:          scopeID,
+		CellID:      scopedCellID(viewID, scopeID),
+		Kind:        boundaryKind,
+		Title:       elem.Title,
+		Technology:  elem.Technology,
+		Description: elem.Description,
+		X:           elementGap,
+		Y:           elementGap,
+		Width:       width,
+		Height:      height,
+	}
+
+	if err := page.CreateElement(data, style); err != nil {
+		result.Warnings = append(result.Warnings, "failed to create scope boundary "+scopeID+": "+err.Error())
+	}
+}
+
 // applyChangesToPage applies element and relationship changes to a single page.
 // If elemFilter is nil, all changes are applied. Otherwise only elements in the
 // filter set are processed, and relationships are only created when both
 // endpoints are in the filter set.
 // viewID is used to scope cell IDs for file-wide uniqueness (empty = legacy).
+// scopeID identifies the boundary element for parenting children (empty = no scope).
 func applyChangesToPage(
 	cs *ChangeSet,
 	page *drawio.Page,
@@ -140,6 +208,7 @@ func applyChangesToPage(
 	flat map[string]*model.Element,
 	elemFilter map[string]bool,
 	viewID string,
+	scopeID string,
 	result *ForwardResult,
 ) {
 	pl := computePlacement(page)
@@ -150,7 +219,7 @@ func applyChangesToPage(
 		}
 		switch ch.Type {
 		case Added:
-			applyElementAdded(ch.ID, viewID, page, templates, flat, &pl, result)
+			applyElementAdded(ch.ID, viewID, scopeID, page, templates, flat, &pl, result)
 		case Modified:
 			applyElementModified(ch, page, flat, result)
 		case Deleted:
@@ -232,9 +301,12 @@ func computePlacement(page *drawio.Page) placement {
 }
 
 // applyElementAdded creates a new element on page with a visual new-element marker.
+// If scopeID is set and the element is a child of the scope, it is parented to the
+// scope boundary cell.
 func applyElementAdded(
 	id string,
 	viewID string,
+	scopeID string,
 	page *drawio.Page,
 	templates *drawio.TemplateSet,
 	flat map[string]*model.Element,
@@ -275,6 +347,11 @@ func applyElementAdded(
 		Y:           pl.nextY,
 		Width:       width,
 		Height:      height,
+	}
+
+	// Parent children of the scope element to the boundary cell.
+	if scopeID != "" && isChildOf(id, scopeID) {
+		data.ParentID = scopedCellID(viewID, scopeID)
 	}
 
 	if err := page.CreateElement(data, style); err != nil {
