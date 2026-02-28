@@ -8,15 +8,53 @@
 
 :toc:
 
-NOTE: This specification will be detailed after the draw.io XML analysis. +
-The sync algorithm depends on understanding the exact structure of mxCell elements and custom properties.
-
 == Overview
 
 Bausteinsicht synchronizes bidirectionally between:
 
 * **JSON Model** (source of truth for structure and metadata)
 * **draw.io XML** (source of truth for layout/positioning)
+
+The sync process reads both files, detects changes relative to a last-sync state, and applies non-conflicting changes in both directions.
+
+== ID Mapping Strategy
+
+=== Element IDs
+
+Every element in the JSON model has a unique key (variable name) that serves as its ID.
+Nested elements use dot notation: `webshop.api.auth`.
+
+In draw.io, the ID is stored in two places for reliability:
+
+1. **`id` attribute on `<object>`** — used by draw.io as the cell identifier
+2. **`bausteinsicht_id` attribute on `<object>`** — redundant copy that survives if draw.io reassigns cell IDs
+
+[source,xml]
+----
+<object label="REST API" id="webshop.api"
+        bausteinsicht_id="webshop.api"
+        bausteinsicht_kind="container">
+  <mxCell ... />
+</object>
+----
+
+=== Relationship IDs
+
+Connector cells use a derived ID: `rel-<from>-<to>`.
+
+[source,xml]
+----
+<mxCell id="rel-customer-webshop.api" value="uses"
+        edge="1" source="customer" target="webshop.api" ... />
+----
+
+=== ID Matching Priority
+
+During reverse sync, elements are matched in this order:
+
+1. `bausteinsicht_id` attribute (most reliable)
+2. `id` attribute on `<object>` (fallback if bausteinsicht_id missing)
+3. Unmatched elements with no Bausteinsicht attributes are treated as new
 
 == Sync Directions
 
@@ -29,22 +67,31 @@ Triggered when the JSON model changes.
 | Change Type | Action
 
 | New element
-| Create mxCell from template, place side-by-side, add visual marker for manual positioning
+| Create `<object>` + `<mxCell>` from template style. Set `bausteinsicht_id`, `bausteinsicht_kind`, `technology`, `tooltip`. Place side-by-side with a visual marker (e.g., red border). If element has a detail view, add `link="data:page/id,<view-id>"`.
 
-| Updated element (title, description, technology)
-| Update mxCell label and properties, preserve position
+| Updated element (title)
+| Update `label` attribute on `<object>` with new HTML-formatted title.
+
+| Updated element (description)
+| Update `tooltip` attribute on `<object>`.
+
+| Updated element (technology)
+| Update `technology` attribute on `<object>` and the technology line in the HTML label.
 
 | Deleted element
-| Remove mxCell and connected edges
+| Remove `<object>` and all connectors where `source` or `target` matches the element ID.
 
 | New relationship
-| Create connector mxCell with centered attachment
+| Create `<mxCell>` with `edge="1"`, `source`, `target`, and label. Use `id="rel-<from>-<to>"`. No `exitX`/`entryX` (auto-routing). Use `parent="1"` (layer, not container).
 
 | Updated relationship (label)
-| Update connector label
+| Update `value` attribute on the connector `<mxCell>`.
 
 | Deleted relationship
-| Remove connector mxCell
+| Remove the connector `<mxCell>`.
+
+| New view
+| Create new `<diagram>` element with view ID and title. Generate all included elements and relationships. Add back-navigation button if parent view exists.
 |===
 
 === Reverse Sync (draw.io → Model)
@@ -53,77 +100,246 @@ Triggered when the draw.io file changes.
 
 [cols="1,3"]
 |===
-| Change Type | Action
+| Change Type | Detection Method | Action
 
-| Element renamed (title changed)
+| Element renamed
+| `label` on `<object>` differs from model `title` (parse HTML label to extract title)
 | Update model element title
 
 | Element description changed
+| `tooltip` on `<object>` differs from model `description`
 | Update model element description
 
-| New element (no Bausteinsicht ID)
-| Add to model with generated ID, warn user to assign meaningful ID
+| Element technology changed
+| `technology` attribute on `<object>` differs from model
+| Update model element technology
 
-| New connector between identified elements
-| Add relationship to model
+| New element (from draw.io)
+| `<object>` or `<mxCell>` with `vertex="1"` and no `bausteinsicht_id`
+| Add to model with auto-generated ID based on label. Warn user to assign meaningful ID. Detect kind from style or container parent.
 
-| Connector label changed
-| Update relationship label in model
+| New relationship (from draw.io)
+| `<mxCell>` with `edge="1"`, `source` and `target` matching known element IDs, not present in model
+| Add relationship to model with label from `value` attribute.
 
-| Element moved (position change only)
-| No model change (layout is draw.io-only concern)
+| Element deleted in draw.io
+| Known `bausteinsicht_id` no longer present in any `<object>`
+| Remove from model. Display warning listing removed elements.
 
-| Element deleted
-| Remove from model (with confirmation/warning?)
+| Relationship deleted in draw.io
+| Connector with known `source`/`target` pair no longer present
+| Remove relationship from model.
+
+| Element moved (position only)
+| `<mxGeometry>` x/y/width/height changed but no metadata changed
+| **No model change.** Layout is a draw.io concern.
 |===
 
-== ID Mapping Strategy
+=== Label Parsing (Reverse Sync)
 
-TODO: Detail how Bausteinsicht IDs are stored in draw.io XML. Options to evaluate:
+HTML labels follow a predictable format generated by forward sync:
 
-* Custom property on mxCell (`bausteinsicht-id="api_gateway"`)
-* `id` attribute of mxCell itself
-* UserObject wrapping the mxCell
+[source,html]
+----
+<b>Title</b><br><font color="#666666">Technology</font>
+----
+
+During reverse sync, the parser extracts:
+
+* **Title**: text content of the first `<b>` element
+* **Technology**: text content of the `<font>` element (if present)
+
+If the label does not match this pattern (user manually formatted), fall back to the full label text as title.
+
+== Placement Strategy for New Elements
+
+New elements from forward sync are placed using a simple side-by-side algorithm:
+
+1. Find the bounding box of all existing elements on the page
+2. Place new elements in a row below the existing content
+3. Use a fixed spacing (e.g., 40px horizontal gap, 40px below existing)
+4. Set a visual marker on new elements (e.g., red dashed border via style `strokeColor=#FF0000;dashed=1;`)
+
+New elements from reverse sync (added in draw.io) keep their draw.io position.
+
+== Container Handling
+
+=== Forward Sync
+
+When generating a view that includes a container element and its children:
+
+1. Create the container as a `swimlane` style element
+2. Create children with `parent="<container-id>"`
+3. Child coordinates are relative to the container's top-left (offset by `startSize` header height)
+4. Connectors between elements always use `parent="1"` (the layer)
+
+=== Reverse Sync
+
+When detecting containment from draw.io:
+
+1. If a shape has `parent` pointing to another shape (not `"1"`), it is a child
+2. Map the parent-child relationship to the model hierarchy
+3. If a new element is placed inside a container in draw.io, add it as a child of that container in the model
 
 == Conflict Detection
 
+=== Last-Sync State File
+
+A `.bausteinsicht-sync` file stores the state after each successful sync:
+
+[source,jsonc]
+----
+{
+  "timestamp": "2026-02-28T12:00:00Z",
+  "model_hash": "sha256:abc123...",
+  "drawio_hash": "sha256:def456...",
+  "elements": {
+    "webshop.api": {
+      "title": "REST API",
+      "description": "Handles all HTTP requests",
+      "technology": "Spring Boot"
+    }
+    // ... all synced element states
+  },
+  "relationships": [
+    { "from": "customer", "to": "webshop.api", "label": "uses" }
+    // ... all synced relationships
+  ]
+}
+----
+
+This file should be committed to version control alongside the model and draw.io files.
+
+=== Three-Way Merge Logic
+
+With the last-sync state, changes are detected as:
+
+* **Model change**: model differs from last-sync, draw.io matches last-sync
+* **draw.io change**: draw.io differs from last-sync, model matches last-sync
+* **Conflict**: both model and draw.io differ from last-sync for the same field
+* **No change**: both match last-sync
+
+=== Conflict Resolution (v1)
+
 For the initial version, conflicts produce warnings:
 
-* Same element changed in both model and draw.io since last sync
-* Element deleted in one, modified in the other
+[source]
+----
+WARNING: Conflict detected for element "webshop.api":
+  Field: title
+  Model value:   "REST API v2"
+  draw.io value: "Backend API"
+  Last sync:     "REST API"
+  → Keeping model value. Edit draw.io manually if needed.
+----
 
-TODO: Define exact conflict detection mechanism (timestamp-based? hash-based? last-sync state file?)
+In v1, the model value wins on conflict. This is the safer default since the JSON model is the declared source of truth for structure.
 
-== Sync Algorithm (Draft)
+== Sync Algorithm
 
 [plantuml, sync-algorithm, png]
 ....
 @startuml
 start
 :Read JSON model;
-:Read draw.io XML;
-:Read last-sync state (if exists);
+:Read draw.io XML (uncompressed);
+:Read .bausteinsicht-sync state;
 
-partition "Detect Changes" {
-  :Compare model to last-sync state
-  → model changes;
-  :Compare draw.io to last-sync state
-  → draw.io changes;
+partition "Parse draw.io" {
+  :Find all <object> elements
+  with bausteinsicht_id;
+  :Find all <mxCell edge="1">
+  connectors;
+  :Find new elements
+  (no bausteinsicht_id);
 }
 
-if (Conflicts detected?) then (yes)
-  :Display warnings for each conflict;
-  :Apply non-conflicting changes;
+partition "Detect Changes" {
+  :Compare model elements
+  to last-sync state
+  → model changes (added/modified/deleted);
+  :Compare draw.io elements
+  to last-sync state
+  → drawio changes (added/modified/deleted);
+  :Identify conflicts
+  (same element changed in both);
+}
+
+if (Conflicts?) then (yes)
+  :Display warnings;
+  :Model value wins;
 else (no)
-  :Apply model changes to draw.io (forward);
-  :Apply draw.io changes to model (reverse);
 endif
+
+partition "Apply Forward Sync" {
+  :Add new model elements to draw.io
+  (from template, side-by-side);
+  :Update modified elements in draw.io
+  (label, tooltip, technology);
+  :Remove deleted elements from draw.io
+  (and their connectors);
+  :Add/update/remove connectors;
+}
+
+partition "Apply Reverse Sync" {
+  :Add new draw.io elements to model
+  (generate ID, warn user);
+  :Update modified elements in model
+  (title, description, technology);
+  :Remove deleted elements from model
+  (with warning);
+  :Add/update/remove relationships;
+}
 
 :Write updated JSON model;
 :Write updated draw.io XML;
-:Save current state as new last-sync state;
+:Write new .bausteinsicht-sync state;
+:Display summary of all changes;
 stop
 @enduml
 ....
 
-NOTE: The last-sync state file enables three-way merge. Without it, only two-way comparison is possible (current model vs. current draw.io), which cannot distinguish "added" from "not yet synced".
+== Template Application
+
+During forward sync, new elements receive their visual style from a template.
+
+=== Template Lookup
+
+1. Read the template draw.io file
+2. Find elements marked with `bausteinsicht_template="<kind>"` on their `<object>`
+3. Extract the `style` string from the template element's `<mxCell>`
+4. Apply this style to the new element, preserving dimensions from the template
+
+=== Template Element Example
+
+[source,xml]
+----
+<!-- In the template file -->
+<object label="Container Template"
+        bausteinsicht_template="container">
+  <mxCell style="rounded=1;whiteSpace=wrap;html=1;
+                 fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;"
+          vertex="1" parent="1">
+    <mxGeometry x="0" y="0" width="160" height="70" as="geometry" />
+  </mxCell>
+</object>
+----
+
+The `bausteinsicht_template` attribute identifies which element kind this template applies to.
+The style, width, and height are copied to new elements of that kind.
+
+== Edge Cases
+
+=== Element appears in multiple views
+
+The same element ID may appear in multiple `<diagram>` pages.
+Each page has its own `<object>` with independent position.
+Changes to metadata (title, description) in one view propagate to all views during sync.
+
+=== Orphaned connectors
+
+If a connector's `source` or `target` references an element not present on the current page, the connector is removed with a warning.
+
+=== Empty views
+
+A view with no matching elements generates a `<diagram>` with only the base cells and a text note: "No elements match this view's include criteria."
