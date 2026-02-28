@@ -293,7 +293,7 @@ The nested `<mxCell>` has no `id` — the `<object>` owns the ID.
 [source,xml]
 ----
 <object label="&lt;b&gt;REST API&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;Spring Boot&lt;/font&gt;"
-        id="webshop.api"
+        id="containers--webshop.api"
         bausteinsicht_id="webshop.api"
         bausteinsicht_kind="container"
         technology="Spring Boot"
@@ -317,10 +317,10 @@ Custom properties on `<object>`:
 | Display text (HTML-escaped, replaces `value` on mxCell)
 
 | `id`
-| Cell ID — set to the Bausteinsicht element ID
+| Cell ID — page-scoped for file-wide uniqueness: `<viewID>--<elementID>` (e.g., `context--customer`). When an element appears on multiple view pages, each instance has a distinct cell ID.
 
 | `bausteinsicht_id`
-| Redundant copy of the element ID for reliable identification during reverse sync
+| The canonical element ID from the model (e.g., `customer`). Used for reverse sync identification. Unlike `id`, this value is the same across all pages where the element appears.
 
 | `bausteinsicht_kind`
 | Element kind (actor, system, container, component)
@@ -382,7 +382,7 @@ Child coordinates are **relative** to the container's top-left corner (below the
 
 <!-- Child element — parent references the container -->
 <object label="&lt;b&gt;REST API&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;Spring Boot&lt;/font&gt;"
-        id="webshop.api"
+        id="containers--webshop.api"
         bausteinsicht_id="webshop.api"
         bausteinsicht_kind="container"
         technology="Spring Boot">
@@ -397,18 +397,18 @@ Child coordinates are **relative** to the container's top-left corner (below the
 
 ==== Connectors (Relationships)
 
-Connectors use `edge="1"` and reference source/target by their IDs.
+Connectors use `edge="1"` and reference source/target by their page-scoped cell IDs.
 Connectors always use `parent="1"` (the layer), even when connecting shapes inside containers.
 
 [source,xml]
 ----
-<mxCell id="rel-customer-api"
+<mxCell id="rel-containers--customer-containers--webshop.api"
         value="uses"
         style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;
                endArrow=block;endFill=1;strokeColor=#666666;"
         edge="1"
-        source="customer"
-        target="webshop.api"
+        source="containers--customer"
+        target="containers--webshop.api"
         parent="1">
   <mxGeometry relative="1" as="geometry" />
 </mxCell>
@@ -418,8 +418,7 @@ Connectors always use `parent="1"` (the layer), even when connecting shapes insi
 
 By **omitting** `exitX`/`exitY`/`entryX`/`entryY` style properties, draw.io auto-routes connectors from the nearest perimeter point. This ensures connectors look correct when elements are moved by the user.
 
-**Connector ID convention:** `rel-<from>-<to>` (e.g., `rel-customer-webshop.api`).
-Dots in element IDs are preserved in the connector ID.
+**Connector ID convention:** `rel-<scopedSource>-<scopedTarget>` where scoped IDs use the `<viewID>--<elementID>` format (e.g., `rel-containers--customer-containers--webshop.api`).
 
 ==== Cross-Page Navigation (Drill-Down)
 
@@ -470,8 +469,8 @@ The `name` attribute is the view title displayed as the tab label.
 </mxfile>
 ----
 
-Cell IDs are **page-local** — the same base cells `id="0"` and `id="1"` exist on every page.
-Bausteinsicht element IDs (e.g., `webshop.api`) may appear on multiple pages if the element is included in multiple views.
+Base cells (`id="0"` and `id="1"`) exist on every page with the same IDs — this is standard draw.io convention.
+Element cell IDs are **page-scoped** using `<viewID>--<elementID>` to ensure file-wide uniqueness (e.g., `context--customer` and `containers--customer` for the same element on different pages). The `bausteinsicht_id` attribute always holds the canonical element ID.
 
 === Go Struct Mappings
 
