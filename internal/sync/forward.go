@@ -2,6 +2,7 @@ package sync
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/docToolchain/Bauteinsicht/internal/drawio"
 	"github.com/docToolchain/Bauteinsicht/internal/model"
@@ -108,6 +109,25 @@ func scopedCellID(viewID, elemID string) string {
 	return viewID + "--" + elemID
 }
 
+// liftEndpoint returns id if it is in elemFilter. Otherwise it walks up the
+// parent chain (by removing the last dot-segment) until a parent is found in
+// the filter. Returns "" if no ancestor is present on the page.
+func liftEndpoint(id string, elemFilter map[string]bool) string {
+	if elemFilter[id] {
+		return id
+	}
+	for {
+		dot := strings.LastIndex(id, ".")
+		if dot < 0 {
+			return ""
+		}
+		id = id[:dot]
+		if elemFilter[id] {
+			return id
+		}
+	}
+}
+
 // applyChangesToPage applies element and relationship changes to a single page.
 // If elemFilter is nil, all changes are applied. Otherwise only elements in the
 // filter set are processed, and relationships are only created when both
@@ -139,18 +159,31 @@ func applyChangesToPage(
 		}
 	}
 
+	liftedSeen := make(map[string]bool)
 	for _, ch := range cs.ModelRelationshipChanges {
-		if elemFilter != nil && (!elemFilter[ch.From] || !elemFilter[ch.To]) {
-			continue
+		from := ch.From
+		to := ch.To
+		if elemFilter != nil {
+			from = liftEndpoint(from, elemFilter)
+			to = liftEndpoint(to, elemFilter)
+			if from == "" || to == "" || from == to {
+				continue
+			}
 		}
+		lifted := RelationshipChange{From: from, To: to, Type: ch.Type, NewValue: ch.NewValue}
+		pairKey := from + "->" + to
 		switch ch.Type {
 		case Added:
-			applyRelAdded(ch, viewID, page, templates, result)
+			if liftedSeen[pairKey] {
+				continue
+			}
+			liftedSeen[pairKey] = true
+			applyRelAdded(lifted, viewID, page, templates, result)
 		case Modified:
-			page.UpdateConnectorLabel(ch.From, ch.To, ch.NewValue)
+			page.UpdateConnectorLabel(from, to, ch.NewValue)
 			result.ConnectorsUpdated++
 		case Deleted:
-			page.DeleteConnector(ch.From, ch.To)
+			page.DeleteConnector(from, to)
 			result.ConnectorsDeleted++
 		}
 	}
