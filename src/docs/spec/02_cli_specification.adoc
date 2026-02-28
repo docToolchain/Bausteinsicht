@@ -1,0 +1,80 @@
+= CLI Specification
+
+:toc:
+
+NOTE: This specification will be detailed after the draw.io XML analysis. +
+See link:01_use_cases.adoc[Use Cases] for the functional overview of all CLI commands.
+
+== Command Overview
+
+[cols="2,3,1"]
+|===
+| Command | Description | Status
+
+| `bausteinsicht init`
+| Initialize a new architecture model with default specification, sample model, and template
+| Planned
+
+| `bausteinsicht sync`
+| Bidirectional synchronization between model and draw.io diagrams
+| Planned
+
+| `bausteinsicht validate`
+| Validate the architecture model against the JSON Schema and check referential integrity
+| Planned
+
+| `bausteinsicht watch`
+| Watch mode — continuously sync on file changes
+| Planned
+
+| `bausteinsicht add element`
+| Add a new element to the model (LLM-friendly)
+| Planned
+
+| `bausteinsicht add relationship`
+| Add a new relationship to the model (LLM-friendly)
+| Planned
+
+| `bausteinsicht --version`
+| Display version number
+| Planned
+|===
+
+== Global Flags
+
+[cols="2,3"]
+|===
+| Flag | Description
+
+| `--format json\|text`
+| Output format (default: text). JSON for machine-readable output (LLM use).
+
+| `--model <path>`
+| Path to the model file (default: auto-detect in current directory)
+
+| `--template <path>`
+| Path to the draw.io template file
+
+| `--verbose`
+| Verbose output for debugging
+|===
+
+== Exit Codes
+
+[cols="1,3"]
+|===
+| Code | Meaning
+
+| 0
+| Success
+
+| 1
+| Validation error or sync conflict
+
+| 2
+| File not found or I/O error
+|===
+
+== Detailed Command Specifications
+
+TODO: Detail each command with full flag descriptions, input/output examples, and edge cases after draw.io XML analysis.

@@ -1,0 +1,80 @@
+= Data Models
+
+:toc:
+
+NOTE: This specification will be detailed after the draw.io XML analysis. +
+The JSON Schema and Go struct definitions will be developed alongside the implementation.
+
+== Overview
+
+Bausteinsicht works with three data formats that must be kept in sync:
+
+[cols="1,2,2"]
+|===
+| Format | Purpose | Location
+
+| JSON Model (JSONC)
+| Single source of truth for the architecture
+| `*.jsonc` files in project directory
+
+| JSON Schema
+| Validation and IDE support for the model
+| Published schema file
+
+| draw.io XML (mxGraph)
+| Visual representation of architecture views
+| `*.drawio` files in project directory
+|===
+
+== JSON Model Structure (Draft)
+
+The model consists of three top-level sections:
+
+[source,jsonc]
+----
+{
+  "$schema": "https://...",
+
+  // Define available element and relationship kinds
+  "specification": { ... },
+
+  // The actual architecture elements and their hierarchy
+  "model": { ... },
+
+  // Connections between elements
+  "relationships": [ ... ],
+
+  // View definitions (which elements appear in which diagram)
+  "views": { ... }
+}
+----
+
+TODO: Full JSON Schema definition after draw.io XML analysis.
+
+== draw.io XML Structure
+
+TODO: Document the mxGraph XML structure after analyzing draw.io template files. Key aspects:
+
+* `mxGraphModel` root element
+* `mxCell` elements for shapes and connectors
+* Style strings (shape, color, font)
+* Geometry attributes (x, y, width, height)
+* Custom properties for Bausteinsicht IDs
+* Connector attachment points (center vs. edge)
+
+== Go Struct Mappings
+
+TODO: Go struct definitions will mirror the JSON Schema. Example outline:
+
+[source,go]
+----
+type Model struct {
+    Schema        string            `json:"$schema"`
+    Specification Specification     `json:"specification"`
+    Model         map[string]Element `json:"model"`
+    Relationships []Relationship    `json:"relationships"`
+    Views         map[string]View   `json:"views"`
+}
+
+// Full definitions after JSON Schema is finalized.
+----

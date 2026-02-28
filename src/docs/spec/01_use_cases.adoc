@@ -1,0 +1,362 @@
+= Use Cases
+
+:toc:
+
+== Actors
+
+[cols="1,3"]
+|===
+| Actor | Description
+
+| Software Architect
+| Primary user who maintains the architecture model and draw.io diagrams. Edits both the JSON DSL and draw.io visually.
+
+| Developer
+| Reads architecture diagrams in draw.io. May occasionally add elements or relationships in draw.io.
+
+| LLM Agent
+| AI assistant that manipulates the architecture model via CLI commands. Reads and writes JSON model files.
+|===
+
+== UC-1: Initialize Architecture Model
+
+=== Description
+A software architect creates a new architecture model for a project.
+
+=== Preconditions
+* Bausteinsicht CLI is installed
+* A project directory exists
+
+=== Flow
+
+[plantuml, uc01-init, png]
+....
+@startuml
+start
+:Architect runs **bausteinsicht init**;
+:Bausteinsicht creates model directory structure;
+:Bausteinsicht creates default specification
+with standard element kinds
+(actor, system, container, component);
+:Bausteinsicht creates example model
+with sample elements;
+:Bausteinsicht creates default template
+(.drawio file with styled reference elements);
+:Architect opens model file in IDE;
+:IDE provides autocompletion
+via JSON Schema;
+stop
+@enduml
+....
+
+=== Postconditions
+* A valid JSON model file exists with specification and example content
+* A default draw.io template file exists
+* JSON Schema is referenced for IDE support
+
+=== Error Scenarios
+* Model files already exist → Bausteinsicht warns and aborts (no overwrite)
+
+== UC-2: Define Architecture Elements
+
+=== Description
+A software architect adds elements (systems, containers, components) to the architecture model.
+
+=== Preconditions
+* An initialized architecture model exists
+* IDE has JSON Schema support active
+
+=== Flow
+
+[plantuml, uc02-define-elements, png]
+....
+@startuml
+start
+:Architect opens model file in IDE;
+:Architect adds element with unique ID,
+kind, title, and description;
+if (Element ID already exists?) then (yes)
+  :IDE shows validation error
+  via JSON Schema;
+  :Architect chooses different ID;
+else (no)
+endif
+:Architect adds relationships
+(from, to, label);
+:Architect saves file;
+:Model is valid JSON;
+stop
+@enduml
+....
+
+=== Postconditions
+* Model contains new elements with unique IDs
+* Relationships reference valid element IDs
+
+=== Error Scenarios
+* Duplicate element ID → JSON Schema validation error in IDE
+* Relationship references non-existent element → validation warning on sync
+
+== UC-3: Generate draw.io Diagrams (Forward Sync)
+
+=== Description
+The architect generates or updates draw.io diagrams from the model.
+
+=== Preconditions
+* A valid architecture model exists
+* A draw.io template exists
+* (Optional) Existing draw.io diagrams with manual layout
+
+=== Flow
+
+[plantuml, uc03-forward-sync, png]
+....
+@startuml
+start
+:Architect runs **bausteinsicht sync**;
+:Bausteinsicht reads JSON model;
+:Bausteinsicht validates model
+against JSON Schema;
+if (Validation errors?) then (yes)
+  :Display errors and abort;
+  stop
+else (no)
+endif
+:Bausteinsicht reads template
+for element styling;
+if (draw.io file exists?) then (yes)
+  :Read existing draw.io XML;
+  :Match elements by ID;
+  :Update changed descriptions/titles;
+  :Add new elements side-by-side
+  with visual marker;
+  :Remove deleted elements;
+  :Preserve layout of existing elements;
+else (no)
+  :Create new draw.io file;
+  :Place all elements side-by-side;
+endif
+:Add/update relationship connectors
+(centered attachment);
+:Write draw.io XML file;
+:Display summary of changes;
+stop
+@enduml
+....
+
+=== Postconditions
+* draw.io file reflects current model state
+* Existing element positions are preserved
+* New elements are visually marked for manual positioning
+* Relationship connectors are attached to element centers
+
+=== Error Scenarios
+* Invalid model → validation errors displayed, sync aborted
+* Template file missing → error with instructions to create one
+* draw.io file locked by another process → warning
+
+== UC-4: Edit in draw.io and Reverse Sync
+
+=== Description
+An architect or developer edits elements in draw.io, and the changes are synced back to the model.
+
+=== Preconditions
+* draw.io diagrams were previously generated from the model
+* Elements in draw.io carry Bausteinsicht IDs
+
+=== Flow
+
+[plantuml, uc04-reverse-sync, png]
+....
+@startuml
+start
+:User edits diagram in draw.io;
+note right
+  Possible edits:
+  * Rename element
+  * Change description
+  * Add new element
+  * Add relationship (arrow)
+  * Delete element
+  * Move element (layout only)
+end note
+:User saves .drawio file;
+:Architect runs **bausteinsicht sync**;
+:Bausteinsicht reads draw.io XML;
+:Bausteinsicht reads JSON model;
+
+:Match elements by ID;
+
+partition "For each element in draw.io" {
+  if (Element has Bausteinsicht ID?) then (yes)
+    if (Title/description changed?) then (yes)
+      :Update model element;
+    else (no)
+    endif
+  else (no)
+    :New element detected;
+    :Add to model with generated ID;
+    :Warn user to assign proper ID;
+  endif
+}
+
+partition "For each relationship in draw.io" {
+  if (Relationship exists in model?) then (yes)
+    if (Label changed?) then (yes)
+      :Update relationship in model;
+    else (no)
+    endif
+  else (no)
+    :Add new relationship to model;
+  endif
+}
+
+:Write updated JSON model;
+:Display summary of changes;
+stop
+@enduml
+....
+
+=== Postconditions
+* Model reflects changes made in draw.io
+* New elements have IDs (generated or user-assigned)
+* Layout changes (element positions) do NOT modify the model
+
+=== Error Scenarios
+* Element in draw.io has no ID and cannot be auto-matched → warning with manual resolution instructions
+* Conflicting changes in both model and draw.io → warning displayed, no silent overwrite
+
+== UC-5: Watch Mode
+
+=== Description
+Bausteinsicht continuously watches for file changes and synchronizes automatically.
+
+=== Preconditions
+* An initialized architecture model exists
+* draw.io diagrams exist
+
+=== Flow
+
+[plantuml, uc05-watch, png]
+....
+@startuml
+start
+:Architect runs **bausteinsicht watch**;
+:Bausteinsicht starts file watchers
+on model and draw.io files;
+
+repeat
+  :Wait for file change event;
+  if (Model file changed?) then (yes)
+    :Forward sync (UC-3);
+  elseif (draw.io file changed?) then (yes)
+    :Reverse sync (UC-4);
+  endif
+  :Display sync result;
+repeat while (Process running?) is (yes)
+
+:Architect stops with Ctrl+C;
+stop
+@enduml
+....
+
+=== Postconditions
+* Model and draw.io diagrams are kept in sync continuously
+
+=== Error Scenarios
+* Rapid successive changes → debounce to avoid conflicts
+* File watcher fails on network drives → fallback to polling with warning
+
+== UC-6: LLM-Driven Architecture Modification
+
+=== Description
+An LLM agent modifies the architecture model using CLI commands.
+
+=== Preconditions
+* An initialized architecture model exists
+* LLM agent has access to the Bausteinsicht CLI
+
+=== Flow
+
+[plantuml, uc06-llm, png]
+....
+@startuml
+start
+:LLM reads model file (JSON);
+:LLM analyzes current architecture;
+:LLM modifies JSON model directly
+or uses CLI commands;
+note right
+  CLI commands:
+  * bausteinsicht add element
+  * bausteinsicht add relationship
+  * bausteinsicht validate
+  * bausteinsicht sync
+end note
+:LLM runs **bausteinsicht validate**;
+if (Valid?) then (yes)
+  :LLM runs **bausteinsicht sync**;
+  :draw.io diagrams updated;
+else (no)
+  :LLM fixes validation errors;
+endif
+stop
+@enduml
+....
+
+=== Postconditions
+* Model is valid and updated
+* draw.io diagrams reflect the changes
+* New elements are marked for manual positioning
+
+=== Error Scenarios
+* LLM generates invalid JSON → validate catches it before sync
+* LLM uses non-existent element ID in relationship → validation error
+
+== UC-7: Drill-Down Navigation
+
+=== Description
+An architect navigates between different abstraction levels within a single draw.io diagram using zoom-based drill-down.
+
+=== Preconditions
+* Multiple views exist at different hierarchy levels
+* Views are placed on a single draw.io page with appropriate spacing
+
+=== Flow
+
+[plantuml, uc07-drilldown, png]
+....
+@startuml
+start
+:Architect views context diagram
+(high zoom level);
+:Architect clicks on a system element;
+:draw.io follows link to
+container view area;
+:Zoom adjusts to show
+container-level detail;
+note right
+  Context diagram remains
+  visible (small) above
+  for orientation
+end note
+:Architect clicks on a container;
+:draw.io navigates to
+component view area;
+if (Wants to go back?) then (yes)
+  :Click on parent view
+  (visible above);
+  :Zoom back to parent level;
+else (no)
+  :Continue exploring;
+endif
+stop
+@enduml
+....
+
+=== Postconditions
+* User can navigate between abstraction levels via click
+* Parent views remain visible for orientation
+
+=== Error Scenarios
+* Target view does not exist → element is not clickable (no link generated)

@@ -1,0 +1,123 @@
+= Sync Specification
+
+:toc:
+
+NOTE: This specification will be detailed after the draw.io XML analysis. +
+The sync algorithm depends on understanding the exact structure of mxCell elements and custom properties.
+
+== Overview
+
+Bausteinsicht synchronizes bidirectionally between:
+
+* **JSON Model** (source of truth for structure and metadata)
+* **draw.io XML** (source of truth for layout/positioning)
+
+== Sync Directions
+
+=== Forward Sync (Model → draw.io)
+
+Triggered when the JSON model changes.
+
+[cols="1,3"]
+|===
+| Change Type | Action
+
+| New element
+| Create mxCell from template, place side-by-side, add visual marker for manual positioning
+
+| Updated element (title, description, technology)
+| Update mxCell label and properties, preserve position
+
+| Deleted element
+| Remove mxCell and connected edges
+
+| New relationship
+| Create connector mxCell with centered attachment
+
+| Updated relationship (label)
+| Update connector label
+
+| Deleted relationship
+| Remove connector mxCell
+|===
+
+=== Reverse Sync (draw.io → Model)
+
+Triggered when the draw.io file changes.
+
+[cols="1,3"]
+|===
+| Change Type | Action
+
+| Element renamed (title changed)
+| Update model element title
+
+| Element description changed
+| Update model element description
+
+| New element (no Bausteinsicht ID)
+| Add to model with generated ID, warn user to assign meaningful ID
+
+| New connector between identified elements
+| Add relationship to model
+
+| Connector label changed
+| Update relationship label in model
+
+| Element moved (position change only)
+| No model change (layout is draw.io-only concern)
+
+| Element deleted
+| Remove from model (with confirmation/warning?)
+|===
+
+== ID Mapping Strategy
+
+TODO: Detail how Bausteinsicht IDs are stored in draw.io XML. Options to evaluate:
+
+* Custom property on mxCell (`bausteinsicht-id="api_gateway"`)
+* `id` attribute of mxCell itself
+* UserObject wrapping the mxCell
+
+== Conflict Detection
+
+For the initial version, conflicts produce warnings:
+
+* Same element changed in both model and draw.io since last sync
+* Element deleted in one, modified in the other
+
+TODO: Define exact conflict detection mechanism (timestamp-based? hash-based? last-sync state file?)
+
+== Sync Algorithm (Draft)
+
+[plantuml, sync-algorithm, png]
+....
+@startuml
+start
+:Read JSON model;
+:Read draw.io XML;
+:Read last-sync state (if exists);
+
+partition "Detect Changes" {
+  :Compare model to last-sync state
+  → model changes;
+  :Compare draw.io to last-sync state
+  → draw.io changes;
+}
+
+if (Conflicts detected?) then (yes)
+  :Display warnings for each conflict;
+  :Apply non-conflicting changes;
+else (no)
+  :Apply model changes to draw.io (forward);
+  :Apply draw.io changes to model (reverse);
+endif
+
+:Write updated JSON model;
+:Write updated draw.io XML;
+:Save current state as new last-sync state;
+stop
+@enduml
+....
+
+NOTE: The last-sync state file enables three-way merge. Without it, only two-way comparison is possible (current model vs. current draw.io), which cannot distinguish "added" from "not yet synced".
