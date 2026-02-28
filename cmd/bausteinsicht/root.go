@@ -16,6 +16,7 @@ func NewRootCmd() *cobra.Command {
 	rootCmd.PersistentFlags().Bool("verbose", false, "Enable verbose output")
 
 	rootCmd.AddCommand(newInitCmd())
+	rootCmd.AddCommand(newSyncCmd())
 	rootCmd.AddCommand(newValidateCmd())
 	rootCmd.AddCommand(newAddCmd())
 
