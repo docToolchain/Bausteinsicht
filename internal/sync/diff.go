@@ -248,7 +248,7 @@ func detectRelationshipChanges(
 		switch {
 		case inModel && !inLast:
 			cs.ModelRelationshipChanges = append(cs.ModelRelationshipChanges, RelationshipChange{
-				From: from, To: to, Type: Added,
+				From: from, To: to, Type: Added, NewValue: mr.Label,
 			})
 		case !inModel && inLast:
 			cs.ModelRelationshipChanges = append(cs.ModelRelationshipChanges, RelationshipChange{
