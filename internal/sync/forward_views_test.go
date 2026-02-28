@@ -284,6 +284,88 @@ func TestApplyForward_RelationshipLiftingDedup(t *testing.T) {
 	}
 }
 
+// TestApplyForward_ScopeBoundingBox verifies that the scope element of a view
+// is rendered as a boundary/swimlane on the page, with children nested inside.
+func TestApplyForward_ScopeBoundingBox(t *testing.T) {
+	doc := drawio.NewDocument()
+	doc.AddPage("view-containers", "Container View")
+	ts := minimalTemplates(t)
+
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"customer": {Kind: "actor", Title: "Customer"},
+			"shop": {Kind: "system", Title: "Online Shop", Children: map[string]model.Element{
+				"api": {Kind: "container", Title: "API", Technology: "Go"},
+				"db":  {Kind: "container", Title: "Database", Technology: "PostgreSQL"},
+			}},
+		},
+		Relationships: []model.Relationship{},
+		Views: map[string]model.View{
+			"containers": {
+				Title:   "Container View",
+				Scope:   "shop",
+				Include: []string{"customer", "shop.*"},
+			},
+		},
+	}
+
+	cs := &ChangeSet{
+		ModelElementChanges: []ElementChange{
+			{ID: "customer", Type: Added},
+			{ID: "shop.api", Type: Added},
+			{ID: "shop.db", Type: Added},
+		},
+	}
+
+	ApplyForward(cs, doc, ts, m)
+
+	page := doc.GetPage("view-containers")
+	if page == nil {
+		t.Fatal("container page not found")
+	}
+
+	// The scope element "shop" should appear as a boundary.
+	scopeElem := page.FindElement("shop")
+	if scopeElem == nil {
+		t.Fatal("expected scope element 'shop' as boundary on container page")
+	}
+
+	// It should have a bausteinsicht_kind attribute indicating it's a boundary.
+	kind := scopeElem.SelectAttrValue("bausteinsicht_kind", "")
+	if kind != "system_boundary" {
+		t.Errorf("scope element kind: got %q, want %q", kind, "system_boundary")
+	}
+
+	// Children (api, db) should be parented to the scope boundary cell.
+	scopeCellID := scopeElem.SelectAttrValue("id", "")
+	apiElem := page.FindElement("shop.api")
+	if apiElem == nil {
+		t.Fatal("expected 'shop.api' on container page")
+	}
+	apiCell := apiElem.FindElement("mxCell")
+	if apiCell == nil {
+		t.Fatal("shop.api has no mxCell")
+	}
+	apiParent := apiCell.SelectAttrValue("parent", "")
+	if apiParent != scopeCellID {
+		t.Errorf("shop.api parent: got %q, want scope cell ID %q", apiParent, scopeCellID)
+	}
+
+	// customer should NOT be parented to the scope (it's external).
+	custElem := page.FindElement("customer")
+	if custElem == nil {
+		t.Fatal("expected 'customer' on container page")
+	}
+	custCell := custElem.FindElement("mxCell")
+	if custCell == nil {
+		t.Fatal("customer has no mxCell")
+	}
+	custParent := custCell.SelectAttrValue("parent", "")
+	if custParent == scopeCellID {
+		t.Error("customer should NOT be parented to scope boundary")
+	}
+}
+
 // TestApplyForward_NoViewsFallback verifies backward compatibility:
 // when no views are defined, elements go to the first page.
 func TestApplyForward_NoViewsFallback(t *testing.T) {
