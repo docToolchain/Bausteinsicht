@@ -161,7 +161,6 @@ func TestRun_FullRoundTrip(t *testing.T) {
 	}
 
 	// Round 2: modify model title → forward update expected.
-	m.Model["svc"] = m.Model["svc"] // ensure map has the element
 	updated := m.Model["svc"]
 	updated.Title = "Service v2"
 	m.Model["svc"] = updated
