@@ -1,0 +1,206 @@
+:jbake-title: Runtime View
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: arc42
+:jbake-order: 6
+
+= Runtime View
+
+:toc:
+
+== Sync Command
+
+The most important runtime scenario. Shows what happens when the user runs `bausteinsicht sync`.
+
+[plantuml, runtime-sync, png]
+....
+@startuml
+skinparam shadowing false
+
+actor User
+participant "cmd/sync" as cmd
+participant "model/loader" as loader
+participant "drawio/document" as doc
+participant "sync/state" as state
+participant "sync/engine" as engine
+participant "sync/diff" as diff
+participant "sync/forward" as fwd
+participant "sync/reverse" as rev
+
+User -> cmd : bausteinsicht sync
+activate cmd
+
+cmd -> loader : Load(model.jsonc)
+activate loader
+loader --> cmd : BausteinsichtModel
+deactivate loader
+
+cmd -> doc : LoadDocument(arch.drawio)
+activate doc
+doc --> cmd : Document
+deactivate doc
+
+cmd -> doc : LoadTemplate(template.drawio)
+activate doc
+doc --> cmd : TemplateSet
+deactivate doc
+
+cmd -> state : LoadState(.bausteinsicht-sync)
+activate state
+state --> cmd : SyncState
+deactivate state
+
+cmd -> engine : Run(model, document, state, templates)
+activate engine
+
+engine -> diff : DetectChanges(model, document, state)
+activate diff
+diff --> engine : ChangeSet
+deactivate diff
+
+alt conflicts detected
+  engine -> engine : Resolve conflicts\n(model wins, log warnings)
+end
+
+engine -> fwd : Apply(modelChanges, document, templates)
+activate fwd
+fwd --> engine : forward result
+deactivate fwd
+
+engine -> rev : Apply(drawioChanges, model)
+activate rev
+rev --> engine : reverse result
+deactivate rev
+
+engine --> cmd : SyncResult
+deactivate engine
+
+cmd -> loader : Save(model.jsonc, updatedModel)
+cmd -> doc : SaveDocument(arch.drawio, updatedDoc)
+cmd -> state : SaveState(.bausteinsicht-sync, newState)
+
+cmd --> User : Summary of changes
+deactivate cmd
+
+@enduml
+....
+
+=== Key Observations
+
+* The sync engine receives all data as parameters — it performs no I/O itself
+* Forward sync runs before reverse sync in the same cycle
+* The state file is only written after both directions complete successfully
+* If any step fails, no files are written (atomic operation)
+
+== Watch Mode
+
+Shows the continuous sync loop triggered by file changes.
+
+[plantuml, runtime-watch, png]
+....
+@startuml
+skinparam shadowing false
+
+actor User
+participant "cmd/watch" as cmd
+participant "watcher" as w
+participant "sync/engine" as engine
+
+User -> cmd : bausteinsicht watch
+activate cmd
+
+cmd -> w : Start(model.jsonc, arch.drawio)
+activate w
+
+loop on file change
+  w -> w : Debounce (300ms)
+  w -> engine : Run(model, document, state, templates)
+  activate engine
+  engine --> w : SyncResult
+  deactivate engine
+  w -> cmd : Log changes
+  cmd -> User : Display summary
+end
+
+User -> cmd : Ctrl+C
+cmd -> w : Stop()
+deactivate w
+deactivate cmd
+
+@enduml
+....
+
+=== Debounce Strategy
+
+File editors often trigger multiple save events in rapid succession (write + metadata update). The watcher debounces events with a 300ms window: after the first change event, it waits 300ms for additional events before triggering a sync.
+
+== Init Command
+
+[plantuml, runtime-init, png]
+....
+@startuml
+skinparam shadowing false
+
+actor User
+participant "cmd/init" as cmd
+participant "model/loader" as loader
+participant "sync/engine" as engine
+
+User -> cmd : bausteinsicht init
+activate cmd
+
+cmd -> cmd : Check if files already exist
+alt files exist
+  cmd --> User : Error: project already initialized
+else no files
+  cmd -> cmd : Generate sample model\n(specification + example elements)
+  cmd -> loader : Save(model.jsonc, sampleModel)
+  cmd -> cmd : Copy default template\nto project directory
+  cmd -> engine : Run(model, document=empty,\nstate=empty, templates)
+  cmd --> User : Project initialized.\nOpen arch.drawio in draw.io.
+end
+
+deactivate cmd
+
+@enduml
+....
+
+== LLM-Driven Modification
+
+Shows how an LLM agent uses CLI commands to modify the architecture.
+
+[plantuml, runtime-llm, png]
+....
+@startuml
+skinparam shadowing false
+
+actor "LLM Agent" as llm
+participant "cmd/add" as add
+participant "model/loader" as loader
+participant "model/validate" as val
+
+llm -> add : bausteinsicht add element\n--id cache --kind container\n--title "Redis Cache"\n--parent webshop\n--format json
+activate add
+
+add -> loader : Load(model.jsonc)
+add -> val : Validate(kind exists, parent exists)
+
+alt validation fails
+  add --> llm : { "error": "..." }
+else valid
+  add -> add : Add element to model
+  add -> loader : Save(model.jsonc, updatedModel)
+  add --> llm : { "status": "added",\n  "id": "webshop.cache" }
+end
+
+deactivate add
+
+llm -> llm : bausteinsicht sync
+note right: Separate command to\nupdate draw.io diagram
+
+@enduml
+....
+
+=== Design Decision: Separate Add and Sync
+
+The `add` commands only modify the JSON model. They do **not** trigger a sync automatically. This keeps commands predictable (single responsibility) and allows LLMs to batch multiple model changes before syncing.

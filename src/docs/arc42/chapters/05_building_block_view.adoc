@@ -1,0 +1,305 @@
+:jbake-title: Building Block View
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: arc42
+:jbake-order: 5
+
+= Building Block View
+
+:toc:
+
+== Level 1: Overall System
+
+[plantuml, building-blocks-level1, png]
+....
+@startuml
+skinparam componentStyle rectangle
+skinparam shadowing false
+skinparam defaultFontSize 11
+
+package "bausteinsicht CLI" as cli {
+  [cmd] <<Cobra Commands>>
+}
+
+package "internal" as internal {
+  [model] <<JSON Model>>
+  [drawio] <<mxGraph XML>>
+  [sync] <<Sync Engine>>
+  [watcher] <<File Watcher>>
+}
+
+[cmd] --> [sync] : delegates
+[cmd] --> [model] : delegates
+[cmd] --> [watcher] : delegates
+[sync] --> [model] : reads/writes model
+[sync] --> [drawio] : reads/writes XML
+[watcher] --> [sync] : triggers sync
+
+database "*.jsonc" as jsonc
+database "*.drawio" as drawiofile
+database ".bausteinsicht-sync" as syncstate
+database "template.drawio" as template
+
+[model] --> jsonc : reads/writes
+[drawio] --> drawiofile : reads/writes
+[drawio] --> template : reads
+[sync] --> syncstate : reads/writes
+
+@enduml
+....
+
+=== Motivation
+
+The system decomposes into four internal packages plus a thin CLI layer. The key separation is between `model` (JSON world) and `drawio` (XML world), with `sync` as the mediator. This ensures changes to one format never leak into the other package.
+
+=== Building Blocks
+
+[cols="1,3"]
+|===
+| Building Block | Responsibility
+
+| `cmd`
+| CLI entry points using Cobra. Parses arguments, calls internal packages, formats output. No business logic.
+
+| `model`
+| Reads, writes, and validates the JSONC architecture model. Provides Go structs (`BausteinsichtModel`, `Element`, `Relationship`, `View`). Handles ID resolution with dot notation and wildcard matching for view includes.
+
+| `drawio`
+| Reads, writes, and manipulates draw.io XML (mxGraph format). Creates elements as `<object>` with `<mxCell>`, manages connectors, applies template styles, parses/generates HTML labels.
+
+| `sync`
+| Orchestrates bidirectional synchronization. Compares model and draw.io state against last-sync state. Detects additions, modifications, deletions, and conflicts. Applies changes in both directions.
+
+| `watcher`
+| Watches model and draw.io files for changes using `fsnotify`. Debounces rapid changes. Triggers sync engine on file modification.
+|===
+
+=== Important Interfaces
+
+[cols="1,3"]
+|===
+| Interface | Description
+
+| `model.Load(path) → BausteinsichtModel`
+| Parses a JSONC file into the Go model struct. Validates against schema constraints.
+
+| `model.Save(path, BausteinsichtModel)`
+| Writes the model back to JSONC, preserving comments where possible.
+
+| `drawio.LoadDocument(path) → Document`
+| Parses a draw.io XML file into a manipulable document structure.
+
+| `drawio.SaveDocument(path, Document)`
+| Writes the document back to uncompressed draw.io XML.
+
+| `drawio.LoadTemplate(path) → TemplateSet`
+| Reads a template file and extracts styles keyed by `bausteinsicht_template` kind.
+
+| `sync.Run(model, document, state, templates) → Result`
+| Executes one full bidirectional sync cycle. Returns a result describing all changes and conflicts.
+
+| `sync.LoadState(path) → SyncState`
+| Reads the `.bausteinsicht-sync` state file.
+
+| `sync.SaveState(path, SyncState)`
+| Writes the updated sync state after successful sync.
+|===
+
+
+== Level 2: Sync Engine
+
+The sync engine is the most complex package. It decomposes into five sub-components.
+
+[plantuml, building-blocks-level2-sync, png]
+....
+@startuml
+skinparam componentStyle rectangle
+skinparam shadowing false
+skinparam defaultFontSize 11
+
+package "sync" {
+  [engine] <<Orchestrator>>
+  [diff] <<Change Detection>>
+  [forward] <<Model → draw.io>>
+  [reverse] <<draw.io → Model>>
+  [state] <<State Management>>
+  [conflict] <<Conflict Resolution>>
+}
+
+[engine] --> [diff] : detect changes
+[engine] --> [forward] : apply model changes
+[engine] --> [reverse] : apply drawio changes
+[engine] --> [state] : read/write state
+[engine] --> [conflict] : resolve conflicts
+[diff] --> [conflict] : report conflicts
+
+@enduml
+....
+
+=== Building Blocks
+
+[cols="1,3"]
+|===
+| Building Block | Responsibility
+
+| `engine`
+| Main orchestrator. Calls diff, resolves conflicts, then applies forward and reverse changes in sequence. Returns a comprehensive result.
+
+| `diff`
+| Compares current model and draw.io state against the last-sync state. Produces lists of added, modified, and deleted elements/relationships for each side. Identifies conflicts (same field changed on both sides).
+
+| `forward`
+| Applies model changes to the draw.io document. Creates new elements from templates (placed side-by-side below existing content). Updates labels, tooltips, technology. Removes deleted elements and orphaned connectors.
+
+| `reverse`
+| Applies draw.io changes to the model. Detects new elements (no `bausteinsicht_id`), renames, description changes. Auto-generates IDs for new elements. Warns about deletions.
+
+| `state`
+| Manages the `.bausteinsicht-sync` file. Serializes/deserializes element states, relationship states, and file hashes. Provides comparison helpers.
+
+| `conflict`
+| Detects and resolves conflicts. In v1: model wins, warning is displayed. Designed for future extension (interactive resolution, merge strategies).
+|===
+
+
+== Level 2: DrawIO Package
+
+The draw.io package handles all mxGraph XML concerns.
+
+[plantuml, building-blocks-level2-drawio, png]
+....
+@startuml
+skinparam componentStyle rectangle
+skinparam shadowing false
+skinparam defaultFontSize 11
+
+package "drawio" {
+  [document] <<XML Document>>
+  [element] <<Element CRUD>>
+  [connector] <<Connector CRUD>>
+  [template] <<Template Loader>>
+  [label] <<HTML Labels>>
+}
+
+[document] --> [element] : manages
+[document] --> [connector] : manages
+[element] --> [label] : generates/parses
+[element] --> [template] : applies style
+
+@enduml
+....
+
+=== Building Blocks
+
+[cols="1,3"]
+|===
+| Building Block | Responsibility
+
+| `document`
+| Top-level draw.io file handling. Parses `<mxfile>` with multiple `<diagram>` pages. Provides access to pages by ID. Manages base cells (`id="0"`, `id="1"`).
+
+| `element`
+| CRUD operations for architecture elements as `<object>` + `<mxCell>` pairs. Sets `bausteinsicht_id`, `bausteinsicht_kind`, `technology`, `tooltip`, `link`. Handles container elements (swimlane style with child `parent` attribute).
+
+| `connector`
+| CRUD operations for relationship connectors. Creates `<mxCell>` with `edge="1"`, `source`, `target`. Uses ID convention `rel-<from>-<to>`. Always sets `parent="1"` (layer, not container).
+
+| `template`
+| Reads template draw.io files. Extracts styles by `bausteinsicht_template` attribute. Returns style string and default dimensions for each element kind.
+
+| `label`
+| Generates HTML labels: `<b>Title</b><br><font color="#666666">Technology</font>`. Parses HTML labels back to extract title and technology during reverse sync. Handles XML entity escaping.
+|===
+
+
+== Level 2: Model Package
+
+[plantuml, building-blocks-level2-model, png]
+....
+@startuml
+skinparam componentStyle rectangle
+skinparam shadowing false
+skinparam defaultFontSize 11
+
+package "model" {
+  [types] <<Go Structs>>
+  [loader] <<JSONC I/O>>
+  [resolve] <<ID Resolution>>
+  [validate] <<Validation>>
+}
+
+[loader] --> [types] : populates
+[resolve] --> [types] : traverses
+[validate] --> [types] : checks
+
+@enduml
+....
+
+=== Building Blocks
+
+[cols="1,3"]
+|===
+| Building Block | Responsibility
+
+| `types`
+| Go struct definitions: `BausteinsichtModel`, `Specification`, `Element`, `Relationship`, `View`, `ElementKind`, `RelationshipKind`. JSON struct tags for serialization.
+
+| `loader`
+| Reads JSONC files (strips comments, parses JSON). Writes model back to JSONC. Auto-detects model file in current directory.
+
+| `resolve`
+| ID resolution using dot notation (`webshop.api.auth`). Traverses the element hierarchy. Wildcard matching for view `include` patterns (`webshop.*`). Flattens nested elements into a map keyed by full ID path.
+
+| `validate`
+| Validates the model: required fields, kind references exist in specification, relationship endpoints reference existing elements, view includes resolve to at least one element.
+|===
+
+
+== Go Package Layout
+
+The following directory structure maps directly to the building blocks above:
+
+....
+bausteinsicht/
+├── cmd/
+│   └── bausteinsicht/
+│       ├── main.go              // Entry point
+│       ├── root.go              // Root command, global flags
+│       ├── init.go              // bausteinsicht init
+│       ├── sync.go              // bausteinsicht sync
+│       ├── validate.go          // bausteinsicht validate
+│       ├── watch.go             // bausteinsicht watch
+│       ├── add_element.go       // bausteinsicht add element
+│       └── add_relationship.go  // bausteinsicht add relationship
+├── internal/
+│   ├── model/
+│   │   ├── types.go             // BausteinsichtModel, Element, ...
+│   │   ├── loader.go            // JSONC read/write
+│   │   ├── resolve.go           // ID resolution, wildcards
+│   │   └── validate.go          // Model validation
+│   ├── drawio/
+│   │   ├── document.go          // mxfile/diagram parsing
+│   │   ├── element.go           // <object> + <mxCell> CRUD
+│   │   ├── connector.go         // Edge/connector CRUD
+│   │   ├── template.go          // Template loading
+│   │   └── label.go             // HTML label gen/parse
+│   ├── sync/
+│   │   ├── engine.go            // Main sync orchestration
+│   │   ├── forward.go           // Model → draw.io
+│   │   ├── reverse.go           // draw.io → Model
+│   │   ├── state.go             // .bausteinsicht-sync I/O
+│   │   ├── diff.go              // Change detection
+│   │   └── conflict.go          // Conflict resolution
+│   └── watcher/
+│       └── watcher.go           // fsnotify file watcher
+├── go.mod
+└── go.sum
+....
+
+=== Conventions
+
+* `cmd/bausteinsicht/` contains only CLI wiring — no business logic
+* `internal/` ensures packages cannot be imported by external code
+* Each package has a clear single responsibility
+* Cross-package dependencies flow inward: `cmd → sync → model + drawio`
+* The `model` and `drawio` packages never depend on each other

@@ -1,0 +1,188 @@
+:jbake-title: Cross-cutting Concepts
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: arc42
+:jbake-order: 8
+
+= Cross-cutting Concepts
+
+:toc:
+
+== Error Handling
+
+=== Strategy
+
+Bausteinsicht uses Go's explicit error handling pattern consistently. Errors propagate upward and are only formatted for the user at the CLI layer.
+
+[cols="1,3"]
+|===
+| Layer | Error Handling
+
+| `internal/*`
+| Return `error` values with context. Use `fmt.Errorf("loading model: %w", err)` for wrapping. Never print to stdout/stderr.
+
+| `cmd/*`
+| Catch errors, format them for the user (plain text or JSON depending on `--format`), and set the exit code.
+|===
+
+=== Exit Codes
+
+[cols="1,3"]
+|===
+| Code | Meaning
+
+| 0 | Success
+| 1 | Validation error or sync conflict
+| 2 | File not found or I/O error
+|===
+
+=== Structured Error Output
+
+With `--format json`, errors are returned as:
+
+[source,json]
+----
+{
+  "error": "validation failed",
+  "details": [
+    { "path": "model.webshop.api", "message": "unknown kind: container2" }
+  ]
+}
+----
+
+This enables LLM agents to parse and react to errors programmatically.
+
+== Testing Strategy
+
+=== Test Levels
+
+[cols="1,2,2"]
+|===
+| Level | Scope | Approach
+
+| Unit tests
+| Individual functions (label parsing, ID resolution, XML element creation)
+| Table-driven tests using `go test`. Test files co-located with source (`*_test.go`).
+
+| Integration tests
+| Package-level (full model load/save cycle, full XML round-trip)
+| Use test fixtures in `testdata/` directories. Verify file output matches expected golden files.
+
+| End-to-end tests
+| Full CLI commands
+| Run the compiled binary with test input files. Verify output files and exit codes. Use `testscript` or shell-based test runner.
+|===
+
+=== Test Fixtures
+
+Each package has a `testdata/` directory with representative input files:
+
+....
+internal/model/testdata/
+├── valid-model.jsonc
+├── invalid-missing-kind.jsonc
+└── nested-elements.jsonc
+
+internal/drawio/testdata/
+├── simple-diagram.drawio
+├── multi-page.drawio
+└── with-containers.drawio
+
+internal/sync/testdata/
+├── scenario-new-element/
+│   ├── before-model.jsonc
+│   ├── before-drawio.drawio
+│   ├── sync-state.json
+│   ├── expected-model.jsonc
+│   └── expected-drawio.drawio
+└── scenario-conflict/
+    └── ...
+....
+
+=== Golden File Testing
+
+For sync scenarios, the test runs a sync cycle and compares the output against expected files. If the output changes intentionally, update the golden files with a flag:
+
+[source,bash]
+----
+go test ./internal/sync/ -update-golden
+----
+
+== Logging and Output
+
+=== User-Facing Output
+
+Normal output goes to **stdout** in one of two formats:
+
+* **text** (default): Human-readable summaries
+* **json** (`--format json`): Machine-parseable output for LLM integration
+
+Warnings and errors go to **stderr**.
+
+=== Verbose Mode
+
+With `--verbose`, additional details are printed to stderr:
+
+....
+[DEBUG] Loading model from architecture.jsonc
+[DEBUG] Loading draw.io from architecture.drawio
+[DEBUG] Loading sync state from .bausteinsicht-sync
+[DEBUG] Detected 2 model changes, 1 drawio change, 0 conflicts
+[DEBUG] Forward: creating element webshop.cache
+[DEBUG] Forward: updating label on webshop.api
+[DEBUG] Reverse: updating title of customer
+[INFO]  Sync complete: 2 forward changes, 1 reverse change
+....
+
+=== No Logging Framework
+
+Bausteinsicht uses Go's standard `log` package for verbose output and `fmt` for normal output. No external logging framework is needed for a CLI tool.
+
+== Version Management
+
+The binary version is set at build time via `ldflags`:
+
+[source,bash]
+----
+go build -ldflags "-X main.version=0.1.0" ./cmd/bausteinsicht
+----
+
+The `--version` flag prints:
+
+....
+bausteinsicht version 0.1.0
+....
+
+GoReleaser handles this automatically for tagged releases.
+
+== JSONC Handling
+
+Standard Go `encoding/json` does not support comments. Bausteinsicht strips comments before parsing:
+
+1. Remove single-line comments (`// ...`)
+2. Remove trailing commas before `}` and `]`
+3. Parse the cleaned JSON with `encoding/json`
+4. When writing back, format with `json.MarshalIndent` (comments are lost on write)
+
+NOTE: Preserving user comments across sync cycles is a future enhancement. For v1, comments in the model file are stripped on write.
+
+== File Atomicity
+
+When writing files, Bausteinsicht uses a write-to-temp-then-rename pattern:
+
+1. Write to a temporary file in the same directory (e.g., `.model.jsonc.tmp`)
+2. `os.Rename` the temp file to the target path (atomic on most filesystems)
+3. On failure, the original file remains intact
+
+This prevents corrupted files if the process is interrupted during write.
+
+== Configuration Discovery
+
+Bausteinsicht uses convention over configuration:
+
+1. Look for `*.jsonc` in the current directory (first match = model file)
+2. Look for `*.drawio` in the current directory (first match = diagram file)
+3. Look for `.bausteinsicht-sync` in the current directory
+4. Template: `template.drawio` in the current directory, or fall back to the embedded default
+
+All paths can be overridden via CLI flags (`--model`, `--template`).
