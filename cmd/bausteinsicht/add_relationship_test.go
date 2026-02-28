@@ -192,7 +192,7 @@ func TestAddRelationshipDuplicateWarning(t *testing.T) {
 		"--label", "also reads",
 	})
 	err := cmd2.Execute()
-	w.Close()
+	_ = w.Close()
 	os.Stderr = oldStderr
 
 	if err != nil {
@@ -200,7 +200,7 @@ func TestAddRelationshipDuplicateWarning(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	buf.ReadFrom(r)
+	_, _ = buf.ReadFrom(r)
 	if !strings.Contains(buf.String(), "already exists") {
 		t.Errorf("expected duplicate warning, got: %q", buf.String())
 	}
@@ -233,7 +233,7 @@ func TestAddRelationshipJSONOutput(t *testing.T) {
 	})
 
 	err := cmd.Execute()
-	w.Close()
+	_ = w.Close()
 	os.Stdout = oldStdout
 
 	if err != nil {
@@ -241,7 +241,7 @@ func TestAddRelationshipJSONOutput(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	buf.ReadFrom(r)
+	_, _ = buf.ReadFrom(r)
 	output := buf.String()
 
 	var result map[string]string
