@@ -34,7 +34,7 @@ func Save(path string, model *BausteinsichtModel) error {
 		return fmt.Errorf("writing temp file: %w", err)
 	}
 	if err := os.Rename(tmp, path); err != nil {
-		os.Remove(tmp)
+		_ = os.Remove(tmp)
 		return fmt.Errorf("renaming temp file: %w", err)
 	}
 	return nil
