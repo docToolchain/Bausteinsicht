@@ -119,6 +119,51 @@ func TestStopWorksCleanly(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 }
 
+func TestFileRedetectedAfterDeleteRecreate(t *testing.T) {
+	path := createTempFile(t)
+
+	var mu sync.Mutex
+	var called int
+
+	w, err := New([]string{path}, 100*time.Millisecond, func(changedFile string) {
+		mu.Lock()
+		defer mu.Unlock()
+		called++
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Stop()
+
+	if err := w.Start(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Delete the file
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(200 * time.Millisecond)
+
+	// Recreate the file
+	if err := os.WriteFile(path, []byte("recreated"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(500 * time.Millisecond)
+
+	// Modify the recreated file
+	if err := os.WriteFile(path, []byte("modified-after-recreate"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(300 * time.Millisecond)
+
+	mu.Lock()
+	defer mu.Unlock()
+	if called < 1 {
+		t.Errorf("expected at least 1 callback after file delete+recreate, got %d", called)
+	}
+}
+
 func TestSyncingFlagPreventsCallback(t *testing.T) {
 	path := createTempFile(t)
 
