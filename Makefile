@@ -1,4 +1,4 @@
-.PHONY: build test test-race lint vet staticcheck gosec nilaway govulncheck git-secrets golangci-lint check clean install-tools
+.PHONY: build test test-race vet staticcheck gosec nilaway govulncheck git-secrets golangci-lint check clean install-tools
 
 # Ensure GOPATH/bin is in PATH for installed tools
 export PATH := $(PATH):$(shell go env GOPATH)/bin
