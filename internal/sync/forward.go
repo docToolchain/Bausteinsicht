@@ -422,23 +422,58 @@ func applyElementModified(
 		return
 	}
 
+	// Handle kind changes separately (only updates attribute and style).
+	if ch.Field == "kind" {
+		ts, ok := templates.GetStyle(elem.Kind)
+		if ok {
+			page.UpdateElementKind(ch.ID, elem.Kind, ts.Style)
+		} else {
+			page.UpdateElementKind(ch.ID, elem.Kind, "")
+		}
+		result.ElementsUpdated++
+		return
+	}
+
+	// When a specific field is known, read the current draw.io values and only
+	// override the changed field. This prevents overwriting draw.io-side changes
+	// to other fields during concurrent modification. (#109)
+	title := elem.Title
+	technology := elem.Technology
+	description := elem.Description
+
+	if ch.Field != "" {
+		obj := page.FindElement(ch.ID)
+		if obj != nil {
+			label := obj.SelectAttrValue("label", "")
+			curTitle, curTech, curDesc := drawio.ParseLabel(label)
+			curTooltip := obj.SelectAttrValue("tooltip", "")
+			if curDesc == "" {
+				curDesc = curTooltip
+			}
+
+			// Start from current draw.io values, override only the changed field.
+			title = curTitle
+			technology = curTech
+			description = curDesc
+
+			switch ch.Field {
+			case "title":
+				title = elem.Title
+			case "technology":
+				technology = elem.Technology
+			case "description":
+				description = elem.Description
+			}
+		}
+	}
+
 	data := drawio.ElementData{
 		ID:          ch.ID,
-		Title:       elem.Title,
-		Technology:  elem.Technology,
-		Description: elem.Description,
+		Title:       title,
+		Technology:  technology,
+		Description: description,
 	}
-
 	page.UpdateElement(ch.ID, data)
-
-	if ch.Field == "kind" {
-		style := ""
-		if ts, ok := templates.GetStyle(elem.Kind); ok {
-			style = ts.Style
-		}
-		page.UpdateElementKind(ch.ID, elem.Kind, style)
-	}
-
 	result.ElementsUpdated++
 }
 
