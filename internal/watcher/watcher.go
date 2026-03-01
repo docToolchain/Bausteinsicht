@@ -140,6 +140,15 @@ func (w *Watcher) rewatch(path string) {
 		if _, err := os.Stat(path); err == nil {
 			// File exists again — re-add to watcher.
 			_ = w.fsWatcher.Add(path)
+			// File was replaced via atomic rename — trigger callback
+			// since the content has changed but no Write event will fire.
+			if !w.isSyncing() {
+				time.AfterFunc(w.debounce, func() {
+					if !w.isSyncing() {
+						w.onChange(path)
+					}
+				})
+			}
 			return
 		}
 		time.Sleep(pollInterval)
