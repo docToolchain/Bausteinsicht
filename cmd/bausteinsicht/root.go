@@ -59,9 +59,9 @@ func ExecuteRoot(cmd *cobra.Command) error {
 			"error": err.Error(),
 			"code":  code,
 		})
-		fmt.Fprintln(cmd.ErrOrStderr(), string(out))
+		_, _ = fmt.Fprintln(cmd.ErrOrStderr(), string(out))
 	} else {
-		fmt.Fprintln(cmd.ErrOrStderr(), err.Error())
+		_, _ = fmt.Fprintln(cmd.ErrOrStderr(), err.Error())
 	}
 	return err
 }
