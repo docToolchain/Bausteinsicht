@@ -3,6 +3,9 @@
   "build": {
     "dockerfile": "Dockerfile"
   },
+  "containerEnv": {
+    "COLORTERM": "truecolor"
+  },
   "features": {
     "ghcr.io/devcontainers/features/github-cli:1": {}
   },

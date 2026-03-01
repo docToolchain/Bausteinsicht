@@ -67,16 +67,12 @@ RUN printf '#!/bin/sh\nxvfb-run drawio "$@"\n' > /usr/local/bin/drawio-export \
  && chmod +x /usr/local/bin/drawio-export
 
 # ──────────────────────────────────────────────
-# Node.js (needed for Claude Code CLI)
+# Claude Code CLI (native installer, no Node.js dependency)
+# Install as vscode user so binary lands in ~/.local/bin/
 # ──────────────────────────────────────────────
-RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
- && apt-get install -y --no-install-recommends nodejs \
- && rm -rf /var/lib/apt/lists/*
-
-# ──────────────────────────────────────────────
-# Claude Code CLI
-# ──────────────────────────────────────────────
-RUN npm install -g @anthropic-ai/claude-code
+USER vscode
+RUN curl -fsSL https://claude.ai/install.sh | bash
+USER root
 
 # ──────────────────────────────────────────────
 # human CLI (gethuman.sh — AI agent issue tracker integration)
