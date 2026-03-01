@@ -343,3 +343,53 @@ func elementX(page *drawio.Page, id string) float64 {
 	}
 	return f
 }
+
+// TestReconcileViewPage_PreservesUserAddedElements verifies that elements
+// manually added by the user in draw.io (with bausteinsicht_id but NOT in
+// the model) are preserved during reconciliation, while model elements not
+// in the view's resolved set are deleted. Regression test for #115.
+func TestReconcileViewPage_PreservesUserAddedElements(t *testing.T) {
+	// Create a page with three elements:
+	// - "a": in the model AND in the view filter (should be kept)
+	// - "b": in the model but NOT in the view filter (should be deleted)
+	// - "useradded": NOT in the model at all (user-added, should be preserved)
+	doc := drawio.NewDocument()
+	page := doc.AddPage("view-test", "Test View")
+	_ = page.CreateElement(drawio.ElementData{
+		ID: "a", CellID: "test--a", Kind: "container", Title: "A",
+	}, "")
+	_ = page.CreateElement(drawio.ElementData{
+		ID: "b", CellID: "test--b", Kind: "container", Title: "B",
+	}, "")
+	_ = page.CreateElement(drawio.ElementData{
+		ID: "useradded", CellID: "test--useradded", Kind: "container", Title: "User Added",
+	}, "")
+
+	elemFilter := map[string]bool{"a": true}
+	flat := map[string]*model.Element{
+		"a": {Kind: "container", Title: "A"},
+		"b": {Kind: "container", Title: "B"},
+	}
+
+	result := &ForwardResult{}
+	reconcileViewPage(page, elemFilter, flat, "", "test", result)
+
+	// "a" is in the filter — should be kept.
+	if page.FindElement("a") == nil {
+		t.Error("element 'a' should be preserved (in view filter)")
+	}
+
+	// "b" is in the model but not in the filter — should be deleted.
+	if page.FindElement("b") != nil {
+		t.Error("element 'b' should be deleted (in model, not in view filter)")
+	}
+
+	// "useradded" is NOT in the model — should be preserved (user-added).
+	if page.FindElement("useradded") == nil {
+		t.Error("element 'useradded' should be preserved (not in model, user-added in draw.io)")
+	}
+
+	if result.ElementsDeleted != 1 {
+		t.Errorf("expected 1 element deleted, got %d", result.ElementsDeleted)
+	}
+}
