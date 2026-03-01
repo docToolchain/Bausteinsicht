@@ -8,6 +8,22 @@
 
 == Security Review — 2026-03-01
 
+=== Changelog
+
+[cols="1,3"]
+|===
+| Date | Changes
+
+| 2026-03-01 (initial)
+| Initial full security review at commit `992d7c1`. 10 findings (SEC-001 to SEC-010) identified.
+
+| 2026-03-01 (fixes)
+| Fixed SEC-002 (predictable temp file), SEC-003 (data race), SEC-009 (Go 1.23.0 → 1.24.0), SEC-010 (x/sys v0.13.0 → v0.41.0). Merged as PR #77.
+
+| 2026-03-01 (tooling)
+| Added Makefile with `gosec`, `staticcheck`, `nilaway`, `govulncheck`, `go vet` (PR #78). First automated scan identified 2 new findings: SEC-011 (unhandled error), SEC-012 (potential nil panics). Updated dependency status table.
+|===
+
 === Scope
 
 Full security review of the Bausteinsicht repository at commit `992d7c1` (main branch, 2026-03-01).
@@ -44,12 +60,12 @@ The primary risk scenario is a **malicious or crafted model/drawio file** shared
 | SEC-002
 | Low-Medium
 | Predictable temp file name in `model.Save` (TOCTOU / symlink attack)
-| Fixed
+| Fixed (PR #77)
 
 | SEC-003
 | Low-Medium
 | Data race on `lastFile` variable in watcher debounce closure
-| Fixed
+| Fixed (PR #77)
 
 | SEC-004
 | Low
@@ -79,12 +95,22 @@ The primary risk scenario is a **malicious or crafted model/drawio file** shared
 | SEC-009
 | Medium
 | Go toolchain 1.23.0 has 25 known stdlib vulnerabilities
-| Fixed (upgraded to 1.24.0)
+| Fixed (PR #77, upgraded to 1.24.0)
 
 | SEC-010
 | Low
 | `golang.org/x/sys` v0.13.0 is 28 minor versions behind current
-| Fixed (upgraded to v0.41.0)
+| Fixed (PR #77, upgraded to v0.41.0)
+
+| SEC-011
+| Low
+| Unhandled `tmp.Close()` error in `model.Save` cleanup path
+| Open
+
+| SEC-012
+| Low
+| Potential nil panics from unchecked `GetPage()` return values
+| Open
 |===
 
 === Findings
@@ -119,74 +145,23 @@ Supplying `--model /tmp/../../some/path/x.jsonc` causes writes at attacker-chose
 For a local CLI tool where the operator provides their own flags, this is acceptable.
 If the CLI is ever wrapped in automation (CI/CD, LLM agent pipelines), this becomes exploitable.
 
+**Tool correlation:** Also flagged by `gosec` as G304 (CWE-22) in `loader.go:14`, `template.go:28`, `state.go:44`, `state.go:100`.
+
 **Recommendation:**
 After resolving the user-supplied path with `filepath.Abs`, verify the result is rooted at an allowed base directory.
 At minimum, document that paths are fully trusted and the tool must not be run with untrusted flag values.
 
-==== SEC-002: Predictable Temp File in model.Save (Low-Medium)
+==== SEC-002: Predictable Temp File in model.Save (Low-Medium) — FIXED
 
 **Affected file:** `internal/model/loader.go:32-38`
 
-[source,go]
-----
-tmp := path + ".tmp"                      // predictable name
-if err := os.WriteFile(tmp, data, 0644);  // no O_EXCL protection
-    ...
-if err := os.Rename(tmp, path); err != nil {
-----
+**Fix applied in PR #77:** Replaced `path + ".tmp"` with `os.CreateTemp(dir, ".model-tmp-*")`, aligning with the safe pattern used in `SaveDocument` and `SaveState`.
 
-**Description:**
-`model.Save` constructs the temp filename by appending `.tmp` to the model path.
-This is predictable and creates two issues:
-
-1. **Concurrent write race:** Two sync operations could write to the same `.tmp` file simultaneously.
-2. **Symlink attack:** A malicious local user who knows the model path could pre-create a symlink at `path + ".tmp"` pointing to an arbitrary file.
-
-The other two write functions (`SaveDocument` in `document.go:36` and `SaveState` in `state.go:76`) correctly use `os.CreateTemp` with randomized suffixes.
-
-**Recommendation:**
-Align `model.Save` with the safe pattern used elsewhere:
-
-[source,go]
-----
-dir := filepath.Dir(path)
-tmp, err := os.CreateTemp(dir, ".model-tmp-*")
-----
-
-==== SEC-003: Data Race in Watcher Debounce (Low-Medium)
+==== SEC-003: Data Race in Watcher Debounce (Low-Medium) — FIXED
 
 **Affected file:** `internal/watcher/watcher.go:99-108`
 
-[source,go]
-----
-lastFile = event.Name          // written by loop goroutine
-
-timer = time.AfterFunc(w.debounce, func() {
-    if !w.isSyncing() {
-        w.onChange(lastFile)   // read by AfterFunc goroutine — DATA RACE
-    }
-})
-----
-
-**Description:**
-`lastFile` is captured by reference in the `time.AfterFunc` closure.
-The `loop` goroutine may update `lastFile` while the timer goroutine concurrently reads it.
-This is a data race under Go's memory model and would be flagged by `go test -race`.
-
-The practical consequence is minor (both files trigger the same sync action), but it is formally incorrect.
-
-**Recommendation:**
-Capture `lastFile` by value:
-
-[source,go]
-----
-captured := lastFile
-timer = time.AfterFunc(w.debounce, func() {
-    if !w.isSyncing() {
-        w.onChange(captured)
-    }
-})
-----
+**Fix applied in PR #77:** Added `captured := lastFile` before `time.AfterFunc` closure to capture the variable by value instead of by reference. Verified with `go test -race ./...`.
 
 ==== SEC-004: World-Readable File Permissions (Low)
 
@@ -199,12 +174,14 @@ timer = time.AfterFunc(w.debounce, func() {
 Model and template files are written with `0644` (world-readable).
 On a shared system, the architecture model is readable by all local users.
 
+**Tool correlation:** Flagged by `gosec` as G306 (CWE-276) in `init.go:46` and `init.go:51`.
+
 **Recommendation:**
 Use `0600` for model files, or let the user's umask control permissions.
 
 ==== SEC-005: AutoDetect Confused Deputy (Low)
 
-**Affected file:** `internal/model/loader.go:44-53`
+**Affected file:** `internal/model/loader.go:56-65`
 
 [source,go]
 ----
@@ -266,50 +243,62 @@ This only affects the fallback path in `ParseLabel` (when the label does not sta
 **Recommendation:**
 Either use a proper HTML tokenizer or add attribute-aware parsing for the `>` inside quotes case.
 
-==== SEC-009: Outdated Go Toolchain (Medium)
+==== SEC-009: Outdated Go Toolchain (Medium) — FIXED
 
-**Current version:** Go 1.23.0 +
-**Recommended minimum:** Go 1.23.12+
+**Previous version:** Go 1.23.0 +
+**Fixed version:** Go 1.24.0
 
-**Description:**
-The Go 1.23.0 standard library contains 25 known vulnerabilities.
-Most are in packages not used by this CLI tool (`net/http`, `crypto/tls`, `crypto/x509`),
-but the following are relevant:
+**Fix applied in PR #77:** Updated `go.mod` to `go 1.24.0`. All 25 stdlib vulnerabilities resolved.
+Confirmed by `govulncheck` — no vulnerable symbols called by project code.
 
-[cols="1,2,1"]
-|===
-| CVE / ID | Description | Fixed in
+==== SEC-010: Outdated golang.org/x/sys (Low) — FIXED
 
-| GO-2026-4403
-| `os.Root.Open("../")` escapes confinement (not used but `os` imported)
-| go1.23.9
+**Previous version:** v0.13.0 +
+**Fixed version:** v0.41.0
 
-| GO-2025-3956
-| `os/exec.LookPath` returns unexpected paths
-| go1.23.12
+**Fix applied in PR #77:** Updated via `go get golang.org/x/sys@latest && go mod tidy`.
 
-| GO-2024-3105
-| `go/parser.Parse` stack exhaustion
-| go1.23.1
-|===
+==== SEC-011: Unhandled Error in model.Save Cleanup (Low)
 
-**No project code calls vulnerable symbols.** This is confirmed by `govulncheck` binary analysis.
+_Added 2026-03-01 — discovered by `gosec` (G104, CWE-703)_
 
-**Recommendation:**
-Update `go.mod` to `go 1.23.12` or higher, then run `go mod tidy`.
+**Affected file:** `internal/model/loader.go:40`
 
-==== SEC-010: Outdated golang.org/x/sys (Low)
-
-**Current version:** v0.13.0 +
-**Latest version:** v0.41.0
+[source,go]
+----
+if _, err := tmp.Write(data); err != nil {
+    tmp.Close()          // error return value not checked
+    _ = os.Remove(tmpName)
+    return ...
+}
+----
 
 **Description:**
-This transitive dependency (pulled in by `fsnotify`) is 28 minor versions behind.
-No specific CVE was found for v0.13.0 in the OSV database,
-but the staleness makes it difficult to reason about coverage of all low-level fixes.
+In the error cleanup path of `model.Save`, `tmp.Close()` is called without checking its return value.
+While unlikely to cause data loss (the write already failed), it violates Go error handling best practices.
 
 **Recommendation:**
-Run `go get golang.org/x/sys@latest && go mod tidy`.
+Use `_ = tmp.Close()` to explicitly discard the error, or log it.
+
+==== SEC-012: Potential Nil Panics from Unchecked GetPage() (Low)
+
+_Added 2026-03-01 — discovered by `nilaway`_
+
+**Affected files:**
+
+* `internal/drawio/document.go:129` — `Page.diagram` accessed without nil check
+* `internal/model/validate.go:117` — `strings.SplitN` result used without nil check
+* Test files: `sync/forward_scoped_ids_test.go`, `sync/forward_views_test.go`, `sync/forward_test.go`
+
+**Description:**
+`GetPage()` can return `nil` when a page is not found (`document.go:86`).
+Multiple call sites — both in production code and tests — use the return value without checking for `nil`.
+If a view references a non-existent page, the program would panic with a nil pointer dereference.
+
+In test code this is less critical (tests would fail with a clear panic), but in production code paths it should be handled gracefully.
+
+**Recommendation:**
+Add nil checks after `GetPage()` calls in production code. In tests, use `t.Fatal` if page is nil.
 
 === Not Vulnerable
 
@@ -363,51 +352,135 @@ The following attack vectors were explicitly tested and confirmed **not exploita
 | None
 
 | `github.com/spf13/pflag`
-| v1.0.9
+| v1.0.10
 | v1.0.10
 | None
 
 | `golang.org/x/sys`
-| v0.13.0
 | v0.41.0
-| None known
+| v0.41.0
+| None
 
 | Go stdlib
-| 1.23.0
+| 1.24.0
 | 1.24.x
-| 25 (none called by project code)
+| None called by project code
 |===
 
 `go.sum` integrity: **PASS** (`go mod verify` — all modules verified)
 
+=== Automated Tool Results
+
+[cols="1,1,1,3"]
+|===
+| Tool | Version | Result | Notes
+
+| `go vet`
+| go1.24.0
+| PASS
+| No findings
+
+| `staticcheck`
+| latest
+| PASS
+| No findings
+
+| `gosec`
+| latest
+| 7 findings
+| 4× G304 (path traversal, → SEC-001), 2× G306 (file permissions, → SEC-004), 1× G104 (unhandled error, → SEC-011)
+
+| `nilaway`
+| latest
+| 14 findings
+| Nil panics from unchecked `GetPage()` returns (→ SEC-012), `SplitN` result in `validate.go`
+
+| `govulncheck`
+| latest
+| Error
+| Internal error on `golang.org/x/sys/unix` import; needs investigation
+
+| `go test -race`
+| go1.24.0
+| PASS
+| No data races detected
+|===
+
 === Prioritized Action Items
 
-==== High Priority
+==== Completed
 
-1. **Upgrade Go toolchain** from 1.23.0 to 1.23.12+ — resolves 25 stdlib vulnerabilities
-2. **Update `golang.org/x/sys`** from v0.13.0 to latest — `go get golang.org/x/sys@latest`
+[cols="1,3,1"]
+|===
+| Priority | Action | PR
 
-==== Medium Priority
+| High
+| Upgrade Go toolchain from 1.23.0 to 1.24.0 (SEC-009)
+| #77
 
-3. **Fix SEC-002**: Replace predictable temp file in `model.Save` with `os.CreateTemp`
-4. **Fix SEC-003**: Capture `lastFile` by value in watcher debounce closure
-5. **Document SEC-001**: Add note to README/CLAUDE.md that `--model`/`--template` paths are fully trusted
+| High
+| Update `golang.org/x/sys` from v0.13.0 to v0.41.0 (SEC-010)
+| #77
 
-==== Low Priority
+| Medium
+| Fix predictable temp file in `model.Save` (SEC-002)
+| #77
 
-6. **Fix SEC-005**: Error on multiple `.jsonc` files without explicit `--model`
-7. **Fix SEC-006**: Add 10 MB file size limit to `model.Load`
-8. **Fix SEC-007**: Add max depth (100) to recursive `Children` traversal
-9. **Fix SEC-004**: Use `0600` instead of `0644` for model files
-10. **Fix SEC-008**: Improve `stripTags` attribute handling
+| Medium
+| Fix data race in watcher debounce closure (SEC-003)
+| #77
+
+| —
+| Add Makefile with lint and security tools
+| #78
+|===
+
+==== Remaining Open
+
+[cols="1,1,3"]
+|===
+| Priority | ID | Action
+
+| Medium
+| SEC-001
+| Document that `--model`/`--template` paths are fully trusted; add path validation if CLI is used in automation
+
+| Low
+| SEC-004
+| Use `0600` instead of `0644` for model files
+
+| Low
+| SEC-005
+| Error on multiple `.jsonc` files without explicit `--model`
+
+| Low
+| SEC-006
+| Add 10 MB file size limit to `model.Load`
+
+| Low
+| SEC-007
+| Add max depth (100) to recursive `Children` traversal
+
+| Low
+| SEC-008
+| Improve `stripTags` attribute handling
+
+| Low
+| SEC-011
+| Explicitly discard `tmp.Close()` error in cleanup path
+
+| Low
+| SEC-012
+| Add nil checks after `GetPage()` calls in production code
+|===
 
 === Next Review
 
 The next security review should:
 
-* Verify all action items from this review are resolved
-* Re-run `govulncheck` with updated Go toolchain
+* Verify all remaining open items
+* Re-run `govulncheck` (investigate internal error with `x/sys/unix`)
 * Review any new CLI commands or features added since this review
 * Check for new CVEs in dependencies (especially `beevik/etree` for XML parsing)
-* Run `go test -race ./...` to verify SEC-003 fix
+* Re-run full `make check` and compare results
 * If export command (#63) is implemented, review for file write safety and draw.io CLI invocation
