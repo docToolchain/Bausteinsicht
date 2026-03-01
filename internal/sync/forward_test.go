@@ -393,3 +393,80 @@ func TestReconcileViewPage_PreservesUserAddedElements(t *testing.T) {
 		t.Errorf("expected 1 element deleted, got %d", result.ElementsDeleted)
 	}
 }
+
+// TestApplyForward_EmptyModelRemovesElements verifies that when the model is
+// emptied (no elements), forward sync removes all elements from the draw.io
+// page, including in no-views (legacy) mode. Regression test for #110.
+func TestApplyForward_EmptyModelRemovesElements(t *testing.T) {
+	// Start with a document that has two elements on the page.
+	doc := drawio.NewDocument()
+	page := doc.AddPage("p1", "Page 1")
+	_ = page.CreateElement(drawio.ElementData{
+		ID: "a", CellID: "a", Kind: "container", Title: "A",
+	}, "")
+	_ = page.CreateElement(drawio.ElementData{
+		ID: "b", CellID: "b", Kind: "container", Title: "B",
+	}, "")
+
+	// Empty model — no elements, no views.
+	m := emptyModel()
+	ts := minimalTemplates(t)
+
+	// ChangeSet has explicit deletions for both elements.
+	cs := &ChangeSet{
+		ModelElementChanges: []ElementChange{
+			{ID: "a", Type: Deleted},
+			{ID: "b", Type: Deleted},
+		},
+	}
+
+	result := ApplyForward(cs, doc, ts, m)
+
+	if result.ElementsDeleted != 2 {
+		t.Errorf("expected 2 elements deleted, got %d", result.ElementsDeleted)
+	}
+	if page.FindElement("a") != nil {
+		t.Error("element 'a' should have been removed")
+	}
+	if page.FindElement("b") != nil {
+		t.Error("element 'b' should have been removed")
+	}
+}
+
+// TestApplyForward_NoViewsReconciliation verifies that in no-views (legacy)
+// mode, orphaned elements on the page are cleaned up even without explicit
+// Deleted changes in the ChangeSet. This handles the case where sync state
+// is missing or out of sync. Regression test for #110.
+func TestApplyForward_NoViewsReconciliation(t *testing.T) {
+	// Document has elements "a" and "orphan" on the page.
+	doc := drawio.NewDocument()
+	page := doc.AddPage("p1", "Page 1")
+	_ = page.CreateElement(drawio.ElementData{
+		ID: "a", CellID: "a", Kind: "container", Title: "A",
+	}, "")
+	_ = page.CreateElement(drawio.ElementData{
+		ID: "orphan", CellID: "orphan", Kind: "container", Title: "Orphan",
+	}, "")
+
+	// Model only has element "a" — "orphan" is not in the model.
+	// But there's NO Deleted entry in the ChangeSet (e.g., sync state lost).
+	m := modelWithElem("a", "container", "A")
+	ts := minimalTemplates(t)
+	cs := &ChangeSet{} // No changes — but orphan should still be cleaned up.
+
+	result := ApplyForward(cs, doc, ts, m)
+
+	// "a" should be preserved.
+	if page.FindElement("a") == nil {
+		t.Error("element 'a' should be preserved (in model)")
+	}
+
+	// "orphan" should be removed — it's not in the model.
+	if page.FindElement("orphan") != nil {
+		t.Error("orphan element should be removed (not in model)")
+	}
+
+	if result.ElementsDeleted != 1 {
+		t.Errorf("expected 1 element deleted (orphan), got %d", result.ElementsDeleted)
+	}
+}
