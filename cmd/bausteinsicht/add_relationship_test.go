@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/docToolchain/Bauteinsicht/internal/model"
@@ -166,7 +165,7 @@ func TestAddRelationshipInvalidKind(t *testing.T) {
 	}
 }
 
-func TestAddRelationshipDuplicateWarning(t *testing.T) {
+func TestAddRelationshipDuplicateBlocked(t *testing.T) {
 	dir := t.TempDir()
 	modelPath := writeRelTestModel(t, dir)
 
@@ -180,10 +179,6 @@ func TestAddRelationshipDuplicateWarning(t *testing.T) {
 		t.Fatalf("first add failed: %v", err)
 	}
 
-	oldStderr := os.Stderr
-	r, w, _ := os.Pipe()
-	os.Stderr = w
-
 	cmd2 := NewRootCmd()
 	cmd2.SetArgs([]string{"add", "relationship",
 		"--model", modelPath,
@@ -191,26 +186,21 @@ func TestAddRelationshipDuplicateWarning(t *testing.T) {
 		"--to", "webshop.db",
 		"--label", "also reads",
 	})
+	cmd2.SilenceErrors = true
+	cmd2.SilenceUsage = true
 	err := cmd2.Execute()
-	_ = w.Close()
-	os.Stderr = oldStderr
 
-	if err != nil {
-		t.Fatalf("second add should succeed with warning: %v", err)
+	if err == nil {
+		t.Fatal("expected error for duplicate relationship, got nil")
 	}
 
-	var buf bytes.Buffer
-	_, _ = buf.ReadFrom(r)
-	if !strings.Contains(buf.String(), "already exists") {
-		t.Errorf("expected duplicate warning, got: %q", buf.String())
-	}
-
+	// Verify the duplicate was NOT added.
 	m, err := model.Load(modelPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(m.Relationships) != 2 {
-		t.Errorf("expected 2 relationships, got %d", len(m.Relationships))
+	if len(m.Relationships) != 1 {
+		t.Errorf("expected 1 relationship (duplicate blocked), got %d", len(m.Relationships))
 	}
 }
 
