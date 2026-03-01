@@ -1,0 +1,78 @@
+= Bausteinsicht
+
+Architecture-as-code tool with https://www.drawio.com/[draw.io] as visual frontend and bidirectional synchronization.
+
+Define your architecture in a JSONC text file, and Bausteinsicht generates and updates draw.io diagrams automatically — in both directions.
+
+== Quick Start
+
+[source,bash]
+----
+# Build from source
+go build -o bausteinsicht ./cmd/bausteinsicht/
+
+# Initialize a sample project
+mkdir my-architecture && cd my-architecture
+bausteinsicht init
+bausteinsicht sync
+----
+
+Open `architecture.drawio` in draw.io to see the generated diagrams.
+
+== Features
+
+* **Bidirectional sync** — model → diagram and diagram → model
+* **Watch mode** — `bausteinsicht watch` for continuous sync on save
+* **Multi-view** — multiple diagram pages from one model (context, container, component views)
+* **Scope & bounding boxes** — visual boundaries around parent elements
+* **Relationship lifting** — connectors auto-lift to parent when endpoint is not on a view
+* **CLI-first** — all commands support `--format json` for LLM/AI agent workflows
+* **JSON Schema** — IDE autocompletion without plugins
+
+== Development
+
+=== Devcontainer (recommended)
+
+The `.devcontainer/` provides a fully reproducible environment with all tools pre-installed.
+Works with VS Code Dev Containers, GitHub Codespaces, or the `devcontainer` CLI.
+
+[source,bash]
+----
+# Start the devcontainer
+devcontainer up --workspace-folder .
+
+# Run commands inside
+devcontainer exec --workspace-folder . make check
+----
+
+Included tools: Go, staticcheck, gosec, nilaway, govulncheck, golangci-lint, gitleaks, draw.io (headless), Claude Code, human CLI, GitHub CLI.
+
+=== Manual Setup
+
+Requires Go 1.24+. Install analysis tools with:
+
+[source,bash]
+----
+make install-tools
+----
+
+=== Build & Test
+
+[source,bash]
+----
+make build          # build binary
+make test           # run tests
+make check          # all analysis tools + race-detected tests
+----
+
+== Documentation
+
+* link:src/docs/manual/user-manual.adoc[User Manual]
+* link:src/docs/spec/02_cli_specification.adoc[CLI Specification]
+* link:src/docs/spec/03_data_models.adoc[Data Models]
+* link:src/docs/spec/05_sync_specification.adoc[Sync Specification]
+* link:src/docs/spec/06_tutorial.adoc[Getting Started Tutorial]
+
+== License
+
+See link:LICENSE[LICENSE].
