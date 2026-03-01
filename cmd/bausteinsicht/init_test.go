@@ -87,6 +87,36 @@ func TestInitDrawioFilesExist(t *testing.T) {
 	}
 }
 
+func TestInitTemplateFileExists(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
+
+	// Create template file to trigger conflict.
+	if err := os.WriteFile(defaultTemplFile, []byte("custom"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"init"})
+	cmd.SilenceErrors = true
+	cmd.SilenceUsage = true
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error when template file already exists")
+	}
+
+	// Verify custom template was NOT overwritten.
+	data, _ := os.ReadFile(defaultTemplFile)
+	if string(data) != "custom" {
+		t.Error("template.drawio was overwritten despite already existing")
+	}
+}
+
 func TestInitGeneratesValidModel(t *testing.T) {
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
