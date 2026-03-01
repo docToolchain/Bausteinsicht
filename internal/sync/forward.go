@@ -497,7 +497,8 @@ func countConnectorsFor(page *drawio.Page, cellID string) int {
 	return n
 }
 
-// applyRelAdded creates a new connector on page.
+// applyRelAdded creates a new connector on page. If the connector already
+// exists (e.g., sync state was deleted), it is skipped to avoid duplicates. (#119)
 func applyRelAdded(
 	ch RelationshipChange,
 	viewID string,
@@ -505,13 +506,21 @@ func applyRelAdded(
 	templates *drawio.TemplateSet,
 	result *ForwardResult,
 ) {
+	srcRef := scopedCellID(viewID, ch.From)
+	tgtRef := scopedCellID(viewID, ch.To)
+
+	// Skip if connector already exists to prevent duplicates. (#119)
+	if page.FindConnector(srcRef, tgtRef) != nil {
+		return
+	}
+
 	style := templates.GetConnectorStyle()
 	data := drawio.ConnectorData{
 		From:      ch.From,
 		To:        ch.To,
 		Label:     ch.NewValue,
-		SourceRef: scopedCellID(viewID, ch.From),
-		TargetRef: scopedCellID(viewID, ch.To),
+		SourceRef: srcRef,
+		TargetRef: tgtRef,
 	}
 	page.CreateConnector(data, style)
 	result.ConnectorsCreated++
