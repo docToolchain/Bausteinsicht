@@ -131,7 +131,7 @@ func doSync(changedFile, modelPath, drawioPath, templatePath string) {
 
 	result := bsync.Run(m, doc, state, tmpl)
 
-	if err := model.Save(modelPath, m); err != nil {
+	if err := saveModel(modelPath, m, result); err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR saving model: %v\n", err)
 		return
 	}
