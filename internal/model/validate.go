@@ -65,6 +65,8 @@ func validateElement(m *BausteinsichtModel, path string, elem Element) []Validat
 
 func validateRelationships(m *BausteinsichtModel) []ValidationError {
 	var errs []ValidationError
+	seen := make(map[string]int) // "from->to" → first index
+
 	for i, rel := range m.Relationships {
 		path := fmt.Sprintf("relationships[%d]", i)
 
@@ -87,6 +89,17 @@ func validateRelationships(m *BausteinsichtModel) []ValidationError {
 					Message: fmt.Sprintf("unknown relationship kind %q", rel.Kind),
 				})
 			}
+		}
+
+		// Detect duplicate from/to pairs. (#117)
+		key := rel.From + "->" + rel.To
+		if firstIdx, exists := seen[key]; exists {
+			errs = append(errs, ValidationError{
+				Path:    path,
+				Message: fmt.Sprintf("duplicate relationship %s → %s (first at relationships[%d])", rel.From, rel.To, firstIdx),
+			})
+		} else {
+			seen[key] = i
 		}
 	}
 	return errs

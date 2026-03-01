@@ -157,6 +157,18 @@ func TestValidate_ViewNonExistentScope(t *testing.T) {
 	}
 }
 
+func TestValidate_DuplicateRelationship(t *testing.T) {
+	m := buildValidModel()
+	// Add a duplicate relationship (same from/to as the existing one).
+	m.Relationships = append(m.Relationships,
+		Relationship{From: "customer", To: "shop", Kind: "uses"})
+
+	errs := Validate(m)
+	if !containsMessage(errs, "duplicate") {
+		t.Errorf("expected error about duplicate relationship, got %v", errs)
+	}
+}
+
 // containsPath checks whether any error has the given path.
 func containsPath(errs []ValidationError, path string) bool {
 	for _, e := range errs {
