@@ -63,6 +63,11 @@ func applyForwardToPage(
 		return
 	}
 	applyChangesToPage(cs, page, templates, flat, elemFilter, "", "", result)
+
+	// Reconcile orphaned elements: remove any element on the page whose
+	// bausteinsicht_id is not present in the current model. This handles
+	// cases where the sync state is missing or the model was emptied. (#110)
+	reconcileOrphanedElements(page, flat, result)
 }
 
 // applyForwardPerView iterates over model views and applies changes per page.
@@ -563,4 +568,28 @@ func reconcileViewPage(
 	}
 }
 
-
+// reconcileOrphanedElements removes elements from the page whose
+// bausteinsicht_id does not exist in the current model. This is the
+// no-views equivalent of reconcileViewPage and handles cases where
+// sync state is missing or the model was emptied. (#110)
+func reconcileOrphanedElements(
+	page *drawio.Page,
+	flat map[string]*model.Element,
+	result *ForwardResult,
+) {
+	for _, obj := range page.FindAllElements() {
+		id := obj.SelectAttrValue("bausteinsicht_id", "")
+		if id == "" {
+			continue
+		}
+		if _, inModel := flat[id]; inModel {
+			continue
+		}
+		// Element is on the page but not in the model — remove it.
+		cellID := id // no view scoping in legacy mode
+		result.ConnectorsDeleted += countConnectorsFor(page, cellID)
+		page.DeleteConnectorsFor(cellID)
+		page.DeleteElement(id)
+		result.ElementsDeleted++
+	}
+}
