@@ -1,0 +1,389 @@
+= Bausteinsicht E2E Test Report
+:author: Claude (automated)
+:date: 2026-03-01
+:toc: left
+:toclevels: 3
+:icons: font
+
+== Executive Summary
+
+Comprehensive end-to-end testing of all Bausteinsicht CLI workflows (issue #81).
+Tested areas: init, sync, validate, add commands, multi-view, watch mode, edge cases, templates.
+
+[cols="1,1,1,1", options="header"]
+|===
+| Category | Tests Run | Passed | Failed/Findings
+
+| Basic Workflow | 4 | 3 | 1
+| Forward Sync | 6 | 3 | 3
+| Reverse Sync | 3 | 3 | 0 (but known bug affects all)
+| CLI Add Commands | 16 | 13 | 3
+| Multi-View | 5 | 5 | 0
+| Watch Mode | 9 | 8 | 1
+| Edge Cases | 10 | 10 | 0 (2 minor findings)
+| Templates | 2 | 2 | 0
+| **Total** | **55** | **47** | **8 bugs filed**
+|===
+
+*8 bugs filed as GitHub issues (#83-#91). 1 critical, 2 high, 5 medium/low.*
+
+== Bugs Filed
+
+[cols="1,1,2,1", options="header"]
+|===
+| Issue | Severity | Title | Area
+
+| https://github.com/docToolchain/Bausteinsicht/issues/83[#83]
+| *Critical*
+| Reverse sync corrupts model relationships with scoped cell IDs
+| Sync Engine
+
+| https://github.com/docToolchain/Bausteinsicht/issues/84[#84]
+| Medium
+| Forward sync does not update scope boundary elements on property changes
+| Forward Sync
+
+| https://github.com/docToolchain/Bausteinsicht/issues/85[#85]
+| *High*
+| Forward sync does not delete elements from draw.io when removed from model
+| Forward Sync
+
+| https://github.com/docToolchain/Bausteinsicht/issues/86[#86]
+| Medium
+| Reverse sync strips JSONC comments and reorders keys
+| Reverse Sync
+
+| https://github.com/docToolchain/Bausteinsicht/issues/87[#87]
+| Low
+| add relationship: duplicate relationships added despite warning
+| CLI Add
+
+| https://github.com/docToolchain/Bausteinsicht/issues/88[#88]
+| Low
+| add element: allows children on non-container elements
+| CLI Add
+
+| https://github.com/docToolchain/Bausteinsicht/issues/89[#89]
+| Low
+| CLI errors not output as JSON when --format json is used
+| CLI Output
+
+| https://github.com/docToolchain/Bausteinsicht/issues/90[#90]
+| Low
+| init silently overwrites template.drawio
+| Init
+
+| https://github.com/docToolchain/Bausteinsicht/issues/91[#91]
+| Low
+| watch mode: file not re-detected after deletion and recreation
+| Watch
+|===
+
+== Detailed Test Results
+
+=== 1. Basic Workflow
+
+[cols="1,3,1", options="header"]
+|===
+| Test | Description | Result
+
+| init
+| Creates `architecture.jsonc`, `template.drawio`, `architecture.drawio`, `.bausteinsicht-sync`
+| PASS
+
+| validate
+| Reports "Model is valid." for sample model
+| PASS
+
+| validate --format json
+| Returns `{"valid": true, "errors": []}`
+| PASS
+
+| sync after init
+| First sync after init reports spurious reverse changes (6 added, 5 deleted). Takes 3 syncs to stabilize.
+| *FAIL* (Bug #83)
+|===
+
+=== 2. Forward Sync (Model -> Diagram)
+
+[cols="1,3,1", options="header"]
+|===
+| Test | Description | Result
+
+| Add element
+| New element appears in correct view with red dashed border, correct label, kind, and template style
+| PASS
+
+| Modify title
+| Title change reflected in all views where element appears
+| PASS
+
+| Modify technology
+| Updated in regular element view but NOT in scope boundary view
+| *PARTIAL* (Bug #84)
+
+| Modify description
+| Description/tooltip updated correctly
+| PASS
+
+| Remove element
+| Element NOT removed from draw.io despite being deleted from model
+| *FAIL* (Bug #85)
+
+| Add relationship
+| Connector added to applicable views with correct relationship lifting
+| PASS
+
+| Remove relationship
+| Forward sync reports deletion but reverse sync re-adds it (due to Bug #83)
+| *FAIL* (Bug #83)
+|===
+
+=== 3. Reverse Sync (Diagram -> Model)
+
+[cols="1,3,1", options="header"]
+|===
+| Test | Description | Result
+
+| Edit label in draw.io
+| Title change propagated to model correctly
+| PASS
+
+| Edit description in draw.io
+| Tooltip change propagated to model correctly
+| PASS
+
+| Conflict detection
+| Both-sides-changed detected, model-wins applied, clear warning message
+| PASS
+|===
+
+NOTE: All reverse sync tests also trigger the relationship corruption bug (#83) and comment stripping (#86) as side effects.
+
+=== 4. CLI Add Commands
+
+[cols="1,3,1", options="header"]
+|===
+| Test | Description | Result
+
+| add element (all flags)
+| Element correctly added with kind, title, technology, description
+| PASS
+
+| add element --parent
+| Element correctly nested under parent
+| PASS
+
+| add element --format json
+| JSON output produced (but missing technology/description fields)
+| *FINDING* (Bug #89)
+
+| add relationship (all flags)
+| Relationship correctly added with all fields
+| PASS
+
+| add relationship --format json
+| Full JSON output with all fields (pretty-printed)
+| PASS
+
+| Duplicate element ID
+| Correctly rejected with error
+| PASS
+
+| Invalid parent
+| Correctly rejected with error
+| PASS
+
+| Missing required flags
+| All three (--id, --kind, --title) correctly required
+| PASS
+
+| Invalid from/to
+| Correctly rejected with error
+| PASS
+
+| Invalid element kind
+| Correctly rejected, lists valid kinds
+| PASS
+
+| Invalid relationship kind
+| Correctly rejected
+| PASS
+
+| Duplicate relationship
+| Warning printed but duplicate still added
+| *FINDING* (Bug #87)
+
+| Child on non-container
+| Allowed despite specification constraint
+| *FINDING* (Bug #88)
+
+| Deep parent path
+| Correct dot-notation navigation
+| PASS
+
+| Error with --format json
+| Errors not formatted as JSON
+| *FINDING* (Bug #89)
+
+| Missing optional flags
+| --label, --kind optional for relationships
+| PASS
+|===
+
+=== 5. Multi-View Features
+
+[cols="1,3,1", options="header"]
+|===
+| Test | Description | Result
+
+| Multiple views as pages
+| 3 views produce 3 diagram pages with correct titles
+| PASS
+
+| Wildcard include
+| `onlineshop.*` resolves all direct children correctly
+| PASS
+
+| Exclude filtering
+| Excluded elements absent from view
+| PASS
+
+| Relationship lifting
+| `customer -> onlineshop.frontend` lifted to `customer -> onlineshop` on context view
+| PASS
+
+| Scope boundary
+| Scope element rendered as swimlane boundary with children parented inside
+| PASS
+|===
+
+=== 6. Watch Mode
+
+[cols="1,3,1", options="header"]
+|===
+| Test | Description | Result
+
+| Model change detection
+| Watch triggers sync on model file modification
+| PASS
+
+| Drawio change detection
+| Watch triggers reverse sync on draw.io modification
+| PASS
+
+| Debounce
+| 5 rapid changes (100ms apart) produce single sync
+| PASS
+
+| Graceful SIGINT shutdown
+| Clean "Stopped watching." exit with code 0
+| PASS
+
+| Missing model at startup
+| Clear error, exit 2
+| PASS
+
+| Missing drawio at startup
+| Clear error, exit 2
+| PASS
+
+| Empty directory
+| Clear error, exit 2
+| PASS
+
+| File deleted while watching
+| Watch stays alive, no crash
+| PASS
+
+| File deleted then recreated
+| File NOT re-detected after recreation
+| *FINDING* (Bug #91)
+|===
+
+=== 7. Edge Cases & Error Handling
+
+[cols="1,3,1", options="header"]
+|===
+| Test | Description | Result
+
+| Empty model
+| Validate passes, sync works (no crash)
+| PASS
+
+| Invalid JSONC syntax
+| Clear error with file path, exit 2
+| PASS
+
+| Missing .drawio file
+| Clear error with full path, exit 2
+| PASS
+
+| Missing model file
+| Clear error (auto-detect and explicit path), exit 2
+| PASS
+
+| Special characters (umlauts, <, >, &, quotes, backslash)
+| All correctly XML-escaped in draw.io, round-trip preserves values
+| PASS
+
+| Large model (60 elements)
+| Synced in 6ms, performance excellent
+| PASS
+
+| Deep nesting (6 levels)
+| Works with per-level views; wildcard is non-recursive (by design)
+| PASS
+
+| Orphan relationships
+| Validate catches all dangling references; sync proceeds without validation
+| PASS
+
+| Special chars in relationship labels
+| All correctly XML-escaped
+| PASS
+
+| init with existing files
+| Correctly refuses for model/drawio; silently overwrites template
+| PASS (minor finding, Bug #90)
+|===
+
+=== 8. Templates
+
+[cols="1,3,1", options="header"]
+|===
+| Test | Description | Result
+
+| Default template styles
+| 4 distinct styles for actor/system/container/component (C4 color scheme)
+| PASS
+
+| Custom template via --template
+| Custom styles correctly applied to all elements
+| PASS
+|===
+
+== Recommendations
+
+=== Priority 1 (must fix before further features)
+
+. *Fix #83* — Scoped cell ID corruption. This is the most impactful bug: it silently corrupts user data on the first sync. Root cause: `extractDrawioRelationships()` in `diff.go` needs to map scoped cell IDs back to element IDs.
+
+. *Fix #85* — Element deletion. Forward sync must handle Deleted changes when views are active (currently only works in legacy no-view mode).
+
+=== Priority 2 (should fix)
+
+. *Fix #86* — JSONC comment preservation. Critical for user experience since comments document architectural decisions.
+
+. *Fix #84* — Scope boundary updates. Scope boundaries must be updated when their underlying element properties change.
+
+=== Priority 3 (nice to have)
+
+. *Fix #87-#91* — CLI polish issues. These affect LLM-friendliness and edge cases but don't block core workflows.
+
+== Test Environment
+
+- Platform: Linux 5.15.167.4-microsoft-standard-WSL2 (devcontainer)
+- Go version: 1.24.0
+- All existing unit tests pass (`make test`)
+- Binary built from commit `360f331` on `main` branch
