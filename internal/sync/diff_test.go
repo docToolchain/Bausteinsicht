@@ -467,6 +467,44 @@ func TestDetectChanges_LiftedConnectorIgnored(t *testing.T) {
 	}
 }
 
+func TestDetectChanges_TooltipChangeDetected(t *testing.T) {
+	// Sync state has element with description "Old Desc"
+	state := stateWithElem("app", "App", "Old Desc", "Go")
+
+	// Model has same description (no model-side change)
+	m := simpleModel("app", "App", "Old Desc", "Go")
+
+	// Create draw.io doc where label still has "Old Desc" in description,
+	// but the tooltip attribute has been changed to "New Desc" by the user
+	doc := docWithElem("app", "App", "Go", "Old Desc")
+	// Manually update the tooltip attribute to simulate user editing tooltip in draw.io
+	for _, page := range doc.Pages() {
+		obj := page.FindElement("app")
+		if obj != nil {
+			attr := obj.SelectAttr("tooltip")
+			if attr != nil {
+				attr.Value = "New Desc"
+			} else {
+				obj.CreateAttr("tooltip", "New Desc")
+			}
+		}
+	}
+
+	cs := DetectChanges(m, doc, state)
+
+	// Should detect a drawio-side description change from "Old Desc" to "New Desc"
+	found := false
+	for _, ch := range cs.DrawioElementChanges {
+		if ch.ID == "app" && ch.Type == Modified && ch.Field == "description" &&
+			ch.OldValue == "Old Desc" && ch.NewValue == "New Desc" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected drawio description modification from tooltip change, got: %+v", cs.DrawioElementChanges)
+	}
+}
+
 func simpleModelWithKind(id, title, description, technology, kind string) *model.BausteinsichtModel {
 	return &model.BausteinsichtModel{
 		Model: map[string]model.Element{

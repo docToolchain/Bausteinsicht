@@ -44,8 +44,10 @@ func ParseLabel(html string) (title, technology, description string) {
 	titlePart := rest[:closeB]
 	after := rest[closeB+len("</b>"):]
 
+	cleanTitle := stripTags(titlePart)
+
 	if after == "" {
-		return unescapeHTML(titlePart), "", ""
+		return cleanTitle, "", ""
 	}
 
 	// Parse remaining <br><font ...>...</font> segments
@@ -56,16 +58,16 @@ func ParseLabel(html string) (title, technology, description string) {
 		seg := segments[0]
 		if seg.color == "#999999" {
 			// Description only (no technology)
-			return unescapeHTML(titlePart), "", unescapeHTML(seg.text)
+			return cleanTitle, "", unescapeHTML(seg.text)
 		}
 		// Technology (with or without brackets)
-		return unescapeHTML(titlePart), unescapeHTML(trimBrackets(seg.text)), ""
+		return cleanTitle, unescapeHTML(trimBrackets(seg.text)), ""
 	case 2:
 		tech := unescapeHTML(trimBrackets(segments[0].text))
 		desc := unescapeHTML(segments[1].text)
-		return unescapeHTML(titlePart), tech, desc
+		return cleanTitle, tech, desc
 	default:
-		return unescapeHTML(titlePart), "", ""
+		return cleanTitle, "", ""
 	}
 }
 
