@@ -22,6 +22,6 @@
       }
     }
   },
-  "postCreateCommand": "make install-tools 2>/dev/null; go mod download",
+  "postCreateCommand": "sudo chown -R vscode:vscode /go && go mod download",
   "remoteUser": "vscode"
 }
