@@ -470,3 +470,51 @@ func TestApplyForward_NoViewsReconciliation(t *testing.T) {
 		t.Errorf("expected 1 element deleted (orphan), got %d", result.ElementsDeleted)
 	}
 }
+
+// TestApplyForward_NoDuplicateConnectors verifies that when a connector
+// already exists on the page, an Added relationship change does not create
+// a duplicate. This happens when sync state is deleted and all relationships
+// are treated as new. Regression test for #119.
+func TestApplyForward_NoDuplicateConnectors(t *testing.T) {
+	// Create a document with two elements and an existing connector.
+	doc := drawio.NewDocument()
+	page := doc.AddPage("p1", "Page 1")
+	_ = page.CreateElement(drawio.ElementData{
+		ID: "a", CellID: "a", Kind: "container", Title: "A",
+	}, "")
+	_ = page.CreateElement(drawio.ElementData{
+		ID: "b", CellID: "b", Kind: "container", Title: "B",
+	}, "")
+	page.CreateConnector(drawio.ConnectorData{
+		From: "a", To: "b", Label: "calls",
+		SourceRef: "a", TargetRef: "b",
+	}, "endArrow=block;")
+
+	// Verify precondition: one connector exists.
+	if len(page.FindAllConnectors()) != 1 {
+		t.Fatalf("precondition: expected 1 connector, got %d", len(page.FindAllConnectors()))
+	}
+
+	m := fwdModelWithRel("a", "b")
+	ts := minimalTemplates(t)
+
+	// Simulate sync state deletion: all relationships appear as Added.
+	cs := &ChangeSet{
+		ModelRelationshipChanges: []RelationshipChange{
+			{From: "a", To: "b", Type: Added, NewValue: "calls"},
+		},
+	}
+
+	result := ApplyForward(cs, doc, ts, m)
+
+	// Should NOT create a duplicate connector.
+	connectors := page.FindAllConnectors()
+	if len(connectors) != 1 {
+		t.Errorf("expected 1 connector (no duplicate), got %d", len(connectors))
+	}
+
+	// Should report 0 connectors created (already exists).
+	if result.ConnectorsCreated != 0 {
+		t.Errorf("expected 0 connectors created, got %d", result.ConnectorsCreated)
+	}
+}
