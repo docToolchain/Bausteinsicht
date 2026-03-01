@@ -44,12 +44,12 @@ The primary risk scenario is a **malicious or crafted model/drawio file** shared
 | SEC-002
 | Low-Medium
 | Predictable temp file name in `model.Save` (TOCTOU / symlink attack)
-| Open
+| Fixed
 
 | SEC-003
 | Low-Medium
 | Data race on `lastFile` variable in watcher debounce closure
-| Open
+| Fixed
 
 | SEC-004
 | Low
@@ -79,12 +79,12 @@ The primary risk scenario is a **malicious or crafted model/drawio file** shared
 | SEC-009
 | Medium
 | Go toolchain 1.23.0 has 25 known stdlib vulnerabilities
-| Open
+| Fixed (upgraded to 1.24.0)
 
 | SEC-010
 | Low
 | `golang.org/x/sys` v0.13.0 is 28 minor versions behind current
-| Open
+| Fixed (upgraded to v0.41.0)
 |===
 
 === Findings
