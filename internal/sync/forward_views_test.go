@@ -366,6 +366,119 @@ func TestApplyForward_ScopeBoundingBox(t *testing.T) {
 	}
 }
 
+// TestApplyForward_DeletedElementRemovedFromViewPages verifies that when an
+// element is deleted from the model, it is removed from all view pages where
+// it previously appeared. Regression test for #85.
+func TestApplyForward_DeletedElementRemovedFromViewPages(t *testing.T) {
+	ts := minimalTemplates(t)
+	m := modelWithViews()
+
+	// Round 1: add all elements to doc.
+	doc := docWithViewPages()
+	csAdd := &ChangeSet{
+		ModelElementChanges: []ElementChange{
+			{ID: "customer", Type: Added},
+			{ID: "webshop", Type: Added},
+			{ID: "webshop.api", Type: Added},
+			{ID: "webshop.db", Type: Added},
+		},
+		ModelRelationshipChanges: []RelationshipChange{
+			{From: "customer", To: "webshop", Type: Added, NewValue: "uses"},
+			{From: "webshop.api", To: "webshop.db", Type: Added, NewValue: "reads"},
+		},
+	}
+	ApplyForward(csAdd, doc, ts, m)
+
+	// Verify db exists on container page before deletion.
+	containerPage := doc.GetPage("view-containers")
+	if containerPage.FindElement("webshop.db") == nil {
+		t.Fatal("precondition: webshop.db should exist on container page before deletion")
+	}
+
+	// Round 2: remove webshop.db from the model.
+	delete(m.Model["webshop"].Children, "db")
+	// Update relationships: remove the one referencing db.
+	m.Relationships = []model.Relationship{
+		{From: "customer", To: "webshop", Label: "uses"},
+	}
+	// Also update the containers view to exclude db.
+	m.Views["containers"] = model.View{
+		Title:   "Container View",
+		Scope:   "webshop",
+		Include: []string{"customer", "webshop.api"},
+	}
+
+	csDel := &ChangeSet{
+		ModelElementChanges: []ElementChange{
+			{ID: "webshop.db", Type: Deleted},
+		},
+		ModelRelationshipChanges: []RelationshipChange{
+			{From: "webshop.api", To: "webshop.db", Type: Deleted},
+		},
+	}
+	result := ApplyForward(csDel, doc, ts, m)
+
+	// The element should be removed from the container page.
+	if containerPage.FindElement("webshop.db") != nil {
+		t.Error("webshop.db should be removed from container page after deletion")
+	}
+
+	if result.ElementsDeleted == 0 {
+		t.Error("expected at least 1 element deleted in forward result")
+	}
+}
+
+// TestApplyForward_DeletedRelationshipRemovedFromViewPages verifies that when
+// a relationship is deleted from the model, its connector is removed from
+// view pages. Regression test for #85.
+func TestApplyForward_DeletedRelationshipRemovedFromViewPages(t *testing.T) {
+	ts := minimalTemplates(t)
+	m := modelWithViews()
+
+	// Round 1: add all elements and relationships.
+	doc := docWithViewPages()
+	csAdd := &ChangeSet{
+		ModelElementChanges: []ElementChange{
+			{ID: "customer", Type: Added},
+			{ID: "webshop", Type: Added},
+			{ID: "webshop.api", Type: Added},
+			{ID: "webshop.db", Type: Added},
+		},
+		ModelRelationshipChanges: []RelationshipChange{
+			{From: "customer", To: "webshop", Type: Added, NewValue: "uses"},
+			{From: "webshop.api", To: "webshop.db", Type: Added, NewValue: "reads"},
+		},
+	}
+	ApplyForward(csAdd, doc, ts, m)
+
+	// Verify connector exists before deletion.
+	containerPage := doc.GetPage("view-containers")
+	if containerPage.FindConnector("containers--webshop.api", "containers--webshop.db") == nil {
+		t.Fatal("precondition: api→db connector should exist on container page")
+	}
+
+	// Round 2: delete the api→db relationship.
+	m.Relationships = []model.Relationship{
+		{From: "customer", To: "webshop", Label: "uses"},
+	}
+
+	csDel := &ChangeSet{
+		ModelRelationshipChanges: []RelationshipChange{
+			{From: "webshop.api", To: "webshop.db", Type: Deleted},
+		},
+	}
+	result := ApplyForward(csDel, doc, ts, m)
+
+	// The connector should be removed from the container page.
+	if containerPage.FindConnector("containers--webshop.api", "containers--webshop.db") != nil {
+		t.Error("api→db connector should be removed from container page after deletion")
+	}
+
+	if result.ConnectorsDeleted == 0 {
+		t.Error("expected at least 1 connector deleted in forward result")
+	}
+}
+
 // TestApplyForward_NoViewsFallback verifies backward compatibility:
 // when no views are defined, elements go to the first page.
 func TestApplyForward_NoViewsFallback(t *testing.T) {
