@@ -188,6 +188,34 @@ func TestParseLabel(t *testing.T) {
 	}
 }
 
+func TestParseLabel_StripsNestedHTMLTags(t *testing.T) {
+	html := `<b><i>Styled</i> Customer</b>`
+	gotTitle, gotTech, gotDesc := ParseLabel(html)
+	if gotTitle != "Styled Customer" {
+		t.Errorf("expected title %q, got %q", "Styled Customer", gotTitle)
+	}
+	if gotTech != "" {
+		t.Errorf("expected empty technology, got %q", gotTech)
+	}
+	if gotDesc != "" {
+		t.Errorf("expected empty description, got %q", gotDesc)
+	}
+}
+
+func TestParseLabel_StripsUnderlineTags(t *testing.T) {
+	html := `<b><u>Important</u> System</b><br><font color="#666666">[Go]</font>`
+	gotTitle, gotTech, gotDesc := ParseLabel(html)
+	if gotTitle != "Important System" {
+		t.Errorf("expected title %q, got %q", "Important System", gotTitle)
+	}
+	if gotTech != "Go" {
+		t.Errorf("expected technology %q, got %q", "Go", gotTech)
+	}
+	if gotDesc != "" {
+		t.Errorf("expected empty description, got %q", gotDesc)
+	}
+}
+
 func TestRoundTrip(t *testing.T) {
 	tests := []struct {
 		title string

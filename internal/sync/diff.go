@@ -109,10 +109,11 @@ func extractDrawioElements(doc *drawio.Document) map[string]drawioElemSnapshot {
 				continue
 			}
 			label := obj.SelectAttrValue("label", "")
-			title, technology, description := drawio.ParseLabel(label)
+			title, technology, labelDesc := drawio.ParseLabel(label)
 			tooltipDesc := obj.SelectAttrValue("tooltip", "")
+			description := tooltipDesc
 			if description == "" {
-				description = tooltipDesc
+				description = labelDesc
 			}
 			result[id] = drawioElemSnapshot{
 				title:       title,
