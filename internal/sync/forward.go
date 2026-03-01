@@ -221,7 +221,7 @@ func applyChangesToPage(
 			}
 			applyElementAdded(ch.ID, viewID, scopeID, page, templates, flat, &pl, result)
 		case Modified:
-			if elemFilter != nil && !elemFilter[ch.ID] {
+			if elemFilter != nil && !elemFilter[ch.ID] && ch.ID != scopeID {
 				continue
 			}
 			applyElementModified(ch, page, flat, result)
