@@ -83,5 +83,9 @@ RUN npm install -g @anthropic-ai/claude-code
 # ──────────────────────────────────────────────
 RUN curl -sSfL https://gethuman.sh/install.sh | bash
 
+# Fix permissions: let the vscode user write to Go module cache and GOPATH/bin
+RUN mkdir -p /go/pkg/mod/cache /go/bin \
+ && chown -R vscode:vscode /go
+
 # Clean up
 RUN apt-get clean && rm -rf /tmp/*
