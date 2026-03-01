@@ -102,6 +102,10 @@ func applyForwardPerView(
 		}
 
 		applyChangesToPage(cs, page, templates, flat, elemSet, viewID, scopeID, result)
+
+		// Reconciliation: remove elements on the page that are no longer
+		// in the resolved view (e.g., after exclude list changes). #102
+		reconcileViewPage(page, elemSet, scopeID, viewID, result)
 	}
 }
 
@@ -238,40 +242,57 @@ func applyChangesToPage(
 	}
 
 	liftedSeen := make(map[string]bool)
-	for _, ch := range cs.ModelRelationshipChanges {
-		switch ch.Type {
-		case Deleted:
-			// For deletions, use scoped cell IDs to find and remove the
-			// connector. The original endpoints may no longer be in the
-			// view's element filter, so we bypass lifting entirely.
-			fromRef := scopedCellID(viewID, ch.From)
-			toRef := scopedCellID(viewID, ch.To)
-			if page.FindConnector(fromRef, toRef) != nil {
-				page.DeleteConnector(fromRef, toRef)
-				result.ConnectorsDeleted++
-			}
-		default:
-			from := ch.From
-			to := ch.To
-			if elemFilter != nil {
-				from = liftEndpoint(from, elemFilter)
-				to = liftEndpoint(to, elemFilter)
-				if from == "" || to == "" || from == to {
-					continue
-				}
-			}
-			lifted := RelationshipChange{From: from, To: to, Type: ch.Type, NewValue: ch.NewValue}
-			pairKey := from + "->" + to
+
+	// Process relationships in two passes: direct first, then lifted.
+	// This ensures that when a direct relationship (e.g., api→db) and a
+	// lifted relationship (e.g., api.catalog→db lifted to api→db) map to
+	// the same pair, the direct one's label is used for the connector.
+	for pass := 0; pass < 2; pass++ {
+		for _, ch := range cs.ModelRelationshipChanges {
 			switch ch.Type {
-			case Added:
-				if liftedSeen[pairKey] {
+			case Deleted:
+				if pass != 0 {
 					continue
 				}
-				liftedSeen[pairKey] = true
-				applyRelAdded(lifted, viewID, page, templates, result)
-			case Modified:
-				page.UpdateConnectorLabel(from, to, ch.NewValue)
-				result.ConnectorsUpdated++
+				// For deletions, use scoped cell IDs to find and remove the
+				// connector. The original endpoints may no longer be in the
+				// view's element filter, so we bypass lifting entirely.
+				fromRef := scopedCellID(viewID, ch.From)
+				toRef := scopedCellID(viewID, ch.To)
+				if page.FindConnector(fromRef, toRef) != nil {
+					page.DeleteConnector(fromRef, toRef)
+					result.ConnectorsDeleted++
+				}
+			default:
+				from := ch.From
+				to := ch.To
+				if elemFilter != nil {
+					from = liftEndpoint(from, elemFilter)
+					to = liftEndpoint(to, elemFilter)
+					if from == "" || to == "" || from == to {
+						continue
+					}
+				}
+				isLifted := from != ch.From || to != ch.To
+				if pass == 0 && isLifted {
+					continue // First pass: only direct relationships
+				}
+				if pass == 1 && !isLifted {
+					continue // Second pass: only lifted relationships
+				}
+				lifted := RelationshipChange{From: from, To: to, Type: ch.Type, NewValue: ch.NewValue}
+				pairKey := from + "->" + to
+				switch ch.Type {
+				case Added:
+					if liftedSeen[pairKey] {
+						continue
+					}
+					liftedSeen[pairKey] = true
+					applyRelAdded(lifted, viewID, page, templates, result)
+				case Modified:
+					page.UpdateConnectorLabel(from, to, ch.NewValue)
+					result.ConnectorsUpdated++
+				}
 			}
 		}
 	}
@@ -424,4 +445,60 @@ func applyRelAdded(
 	}
 	page.CreateConnector(data, style)
 	result.ConnectorsCreated++
+}
+
+// reconcileViewPage removes elements from the page that are not in the
+// resolved view filter. This handles cases where view include/exclude rules
+// change without corresponding model element changes (no ChangeSet entries).
+func reconcileViewPage(
+	page *drawio.Page,
+	elemFilter map[string]bool,
+	scopeID string,
+	viewID string,
+	result *ForwardResult,
+) {
+	if elemFilter == nil {
+		return
+	}
+
+	for _, obj := range page.FindAllElements() {
+		id := obj.SelectAttrValue("bausteinsicht_id", "")
+		if id == "" {
+			continue
+		}
+
+		// Skip the scope boundary element — it's rendered separately
+		// and is not subject to the normal element filter.
+		if id == scopeID {
+			continue
+		}
+
+		if elemFilter[id] {
+			continue
+		}
+
+		// Element is on the page but not in the view's resolved set.
+		// Remove its connectors first (using scoped cell ID), then the element.
+		// On view pages, connectors reference scoped cell IDs, not raw element IDs.
+		cellID := scopedCellID(viewID, id)
+		result.ConnectorsDeleted += countConnectorsFor(page, cellID)
+		page.DeleteConnectorsFor(cellID)
+
+		page.DeleteElement(id)
+		result.ElementsDeleted++
+	}
+}
+
+// countConnectorsFor returns the number of connectors on the page that
+// reference elementID as source or target.
+func countConnectorsFor(page *drawio.Page, elementID string) int {
+	count := 0
+	for _, conn := range page.FindAllConnectors() {
+		src := conn.SelectAttrValue("source", "")
+		tgt := conn.SelectAttrValue("target", "")
+		if src == elementID || tgt == elementID {
+			count++
+		}
+	}
+	return count
 }

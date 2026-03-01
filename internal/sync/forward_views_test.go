@@ -543,6 +543,82 @@ func TestApplyForward_ScopeBoundaryUpdatedOnModify(t *testing.T) {
 	}
 }
 
+// TestExcludeRemovesElementFromPage verifies that when a view's exclude list
+// changes to exclude an element that was previously on the page, the element
+// and its connectors are removed during forward sync — even when the ChangeSet
+// is empty (no model changes, only view configuration changes). Fix for #102.
+func TestExcludeRemovesElementFromPage(t *testing.T) {
+	ts := minimalTemplates(t)
+	m := modelWithViews()
+
+	// Round 1: add all elements and relationships.
+	doc := docWithViewPages()
+	csAdd := &ChangeSet{
+		ModelElementChanges: []ElementChange{
+			{ID: "customer", Type: Added},
+			{ID: "webshop", Type: Added},
+			{ID: "webshop.api", Type: Added},
+			{ID: "webshop.db", Type: Added},
+		},
+		ModelRelationshipChanges: []RelationshipChange{
+			{From: "customer", To: "webshop", Type: Added, NewValue: "uses"},
+			{From: "webshop.api", To: "webshop.db", Type: Added, NewValue: "reads"},
+		},
+	}
+	ApplyForward(csAdd, doc, ts, m)
+
+	// Verify preconditions: webshop.db is on the container page with a connector.
+	containerPage := doc.GetPage("view-containers")
+	if containerPage == nil {
+		t.Fatal("precondition: container page not found")
+	}
+	if containerPage.FindElement("webshop.db") == nil {
+		t.Fatal("precondition: webshop.db should exist on container page")
+	}
+	if containerPage.FindConnector("containers--webshop.api", "containers--webshop.db") == nil {
+		t.Fatal("precondition: api→db connector should exist on container page")
+	}
+
+	// Round 2: add webshop.db to the view's exclude list.
+	// The element still exists in the model — only the view config changes.
+	m.Views["containers"] = model.View{
+		Title:   "Container View",
+		Scope:   "webshop",
+		Include: []string{"customer", "webshop.*"},
+		Exclude: []string{"webshop.db"},
+	}
+
+	// Empty ChangeSet: no model changes, only view exclude changed.
+	csEmpty := &ChangeSet{}
+	result := ApplyForward(csEmpty, doc, ts, m)
+
+	// The excluded element should be removed from the page.
+	if containerPage.FindElement("webshop.db") != nil {
+		t.Error("webshop.db should be removed from container page after being excluded from view")
+	}
+
+	// Connectors referencing the excluded element should also be removed.
+	if containerPage.FindConnector("containers--webshop.api", "containers--webshop.db") != nil {
+		t.Error("api→db connector should be removed after webshop.db is excluded from view")
+	}
+
+	// Result counters should reflect the removals.
+	if result.ElementsDeleted == 0 {
+		t.Error("expected at least 1 element deleted in forward result")
+	}
+	if result.ConnectorsDeleted == 0 {
+		t.Error("expected at least 1 connector deleted in forward result")
+	}
+
+	// Elements that are still in the view should remain untouched.
+	if containerPage.FindElement("customer") == nil {
+		t.Error("customer should still be on container page")
+	}
+	if containerPage.FindElement("webshop.api") == nil {
+		t.Error("webshop.api should still be on container page")
+	}
+}
+
 // TestApplyForward_NoViewsFallback verifies backward compatibility:
 // when no views are defined, elements go to the first page.
 func TestApplyForward_NoViewsFallback(t *testing.T) {

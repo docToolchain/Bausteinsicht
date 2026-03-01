@@ -35,7 +35,7 @@ func PatchSave(path string, ops []PatchOp) error {
 	}
 	tmpName := tmp.Name()
 	if _, err := tmp.Write(data); err != nil {
-		tmp.Close()
+		_ = tmp.Close()
 		_ = os.Remove(tmpName)
 		return fmt.Errorf("writing temp file: %w", err)
 	}
@@ -224,9 +224,10 @@ func skipBraced(data []byte, i, n int, open, close byte) int {
 			}
 			continue
 		}
-		if c == open {
+		switch c {
+		case open:
 			depth++
-		} else if c == close {
+		case close:
 			depth--
 			if depth == 0 {
 				return i + 1
