@@ -2,6 +2,7 @@
 package watcher
 
 import (
+	"os"
 	"sync"
 	"time"
 
@@ -89,7 +90,15 @@ func (w *Watcher) loop() {
 			if !ok {
 				return
 			}
-			if !event.Has(fsnotify.Write) {
+
+			// When a file is removed or renamed, try to re-add it.
+			// Editors and git often use atomic writes (delete + create).
+			if event.Has(fsnotify.Remove) || event.Has(fsnotify.Rename) {
+				go w.rewatch(event.Name)
+				continue
+			}
+
+			if !event.Has(fsnotify.Write) && !event.Has(fsnotify.Create) {
 				continue
 			}
 			if w.isSyncing() {
@@ -113,5 +122,26 @@ func (w *Watcher) loop() {
 				return
 			}
 		}
+	}
+}
+
+// rewatch polls for a removed file to reappear, then re-adds it to the watcher.
+func (w *Watcher) rewatch(path string) {
+	const maxAttempts = 20
+	const pollInterval = 50 * time.Millisecond
+
+	for i := 0; i < maxAttempts; i++ {
+		select {
+		case <-w.done:
+			return
+		default:
+		}
+
+		if _, err := os.Stat(path); err == nil {
+			// File exists again — re-add to watcher.
+			_ = w.fsWatcher.Add(path)
+			return
+		}
+		time.Sleep(pollInterval)
 	}
 }
