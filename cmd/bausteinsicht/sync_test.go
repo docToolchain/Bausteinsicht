@@ -281,6 +281,88 @@ func captureStdout(t *testing.T, fn func()) {
 	os.Stdout = oldStdout
 }
 
+func TestSyncConcurrentModelAndDrawioChanges(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
+
+	// Init.
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"init"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("init: %v", err)
+	}
+
+	// Model: change customer description
+	modelData, err := os.ReadFile("architecture.jsonc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ms := strings.Replace(string(modelData),
+		`"description": "End user who browses and purchases products in the online shop"`,
+		`"description": "Premium customer with VIP access"`, 1)
+	if ms == string(modelData) {
+		t.Skip("could not find customer description to modify")
+	}
+	if err := os.WriteFile("architecture.jsonc", []byte(ms), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Draw.io: change customer title
+	drawioData, err := os.ReadFile("architecture.drawio")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ds := strings.ReplaceAll(string(drawioData),
+		"&lt;b&gt;Customer&lt;/b&gt;",
+		"&lt;b&gt;VIP Customer&lt;/b&gt;")
+	if ds == string(drawioData) {
+		t.Skip("could not find Customer label in draw.io")
+	}
+	if err := os.WriteFile("architecture.drawio", []byte(ds), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// First sync
+	captureStdout(t, func() {
+		cmd2 := NewRootCmd()
+		cmd2.SetArgs([]string{"sync"})
+		if err := cmd2.Execute(); err != nil {
+			t.Fatalf("first sync: %v", err)
+		}
+	})
+
+	// After first sync: model should have VIP Customer (reverse sync picks it up)
+	m1, _ := os.ReadFile("architecture.jsonc")
+	if !strings.Contains(string(m1), "VIP Customer") {
+		t.Error("after first sync: model should have 'VIP Customer'")
+	}
+
+	// After first sync: draw.io should ALSO have VIP Customer (not overwritten)
+	d1, _ := os.ReadFile("architecture.drawio")
+	if !strings.Contains(string(d1), "VIP Customer") {
+		t.Error("after first sync: draw.io should preserve 'VIP Customer' (not overwrite with model title)")
+	}
+
+	// Second sync should be no-op
+	captureStdout(t, func() {
+		cmd3 := NewRootCmd()
+		cmd3.SetArgs([]string{"sync"})
+		if err := cmd3.Execute(); err != nil {
+			t.Fatalf("second sync: %v", err)
+		}
+	})
+
+	// After second sync: model should STILL have VIP Customer
+	m2, _ := os.ReadFile("architecture.jsonc")
+	if !strings.Contains(string(m2), "VIP Customer") {
+		t.Error("after second sync: model should still have 'VIP Customer' (draw.io change should not be reverted)")
+	}
+}
+
 func TestSyncWithExplicitModelPath(t *testing.T) {
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
