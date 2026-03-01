@@ -149,6 +149,23 @@ func TestMatchPattern_Wildcard(t *testing.T) {
 			wantIDs: []string{"customer"},
 			notWant: []string{"onlineshop"},
 		},
+		{
+			pattern: "*",
+			wantIDs: []string{"customer", "onlineshop"},
+			notWant: []string{"onlineshop.frontend", "onlineshop.api"},
+		},
+		{
+			pattern: "**",
+			wantIDs: []string{"customer", "onlineshop", "onlineshop.frontend",
+				"onlineshop.api", "onlineshop.api.catalog", "onlineshop.api.orders",
+				"onlineshop.db"},
+		},
+		{
+			pattern: "onlineshop.**",
+			wantIDs: []string{"onlineshop.frontend", "onlineshop.api",
+				"onlineshop.api.catalog", "onlineshop.api.orders", "onlineshop.db"},
+			notWant: []string{"customer", "onlineshop"},
+		},
 	}
 
 	for _, tt := range tests {
