@@ -363,6 +363,71 @@ func TestSyncConcurrentModelAndDrawioChanges(t *testing.T) {
 	}
 }
 
+// TestSyncPreservesUserAddedDrawioElement verifies that elements manually
+// added by the user in draw.io (with a bausteinsicht_id that does NOT exist
+// in the model) are preserved across sync cycles. Regression test for #115.
+func TestSyncPreservesUserAddedDrawioElement(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
+
+	// Init the project.
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"init"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("init failed: %v", err)
+	}
+
+	// Inject a user-added element into the draw.io XML.
+	// This simulates a user manually adding an <object> in draw.io.
+	drawioData, err := os.ReadFile("architecture.drawio")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Insert a user element before the closing </root> tag on the first view page.
+	userElemXML := `<object bausteinsicht_id="userelem" bausteinsicht_kind="system" label="User Custom Element" id="userelem">
+          <mxCell style="shape=rectangle;" vertex="1" parent="1">
+            <mxGeometry x="500" y="500" width="120" height="60" as="geometry"/>
+          </mxCell>
+        </object>`
+
+	modified := strings.Replace(string(drawioData), "</root>", userElemXML+"\n      </root>", 1)
+	if modified == string(drawioData) {
+		t.Fatal("failed to inject user element into draw.io XML")
+	}
+	if err := os.WriteFile("architecture.drawio", []byte(modified), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify the element was injected.
+	if !strings.Contains(modified, "userelem") {
+		t.Fatal("precondition: user element not found in draw.io XML")
+	}
+
+	// Run sync.
+	cmd2 := NewRootCmd()
+	cmd2.SetArgs([]string{"sync"})
+	captureStdout(t, func() {
+		if err := cmd2.Execute(); err != nil {
+			t.Fatalf("sync failed: %v", err)
+		}
+	})
+
+	// Read the draw.io file after sync and verify the user element is preserved.
+	afterSync, err := os.ReadFile("architecture.drawio")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(string(afterSync), `bausteinsicht_id="userelem"`) {
+		t.Error("user-added element 'userelem' was deleted during sync; it should be preserved (#115)")
+	}
+}
+
 func TestSyncWithExplicitModelPath(t *testing.T) {
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()

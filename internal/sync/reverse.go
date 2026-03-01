@@ -66,7 +66,7 @@ func applyElementChange(ch ElementChange, m *model.BausteinsichtModel, result *R
 
 	case Added:
 		result.Warnings = append(result.Warnings,
-			"New element detected in draw.io (no bausteinsicht_id). Please add it to the model manually.")
+			fmt.Sprintf("New element %q detected in draw.io. Add it to the model to keep it synchronized.", ch.ID))
 	}
 }
 

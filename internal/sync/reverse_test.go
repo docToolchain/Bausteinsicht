@@ -139,8 +139,16 @@ func TestApplyReverse_AddedElementWarning(t *testing.T) {
 
 	r := ApplyReverse(cs, m)
 
-	if len(r.Warnings) != 1 || !strings.Contains(r.Warnings[0], "manually") {
-		t.Errorf("expected manual-add warning, got %v", r.Warnings)
+	if len(r.Warnings) != 1 {
+		t.Fatalf("expected 1 warning, got %d: %v", len(r.Warnings), r.Warnings)
+	}
+	// The warning should include the element ID and mention the model. (#115)
+	w := r.Warnings[0]
+	if !strings.Contains(w, `"unknown"`) {
+		t.Errorf("expected warning to include element ID %q, got: %s", "unknown", w)
+	}
+	if !strings.Contains(w, "model") {
+		t.Errorf("expected warning to mention 'model', got: %s", w)
 	}
 	if r.ElementsCreated != 0 {
 		t.Errorf("expected ElementsCreated=0, got %d", r.ElementsCreated)

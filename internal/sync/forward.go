@@ -105,7 +105,7 @@ func applyForwardPerView(
 
 		// Reconciliation: remove elements on the page that are no longer
 		// in the resolved view (e.g., after exclude list changes). #102
-		reconcileViewPage(page, elemSet, scopeID, viewID, result)
+		reconcileViewPage(page, elemSet, flat, scopeID, viewID, result)
 	}
 }
 
@@ -515,9 +515,12 @@ func applyRelAdded(
 // reconcileViewPage removes elements from the page that are not in the
 // resolved view filter. This handles cases where view include/exclude rules
 // change without corresponding model element changes (no ChangeSet entries).
+// Elements not present in the flat model map are preserved — they were
+// manually added by the user in draw.io and should not be deleted. (#115)
 func reconcileViewPage(
 	page *drawio.Page,
 	elemFilter map[string]bool,
+	flat map[string]*model.Element,
 	scopeID string,
 	viewID string,
 	result *ForwardResult,
@@ -539,6 +542,12 @@ func reconcileViewPage(
 		}
 
 		if elemFilter[id] {
+			continue
+		}
+
+		// Preserve elements not in the model — they were manually added
+		// by the user in draw.io and should not be deleted. (#115)
+		if _, inModel := flat[id]; !inModel {
 			continue
 		}
 
