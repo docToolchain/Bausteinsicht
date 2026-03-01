@@ -164,6 +164,48 @@ func TestFileRedetectedAfterDeleteRecreate(t *testing.T) {
 	}
 }
 
+func TestAtomicRenameTriggersCallback(t *testing.T) {
+	path := createTempFile(t)
+
+	called := make(chan string, 1)
+
+	w, err := New([]string{path}, 100*time.Millisecond, func(changedFile string) {
+		select {
+		case called <- changedFile:
+		default:
+		}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Stop()
+
+	if err := w.Start(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Perform atomic rename: write new content to a temp file, then rename
+	// over the watched file. This is what sed -i and vim do.
+	tmpPath := path + ".tmp"
+	if err := os.WriteFile(tmpPath, []byte("atomically-replaced"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Remove(tmpPath) })
+
+	if err := os.Rename(tmpPath, path); err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case changedFile := <-called:
+		if changedFile != path {
+			t.Errorf("expected callback for %s, got %s", path, changedFile)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out waiting for callback after atomic rename")
+	}
+}
+
 func TestSyncingFlagPreventsCallback(t *testing.T) {
 	path := createTempFile(t)
 
