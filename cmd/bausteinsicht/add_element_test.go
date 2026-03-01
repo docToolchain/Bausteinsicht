@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/docToolchain/Bauteinsicht/internal/model"
@@ -21,7 +22,9 @@ func writeSampleModel(t *testing.T, dir string) string {
       "container": {"notation": "box", "container": true}
     }
   },
+  // Architecture elements
   "model": {
+    // External user
     "customer": {
       "kind": "actor",
       "title": "Customer"
@@ -395,5 +398,47 @@ func TestAddElementWithOptionalFlags(t *testing.T) {
 	}
 	if elem.Description != "Handles payments" {
 		t.Errorf("expected description 'Handles payments', got %q", elem.Description)
+	}
+}
+
+// TestAddElementPreservesComments verifies that adding an element does not
+// strip JSONC comments from the model file. Regression test for #122.
+func TestAddElementPreservesComments(t *testing.T) {
+	dir := t.TempDir()
+	modelPath := writeSampleModel(t, dir)
+
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"add", "element",
+		"--model", modelPath,
+		"--id", "payments",
+		"--kind", "system",
+		"--title", "Payment Service",
+	})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Read raw file — comments should be preserved.
+	data, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := string(data)
+
+	if !strings.Contains(content, "// Architecture elements") {
+		t.Error("comment '// Architecture elements' was stripped")
+	}
+	if !strings.Contains(content, "// External user") {
+		t.Error("comment '// External user' was stripped")
+	}
+
+	// Model should still be parseable and contain the new element.
+	m, err := model.Load(modelPath)
+	if err != nil {
+		t.Fatalf("model not parseable after add: %v", err)
+	}
+	if _, ok := m.Model["payments"]; !ok {
+		t.Error("new element 'payments' not found in model")
 	}
 }
