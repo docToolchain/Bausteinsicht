@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -238,6 +239,110 @@ func TestAddElementJSONOutput(t *testing.T) {
 	}
 	if result["kind"] != "system" {
 		t.Errorf("expected kind 'system', got %q", result["kind"])
+	}
+}
+
+func TestAddElementJSONOutputIncludesAllFields(t *testing.T) {
+	dir := t.TempDir()
+	modelPath := writeSampleModel(t, dir)
+
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"add", "element",
+		"--model", modelPath,
+		"--format", "json",
+		"--id", "payments",
+		"--kind", "system",
+		"--title", "Payment Service",
+		"--technology", "Go",
+		"--description", "Handles payments",
+	})
+
+	err := cmd.Execute()
+	_ = w.Close()
+	os.Stdout = oldStdout
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	buf := make([]byte, 4096)
+	n, _ := r.Read(buf)
+	output := string(buf[:n])
+
+	var result map[string]string
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		t.Fatalf("invalid JSON output: %v\noutput: %s", err, output)
+	}
+	if result["technology"] != "Go" {
+		t.Errorf("expected technology 'Go', got %q", result["technology"])
+	}
+	if result["description"] != "Handles payments" {
+		t.Errorf("expected description 'Handles payments', got %q", result["description"])
+	}
+}
+
+func TestAddElementJSONErrorOutput(t *testing.T) {
+	dir := t.TempDir()
+	modelPath := writeSampleModel(t, dir)
+
+	var errBuf bytes.Buffer
+	cmd := NewRootCmd()
+	cmd.SetErr(&errBuf)
+	cmd.SetArgs([]string{"add", "element",
+		"--model", modelPath,
+		"--format", "json",
+		"--id", "foo",
+		"--kind", "nonexistent",
+		"--title", "Foo",
+	})
+
+	err := ExecuteRoot(cmd)
+	if err == nil {
+		t.Fatal("expected error for invalid kind")
+	}
+
+	output := errBuf.String()
+
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		t.Fatalf("expected JSON error output, got: %s", output)
+	}
+	if _, ok := result["error"]; !ok {
+		t.Error("expected 'error' key in JSON error output")
+	}
+}
+
+func TestAddElementTextErrorOutput(t *testing.T) {
+	dir := t.TempDir()
+	modelPath := writeSampleModel(t, dir)
+
+	var errBuf bytes.Buffer
+	cmd := NewRootCmd()
+	cmd.SetErr(&errBuf)
+	cmd.SetArgs([]string{"add", "element",
+		"--model", modelPath,
+		"--id", "foo",
+		"--kind", "nonexistent",
+		"--title", "Foo",
+	})
+
+	err := ExecuteRoot(cmd)
+	if err == nil {
+		t.Fatal("expected error for invalid kind")
+	}
+
+	output := errBuf.String()
+	// Should be plain text, not JSON
+	var js map[string]interface{}
+	if json.Unmarshal([]byte(output), &js) == nil {
+		t.Error("expected plain text error, got JSON")
+	}
+	if !bytes.Contains(errBuf.Bytes(), []byte("nonexistent")) {
+		t.Errorf("expected error message to mention 'nonexistent', got: %s", output)
 	}
 }
 
