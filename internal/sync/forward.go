@@ -214,46 +214,65 @@ func applyChangesToPage(
 	pl := computePlacement(page)
 
 	for _, ch := range cs.ModelElementChanges {
-		if elemFilter != nil && !elemFilter[ch.ID] {
-			continue
-		}
 		switch ch.Type {
 		case Added:
+			if elemFilter != nil && !elemFilter[ch.ID] {
+				continue
+			}
 			applyElementAdded(ch.ID, viewID, scopeID, page, templates, flat, &pl, result)
 		case Modified:
+			if elemFilter != nil && !elemFilter[ch.ID] {
+				continue
+			}
 			applyElementModified(ch, page, flat, result)
 		case Deleted:
-			page.DeleteElement(ch.ID)
-			result.ElementsDeleted++
+			// Deleted elements are removed from all pages where they exist,
+			// regardless of the current view filter — a deleted element is
+			// no longer in the model, so it can't appear in any view's
+			// resolved set. We just check if it exists on this page.
+			if page.FindElement(ch.ID) != nil {
+				page.DeleteElement(ch.ID)
+				result.ElementsDeleted++
+			}
 		}
 	}
 
 	liftedSeen := make(map[string]bool)
 	for _, ch := range cs.ModelRelationshipChanges {
-		from := ch.From
-		to := ch.To
-		if elemFilter != nil {
-			from = liftEndpoint(from, elemFilter)
-			to = liftEndpoint(to, elemFilter)
-			if from == "" || to == "" || from == to {
-				continue
-			}
-		}
-		lifted := RelationshipChange{From: from, To: to, Type: ch.Type, NewValue: ch.NewValue}
-		pairKey := from + "->" + to
 		switch ch.Type {
-		case Added:
-			if liftedSeen[pairKey] {
-				continue
-			}
-			liftedSeen[pairKey] = true
-			applyRelAdded(lifted, viewID, page, templates, result)
-		case Modified:
-			page.UpdateConnectorLabel(from, to, ch.NewValue)
-			result.ConnectorsUpdated++
 		case Deleted:
-			page.DeleteConnector(from, to)
-			result.ConnectorsDeleted++
+			// For deletions, use scoped cell IDs to find and remove the
+			// connector. The original endpoints may no longer be in the
+			// view's element filter, so we bypass lifting entirely.
+			fromRef := scopedCellID(viewID, ch.From)
+			toRef := scopedCellID(viewID, ch.To)
+			if page.FindConnector(fromRef, toRef) != nil {
+				page.DeleteConnector(fromRef, toRef)
+				result.ConnectorsDeleted++
+			}
+		default:
+			from := ch.From
+			to := ch.To
+			if elemFilter != nil {
+				from = liftEndpoint(from, elemFilter)
+				to = liftEndpoint(to, elemFilter)
+				if from == "" || to == "" || from == to {
+					continue
+				}
+			}
+			lifted := RelationshipChange{From: from, To: to, Type: ch.Type, NewValue: ch.NewValue}
+			pairKey := from + "->" + to
+			switch ch.Type {
+			case Added:
+				if liftedSeen[pairKey] {
+					continue
+				}
+				liftedSeen[pairKey] = true
+				applyRelAdded(lifted, viewID, page, templates, result)
+			case Modified:
+				page.UpdateConnectorLabel(from, to, ch.NewValue)
+				result.ConnectorsUpdated++
+			}
 		}
 	}
 }
