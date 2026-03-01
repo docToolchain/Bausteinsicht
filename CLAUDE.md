@@ -12,13 +12,14 @@ Architecture-as-code tool with draw.io as visual frontend and bidirectional sync
 - ADR format: Nygard with Weighted Pugh Matrix (-1/0/1 scale)
 - PRD path: `src/docs/PRD/`
 - Spec path: `src/docs/spec/`
+- Security reports: `src/docs/security/` (fortlaufend, mit Changelog)
 
 ### Technology Stack
 - Implementation language: **Go** (ADR-002)
 - DSL format: **JSONC with JSON Schema** (ADR-001)
 - CLI framework: Cobra
-- XML processing: beevik/etree or emicklei/mxgraph
-- No JavaScript/Node.js (security concerns with npm)
+- XML processing: beevik/etree
+- No JavaScript/Node.js for the product itself (security concerns with npm supply chain)
 
 ### Quality Goals (Top 3)
 1. **Learnability** — new users productive within 30 minutes
@@ -31,6 +32,45 @@ Architecture-as-code tool with draw.io as visual frontend and bidirectional sync
 - Template-based styling (templates are draw.io files)
 - Zoom-based drill-down navigation on single draw.io page
 - CLI + watch mode; CLI commands for LLM-driven workflows
+
+## Development Environment
+
+### Devcontainer
+A `.devcontainer/` configuration provides a fully reproducible dev environment with all tools pre-installed. Use with VS Code Dev Containers or GitHub Codespaces.
+
+### Makefile
+All build, test, and analysis commands are available via `make`:
+- `make build` — build the CLI binary
+- `make test` / `make test-race` — run tests (with race detector)
+- `make check` — run all analysis tools + race-detected tests
+- `make vet` / `make staticcheck` / `make gosec` / `make nilaway` / `make govulncheck` — individual analysis tools
+- `make gitleaks` — scan for secrets
+- `make golangci-lint` — meta-linter
+- `make install-tools` — install Go-based tools
+
+### Installed Tools
+- `go vet`, `staticcheck` — static analysis
+- `gosec` — security scanner
+- `nilaway` — nil pointer analysis
+- `govulncheck` — vulnerability scanner
+- `golangci-lint` — meta-linter
+- `gitleaks` — secret scanner
+- `draw.io` CLI (headless via xvfb in devcontainer)
+- `claude` (Claude Code CLI)
+- `human` (gethuman.sh — AI agent issue tracker integration)
+
+## Workflow Rules
+
+### PR Merge Policy
+Before merging any PR:
+1. **Security review** on the changes
+2. **Code review** on the changes
+
+### Security Report
+The security report at `src/docs/security/2026-03-01-security-review.adoc` is a living document. Update it (with a Changelog entry) whenever:
+- Security findings are fixed or new ones discovered
+- Dependencies are updated
+- Automated tool results change
 
 ### Future Ideas (Out of Scope for v1)
 - As-Is / To-Be architecture comparison
