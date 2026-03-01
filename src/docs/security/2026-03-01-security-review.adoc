@@ -1,0 +1,413 @@
+:jbake-title: Security Review 2026-03-01
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: Security
+:jbake-order: 1
+
+:toc:
+
+== Security Review — 2026-03-01
+
+=== Scope
+
+Full security review of the Bausteinsicht repository at commit `992d7c1` (main branch, 2026-03-01).
+
+Reviewed areas:
+
+* All Go source files in `cmd/bausteinsicht/` (CLI layer)
+* All Go source files in `internal/` (drawio, model, sync, watcher packages)
+* All direct and transitive dependencies (`go.mod` / `go.sum`)
+* Dependency vulnerability scan via `govulncheck` and OSV database
+
+=== Threat Model
+
+Bausteinsicht is a **local CLI tool** that reads/writes files on the user's workstation.
+The trust boundary is:
+
+* **Trusted input**: CLI flags provided by the operator
+* **Semi-trusted input**: JSONC model files and draw.io XML files (may be shared via Git between team members)
+* **No network exposure**: No HTTP server, no outbound API calls, no TLS server
+
+The primary risk scenario is a **malicious or crafted model/drawio file** shared via a repository that causes unexpected behavior when another user runs `bausteinsicht sync`.
+
+=== Summary
+
+[cols="1,1,3,1"]
+|===
+| ID | Severity | Issue | Status
+
+| SEC-001
+| Medium
+| No path boundary check on `--model` / `--template` flags; write paths derived from user-controlled input
+| Open
+
+| SEC-002
+| Low-Medium
+| Predictable temp file name in `model.Save` (TOCTOU / symlink attack)
+| Open
+
+| SEC-003
+| Low-Medium
+| Data race on `lastFile` variable in watcher debounce closure
+| Open
+
+| SEC-004
+| Low
+| File permissions hardcoded to `0644` (world-readable) for model and template files
+| Open
+
+| SEC-005
+| Low
+| `AutoDetect` silently picks first `.jsonc` file alphabetically (confused deputy)
+| Open
+
+| SEC-006
+| Low
+| No file size limit on JSONC model parsing (memory exhaustion DoS)
+| Open
+
+| SEC-007
+| Low
+| No recursion depth limit on `Element.Children` traversal (stack overflow DoS)
+| Open
+
+| SEC-008
+| Low
+| `stripTags` incorrectly handles `>` inside HTML attribute values
+| Open
+
+| SEC-009
+| Medium
+| Go toolchain 1.23.0 has 25 known stdlib vulnerabilities
+| Open
+
+| SEC-010
+| Low
+| `golang.org/x/sys` v0.13.0 is 28 minor versions behind current
+| Open
+|===
+
+=== Findings
+
+==== SEC-001: Path Traversal via CLI Flags (Medium)
+
+**Affected files:**
+
+* `cmd/bausteinsicht/sync.go:27-28`
+* `cmd/bausteinsicht/watch.go:29-30`
+* `cmd/bausteinsicht/validate.go:34`
+* `cmd/bausteinsicht/add_element.go:40`
+* `cmd/bausteinsicht/add_relationship.go:34`
+* `internal/model/loader.go:13-14`
+* `internal/drawio/template.go:27-33`
+
+**Description:**
+The `--model` and `--template` CLI flags accept arbitrary filesystem paths without validation.
+No call to `filepath.Clean` or boundary check exists.
+More critically, write targets are derived from the model path:
+
+[source,go]
+----
+dir := filepath.Dir(modelPath)          // attacker-controlled
+drawioPath := filepath.Join(dir, "architecture.drawio")
+statePath  := filepath.Join(dir, ".bausteinsicht-sync")
+----
+
+Supplying `--model /tmp/../../some/path/x.jsonc` causes writes at attacker-chosen locations.
+
+**Risk:**
+For a local CLI tool where the operator provides their own flags, this is acceptable.
+If the CLI is ever wrapped in automation (CI/CD, LLM agent pipelines), this becomes exploitable.
+
+**Recommendation:**
+After resolving the user-supplied path with `filepath.Abs`, verify the result is rooted at an allowed base directory.
+At minimum, document that paths are fully trusted and the tool must not be run with untrusted flag values.
+
+==== SEC-002: Predictable Temp File in model.Save (Low-Medium)
+
+**Affected file:** `internal/model/loader.go:32-38`
+
+[source,go]
+----
+tmp := path + ".tmp"                      // predictable name
+if err := os.WriteFile(tmp, data, 0644);  // no O_EXCL protection
+    ...
+if err := os.Rename(tmp, path); err != nil {
+----
+
+**Description:**
+`model.Save` constructs the temp filename by appending `.tmp` to the model path.
+This is predictable and creates two issues:
+
+1. **Concurrent write race:** Two sync operations could write to the same `.tmp` file simultaneously.
+2. **Symlink attack:** A malicious local user who knows the model path could pre-create a symlink at `path + ".tmp"` pointing to an arbitrary file.
+
+The other two write functions (`SaveDocument` in `document.go:36` and `SaveState` in `state.go:76`) correctly use `os.CreateTemp` with randomized suffixes.
+
+**Recommendation:**
+Align `model.Save` with the safe pattern used elsewhere:
+
+[source,go]
+----
+dir := filepath.Dir(path)
+tmp, err := os.CreateTemp(dir, ".model-tmp-*")
+----
+
+==== SEC-003: Data Race in Watcher Debounce (Low-Medium)
+
+**Affected file:** `internal/watcher/watcher.go:99-108`
+
+[source,go]
+----
+lastFile = event.Name          // written by loop goroutine
+
+timer = time.AfterFunc(w.debounce, func() {
+    if !w.isSyncing() {
+        w.onChange(lastFile)   // read by AfterFunc goroutine — DATA RACE
+    }
+})
+----
+
+**Description:**
+`lastFile` is captured by reference in the `time.AfterFunc` closure.
+The `loop` goroutine may update `lastFile` while the timer goroutine concurrently reads it.
+This is a data race under Go's memory model and would be flagged by `go test -race`.
+
+The practical consequence is minor (both files trigger the same sync action), but it is formally incorrect.
+
+**Recommendation:**
+Capture `lastFile` by value:
+
+[source,go]
+----
+captured := lastFile
+timer = time.AfterFunc(w.debounce, func() {
+    if !w.isSyncing() {
+        w.onChange(captured)
+    }
+})
+----
+
+==== SEC-004: World-Readable File Permissions (Low)
+
+**Affected files:**
+
+* `cmd/bausteinsicht/init.go:46, 51` — `os.WriteFile(..., 0644)`
+* `internal/model/loader.go:33` — `os.WriteFile(..., 0644)`
+
+**Description:**
+Model and template files are written with `0644` (world-readable).
+On a shared system, the architecture model is readable by all local users.
+
+**Recommendation:**
+Use `0600` for model files, or let the user's umask control permissions.
+
+==== SEC-005: AutoDetect Confused Deputy (Low)
+
+**Affected file:** `internal/model/loader.go:44-53`
+
+[source,go]
+----
+func AutoDetect(dir string) (string, error) {
+    matches, err := filepath.Glob(filepath.Join(dir, "*.jsonc"))
+    ...
+    return matches[0], nil   // first alphabetical match
+}
+----
+
+**Description:**
+When multiple `.jsonc` files exist, the tool silently picks the first alphabetically.
+A malicious file named `aaa-evil.jsonc` placed in the project directory would be used over `architecture.jsonc`.
+
+**Recommendation:**
+If more than one `.jsonc` is found and `--model` was not specified, return an error requiring explicit selection.
+
+==== SEC-006: No File Size Limit on JSONC Parsing (Low)
+
+**Affected file:** `internal/model/loader.go:13-24`
+
+**Description:**
+`model.Load` reads the entire file into memory with `os.ReadFile` without a size check.
+A crafted multi-gigabyte `.jsonc` file could exhaust memory.
+
+Additionally, `StripJSONC` does not handle block comments (`/* ... */`), causing confusing parse errors rather than a clear message.
+
+**Recommendation:**
+Add a maximum file size check (e.g., reject files over 10 MB).
+
+==== SEC-007: Unbounded Recursion on Element Hierarchy (Low)
+
+**Affected files:**
+
+* `internal/model/resolve.go:33` — `flattenInto`
+* `internal/model/validate.go:35` — `validateElement`
+* `internal/model/validate.go:127` — `lookupChild`
+* `internal/sync/reverse.go:128` — `modifyInMap`
+* `internal/sync/reverse.go:159` — `deleteFromMap`
+
+**Description:**
+All five functions recursively traverse `Element.Children` without a depth limit.
+A deeply nested model (50,000+ levels) would exhaust the goroutine stack and panic.
+
+**Recommendation:**
+Add a `maxDepth` parameter (e.g., 100 levels) and return an error if exceeded.
+
+==== SEC-008: stripTags Incorrect Parsing (Low)
+
+**Affected file:** `internal/drawio/label.go:141-155`
+
+**Description:**
+The `stripTags` fallback function uses a simple state machine that treats any `>` as a tag closer.
+If a draw.io label contains `>` inside an HTML attribute value (e.g., `<font color="a>b">`),
+the parser exits the "inTag" state prematurely, leaking attribute content into the output.
+
+This only affects the fallback path in `ParseLabel` (when the label does not start with `<b>`).
+
+**Recommendation:**
+Either use a proper HTML tokenizer or add attribute-aware parsing for the `>` inside quotes case.
+
+==== SEC-009: Outdated Go Toolchain (Medium)
+
+**Current version:** Go 1.23.0 +
+**Recommended minimum:** Go 1.23.12+
+
+**Description:**
+The Go 1.23.0 standard library contains 25 known vulnerabilities.
+Most are in packages not used by this CLI tool (`net/http`, `crypto/tls`, `crypto/x509`),
+but the following are relevant:
+
+[cols="1,2,1"]
+|===
+| CVE / ID | Description | Fixed in
+
+| GO-2026-4403
+| `os.Root.Open("../")` escapes confinement (not used but `os` imported)
+| go1.23.9
+
+| GO-2025-3956
+| `os/exec.LookPath` returns unexpected paths
+| go1.23.12
+
+| GO-2024-3105
+| `go/parser.Parse` stack exhaustion
+| go1.23.1
+|===
+
+**No project code calls vulnerable symbols.** This is confirmed by `govulncheck` binary analysis.
+
+**Recommendation:**
+Update `go.mod` to `go 1.23.12` or higher, then run `go mod tidy`.
+
+==== SEC-010: Outdated golang.org/x/sys (Low)
+
+**Current version:** v0.13.0 +
+**Latest version:** v0.41.0
+
+**Description:**
+This transitive dependency (pulled in by `fsnotify`) is 28 minor versions behind.
+No specific CVE was found for v0.13.0 in the OSV database,
+but the staleness makes it difficult to reason about coverage of all low-level fixes.
+
+**Recommendation:**
+Run `go get golang.org/x/sys@latest && go mod tidy`.
+
+=== Not Vulnerable
+
+The following attack vectors were explicitly tested and confirmed **not exploitable**:
+
+[cols="1,3"]
+|===
+| Attack Vector | Reason
+
+| XXE (XML External Entity)
+| `beevik/etree` uses `encoding/xml.RawToken()` which does not expand entities. Go's XML decoder never fetches external entities.
+
+| Billion Laughs / XML Bomb
+| Entity expansion does not occur with `RawToken`.
+
+| HTML Injection (forward sync)
+| User-controlled model strings pass through `escapeHTML()` before XML attribute storage. Round-trip is safe.
+
+| JSON Deserialization Attack
+| Go's `encoding/json` is not susceptible to unsafe deserialization. No `interface{}` unmarshaling of untrusted data.
+
+| Command Injection
+| No use of `os/exec`, `syscall.Exec`, or shell invocation anywhere in the codebase.
+
+| Privilege Escalation
+| No setuid, no capability use, no privileged file paths accessed.
+
+| Supply Chain (Dependencies)
+| `go mod verify` passes. All dependency hashes match. No CVEs in `beevik/etree`, `cobra`, or `fsnotify`.
+|===
+
+=== Dependency Status
+
+[cols="2,1,1,1"]
+|===
+| Module | Version | Latest | CVEs
+
+| `github.com/beevik/etree`
+| v1.6.0
+| v1.6.0
+| None
+
+| `github.com/spf13/cobra`
+| v1.10.2
+| v1.10.2
+| None
+
+| `github.com/fsnotify/fsnotify`
+| v1.9.0
+| v1.9.0
+| None
+
+| `github.com/spf13/pflag`
+| v1.0.9
+| v1.0.10
+| None
+
+| `golang.org/x/sys`
+| v0.13.0
+| v0.41.0
+| None known
+
+| Go stdlib
+| 1.23.0
+| 1.24.x
+| 25 (none called by project code)
+|===
+
+`go.sum` integrity: **PASS** (`go mod verify` — all modules verified)
+
+=== Prioritized Action Items
+
+==== High Priority
+
+1. **Upgrade Go toolchain** from 1.23.0 to 1.23.12+ — resolves 25 stdlib vulnerabilities
+2. **Update `golang.org/x/sys`** from v0.13.0 to latest — `go get golang.org/x/sys@latest`
+
+==== Medium Priority
+
+3. **Fix SEC-002**: Replace predictable temp file in `model.Save` with `os.CreateTemp`
+4. **Fix SEC-003**: Capture `lastFile` by value in watcher debounce closure
+5. **Document SEC-001**: Add note to README/CLAUDE.md that `--model`/`--template` paths are fully trusted
+
+==== Low Priority
+
+6. **Fix SEC-005**: Error on multiple `.jsonc` files without explicit `--model`
+7. **Fix SEC-006**: Add 10 MB file size limit to `model.Load`
+8. **Fix SEC-007**: Add max depth (100) to recursive `Children` traversal
+9. **Fix SEC-004**: Use `0600` instead of `0644` for model files
+10. **Fix SEC-008**: Improve `stripTags` attribute handling
+
+=== Next Review
+
+The next security review should:
+
+* Verify all action items from this review are resolved
+* Re-run `govulncheck` with updated Go toolchain
+* Review any new CLI commands or features added since this review
+* Check for new CVEs in dependencies (especially `beevik/etree` for XML parsing)
+* Run `go test -race ./...` to verify SEC-003 fix
+* If export command (#63) is implemented, review for file write safety and draw.io CLI invocation
