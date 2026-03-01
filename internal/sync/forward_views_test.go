@@ -479,6 +479,70 @@ func TestApplyForward_DeletedRelationshipRemovedFromViewPages(t *testing.T) {
 	}
 }
 
+// TestApplyForward_ScopeBoundaryUpdatedOnModify verifies that when a scope
+// element's properties change, the scope boundary on its view page is also
+// updated. Regression test for #84.
+func TestApplyForward_ScopeBoundaryUpdatedOnModify(t *testing.T) {
+	ts := minimalTemplates(t)
+	m := modelWithViews()
+
+	// Round 1: add all elements (creates scope boundary for "webshop" on containers page).
+	doc := docWithViewPages()
+	csAdd := &ChangeSet{
+		ModelElementChanges: []ElementChange{
+			{ID: "customer", Type: Added},
+			{ID: "webshop", Type: Added},
+			{ID: "webshop.api", Type: Added},
+			{ID: "webshop.db", Type: Added},
+		},
+	}
+	ApplyForward(csAdd, doc, ts, m)
+
+	// Verify boundary exists with original title.
+	containerPage := doc.GetPage("view-containers")
+	boundary := containerPage.FindElement("webshop")
+	if boundary == nil {
+		t.Fatal("precondition: scope boundary for webshop should exist on containers page")
+	}
+	origLabel := boundary.SelectAttrValue("label", "")
+	if origLabel == "" {
+		t.Fatal("precondition: scope boundary should have a label")
+	}
+
+	// Round 2: modify the scope element's technology.
+	m.Model["webshop"] = model.Element{
+		Kind:       "container",
+		Title:      "Webshop",
+		Technology: "Kubernetes",
+		Children: map[string]model.Element{
+			"api": {Kind: "container", Title: "API"},
+			"db":  {Kind: "container", Title: "Database"},
+		},
+	}
+
+	csMod := &ChangeSet{
+		ModelElementChanges: []ElementChange{
+			{ID: "webshop", Type: Modified},
+		},
+	}
+	result := ApplyForward(csMod, doc, ts, m)
+
+	// The boundary label on the containers page should reflect the new technology.
+	boundary = containerPage.FindElement("webshop")
+	if boundary == nil {
+		t.Fatal("scope boundary for webshop should still exist after modify")
+	}
+	newLabel := boundary.SelectAttrValue("label", "")
+	expectedLabel := drawio.GenerateLabel("Webshop", "Kubernetes", "")
+	if newLabel != expectedLabel {
+		t.Errorf("scope boundary label not updated:\ngot:  %s\nwant: %s", newLabel, expectedLabel)
+	}
+
+	if result.ElementsUpdated == 0 {
+		t.Error("expected at least 1 element updated in forward result")
+	}
+}
+
 // TestApplyForward_NoViewsFallback verifies backward compatibility:
 // when no views are defined, elements go to the first page.
 func TestApplyForward_NoViewsFallback(t *testing.T) {
