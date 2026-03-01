@@ -193,6 +193,7 @@ func detectElementChanges(
 			appendIfChanged(id, "title", lastElem.Title, me.Title, &cs.ModelElementChanges)
 			appendIfChanged(id, "description", lastElem.Description, me.Description, &cs.ModelElementChanges)
 			appendIfChanged(id, "technology", lastElem.Technology, me.Technology, &cs.ModelElementChanges)
+			appendIfChanged(id, "kind", lastElem.Kind, me.Kind, &cs.ModelElementChanges)
 		}
 
 		// Draw.io side changes
@@ -205,6 +206,9 @@ func detectElementChanges(
 			appendIfChanged(id, "title", lastElem.Title, de.title, &cs.DrawioElementChanges)
 			appendIfChanged(id, "description", lastElem.Description, de.description, &cs.DrawioElementChanges)
 			appendIfChanged(id, "technology", lastElem.Technology, de.technology, &cs.DrawioElementChanges)
+			// Note: kind is not compared on the draw.io side because scope
+			// boundary elements have a derived kind (e.g. "system_boundary")
+			// that legitimately differs from the model kind ("system").
 		}
 
 		// Conflicts: both sides modified the same field
@@ -212,6 +216,8 @@ func detectElementChanges(
 			checkElemConflict(cs, id, "title", lastElem.Title, me.Title, de.title)
 			checkElemConflict(cs, id, "description", lastElem.Description, me.Description, de.description)
 			checkElemConflict(cs, id, "technology", lastElem.Technology, me.Technology, de.technology)
+			// Note: kind conflicts are not checked because kind is
+			// model-authoritative and draw.io boundary kinds are derived.
 		}
 	}
 }

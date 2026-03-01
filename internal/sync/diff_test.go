@@ -467,6 +467,37 @@ func TestDetectChanges_LiftedConnectorIgnored(t *testing.T) {
 	}
 }
 
+func simpleModelWithKind(id, title, description, technology, kind string) *model.BausteinsichtModel {
+	return &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			id: {Kind: kind, Title: title, Description: description, Technology: technology},
+		},
+		Relationships: []model.Relationship{},
+	}
+}
+
+func TestDetectChanges_ModelModifiedKind(t *testing.T) {
+	state := stateWithElem("app", "App", "Desc", "Go")
+	m := simpleModelWithKind("app", "App", "Desc", "Go", "component")
+	doc := docWithElem("app", "App", "Go", "Desc")
+
+	cs := DetectChanges(m, doc, state)
+
+	found := false
+	for _, ch := range cs.ModelElementChanges {
+		if ch.ID == "app" && ch.Type == Modified && ch.Field == "kind" &&
+			ch.OldValue == "container" && ch.NewValue == "component" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected model kind modification, changes: %+v", cs.ModelElementChanges)
+	}
+	if len(cs.Conflicts) != 0 {
+		t.Errorf("expected no conflicts, got %d", len(cs.Conflicts))
+	}
+}
+
 func TestDetectChanges_ScopedConnectorLabelChange(t *testing.T) {
 	// Relationship exists in state with label "uses". draw.io connector (scoped)
 	// has label "calls". Should detect a drawio-side label modification.
