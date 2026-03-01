@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 
 	"github.com/docToolchain/Bauteinsicht/internal/model"
 	"github.com/spf13/cobra"
@@ -70,8 +69,7 @@ func runAddRelationship(cmd *cobra.Command, args []string) error {
 
 	for _, r := range m.Relationships {
 		if r.From == from && r.To == to {
-			fmt.Fprintf(os.Stderr, "Warning: relationship %s -> %s already exists\n", from, to)
-			break
+			return exitWithCode(fmt.Errorf("relationship %s -> %s already exists", from, to), 1)
 		}
 	}
 
