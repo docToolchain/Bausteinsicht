@@ -33,7 +33,7 @@ func runInit(cmd *cobra.Command, _ []string) error {
 	format, _ := cmd.Flags().GetString("format")
 
 	// Check if files already exist.
-	for _, name := range []string{defaultModelFile, defaultDrawioFile} {
+	for _, name := range []string{defaultModelFile, defaultDrawioFile, defaultTemplFile} {
 		if _, err := os.Stat(name); err == nil {
 			return exitWithCode(
 				fmt.Errorf("file %q already exists; remove it or use a different directory", name),
