@@ -415,6 +415,21 @@ func applyElementModified(
 	result.ElementsUpdated++
 }
 
+// countConnectorsFor counts the number of connectors on page where source or
+// target matches cellID. This is used to increment ConnectorsDeleted before
+// calling page.DeleteConnectorsFor.
+func countConnectorsFor(page *drawio.Page, cellID string) int {
+	n := 0
+	for _, c := range page.FindAllConnectors() {
+		src := c.SelectAttrValue("source", "")
+		tgt := c.SelectAttrValue("target", "")
+		if src == cellID || tgt == cellID {
+			n++
+		}
+	}
+	return n
+}
+
 // applyRelAdded creates a new connector on page.
 func applyRelAdded(
 	ch RelationshipChange,
@@ -477,16 +492,4 @@ func reconcileViewPage(
 	}
 }
 
-// countConnectorsFor returns the number of connectors on the page that
-// reference elementID as source or target.
-func countConnectorsFor(page *drawio.Page, elementID string) int {
-	count := 0
-	for _, conn := range page.FindAllConnectors() {
-		src := conn.SelectAttrValue("source", "")
-		tgt := conn.SelectAttrValue("target", "")
-		if src == elementID || tgt == elementID {
-			count++
-		}
-	}
-	return count
-}
+
