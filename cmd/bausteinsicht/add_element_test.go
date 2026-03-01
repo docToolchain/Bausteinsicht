@@ -442,3 +442,84 @@ func TestAddElementPreservesComments(t *testing.T) {
 		t.Error("new element 'payments' not found in model")
 	}
 }
+
+// TestAddElementInvalidIDs verifies that IDs with dots, spaces, or special
+// characters are rejected. Regression test for #123.
+func TestAddElementInvalidIDs(t *testing.T) {
+	dir := t.TempDir()
+	modelPath := writeSampleModel(t, dir)
+
+	invalidIDs := []string{
+		"foo.bar",    // dot (hierarchy separator)
+		"foo bar",    // space
+		"foo@bar",    // special char
+		"foo/bar",    // slash
+		"",           // empty
+		"123invalid", // starts with digit
+	}
+
+	for _, id := range invalidIDs {
+		t.Run(id, func(t *testing.T) {
+			cmd := NewRootCmd()
+			cmd.SilenceErrors = true
+			cmd.SilenceUsage = true
+			cmd.SetArgs([]string{"add", "element",
+				"--model", modelPath,
+				"--id", id,
+				"--kind", "system",
+				"--title", "Test",
+			})
+			err := cmd.Execute()
+			if err == nil {
+				t.Errorf("expected error for invalid ID %q", id)
+			}
+		})
+	}
+}
+
+// TestAddElementEmptyTitle verifies that empty title is rejected.
+// Regression test for #124.
+func TestAddElementEmptyTitle(t *testing.T) {
+	dir := t.TempDir()
+	modelPath := writeSampleModel(t, dir)
+
+	cmd := NewRootCmd()
+	cmd.SilenceErrors = true
+	cmd.SilenceUsage = true
+	cmd.SetArgs([]string{"add", "element",
+		"--model", modelPath,
+		"--id", "test",
+		"--kind", "system",
+		"--title", "",
+	})
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error for empty title")
+	}
+}
+
+// TestAddElementValidIDs verifies that valid IDs are accepted.
+func TestAddElementValidIDs(t *testing.T) {
+	validIDs := []string{"api", "my-service", "my_service", "API", "a1"}
+
+	for _, id := range validIDs {
+		t.Run(id, func(t *testing.T) {
+			dir := t.TempDir()
+			modelPath := writeSampleModel(t, dir)
+
+			cmd := NewRootCmd()
+			cmd.SilenceErrors = true
+			cmd.SilenceUsage = true
+			cmd.SetArgs([]string{"add", "element",
+				"--model", modelPath,
+				"--id", id,
+				"--kind", "system",
+				"--title", "Test",
+			})
+			err := cmd.Execute()
+			if err != nil {
+				t.Errorf("unexpected error for valid ID %q: %v", id, err)
+			}
+		})
+	}
+}
