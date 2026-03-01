@@ -102,6 +102,10 @@ func applyForwardPerView(
 		}
 
 		applyChangesToPage(cs, page, templates, flat, elemSet, viewID, scopeID, result)
+
+		// Reconciliation: remove elements on the page that are no longer
+		// in the resolved view (e.g., after exclude list changes). #102
+		reconcileViewPage(page, elemSet, scopeID, viewID, result)
 	}
 }
 
@@ -424,4 +428,60 @@ func applyRelAdded(
 	}
 	page.CreateConnector(data, style)
 	result.ConnectorsCreated++
+}
+
+// reconcileViewPage removes elements from the page that are not in the
+// resolved view filter. This handles cases where view include/exclude rules
+// change without corresponding model element changes (no ChangeSet entries).
+func reconcileViewPage(
+	page *drawio.Page,
+	elemFilter map[string]bool,
+	scopeID string,
+	viewID string,
+	result *ForwardResult,
+) {
+	if elemFilter == nil {
+		return
+	}
+
+	for _, obj := range page.FindAllElements() {
+		id := obj.SelectAttrValue("bausteinsicht_id", "")
+		if id == "" {
+			continue
+		}
+
+		// Skip the scope boundary element — it's rendered separately
+		// and is not subject to the normal element filter.
+		if id == scopeID {
+			continue
+		}
+
+		if elemFilter[id] {
+			continue
+		}
+
+		// Element is on the page but not in the view's resolved set.
+		// Remove its connectors first (using scoped cell ID), then the element.
+		// On view pages, connectors reference scoped cell IDs, not raw element IDs.
+		cellID := scopedCellID(viewID, id)
+		result.ConnectorsDeleted += countConnectorsFor(page, cellID)
+		page.DeleteConnectorsFor(cellID)
+
+		page.DeleteElement(id)
+		result.ElementsDeleted++
+	}
+}
+
+// countConnectorsFor returns the number of connectors on the page that
+// reference elementID as source or target.
+func countConnectorsFor(page *drawio.Page, elementID string) int {
+	count := 0
+	for _, conn := range page.FindAllConnectors() {
+		src := conn.SelectAttrValue("source", "")
+		tgt := conn.SelectAttrValue("target", "")
+		if src == elementID || tgt == elementID {
+			count++
+		}
+	}
+	return count
 }
