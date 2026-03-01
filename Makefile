@@ -1,4 +1,4 @@
-.PHONY: build test test-race vet staticcheck gosec nilaway govulncheck git-secrets golangci-lint check clean install-tools
+.PHONY: build test test-race vet staticcheck gosec nilaway govulncheck gitleaks golangci-lint check clean install-tools
 
 # Ensure GOPATH/bin is in PATH for installed tools
 export PATH := $(PATH):$(shell go env GOPATH)/bin
@@ -38,9 +38,9 @@ nilaway:
 govulncheck:
 	govulncheck ./...
 
-# git-secrets — scan for secrets
-git-secrets:
-	git secrets --scan
+# gitleaks — scan for secrets
+gitleaks:
+	gitleaks detect --source . --no-git
 
 # golangci-lint — meta-linter (includes many linters)
 golangci-lint:
@@ -53,7 +53,7 @@ install-tools:
 	go install go.uber.org/nilaway/cmd/nilaway@latest
 	go install golang.org/x/vuln/cmd/govulncheck@latest
 	@echo "Install golangci-lint via: https://golangci-lint.run/welcome/install/"
-	@echo "Install git-secrets via: https://github.com/awslabs/git-secrets#installing-git-secrets"
+	@echo "Install gitleaks via: https://github.com/gitleaks/gitleaks#installing"
 
 clean:
 	rm -f bausteinsicht

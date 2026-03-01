@@ -7,7 +7,7 @@ FROM mcr.microsoft.com/devcontainers/go:1.24
 ENV DEBIAN_FRONTEND=noninteractive
 
 # ──────────────────────────────────────────────
-# System packages (draw.io headless dependencies + git-secrets build)
+# System packages (draw.io headless dependencies)
 # ──────────────────────────────────────────────
 RUN apt-get update && apt-get install -y --no-install-recommends \
     # draw.io / Electron headless requirements
@@ -47,13 +47,12 @@ RUN GOTOOLCHAIN=auto go install honnef.co/go/tools/cmd/staticcheck@latest \
 RUN curl -sSfL https://golangci-lint.run/install.sh | sh -s -- -b /usr/local/bin
 
 # ──────────────────────────────────────────────
-# git-secrets (AWS — prevents committing secrets)
+# gitleaks (secret scanner — prevents committing credentials)
 # ──────────────────────────────────────────────
-RUN cd /tmp \
- && git clone https://github.com/awslabs/git-secrets.git \
- && cd git-secrets \
- && make install \
- && cd / && rm -rf /tmp/git-secrets
+RUN GITLEAKS_VERSION=$(curl -sL https://api.github.com/repos/gitleaks/gitleaks/releases/latest | jq -r '.tag_name' | sed 's/^v//') \
+ && wget -q "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" -O /tmp/gitleaks.tar.gz \
+ && tar -xzf /tmp/gitleaks.tar.gz -C /usr/local/bin gitleaks \
+ && rm -f /tmp/gitleaks.tar.gz
 
 # ──────────────────────────────────────────────
 # draw.io Desktop (headless export via xvfb-run)
