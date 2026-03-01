@@ -49,12 +49,41 @@ func FlattenElements(m *BausteinsichtModel) map[string]*Element {
 }
 
 // MatchPattern matches elements in the flat map against a pattern.
-// A trailing ".*" matches direct children only (one level deep).
-// A plain ID matches exactly that element.
+// Supported patterns:
+//   - "id"         — exact match
+//   - "prefix.*"   — direct children of prefix (one level deep)
+//   - "prefix.**"  — all descendants of prefix (recursive)
+//   - "*"          — all top-level elements (no dots in ID)
+//   - "**"         — all elements
 func MatchPattern(flatMap map[string]*Element, pattern string) []string {
 	var matches []string
 
-	if strings.HasSuffix(pattern, ".*") {
+	switch {
+	case pattern == "**":
+		// Match all elements.
+		for id := range flatMap {
+			matches = append(matches, id)
+		}
+
+	case pattern == "*":
+		// Match top-level elements only (no dots in ID).
+		for id := range flatMap {
+			if !strings.Contains(id, ".") {
+				matches = append(matches, id)
+			}
+		}
+
+	case strings.HasSuffix(pattern, ".**"):
+		// Match all descendants of prefix (recursive).
+		prefix := strings.TrimSuffix(pattern, "**")
+		for id := range flatMap {
+			if strings.HasPrefix(id, prefix) {
+				matches = append(matches, id)
+			}
+		}
+
+	case strings.HasSuffix(pattern, ".*"):
+		// Match direct children only (one level deep).
 		prefix := strings.TrimSuffix(pattern, "*")
 		depth := strings.Count(prefix, ".")
 		for id := range flatMap {
@@ -66,7 +95,9 @@ func MatchPattern(flatMap map[string]*Element, pattern string) []string {
 				matches = append(matches, id)
 			}
 		}
-	} else {
+
+	default:
+		// Exact match.
 		if _, ok := flatMap[pattern]; ok {
 			matches = append(matches, pattern)
 		}
