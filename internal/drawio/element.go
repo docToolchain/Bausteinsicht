@@ -113,6 +113,20 @@ func (p *Page) UpdateElement(id string, data ElementData) {
 	}
 }
 
+// UpdateElementKind updates the bausteinsicht_kind attribute and the mxCell style
+// of an existing element. If style is empty, the mxCell style is not changed.
+func (p *Page) UpdateElementKind(id, kind, style string) {
+	obj := p.FindElement(id)
+	if obj == nil {
+		return
+	}
+	setAttr(obj, "bausteinsicht_kind", kind)
+	cell := obj.FindElement("mxCell")
+	if cell != nil && style != "" {
+		setAttr(cell, "style", style)
+	}
+}
+
 // DeleteElement removes the <object> element with the given bausteinsicht_id.
 // It also removes any mxCell connectors that reference this element as source or target.
 func (p *Page) DeleteElement(id string) {

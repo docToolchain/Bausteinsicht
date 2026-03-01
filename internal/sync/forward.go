@@ -228,7 +228,7 @@ func applyChangesToPage(
 			if elemFilter != nil && !elemFilter[ch.ID] && ch.ID != scopeID {
 				continue
 			}
-			applyElementModified(ch, page, flat, result)
+			applyElementModified(ch, page, templates, flat, result)
 		case Deleted:
 			// Deleted elements are removed from all pages where they exist,
 			// regardless of the current view filter — a deleted element is
@@ -412,6 +412,7 @@ func applyElementAdded(
 func applyElementModified(
 	ch ElementChange,
 	page *drawio.Page,
+	templates *drawio.TemplateSet,
 	flat map[string]*model.Element,
 	result *ForwardResult,
 ) {
@@ -429,6 +430,15 @@ func applyElementModified(
 	}
 
 	page.UpdateElement(ch.ID, data)
+
+	if ch.Field == "kind" {
+		style := ""
+		if ts, ok := templates.GetStyle(elem.Kind); ok {
+			style = ts.Style
+		}
+		page.UpdateElementKind(ch.ID, elem.Kind, style)
+	}
+
 	result.ElementsUpdated++
 }
 

@@ -61,6 +61,84 @@ func fwdModelWithRel(fromID, toID string) *model.BausteinsichtModel {
 	}
 }
 
+// templatesWithComponent returns a TemplateSet with both "container" and "component" kinds.
+func templatesWithComponent(t *testing.T) *drawio.TemplateSet {
+	t.Helper()
+	xml := `<?xml version="1.0" encoding="UTF-8"?>
+<mxfile>
+  <diagram id="t1" name="templates">
+    <mxGraphModel>
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <object bausteinsicht_template="container" label="" id="tpl-container">
+          <mxCell style="shape=mxgraph.c4;c4Type=container;" vertex="1" parent="1">
+            <mxGeometry width="120" height="60" as="geometry"/>
+          </mxCell>
+        </object>
+        <object bausteinsicht_template="component" label="" id="tpl-component">
+          <mxCell style="shape=mxgraph.c4;c4Type=component;" vertex="1" parent="1">
+            <mxGeometry width="100" height="50" as="geometry"/>
+          </mxCell>
+        </object>
+        <mxCell bausteinsicht_template="relationship" style="endArrow=block;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>`
+	ts, err := drawio.LoadTemplateFromBytes([]byte(xml))
+	if err != nil {
+		t.Fatalf("LoadTemplateFromBytes: %v", err)
+	}
+	return ts
+}
+
+// TestApplyForward_ElementKindChanged verifies that a kind change updates
+// the bausteinsicht_kind attribute and the mxCell style.
+func TestApplyForward_ElementKindChanged(t *testing.T) {
+	// Create a doc with an element of kind "container"
+	doc := docWithElem("api", "API", "Go", "")
+	ts := templatesWithComponent(t)
+	// Model now has kind "component"
+	m := modelWithElem("api", "component", "API")
+
+	cs := &ChangeSet{
+		ModelElementChanges: []ElementChange{
+			{ID: "api", Type: Modified, Field: "kind", OldValue: "container", NewValue: "component"},
+		},
+	}
+
+	result := ApplyForward(cs, doc, ts, m)
+
+	if result.ElementsUpdated != 1 {
+		t.Fatalf("expected 1 element updated, got %d", result.ElementsUpdated)
+	}
+
+	page := doc.Pages()[0]
+	obj := page.FindElement("api")
+	if obj == nil {
+		t.Fatal("element 'api' not found")
+	}
+
+	// Verify bausteinsicht_kind attribute was updated
+	kindAttr := obj.SelectAttrValue("bausteinsicht_kind", "")
+	if kindAttr != "component" {
+		t.Errorf("expected bausteinsicht_kind='component', got %q", kindAttr)
+	}
+
+	// Verify style was updated to component style
+	cell := obj.FindElement("mxCell")
+	if cell == nil {
+		t.Fatal("mxCell not found under element")
+	}
+	style := cell.SelectAttrValue("style", "")
+	if !strings.Contains(style, "c4Type=component") {
+		t.Errorf("expected style to contain component template style, got: %s", style)
+	}
+}
+
 // TestApplyForward_NewElement verifies that an Added element change creates the element.
 func TestApplyForward_NewElement(t *testing.T) {
 	doc := emptyDoc()
