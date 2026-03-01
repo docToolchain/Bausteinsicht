@@ -124,6 +124,12 @@ func runAddElement(cmd *cobra.Command, args []string) error {
 			"kind":  kind,
 			"title": title,
 		}
+		if technology != "" {
+			out["technology"] = technology
+		}
+		if description != "" {
+			out["description"] = description
+		}
 		data, _ := json.Marshal(out)
 		fmt.Println(string(data))
 	} else {
