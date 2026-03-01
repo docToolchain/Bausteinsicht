@@ -35,8 +35,19 @@ Architecture-as-code tool with draw.io as visual frontend and bidirectional sync
 
 ## Development Environment
 
-### Devcontainer
-A `.devcontainer/` configuration provides a fully reproducible dev environment with all tools pre-installed. Use with VS Code Dev Containers or GitHub Codespaces.
+### Devcontainer (recommended)
+A `.devcontainer/` configuration provides a fully reproducible dev environment with all tools pre-installed. Use with VS Code Dev Containers, GitHub Codespaces, or the `devcontainer` CLI.
+
+Start the container and run Claude Code autonomously:
+```bash
+devcontainer up --workspace-folder .
+devcontainer exec --workspace-folder . claude --dangerously-skip-permissions -p "your prompt"
+```
+
+Key details:
+- Claude Code is installed via **native installer** (not npm) — no Node.js dependency
+- draw.io runs headless via `xvfb-run` — use `drawio-export` wrapper for exports
+- `COLORTERM=truecolor` is set for correct terminal color rendering
 
 ### Makefile
 All build, test, and analysis commands are available via `make`:
