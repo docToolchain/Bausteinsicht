@@ -3,6 +3,9 @@ package sync
 import (
 	"strings"
 	"testing"
+
+	"github.com/docToolchain/Bauteinsicht/internal/drawio"
+	"github.com/docToolchain/Bauteinsicht/internal/model"
 )
 
 // --- Test 1: Empty sync (no changes) → zero counts ---
@@ -133,7 +136,79 @@ func TestRun_ConflictModelWins(t *testing.T) {
 	}
 }
 
-// --- Test 5: Full round-trip ---
+// --- Test 5: Full round-trip with views (regression test for #83) ---
+//
+// Verifies that after a forward sync with views, a second sync detects no
+// phantom changes. Scoped cell IDs on connectors must be resolved back to
+// element IDs so the state comparison works correctly.
+
+func TestRun_ViewBasedSyncNoPhantomChanges(t *testing.T) {
+	ts := minimalTemplates(t)
+
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"customer": {Kind: "container", Title: "Customer"},
+			"shop":     {Kind: "container", Title: "Shop"},
+		},
+		Relationships: []model.Relationship{
+			{From: "customer", To: "shop", Label: "uses"},
+		},
+		Views: map[string]model.View{
+			"ctx": {Title: "Context", Include: []string{"customer", "shop"}},
+		},
+	}
+
+	// Build empty doc with the view page.
+	doc := drawio.NewDocument()
+	doc.AddPage("view-ctx", "Context")
+
+	state := emptyState()
+
+	// Round 1: forward sync populates the doc.
+	r1 := Run(m, doc, state, ts)
+	if r1.Forward.ElementsCreated != 2 {
+		t.Fatalf("round 1: expected 2 elements created, got %d", r1.Forward.ElementsCreated)
+	}
+	if r1.Forward.ConnectorsCreated != 1 {
+		t.Fatalf("round 1: expected 1 connector created, got %d", r1.Forward.ConnectorsCreated)
+	}
+
+	// Build state after round 1 (mirrors what BuildState does).
+	state1 := &SyncState{
+		Elements: map[string]ElementState{
+			"customer": {Title: "Customer", Kind: "container"},
+			"shop":     {Title: "Shop", Kind: "container"},
+		},
+		Relationships: []RelationshipState{
+			{From: "customer", To: "shop", Label: "uses"},
+		},
+	}
+
+	// Round 2: nothing changed — sync should be a complete no-op.
+	r2 := Run(m, doc, state1, ts)
+
+	if r2.Forward.ElementsCreated != 0 || r2.Forward.ElementsUpdated != 0 || r2.Forward.ElementsDeleted != 0 {
+		t.Errorf("round 2: expected no forward element changes, got created=%d updated=%d deleted=%d",
+			r2.Forward.ElementsCreated, r2.Forward.ElementsUpdated, r2.Forward.ElementsDeleted)
+	}
+	if r2.Forward.ConnectorsCreated != 0 || r2.Forward.ConnectorsUpdated != 0 || r2.Forward.ConnectorsDeleted != 0 {
+		t.Errorf("round 2: expected no forward connector changes, got created=%d updated=%d deleted=%d",
+			r2.Forward.ConnectorsCreated, r2.Forward.ConnectorsUpdated, r2.Forward.ConnectorsDeleted)
+	}
+	if r2.Reverse.ElementsCreated != 0 || r2.Reverse.ElementsUpdated != 0 || r2.Reverse.ElementsDeleted != 0 {
+		t.Errorf("round 2: expected no reverse element changes, got created=%d updated=%d deleted=%d",
+			r2.Reverse.ElementsCreated, r2.Reverse.ElementsUpdated, r2.Reverse.ElementsDeleted)
+	}
+	if r2.Reverse.RelationshipsCreated != 0 || r2.Reverse.RelationshipsDeleted != 0 {
+		t.Errorf("round 2: expected no reverse relationship changes, got created=%d deleted=%d",
+			r2.Reverse.RelationshipsCreated, r2.Reverse.RelationshipsDeleted)
+	}
+	if len(r2.Conflicts) != 0 {
+		t.Errorf("round 2: expected no conflicts, got %d", len(r2.Conflicts))
+	}
+}
+
+// --- Test 6: Full round-trip ---
 //
 // Round 1: model has one element, doc is empty, state is empty → forward populates doc.
 // Build new state manually.

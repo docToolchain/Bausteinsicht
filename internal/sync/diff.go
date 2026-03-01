@@ -1,6 +1,8 @@
 package sync
 
 import (
+	"strings"
+
 	"github.com/docToolchain/Bauteinsicht/internal/drawio"
 	"github.com/docToolchain/Bauteinsicht/internal/model"
 )
@@ -97,20 +99,56 @@ func extractDrawioElements(doc *drawio.Document) map[string]drawioElemSnapshot {
 	return result
 }
 
+// buildCellIDToElemID builds a mapping from draw.io cell IDs to bausteinsicht
+// element IDs. When views are used, cell IDs are scoped (e.g., "context--customer")
+// while element IDs are un-scoped (e.g., "customer").
+func buildCellIDToElemID(doc *drawio.Document) map[string]string {
+	m := make(map[string]string)
+	for _, page := range doc.Pages() {
+		for _, obj := range page.FindAllElements() {
+			elemID := obj.SelectAttrValue("bausteinsicht_id", "")
+			cellID := obj.SelectAttrValue("id", "")
+			if elemID != "" && cellID != "" {
+				m[cellID] = elemID
+			}
+		}
+	}
+	return m
+}
+
 // extractDrawioRelationships gathers connector data from all pages.
+// Connector source/target cell IDs are resolved to element IDs using the
+// bausteinsicht_id attributes of referenced elements.
+// Lifted connectors (where an endpoint was lifted to a parent because the
+// original target is not visible on a view) are excluded to avoid phantom
+// reverse changes.
 func extractDrawioRelationships(doc *drawio.Document) map[string]RelationshipState {
+	cellToElem := buildCellIDToElemID(doc)
 	result := make(map[string]RelationshipState)
 	for _, page := range doc.Pages() {
 		for _, cell := range page.FindAllConnectors() {
-			from := cell.SelectAttrValue("source", "")
-			to := cell.SelectAttrValue("target", "")
-			if from == "" || to == "" {
+			fromCell := cell.SelectAttrValue("source", "")
+			toCell := cell.SelectAttrValue("target", "")
+			if fromCell == "" || toCell == "" {
 				continue
 			}
-			result[relKey(from, to)] = RelationshipState{
-				From:  from,
-				To:    to,
-				Label: cell.SelectAttrValue("value", ""),
+			// Resolve scoped cell IDs to element IDs.
+			// Fall back to raw cell ID for legacy (non-view) documents.
+			from := fromCell
+			if elemID, ok := cellToElem[fromCell]; ok {
+				from = elemID
+			}
+			to := toCell
+			if elemID, ok := cellToElem[toCell]; ok {
+				to = elemID
+			}
+			key := relKey(from, to)
+			if _, exists := result[key]; !exists {
+				result[key] = RelationshipState{
+					From:  from,
+					To:    to,
+					Label: cell.SelectAttrValue("value", ""),
+				}
 			}
 		}
 	}
@@ -264,6 +302,12 @@ func detectRelationshipChanges(
 		// Draw.io side
 		switch {
 		case inDrawio && !inLast:
+			// Skip lifted connectors: when a view lifts a relationship
+			// endpoint to a parent (e.g., A→B.child becomes A→B),
+			// the lifted connector should not be treated as a new relationship.
+			if isLiftedRelationship(from, to, modelRels) {
+				continue
+			}
 			cs.DrawioRelationshipChanges = append(cs.DrawioRelationshipChanges, RelationshipChange{
 				From: from, To: to, Type: Added,
 			})
@@ -295,6 +339,30 @@ func unionRelKeys(
 		all[k] = struct{}{}
 	}
 	return all
+}
+
+// isLiftedRelationship returns true if the relationship from→to is a "lifted"
+// version of an existing model relationship. A relationship is lifted when a
+// view shows a connector between parent elements because the original endpoint
+// is not visible. For example, model has A→B.child but the view only shows A
+// and B, so the connector is lifted to A→B.
+func isLiftedRelationship(from, to string, modelRels map[string]RelationshipState) bool {
+	for _, mr := range modelRels {
+		// Same from, model to is more specific (to is ancestor of mr.To)
+		if mr.From == from && mr.To != to && strings.HasPrefix(mr.To, to+".") {
+			return true
+		}
+		// Same to, model from is more specific
+		if mr.To == to && mr.From != from && strings.HasPrefix(mr.From, from+".") {
+			return true
+		}
+		// Both endpoints lifted
+		if mr.From != from && mr.To != to &&
+			strings.HasPrefix(mr.From, from+".") && strings.HasPrefix(mr.To, to+".") {
+			return true
+		}
+	}
+	return false
 }
 
 // resolveRelFromTo returns the from/to pair from the first non-empty source.

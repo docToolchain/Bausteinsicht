@@ -300,3 +300,204 @@ func TestDetectChanges_DrawioRelationshipAdded(t *testing.T) {
 		t.Errorf("expected drawio relationship added, changes: %+v", cs.DrawioRelationshipChanges)
 	}
 }
+
+// docWithScopedConnector creates a document simulating a view-based layout
+// where elements have scoped cell IDs (viewID--elemID) but bausteinsicht_id
+// attributes contain the un-scoped element ID.
+func docWithScopedConnector(viewID, fromElemID, toElemID, label string) *drawio.Document {
+	doc := drawio.NewDocument()
+	page := doc.AddPage("view-"+viewID, viewID+" View")
+	// Create elements with scoped cell IDs (as forward sync does)
+	_ = page.CreateElement(drawio.ElementData{
+		ID:     fromElemID,
+		CellID: viewID + "--" + fromElemID,
+		Kind:   "system",
+		Title:  fromElemID,
+	}, "")
+	_ = page.CreateElement(drawio.ElementData{
+		ID:     toElemID,
+		CellID: viewID + "--" + toElemID,
+		Kind:   "system",
+		Title:  toElemID,
+	}, "")
+	// Create connector using scoped cell IDs as source/target (as forward sync does)
+	page.CreateConnector(drawio.ConnectorData{
+		From:      fromElemID,
+		To:        toElemID,
+		Label:     label,
+		SourceRef: viewID + "--" + fromElemID,
+		TargetRef: viewID + "--" + toElemID,
+	}, "")
+	return doc
+}
+
+func TestDetectChanges_ScopedConnectorsMappedToElementIDs(t *testing.T) {
+	// State has a relationship with un-scoped element IDs (the correct form).
+	state := emptyState()
+	state.Relationships = []RelationshipState{
+		{From: "customer", To: "webshop", Label: "uses"},
+	}
+
+	// Model matches state — no model-side changes.
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"customer": {Kind: "system", Title: "Customer"},
+			"webshop":  {Kind: "system", Title: "Webshop"},
+		},
+		Relationships: []model.Relationship{
+			{From: "customer", To: "webshop", Label: "uses"},
+		},
+	}
+
+	// draw.io has scoped cell IDs (e.g., context--customer) on connectors.
+	doc := docWithScopedConnector("context", "customer", "webshop", "uses")
+
+	cs := DetectChanges(m, doc, state)
+
+	// There should be NO drawio relationship changes — the connector represents
+	// the same relationship as in state, just with scoped cell IDs.
+	if len(cs.DrawioRelationshipChanges) != 0 {
+		t.Errorf("expected no drawio relationship changes when connectors use scoped cell IDs, got %d: %+v",
+			len(cs.DrawioRelationshipChanges), cs.DrawioRelationshipChanges)
+	}
+
+	// There should be NO model relationship changes either.
+	if len(cs.ModelRelationshipChanges) != 0 {
+		t.Errorf("expected no model relationship changes, got %d: %+v",
+			len(cs.ModelRelationshipChanges), cs.ModelRelationshipChanges)
+	}
+}
+
+func TestDetectChanges_ScopedConnectorsMultipleViews(t *testing.T) {
+	// Same relationship appears on multiple view pages with different scoped IDs.
+	// It should be detected as a single relationship, not duplicates.
+	state := emptyState()
+	state.Relationships = []RelationshipState{
+		{From: "customer", To: "webshop", Label: "uses"},
+	}
+
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"customer": {Kind: "system", Title: "Customer"},
+			"webshop":  {Kind: "system", Title: "Webshop"},
+		},
+		Relationships: []model.Relationship{
+			{From: "customer", To: "webshop", Label: "uses"},
+		},
+	}
+
+	// Build a doc with the same relationship on two view pages.
+	doc := drawio.NewDocument()
+	for _, viewID := range []string{"context", "containers"} {
+		page := doc.AddPage("view-"+viewID, viewID+" View")
+		_ = page.CreateElement(drawio.ElementData{
+			ID: "customer", CellID: viewID + "--customer", Kind: "system", Title: "Customer",
+		}, "")
+		_ = page.CreateElement(drawio.ElementData{
+			ID: "webshop", CellID: viewID + "--webshop", Kind: "system", Title: "Webshop",
+		}, "")
+		page.CreateConnector(drawio.ConnectorData{
+			From: "customer", To: "webshop", Label: "uses",
+			SourceRef: viewID + "--customer", TargetRef: viewID + "--webshop",
+		}, "")
+	}
+
+	cs := DetectChanges(m, doc, state)
+
+	if len(cs.DrawioRelationshipChanges) != 0 {
+		t.Errorf("expected no drawio relationship changes for multi-view scoped connectors, got %d: %+v",
+			len(cs.DrawioRelationshipChanges), cs.DrawioRelationshipChanges)
+	}
+	if len(cs.ModelRelationshipChanges) != 0 {
+		t.Errorf("expected no model relationship changes, got %d: %+v",
+			len(cs.ModelRelationshipChanges), cs.ModelRelationshipChanges)
+	}
+}
+
+func TestDetectChanges_LiftedConnectorIgnored(t *testing.T) {
+	// The model has customer → shop.frontend. On the context view,
+	// the relationship is lifted to customer → shop (because shop.frontend
+	// is not on the context view). The lifted connector should NOT
+	// be treated as a new drawio relationship.
+	state := emptyState()
+	state.Relationships = []RelationshipState{
+		{From: "customer", To: "shop.frontend", Label: "uses"},
+	}
+
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"customer": {Kind: "system", Title: "Customer"},
+			"shop": {Kind: "system", Title: "Shop", Children: map[string]model.Element{
+				"frontend": {Kind: "container", Title: "Frontend"},
+			}},
+		},
+		Relationships: []model.Relationship{
+			{From: "customer", To: "shop.frontend", Label: "uses"},
+		},
+	}
+
+	// Create a doc where the connector uses lifted endpoints.
+	doc := drawio.NewDocument()
+	page := doc.AddPage("view-ctx", "Context")
+	_ = page.CreateElement(drawio.ElementData{
+		ID: "customer", CellID: "ctx--customer", Kind: "system", Title: "Customer",
+	}, "")
+	_ = page.CreateElement(drawio.ElementData{
+		ID: "shop", CellID: "ctx--shop", Kind: "system", Title: "Shop",
+	}, "")
+	// This is a lifted connector: the original relationship is customer → shop.frontend
+	// but the connector endpoints were lifted to customer → shop.
+	page.CreateConnector(drawio.ConnectorData{
+		From: "customer", To: "shop",
+		Label:     "uses",
+		SourceRef: "ctx--customer",
+		TargetRef: "ctx--shop",
+	}, "")
+
+	cs := DetectChanges(m, doc, state)
+
+	// The lifted connector (customer → shop) should NOT appear as a new
+	// drawio relationship, because it's a visual representation of an
+	// existing model relationship (customer → shop.frontend).
+	for _, ch := range cs.DrawioRelationshipChanges {
+		if ch.From == "customer" && ch.To == "shop" && ch.Type == Added {
+			t.Errorf("lifted connector customer→shop should not be detected as a new drawio relationship, got: %+v",
+				cs.DrawioRelationshipChanges)
+		}
+	}
+}
+
+func TestDetectChanges_ScopedConnectorLabelChange(t *testing.T) {
+	// Relationship exists in state with label "uses". draw.io connector (scoped)
+	// has label "calls". Should detect a drawio-side label modification.
+	state := emptyState()
+	state.Relationships = []RelationshipState{
+		{From: "a", To: "b", Label: "uses"},
+	}
+
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"a": {Kind: "system", Title: "A"},
+			"b": {Kind: "system", Title: "B"},
+		},
+		Relationships: []model.Relationship{
+			{From: "a", To: "b", Label: "uses"},
+		},
+	}
+
+	doc := docWithScopedConnector("ctx", "a", "b", "calls")
+
+	cs := DetectChanges(m, doc, state)
+
+	found := false
+	for _, ch := range cs.DrawioRelationshipChanges {
+		if ch.From == "a" && ch.To == "b" && ch.Type == Modified &&
+			ch.Field == "label" && ch.OldValue == "uses" && ch.NewValue == "calls" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected drawio label modification for scoped connector, got: %+v",
+			cs.DrawioRelationshipChanges)
+	}
+}
