@@ -247,40 +247,57 @@ func applyChangesToPage(
 	}
 
 	liftedSeen := make(map[string]bool)
-	for _, ch := range cs.ModelRelationshipChanges {
-		switch ch.Type {
-		case Deleted:
-			// For deletions, use scoped cell IDs to find and remove the
-			// connector. The original endpoints may no longer be in the
-			// view's element filter, so we bypass lifting entirely.
-			fromRef := scopedCellID(viewID, ch.From)
-			toRef := scopedCellID(viewID, ch.To)
-			if page.FindConnector(fromRef, toRef) != nil {
-				page.DeleteConnector(fromRef, toRef)
-				result.ConnectorsDeleted++
-			}
-		default:
-			from := ch.From
-			to := ch.To
-			if elemFilter != nil {
-				from = liftEndpoint(from, elemFilter)
-				to = liftEndpoint(to, elemFilter)
-				if from == "" || to == "" || from == to {
-					continue
-				}
-			}
-			lifted := RelationshipChange{From: from, To: to, Type: ch.Type, NewValue: ch.NewValue}
-			pairKey := from + "->" + to
+
+	// Process relationships in two passes: direct first, then lifted.
+	// This ensures that when a direct relationship (e.g., api→db) and a
+	// lifted relationship (e.g., api.catalog→db lifted to api→db) map to
+	// the same pair, the direct one's label is used for the connector.
+	for pass := 0; pass < 2; pass++ {
+		for _, ch := range cs.ModelRelationshipChanges {
 			switch ch.Type {
-			case Added:
-				if liftedSeen[pairKey] {
+			case Deleted:
+				if pass != 0 {
 					continue
 				}
-				liftedSeen[pairKey] = true
-				applyRelAdded(lifted, viewID, page, templates, result)
-			case Modified:
-				page.UpdateConnectorLabel(from, to, ch.NewValue)
-				result.ConnectorsUpdated++
+				// For deletions, use scoped cell IDs to find and remove the
+				// connector. The original endpoints may no longer be in the
+				// view's element filter, so we bypass lifting entirely.
+				fromRef := scopedCellID(viewID, ch.From)
+				toRef := scopedCellID(viewID, ch.To)
+				if page.FindConnector(fromRef, toRef) != nil {
+					page.DeleteConnector(fromRef, toRef)
+					result.ConnectorsDeleted++
+				}
+			default:
+				from := ch.From
+				to := ch.To
+				if elemFilter != nil {
+					from = liftEndpoint(from, elemFilter)
+					to = liftEndpoint(to, elemFilter)
+					if from == "" || to == "" || from == to {
+						continue
+					}
+				}
+				isLifted := from != ch.From || to != ch.To
+				if pass == 0 && isLifted {
+					continue // First pass: only direct relationships
+				}
+				if pass == 1 && !isLifted {
+					continue // Second pass: only lifted relationships
+				}
+				lifted := RelationshipChange{From: from, To: to, Type: ch.Type, NewValue: ch.NewValue}
+				pairKey := from + "->" + to
+				switch ch.Type {
+				case Added:
+					if liftedSeen[pairKey] {
+						continue
+					}
+					liftedSeen[pairKey] = true
+					applyRelAdded(lifted, viewID, page, templates, result)
+				case Modified:
+					page.UpdateConnectorLabel(from, to, ch.NewValue)
+					result.ConnectorsUpdated++
+				}
 			}
 		}
 	}
