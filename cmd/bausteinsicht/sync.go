@@ -81,8 +81,9 @@ func runSync(cmd *cobra.Command, _ []string) error {
 	// Run sync.
 	result := bsync.Run(m, doc, state, tmpl)
 
-	// Save updated files.
-	if err := model.Save(modelPath, m); err != nil {
+	// Save updated model: use PatchSave to preserve JSONC comments and key
+	// ordering when possible, fall back to full Save for structural changes.
+	if err := saveModel(modelPath, m, result); err != nil {
 		return exitWithCode(fmt.Errorf("saving model: %w", err), 2)
 	}
 	if err := drawio.SaveDocument(drawioPath, doc); err != nil {
@@ -152,6 +153,33 @@ func buildSyncSummary(result *bsync.SyncResult) syncSummary {
 		s.ReverseDeleted += result.Reverse.RelationshipsDeleted
 	}
 	return s
+}
+
+// saveModel saves the model to path, preserving JSONC comments and key ordering
+// when the reverse changes are simple field modifications. Falls back to full
+// Save for structural changes or when patching fails.
+func saveModel(path string, m *model.BausteinsichtModel, result *bsync.SyncResult) error {
+	hasReverse := result.Reverse != nil &&
+		(result.Reverse.ElementsUpdated+result.Reverse.ElementsCreated+
+			result.Reverse.ElementsDeleted+result.Reverse.RelationshipsCreated+
+			result.Reverse.RelationshipsUpdated+result.Reverse.RelationshipsDeleted) > 0
+
+	if !hasReverse {
+		// No reverse changes — model file doesn't need updating.
+		return nil
+	}
+
+	if result.Changes != nil {
+		ops, patchable := bsync.ReversePatchOps(result.Changes)
+		if patchable && len(ops) > 0 {
+			if err := model.PatchSave(path, ops); err == nil {
+				return nil
+			}
+			// PatchSave failed — fall through to full Save.
+		}
+	}
+
+	return model.Save(path, m)
 }
 
 func printSyncSummary(s syncSummary) {

@@ -9,6 +9,7 @@ import (
 type SyncResult struct {
 	Forward   *ForwardResult
 	Reverse   *ReverseResult
+	Changes   *ChangeSet // The (post-conflict-resolution) changes used for sync.
 	Conflicts []ResolvedConflict
 	Warnings  []string
 }
@@ -45,6 +46,8 @@ func Run(
 			changes.DrawioElementChanges, resolved,
 		)
 	}
+
+	result.Changes = changes
 
 	// Step 4: Forward sync (model → draw.io).
 	result.Forward = ApplyForward(changes, doc, templates, m)

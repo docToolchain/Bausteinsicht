@@ -175,6 +175,112 @@ func TestSyncDetectsModelChanges(t *testing.T) {
 	}
 }
 
+func TestSyncPreservesJSONCComments(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
+
+	// Init.
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"init"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("init failed: %v", err)
+	}
+
+	// Verify the model has comments right after init (before any sync).
+	original, err := os.ReadFile("architecture.jsonc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !hasLineComment(string(original)) {
+		t.Fatal("precondition: init model should have JSONC comments")
+	}
+
+	// First sync to establish state — this should NOT strip comments.
+	cmd2 := NewRootCmd()
+	cmd2.SetArgs([]string{"sync"})
+	captureStdout(t, func() {
+		if err := cmd2.Execute(); err != nil {
+			t.Fatalf("first sync failed: %v", err)
+		}
+	})
+
+	afterFirstSync, err := os.ReadFile("architecture.jsonc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !hasLineComment(string(afterFirstSync)) {
+		t.Error("JSONC comments were stripped during first sync (no-op sync)")
+	}
+
+	// Simulate a draw.io change by editing the HTML-encoded label in the XML.
+	drawioData, err := os.ReadFile("architecture.drawio")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Labels are HTML-encoded in draw.io XML: &lt;b&gt;Customer&lt;/b&gt;
+	modified := strings.ReplaceAll(string(drawioData),
+		"&lt;b&gt;Customer&lt;/b&gt;",
+		"&lt;b&gt;Customer Portal&lt;/b&gt;")
+	if modified == string(drawioData) {
+		t.Skip("could not find encoded label to modify in drawio file")
+	}
+	if err := os.WriteFile("architecture.drawio", []byte(modified), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Sync again — this triggers reverse sync.
+	cmd3 := NewRootCmd()
+	cmd3.SetArgs([]string{"sync"})
+	captureStdout(t, func() {
+		if err := cmd3.Execute(); err != nil {
+			t.Fatalf("reverse sync failed: %v", err)
+		}
+	})
+
+	// Read the model after sync.
+	afterSync, err := os.ReadFile("architecture.jsonc")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Comments should be preserved.
+	if !hasLineComment(string(afterSync)) {
+		t.Error("JSONC comments were stripped during reverse sync")
+	}
+
+	// The title should be updated.
+	if !strings.Contains(string(afterSync), "Customer Portal") {
+		t.Error("expected title to be updated to 'Customer Portal'")
+	}
+}
+
+// hasLineComment returns true if the text contains any line that starts with //.
+func hasLineComment(text string) bool {
+	for _, line := range strings.Split(text, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "//") {
+			return true
+		}
+	}
+	return false
+}
+
+// captureStdout redirects stdout during fn and discards the output.
+func captureStdout(t *testing.T, fn func()) {
+	t.Helper()
+	oldStdout := os.Stdout
+	_, w, _ := os.Pipe()
+	os.Stdout = w
+	fn()
+	_ = w.Close()
+	os.Stdout = oldStdout
+}
+
 func TestSyncWithExplicitModelPath(t *testing.T) {
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
