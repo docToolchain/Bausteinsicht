@@ -234,7 +234,12 @@ func applyChangesToPage(
 			// regardless of the current view filter — a deleted element is
 			// no longer in the model, so it can't appear in any view's
 			// resolved set. We just check if it exists on this page.
+			cellID := scopedCellID(viewID, ch.ID)
 			if page.FindElement(ch.ID) != nil {
+				// Delete connectors referencing this element's cell ID before
+				// removing the element itself. (#101)
+				result.ConnectorsDeleted += countConnectorsFor(page, cellID)
+				page.DeleteConnectorsFor(cellID)
 				page.DeleteElement(ch.ID)
 				result.ElementsDeleted++
 			}

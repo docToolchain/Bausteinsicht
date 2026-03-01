@@ -619,6 +619,86 @@ func TestExcludeRemovesElementFromPage(t *testing.T) {
 	}
 }
 
+// TestApplyForward_DeleteElementRemovesConnectors verifies that when an
+// element is deleted from the model, any connectors referencing that element
+// are also removed from the page — even when no explicit relationship deletion
+// is in the ChangeSet. This prevents orphaned connectors that reverse sync
+// would otherwise pick up as phantom relationships. Regression test for #101.
+func TestApplyForward_DeleteElementRemovesConnectors(t *testing.T) {
+	ts := minimalTemplates(t)
+	m := modelWithViews()
+
+	// Round 1: add all elements and relationships.
+	doc := docWithViewPages()
+	csAdd := &ChangeSet{
+		ModelElementChanges: []ElementChange{
+			{ID: "customer", Type: Added},
+			{ID: "webshop", Type: Added},
+			{ID: "webshop.api", Type: Added},
+			{ID: "webshop.db", Type: Added},
+		},
+		ModelRelationshipChanges: []RelationshipChange{
+			{From: "customer", To: "webshop", Type: Added, NewValue: "uses"},
+			{From: "webshop.api", To: "webshop.db", Type: Added, NewValue: "reads"},
+		},
+	}
+	ApplyForward(csAdd, doc, ts, m)
+
+	// Verify preconditions on the container page.
+	containerPage := doc.GetPage("view-containers")
+	if containerPage.FindElement("webshop.db") == nil {
+		t.Fatal("precondition: webshop.db should exist on container page")
+	}
+	if containerPage.FindConnector("containers--webshop.api", "containers--webshop.db") == nil {
+		t.Fatal("precondition: api→db connector should exist on container page")
+	}
+
+	// Round 2: delete webshop.db from the model.
+	// Note: we include the element deletion but intentionally omit the
+	// explicit relationship deletion to test the orphan-cleanup path.
+	delete(m.Model["webshop"].Children, "db")
+	m.Relationships = []model.Relationship{
+		{From: "customer", To: "webshop", Label: "uses"},
+	}
+	m.Views["containers"] = model.View{
+		Title:   "Container View",
+		Scope:   "webshop",
+		Include: []string{"customer", "webshop.api"},
+	}
+
+	csDel := &ChangeSet{
+		ModelElementChanges: []ElementChange{
+			{ID: "webshop.db", Type: Deleted},
+		},
+		// No ModelRelationshipChanges — the element deletion should
+		// clean up connectors referencing the deleted element.
+	}
+	result := ApplyForward(csDel, doc, ts, m)
+
+	// The element should be removed.
+	if containerPage.FindElement("webshop.db") != nil {
+		t.Error("webshop.db should be removed from container page after deletion")
+	}
+
+	// The connector referencing the deleted element should also be removed.
+	if containerPage.FindConnector("containers--webshop.api", "containers--webshop.db") != nil {
+		t.Error("api→db connector should be removed when webshop.db is deleted")
+	}
+
+	// The customer→webshop connector on the context page should be unaffected.
+	contextPage := doc.GetPage("view-context")
+	if contextPage.FindConnector("context--customer", "context--webshop") == nil {
+		t.Error("customer→webshop connector on context page should be unaffected")
+	}
+
+	if result.ElementsDeleted == 0 {
+		t.Error("expected at least 1 element deleted in forward result")
+	}
+	if result.ConnectorsDeleted == 0 {
+		t.Error("expected at least 1 connector deleted in forward result")
+	}
+}
+
 // TestApplyForward_NoViewsFallback verifies backward compatibility:
 // when no views are defined, elements go to the first page.
 func TestApplyForward_NoViewsFallback(t *testing.T) {
