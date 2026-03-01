@@ -101,9 +101,10 @@ func (w *Watcher) loop() {
 			if timer != nil {
 				timer.Stop()
 			}
+			captured := lastFile // capture by value to avoid data race with AfterFunc goroutine
 			timer = time.AfterFunc(w.debounce, func() {
 				if !w.isSyncing() {
-					w.onChange(lastFile)
+					w.onChange(captured)
 				}
 			})
 
