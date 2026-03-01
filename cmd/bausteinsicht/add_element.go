@@ -79,6 +79,14 @@ func runAddElement(cmd *cobra.Command, args []string) error {
 			return exitWithCode(fmt.Errorf("parent %q not found: %w", parent, err), 1)
 		}
 
+		// Validate parent's kind allows children.
+		if spec, ok := m.Specification.Elements[parentElem.Kind]; !ok || !spec.Container {
+			return exitWithCode(
+				fmt.Errorf("element %q (kind: %s) is not a container and cannot have children", parent, parentElem.Kind),
+				1,
+			)
+		}
+
 		// Check duplicate within parent's children
 		if parentElem.Children != nil {
 			if _, exists := parentElem.Children[id]; exists {

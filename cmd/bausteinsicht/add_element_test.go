@@ -15,11 +15,16 @@ func writeSampleModel(t *testing.T, dir string) string {
 	content := `{
   "specification": {
     "elements": {
-      "system": {"notation": "box"},
+      "actor": {"notation": "person"},
+      "system": {"notation": "box", "container": true},
       "container": {"notation": "box", "container": true}
     }
   },
   "model": {
+    "customer": {
+      "kind": "actor",
+      "title": "Customer"
+    },
     "webshop": {
       "kind": "system",
       "title": "Webshop",
@@ -233,6 +238,27 @@ func TestAddElementJSONOutput(t *testing.T) {
 	}
 	if result["kind"] != "system" {
 		t.Errorf("expected kind 'system', got %q", result["kind"])
+	}
+}
+
+func TestAddElementNonContainerParentRejected(t *testing.T) {
+	dir := t.TempDir()
+	modelPath := writeSampleModel(t, dir)
+
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"add", "element",
+		"--model", modelPath,
+		"--id", "subactor",
+		"--kind", "container",
+		"--title", "Sub Actor",
+		"--parent", "customer",
+	})
+	cmd.SilenceErrors = true
+	cmd.SilenceUsage = true
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error adding child to non-container element, got nil")
 	}
 }
 
