@@ -532,3 +532,156 @@ func TestDetectChanges_ScopedConnectorLabelChange(t *testing.T) {
 			cs.DrawioRelationshipChanges)
 	}
 }
+
+// --- View-aware deletion tests (#108, #118) ---
+
+// modelWithCustomViews creates a model with the given elements and views.
+func modelWithCustomViews(elements map[string]model.Element, views map[string]model.View) *model.BausteinsichtModel {
+	return &model.BausteinsichtModel{
+		Model:         elements,
+		Views:         views,
+		Relationships: []model.Relationship{},
+	}
+}
+
+// docWithElems creates a draw.io document with multiple elements by ID.
+func docWithElems(ids ...string) *drawio.Document {
+	doc := drawio.NewDocument()
+	page := doc.AddPage("p1", "Page 1")
+	for _, id := range ids {
+		_ = page.CreateElement(drawio.ElementData{
+			ID:    id,
+			Kind:  "container",
+			Title: id,
+		}, "")
+	}
+	return doc
+}
+
+// stateWithElems creates a SyncState with multiple elements by ID.
+func stateWithElems(ids ...string) *SyncState {
+	s := emptyState()
+	for _, id := range ids {
+		s.Elements[id] = ElementState{Title: id, Kind: "container"}
+	}
+	return s
+}
+
+func TestDetectChanges_ElementNotOnViewNotTreatedAsDeleted(t *testing.T) {
+	// Model has elements a, b, c.
+	// View only includes a and b.
+	// Sync state has a, b, c (from a previous sync without views).
+	// draw.io only has a, b (because c is filtered out by the view).
+	// c should NOT appear as a DrawioElementChange Deleted.
+	m := modelWithCustomViews(
+		map[string]model.Element{
+			"a": {Kind: "container", Title: "A"},
+			"b": {Kind: "container", Title: "B"},
+			"c": {Kind: "container", Title: "C"},
+		},
+		map[string]model.View{
+			"main": {Title: "Main", Include: []string{"a", "b"}},
+		},
+	)
+	state := stateWithElems("a", "b", "c")
+	doc := docWithElems("a", "b")
+
+	cs := DetectChanges(m, doc, state)
+
+	for _, ch := range cs.DrawioElementChanges {
+		if ch.ID == "c" && ch.Type == Deleted {
+			t.Errorf("element 'c' is not in any view and should NOT be treated as deleted from draw.io, got: %+v",
+				cs.DrawioElementChanges)
+		}
+	}
+}
+
+func TestDetectChanges_ExcludedElementNotTreatedAsDeleted(t *testing.T) {
+	// Model has elements a and b.
+	// View includes a and b but explicitly excludes b.
+	// Sync state has a and b.
+	// draw.io only has a (b excluded from view).
+	// b should NOT appear as a DrawioElementChange Deleted.
+	m := modelWithCustomViews(
+		map[string]model.Element{
+			"a": {Kind: "container", Title: "A"},
+			"b": {Kind: "container", Title: "B"},
+		},
+		map[string]model.View{
+			"main": {Title: "Main", Include: []string{"a", "b"}, Exclude: []string{"b"}},
+		},
+	)
+	state := stateWithElems("a", "b")
+	doc := docWithElems("a")
+
+	cs := DetectChanges(m, doc, state)
+
+	for _, ch := range cs.DrawioElementChanges {
+		if ch.ID == "b" && ch.Type == Deleted {
+			t.Errorf("element 'b' is excluded from all views and should NOT be treated as deleted from draw.io, got: %+v",
+				cs.DrawioElementChanges)
+		}
+	}
+}
+
+func TestDetectChanges_TrueDeletionStillDetected(t *testing.T) {
+	// Model has elements a and b.
+	// View includes both a and b (both visible).
+	// Sync state has a and b.
+	// draw.io only has a (user actually deleted b from draw.io).
+	// b SHOULD appear as a DrawioElementChange Deleted.
+	m := modelWithCustomViews(
+		map[string]model.Element{
+			"a": {Kind: "container", Title: "A"},
+			"b": {Kind: "container", Title: "B"},
+		},
+		map[string]model.View{
+			"main": {Title: "Main", Include: []string{"a", "b"}},
+		},
+	)
+	state := stateWithElems("a", "b")
+	doc := docWithElems("a")
+
+	cs := DetectChanges(m, doc, state)
+
+	found := false
+	for _, ch := range cs.DrawioElementChanges {
+		if ch.ID == "b" && ch.Type == Deleted {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("element 'b' is visible on a view and was removed from draw.io; should be detected as deleted, got: %+v",
+			cs.DrawioElementChanges)
+	}
+}
+
+func TestDetectChanges_NoViewsAllDeletionsDetected(t *testing.T) {
+	// No views (legacy mode / backward compatibility).
+	// Sync state has a and b.
+	// draw.io only has a.
+	// b SHOULD appear as a DrawioElementChange Deleted.
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"a": {Kind: "container", Title: "A"},
+			"b": {Kind: "container", Title: "B"},
+		},
+		Relationships: []model.Relationship{},
+		// No Views field → nil map
+	}
+	state := stateWithElems("a", "b")
+	doc := docWithElems("a")
+
+	cs := DetectChanges(m, doc, state)
+
+	found := false
+	for _, ch := range cs.DrawioElementChanges {
+		if ch.ID == "b" && ch.Type == Deleted {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("with no views, element 'b' absent from draw.io should be detected as deleted, got: %+v",
+			cs.DrawioElementChanges)
+	}
+}

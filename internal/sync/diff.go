@@ -57,6 +57,31 @@ func relKey(from, to string) string {
 	return from + ":" + to
 }
 
+// computeVisibleElements returns the set of element IDs that should be visible
+// across all views. If the model has no views, returns nil (meaning ALL elements
+// are visible on the single page).
+func computeVisibleElements(m *model.BausteinsichtModel) map[string]bool {
+	if len(m.Views) == 0 {
+		return nil // all elements visible
+	}
+	visible := make(map[string]bool)
+	for _, view := range m.Views {
+		v := view
+		resolved, err := model.ResolveView(m, &v)
+		if err != nil {
+			continue
+		}
+		for _, id := range resolved {
+			visible[id] = true
+		}
+		// The scope element itself is also visible (rendered as boundary).
+		if view.Scope != "" {
+			visible[view.Scope] = true
+		}
+	}
+	return visible
+}
+
 // DetectChanges performs a three-way diff between the model, draw.io document,
 // and the last known sync state.
 func DetectChanges(m *model.BausteinsichtModel, doc *drawio.Document, lastState *SyncState) *ChangeSet {
@@ -64,7 +89,8 @@ func DetectChanges(m *model.BausteinsichtModel, doc *drawio.Document, lastState 
 
 	flatModel := model.FlattenElements(m)
 	drawioElems := extractDrawioElements(doc)
-	detectElementChanges(cs, flatModel, drawioElems, lastState)
+	visibleElems := computeVisibleElements(m)
+	detectElementChanges(cs, flatModel, drawioElems, lastState, visibleElems)
 
 	modelRels := buildModelRelMap(m)
 	drawioRels := extractDrawioRelationships(doc)
@@ -170,11 +196,14 @@ func buildModelRelMap(m *model.BausteinsichtModel) map[string]RelationshipState 
 }
 
 // detectElementChanges performs three-way comparison for elements.
+// visibleElems is the set of element IDs visible across all views. If nil,
+// all elements are considered visible (no views defined).
 func detectElementChanges(
 	cs *ChangeSet,
 	flatModel map[string]*model.Element,
 	drawioElems map[string]drawioElemSnapshot,
 	lastState *SyncState,
+	visibleElems map[string]bool,
 ) {
 	allIDs := unionElementIDs(flatModel, drawioElems, lastState)
 
@@ -201,7 +230,12 @@ func detectElementChanges(
 		case inDrawio && !inLast:
 			cs.DrawioElementChanges = append(cs.DrawioElementChanges, ElementChange{ID: id, Type: Added})
 		case !inDrawio && inLast:
-			cs.DrawioElementChanges = append(cs.DrawioElementChanges, ElementChange{ID: id, Type: Deleted})
+			// Only treat as deleted if the element should be visible on at least one
+			// view page. Elements not in any view's resolved set are simply filtered
+			// out and their absence from draw.io is expected, not a deletion. (#108, #118)
+			if visibleElems == nil || visibleElems[id] {
+				cs.DrawioElementChanges = append(cs.DrawioElementChanges, ElementChange{ID: id, Type: Deleted})
+			}
 		case inDrawio && inLast:
 			appendIfChanged(id, "title", lastElem.Title, de.title, &cs.DrawioElementChanges)
 			appendIfChanged(id, "description", lastElem.Description, de.description, &cs.DrawioElementChanges)
