@@ -50,6 +50,42 @@ func PatchSave(path string, ops []PatchOp) error {
 	return nil
 }
 
+// PatchInsert reads the JSONC file at path, applies a raw data transformation,
+// and writes the result back atomically. Used by InsertObjectEntry and
+// AppendArrayEntry for comment-preserving insertions.
+func PatchInsert(path string, transform func([]byte) ([]byte, error)) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("reading %s: %w", path, err)
+	}
+
+	data, err = transform(data)
+	if err != nil {
+		return err
+	}
+
+	dir := filepath.Dir(path)
+	tmp, err := os.CreateTemp(dir, ".model-tmp-*")
+	if err != nil {
+		return fmt.Errorf("creating temp file: %w", err)
+	}
+	tmpName := tmp.Name()
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		_ = os.Remove(tmpName)
+		return fmt.Errorf("writing temp file: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		_ = os.Remove(tmpName)
+		return fmt.Errorf("closing temp file: %w", err)
+	}
+	if err := os.Rename(tmpName, path); err != nil {
+		_ = os.Remove(tmpName)
+		return fmt.Errorf("renaming temp file: %w", err)
+	}
+	return nil
+}
+
 // PatchValue finds the JSON value at path in JSONC data and replaces it with
 // newValue. The rest of the document (comments, whitespace, key ordering)
 // is preserved. Returns the patched data or an error if the path is not found.
@@ -236,6 +272,111 @@ func skipBraced(data []byte, i, n int, open, close byte) int {
 		i++
 	}
 	return i
+}
+
+// InsertObjectEntry inserts a new key-value pair into the object at the given
+// path. The value is inserted before the closing '}' of the target object.
+// Comments and formatting are preserved.
+func InsertObjectEntry(data []byte, objectPath []string, key, valueJSON string) ([]byte, error) {
+	// Find the object's value range.
+	start, end, err := findValueRange(data, objectPath)
+	if err != nil {
+		return nil, err
+	}
+	if data[start] != '{' {
+		return nil, fmt.Errorf("value at path %v is not an object", objectPath)
+	}
+
+	// Find the closing '}' of this object (end-1 since findValueRange returns after it).
+	closeBrace := end - 1
+	for closeBrace > start && data[closeBrace] != '}' {
+		closeBrace--
+	}
+
+	// Detect indentation from the closing brace line.
+	indent := detectIndent(data, closeBrace)
+
+	// Check if the object has existing entries by scanning for non-whitespace
+	// between '{' and '}'.
+	hasEntries := false
+	scan := start + 1
+	scan = skipWhitespaceAndComments(data, scan, len(data))
+	if scan < closeBrace {
+		hasEntries = true
+	}
+
+	// Build the insertion text.
+	var insertion string
+	if hasEntries {
+		insertion = fmt.Sprintf(",\n%s  %q: %s", indent, key, valueJSON)
+	} else {
+		insertion = fmt.Sprintf("\n%s  %q: %s\n%s", indent, key, valueJSON, indent)
+	}
+
+	result := make([]byte, 0, len(data)+len(insertion))
+	result = append(result, data[:closeBrace]...)
+	result = append(result, []byte(insertion)...)
+	result = append(result, data[closeBrace:]...)
+	return result, nil
+}
+
+// AppendArrayEntry appends a new value to the array at the given path.
+// The value is inserted before the closing ']'. Comments and formatting
+// are preserved.
+func AppendArrayEntry(data []byte, arrayPath []string, valueJSON string) ([]byte, error) {
+	start, end, err := findValueRange(data, arrayPath)
+	if err != nil {
+		return nil, err
+	}
+	if data[start] != '[' {
+		return nil, fmt.Errorf("value at path %v is not an array", arrayPath)
+	}
+
+	// Find the closing ']'.
+	closeBracket := end - 1
+	for closeBracket > start && data[closeBracket] != ']' {
+		closeBracket--
+	}
+
+	indent := detectIndent(data, closeBracket)
+
+	// Check if the array has existing entries.
+	hasEntries := false
+	scan := start + 1
+	scan = skipWhitespaceAndComments(data, scan, len(data))
+	if scan < closeBracket {
+		hasEntries = true
+	}
+
+	var insertion string
+	if hasEntries {
+		insertion = fmt.Sprintf(",\n%s  %s", indent, valueJSON)
+	} else {
+		insertion = fmt.Sprintf("\n%s  %s\n%s", indent, valueJSON, indent)
+	}
+
+	result := make([]byte, 0, len(data)+len(insertion))
+	result = append(result, data[:closeBracket]...)
+	result = append(result, []byte(insertion)...)
+	result = append(result, data[closeBracket:]...)
+	return result, nil
+}
+
+// detectIndent returns the whitespace prefix of the line containing position pos.
+func detectIndent(data []byte, pos int) string {
+	lineStart := pos
+	for lineStart > 0 && data[lineStart-1] != '\n' {
+		lineStart--
+	}
+	indent := ""
+	for i := lineStart; i < pos; i++ {
+		if data[i] == ' ' || data[i] == '\t' {
+			indent += string(data[i])
+		} else {
+			break
+		}
+	}
+	return indent
 }
 
 // skipToChar advances to the first occurrence of ch, skipping strings and comments.

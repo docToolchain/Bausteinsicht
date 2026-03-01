@@ -112,8 +112,8 @@ func runAddElement(cmd *cobra.Command, args []string) error {
 		m.Model[id] = elem
 	}
 
-	// Save model
-	if err := model.Save(modelPath, m); err != nil {
+	// Save model — use comment-preserving insertion. (#122)
+	if err := saveAddedElement(modelPath, m, fullID, parent, id, elem); err != nil {
 		return exitWithCode(fmt.Errorf("saving model: %w", err), 2)
 	}
 
@@ -210,6 +210,55 @@ func splitDotPath(path string) []string {
 	if current != "" {
 		result = append(result, current)
 	}
+	return result
+}
+
+// saveAddedElement saves a newly added element using comment-preserving
+// insertion. Falls back to model.Save if patching fails. (#122)
+func saveAddedElement(modelPath string, m *model.BausteinsichtModel, fullID, parent, id string, elem model.Element) error {
+	elemJSON := marshalElementJSON(elem)
+
+	// Build the object path for insertion.
+	var objectPath []string
+	if parent != "" {
+		// Insert into the parent's "children" object.
+		parts := splitDotPath(parent)
+		objectPath = append([]string{"model"}, parts...)
+		objectPath = append(objectPath, "children")
+	} else {
+		objectPath = []string{"model"}
+	}
+
+	err := model.PatchInsert(modelPath, func(data []byte) ([]byte, error) {
+		return model.InsertObjectEntry(data, objectPath, id, elemJSON)
+	})
+	if err != nil {
+		// Fall back to full save if patching fails.
+		return model.Save(modelPath, m)
+	}
+	return nil
+}
+
+// marshalElementJSON builds a compact JSON object for an element.
+func marshalElementJSON(elem model.Element) string {
+	parts := []string{fmt.Sprintf(`"kind": %q`, elem.Kind)}
+	parts = append(parts, fmt.Sprintf(`"title": %q`, elem.Title))
+	if elem.Technology != "" {
+		parts = append(parts, fmt.Sprintf(`"technology": %q`, elem.Technology))
+	}
+	if elem.Description != "" {
+		parts = append(parts, fmt.Sprintf(`"description": %q`, elem.Description))
+	}
+
+	result := "{\n"
+	for i, p := range parts {
+		result += "      " + p
+		if i < len(parts)-1 {
+			result += ","
+		}
+		result += "\n"
+	}
+	result += "    }"
 	return result
 }
 

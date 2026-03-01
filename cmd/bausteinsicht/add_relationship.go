@@ -82,8 +82,16 @@ func runAddRelationship(cmd *cobra.Command, args []string) error {
 	}
 	m.Relationships = append(m.Relationships, rel)
 
-	if err := model.Save(modelPath, m); err != nil {
-		return exitWithCode(fmt.Errorf("saving model: %w", err), 2)
+	// Save using comment-preserving array append. (#122)
+	relJSON := marshalRelationshipJSON(rel)
+	err = model.PatchInsert(modelPath, func(data []byte) ([]byte, error) {
+		return model.AppendArrayEntry(data, []string{"relationships"}, relJSON)
+	})
+	if err != nil {
+		// Fall back to full save if patching fails.
+		if err := model.Save(modelPath, m); err != nil {
+			return exitWithCode(fmt.Errorf("saving model: %w", err), 2)
+		}
 	}
 
 	if format == "json" {
@@ -91,6 +99,34 @@ func runAddRelationship(cmd *cobra.Command, args []string) error {
 	}
 	printRelationshipText(rel)
 	return nil
+}
+
+// marshalRelationshipJSON builds a compact JSON object for a relationship.
+func marshalRelationshipJSON(rel model.Relationship) string {
+	parts := []string{
+		fmt.Sprintf(`"from": %q`, rel.From),
+		fmt.Sprintf(`"to": %q`, rel.To),
+	}
+	if rel.Label != "" {
+		parts = append(parts, fmt.Sprintf(`"label": %q`, rel.Label))
+	}
+	if rel.Kind != "" {
+		parts = append(parts, fmt.Sprintf(`"kind": %q`, rel.Kind))
+	}
+	if rel.Description != "" {
+		parts = append(parts, fmt.Sprintf(`"description": %q`, rel.Description))
+	}
+
+	result := "{\n"
+	for i, p := range parts {
+		result += "      " + p
+		if i < len(parts)-1 {
+			result += ","
+		}
+		result += "\n"
+	}
+	result += "    }"
+	return result
 }
 
 func printRelationshipText(r model.Relationship) {

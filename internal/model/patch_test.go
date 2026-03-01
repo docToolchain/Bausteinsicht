@@ -163,3 +163,80 @@ func TestPatchSave_PreservesCommentsAndOrder(t *testing.T) {
 		t.Errorf("expected technology Rust, got %s", m.Model["mySystem"].Technology)
 	}
 }
+
+func TestInsertObjectEntry_PreservesComments(t *testing.T) {
+	input := `{
+  // Architecture model
+  "model": {
+    // External actor
+    "customer": {
+      "kind": "actor",
+      "title": "Customer"
+    }
+  }
+}`
+	newEntry := `{
+      "kind": "system",
+      "title": "New System"
+    }`
+	got, err := InsertObjectEntry([]byte(input), []string{"model"}, "newsystem", newEntry)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	result := string(got)
+
+	// Comments preserved.
+	if !strings.Contains(result, "// Architecture model") {
+		t.Error("top-level comment was stripped")
+	}
+	if !strings.Contains(result, "// External actor") {
+		t.Error("inline comment was stripped")
+	}
+	// New entry present.
+	if !strings.Contains(result, `"newsystem"`) {
+		t.Error("new entry key not found")
+	}
+	if !strings.Contains(result, `"New System"`) {
+		t.Error("new entry value not found")
+	}
+	// Original entry still present.
+	if !strings.Contains(result, `"customer"`) {
+		t.Error("existing entry removed")
+	}
+}
+
+func TestAppendArrayEntry_PreservesComments(t *testing.T) {
+	input := `{
+  // Relationships
+  "relationships": [
+    {
+      "from": "a",
+      "to": "b",
+      "label": "calls"
+    }
+  ]
+}`
+	newItem := `{
+      "from": "c",
+      "to": "d",
+      "label": "uses"
+    }`
+	got, err := AppendArrayEntry([]byte(input), []string{"relationships"}, newItem)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	result := string(got)
+
+	// Comment preserved.
+	if !strings.Contains(result, "// Relationships") {
+		t.Error("comment was stripped")
+	}
+	// Original entry present.
+	if !strings.Contains(result, `"from": "a"`) {
+		t.Error("existing entry removed")
+	}
+	// New entry present.
+	if !strings.Contains(result, `"from": "c"`) {
+		t.Error("new entry not found")
+	}
+}
