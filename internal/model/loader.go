@@ -91,6 +91,27 @@ func StripJSONC(data []byte) []byte {
 			}
 			continue
 		}
+		// Handle block comments
+		if i+1 < len(src) && src[i] == '/' && src[i+1] == '*' {
+			// Trim trailing whitespace before comment if it's only
+			// whitespace since the last newline (i.e., comment on its own line).
+			s := sb.String()
+			lastNL := strings.LastIndex(s, "\n")
+			linePrefix := s[lastNL+1:]
+			if strings.TrimRight(linePrefix, " \t") == "" {
+				sb.Reset()
+				sb.WriteString(s[:lastNL+1])
+			}
+			i += 2
+			for i+1 < len(src) {
+				if src[i] == '*' && src[i+1] == '/' {
+					i += 2
+					break
+				}
+				i++
+			}
+			continue
+		}
 		// Handle single-line comments
 		if i+1 < len(src) && src[i] == '/' && src[i+1] == '/' {
 			// Trim trailing whitespace written before the comment

@@ -142,6 +142,55 @@ func TestStripJSONC_PreservesCommentInString(t *testing.T) {
 	}
 }
 
+func TestStripJSONC_RemovesBlockComments(t *testing.T) {
+	input := []byte(`{
+  /* this is a block comment */
+  "key": "value"
+}`)
+	out := StripJSONC(input)
+	expected := `{
+
+  "key": "value"
+}`
+	if string(out) != expected {
+		t.Errorf("expected:\n%s\ngot:\n%s", expected, string(out))
+	}
+}
+
+func TestStripJSONC_RemovesInlineBlockComment(t *testing.T) {
+	input := []byte(`{"key": /* comment */ "value"}`)
+	out := StripJSONC(input)
+	expected := `{"key":  "value"}`
+	if string(out) != expected {
+		t.Errorf("expected:\n%s\ngot:\n%s", expected, string(out))
+	}
+}
+
+func TestStripJSONC_PreservesBlockCommentInString(t *testing.T) {
+	input := []byte(`{"key": "value /* not a comment */"}`)
+	out := StripJSONC(input)
+	if string(out) != `{"key": "value /* not a comment */"}` {
+		t.Errorf("block comment inside string should not be stripped, got: %s", string(out))
+	}
+}
+
+func TestStripJSONC_MultilineBlockComment(t *testing.T) {
+	input := []byte(`{
+  /* multi
+     line
+     comment */
+  "key": "value"
+}`)
+	out := StripJSONC(input)
+	expected := `{
+
+  "key": "value"
+}`
+	if string(out) != expected {
+		t.Errorf("expected:\n%s\ngot:\n%s", expected, string(out))
+	}
+}
+
 func TestStripJSONC_RemovesTrailingCommas(t *testing.T) {
 	input := []byte(`{"a": 1, "b": 2,}`)
 	out := StripJSONC(input)

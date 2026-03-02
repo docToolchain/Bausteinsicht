@@ -193,6 +193,17 @@ func skipWhitespaceAndComments(data []byte, i, n int) int {
 			}
 			continue
 		}
+		if i+1 < n && data[i] == '/' && data[i+1] == '*' {
+			i += 2
+			for i+1 < n {
+				if data[i] == '*' && data[i+1] == '/' {
+					i += 2
+					break
+				}
+				i++
+			}
+			continue
+		}
 		break
 	}
 	return i
@@ -234,8 +245,8 @@ func skipValue(data []byte, i, n int) int {
 			if c == ',' || c == '}' || c == ']' || c == ' ' || c == '\t' || c == '\n' || c == '\r' {
 				break
 			}
-			// Also stop at // comment.
-			if c == '/' && i+1 < n && data[i+1] == '/' {
+			// Also stop at // or /* comment.
+			if c == '/' && i+1 < n && (data[i+1] == '/' || data[i+1] == '*') {
 				break
 			}
 			i++
@@ -256,6 +267,17 @@ func skipBraced(data []byte, i, n int, open, close byte) int {
 		}
 		if c == '/' && i+1 < n && data[i+1] == '/' {
 			for i < n && data[i] != '\n' {
+				i++
+			}
+			continue
+		}
+		if c == '/' && i+1 < n && data[i+1] == '*' {
+			i += 2
+			for i+1 < n {
+				if data[i] == '*' && data[i+1] == '/' {
+					i += 2
+					break
+				}
 				i++
 			}
 			continue
@@ -388,6 +410,17 @@ func skipToChar(data []byte, i, n int, ch byte) int {
 		}
 		if data[i] == '/' && i+1 < n && data[i+1] == '/' {
 			for i < n && data[i] != '\n' {
+				i++
+			}
+			continue
+		}
+		if data[i] == '/' && i+1 < n && data[i+1] == '*' {
+			i += 2
+			for i+1 < n {
+				if data[i] == '*' && data[i+1] == '/' {
+					i += 2
+					break
+				}
 				i++
 			}
 			continue
