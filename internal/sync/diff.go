@@ -336,6 +336,10 @@ func extractDrawioRelationships(doc *drawio.Document) map[string]RelationshipSta
 			// For legacy (non-view) documents the raw cell ID is used as-is.
 			from := resolveCellID(fromCell, cellToElem)
 			to := resolveCellID(toCell, cellToElem)
+			// Skip connectors targeting navigation buttons (#205).
+			if strings.HasPrefix(from, "nav-back-") || strings.HasPrefix(to, "nav-back-") {
+				continue
+			}
 			// Extract the relationship index from the connector ID.
 			cellID := cell.SelectAttrValue("id", "")
 			index := parseConnectorIndex(cellID)
