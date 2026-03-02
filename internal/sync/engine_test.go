@@ -346,6 +346,252 @@ func TestRun_FullRoundTrip(t *testing.T) {
 	}
 }
 
+// --- Test 6b: View filter change must NOT delete model elements (#167) ---
+//
+// Scenario:
+// Round 1: model has customer, webshop, webshop.api. View includes ["**"].
+//          Sync populates draw.io with all elements.
+// Round 2: view filter changes to ["webshop.*"]. Forward sync removes customer
+//          from the draw.io page (reconcileViewPage). Reverse sync must NOT
+//          delete customer from the model — it was removed because of the filter
+//          change, not because the user deleted it in draw.io.
+
+func TestRun_ViewFilterChangeDoesNotDeleteModelElements(t *testing.T) {
+	ts := minimalTemplates(t)
+
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"customer": {Kind: "container", Title: "Customer"},
+			"webshop": {Kind: "container", Title: "Webshop", Children: map[string]model.Element{
+				"api": {Kind: "container", Title: "API"},
+			}},
+		},
+		Relationships: []model.Relationship{
+			{From: "customer", To: "webshop", Label: "uses"},
+		},
+		Views: map[string]model.View{
+			"main": {Title: "Main", Include: []string{"**"}},
+		},
+	}
+
+	// Build doc with view page.
+	doc := drawio.NewDocument()
+	doc.AddPage("view-main", "Main")
+
+	state := emptyState()
+
+	// --- Round 1: initial sync with include ["**"] ---
+	r1 := Run(m, doc, state, ts)
+	if r1.Forward.ElementsCreated < 3 {
+		t.Fatalf("round 1: expected at least 3 elements created, got %d", r1.Forward.ElementsCreated)
+	}
+
+	// Build state after round 1 (simulating BuildState which records ALL model elements).
+	state1 := &SyncState{
+		Elements: map[string]ElementState{
+			"customer":    {Title: "Customer", Kind: "container"},
+			"webshop":     {Title: "Webshop", Kind: "container"},
+			"webshop.api": {Title: "API", Kind: "container"},
+		},
+		Relationships: []RelationshipState{
+			{From: "customer", To: "webshop", Label: "uses"},
+		},
+	}
+
+	// --- Round 2: narrow the view filter to ["webshop.*"] ---
+	m.Views["main"] = model.View{Title: "Main", Include: []string{"webshop.*"}}
+
+	r2 := Run(m, doc, state1, ts)
+
+	// Forward sync should remove customer from the page (reconcileViewPage).
+	// That's expected and correct.
+
+	// CRITICAL: customer must still be in the model after reverse sync.
+	// The reverse sync must NOT interpret the absence of customer from draw.io
+	// as a user deletion.
+	if _, ok := m.Model["customer"]; !ok {
+		t.Error("CRITICAL: customer was deleted from model after view filter change — this is the #167 bug")
+	}
+
+	// The relationship should also still exist.
+	if len(m.Relationships) == 0 {
+		t.Error("CRITICAL: relationship was deleted from model after view filter change")
+	}
+
+	// webshop should still be in the model.
+	if _, ok := m.Model["webshop"]; !ok {
+		t.Error("webshop was deleted from model")
+	}
+
+	// Reverse sync should report 0 element deletions.
+	if r2.Reverse.ElementsDeleted != 0 {
+		t.Errorf("expected 0 reverse element deletions, got %d", r2.Reverse.ElementsDeleted)
+	}
+}
+
+// --- Test 6b2: View filter change must NOT delete relationships (#167) ---
+//
+// This is the relationship-side version of the #167 bug. When a view filter
+// narrows and forward sync removes a connector (because an endpoint is no longer
+// visible), the reverse sync must NOT delete the relationship from the model.
+// The relationship is still valid — it's just not visible in the current view.
+
+func TestRun_ViewFilterChangeDoesNotDeleteRelationships(t *testing.T) {
+	ts := minimalTemplates(t)
+
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"customer": {Kind: "container", Title: "Customer"},
+			"webshop": {Kind: "container", Title: "Webshop", Children: map[string]model.Element{
+				"api": {Kind: "container", Title: "API"},
+			}},
+		},
+		Relationships: []model.Relationship{
+			{From: "customer", To: "webshop", Label: "uses"},
+		},
+		Views: map[string]model.View{
+			"main": {Title: "Main", Include: []string{"**"}},
+		},
+	}
+
+	// Build doc with view page.
+	doc := drawio.NewDocument()
+	doc.AddPage("view-main", "Main")
+
+	state := emptyState()
+
+	// --- Round 1: initial sync with include ["**"] ---
+	r1 := Run(m, doc, state, ts)
+	if r1.Forward.ElementsCreated < 3 {
+		t.Fatalf("round 1: expected at least 3 elements created, got %d", r1.Forward.ElementsCreated)
+	}
+	if r1.Forward.ConnectorsCreated != 1 {
+		t.Fatalf("round 1: expected 1 connector created, got %d", r1.Forward.ConnectorsCreated)
+	}
+
+	// Build state after round 1.
+	state1 := &SyncState{
+		Elements: map[string]ElementState{
+			"customer":    {Title: "Customer", Kind: "container"},
+			"webshop":     {Title: "Webshop", Kind: "container"},
+			"webshop.api": {Title: "API", Kind: "container"},
+		},
+		Relationships: []RelationshipState{
+			{From: "customer", To: "webshop", Label: "uses"},
+		},
+	}
+
+	// --- Round 2: narrow the view filter to ["webshop.*"] ---
+	// This removes customer from the page AND its connector customer→webshop.
+	m.Views["main"] = model.View{Title: "Main", Include: []string{"webshop.*"}}
+
+	r2 := Run(m, doc, state1, ts)
+
+	// Forward sync should remove customer and the connector from the page.
+
+	// Build state after round 2.
+	state2 := &SyncState{
+		Elements: map[string]ElementState{
+			"customer":    {Title: "Customer", Kind: "container"},
+			"webshop":     {Title: "Webshop", Kind: "container"},
+			"webshop.api": {Title: "API", Kind: "container"},
+		},
+		Relationships: []RelationshipState{
+			{From: "customer", To: "webshop", Label: "uses"},
+		},
+	}
+
+	// --- Round 3: sync again — the connector is gone from draw.io ---
+	r3 := Run(m, doc, state2, ts)
+
+	// CRITICAL: customer must still be in the model.
+	if _, ok := m.Model["customer"]; !ok {
+		t.Error("CRITICAL: customer was deleted from model after view filter change — #167 bug (element)")
+	}
+
+	// CRITICAL: the relationship must still be in the model.
+	if len(m.Relationships) == 0 {
+		t.Error("CRITICAL: relationship customer→webshop was deleted from model after view filter change — #167 bug (relationship)")
+	}
+
+	// Reverse sync should report 0 deletions.
+	if r2.Reverse.ElementsDeleted != 0 {
+		t.Errorf("round 2: expected 0 reverse element deletions, got %d", r2.Reverse.ElementsDeleted)
+	}
+	if r2.Reverse.RelationshipsDeleted != 0 {
+		t.Errorf("round 2: expected 0 reverse relationship deletions, got %d", r2.Reverse.RelationshipsDeleted)
+	}
+	if r3.Reverse.ElementsDeleted != 0 {
+		t.Errorf("round 3: expected 0 reverse element deletions, got %d", r3.Reverse.ElementsDeleted)
+	}
+	if r3.Reverse.RelationshipsDeleted != 0 {
+		t.Errorf("round 3: expected 0 reverse relationship deletions, got %d", r3.Reverse.RelationshipsDeleted)
+	}
+
+	_ = r2
+	_ = r3
+}
+
+// --- Test 6c: User deletion in draw.io still works with views (#167) ---
+//
+// Verifies that when a user manually deletes an element from draw.io (while
+// the element IS still in the view's filter), the reverse sync correctly
+// deletes it from the model. This must continue to work after the #167 fix.
+
+func TestRun_UserDeletionInDrawioStillWorksWithViews(t *testing.T) {
+	ts := minimalTemplates(t)
+
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"customer": {Kind: "container", Title: "Customer"},
+			"webshop":  {Kind: "container", Title: "Webshop"},
+		},
+		Relationships: []model.Relationship{},
+		Views: map[string]model.View{
+			"main": {Title: "Main", Include: []string{"customer", "webshop"}},
+		},
+	}
+
+	// Build doc with view page containing both elements.
+	doc := drawio.NewDocument()
+	page := doc.AddPage("view-main", "Main")
+	_ = page.CreateElement(drawio.ElementData{
+		ID: "customer", CellID: "main--customer", Kind: "container", Title: "Customer",
+	}, "")
+	_ = page.CreateElement(drawio.ElementData{
+		ID: "webshop", CellID: "main--webshop", Kind: "container", Title: "Webshop",
+	}, "")
+
+	// State from previous sync includes both elements.
+	state := &SyncState{
+		Elements: map[string]ElementState{
+			"customer": {Title: "Customer", Kind: "container"},
+			"webshop":  {Title: "Webshop", Kind: "container"},
+		},
+		Relationships: []RelationshipState{},
+	}
+
+	// User manually deletes "customer" from draw.io.
+	page.DeleteElement("customer")
+
+	// Run sync — reverse should detect and apply the deletion.
+	r := Run(m, doc, state, ts)
+
+	// customer should be deleted from the model (user intended this).
+	if _, ok := m.Model["customer"]; ok {
+		t.Error("customer should have been deleted from model (user deleted it in draw.io)")
+	}
+
+	if r.Reverse.ElementsDeleted != 1 {
+		t.Errorf("expected 1 reverse element deletion, got %d", r.Reverse.ElementsDeleted)
+	}
+
+	// webshop should still be in the model.
+	if _, ok := m.Model["webshop"]; !ok {
+		t.Error("webshop should still be in the model")
+	}
+}
+
 // --- Test 7: Multiple relationships between same pair (#142) ---
 //
 // Verifies that two relationships from A to B with different labels both
