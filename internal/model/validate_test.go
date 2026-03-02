@@ -1,6 +1,7 @@
 package model
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -166,6 +167,76 @@ func TestValidate_DuplicateRelationship(t *testing.T) {
 	errs := Validate(m)
 	if !containsMessage(errs, "duplicate") {
 		t.Errorf("expected error about duplicate relationship, got %v", errs)
+	}
+}
+
+func TestValidate_EmptyElementID(t *testing.T) {
+	m := &BausteinsichtModel{
+		Specification: Specification{
+			Elements: map[string]ElementKind{"system": {Notation: "System"}},
+		},
+		Model: map[string]Element{
+			"": {Kind: "system", Title: "Empty ID"},
+		},
+	}
+	errs := Validate(m)
+	if len(errs) == 0 {
+		t.Fatal("expected validation error for empty element ID")
+	}
+	found := false
+	for _, e := range errs {
+		if strings.Contains(e.Message, "invalid element ID") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected 'invalid element ID' error, got: %v", errs)
+	}
+}
+
+func TestValidate_WhitespaceElementID(t *testing.T) {
+	m := &BausteinsichtModel{
+		Specification: Specification{
+			Elements: map[string]ElementKind{"system": {Notation: "System"}},
+		},
+		Model: map[string]Element{
+			" ": {Kind: "system", Title: "Whitespace"},
+		},
+	}
+	errs := Validate(m)
+	found := false
+	for _, e := range errs {
+		if strings.Contains(e.Message, "invalid element ID") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected 'invalid element ID' error for whitespace-only ID, got: %v", errs)
+	}
+}
+
+func TestValidate_EmptyChildID(t *testing.T) {
+	m := &BausteinsichtModel{
+		Specification: Specification{
+			Elements: map[string]ElementKind{
+				"system": {Notation: "System", Container: true},
+			},
+		},
+		Model: map[string]Element{
+			"parent": {Kind: "system", Title: "Parent", Children: map[string]Element{
+				"": {Kind: "system", Title: "Empty Child"},
+			}},
+		},
+	}
+	errs := Validate(m)
+	found := false
+	for _, e := range errs {
+		if strings.Contains(e.Message, "invalid element ID") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected 'invalid element ID' error for empty child ID, got: %v", errs)
 	}
 }
 
