@@ -155,6 +155,11 @@ func applyElementChange(ch ElementChange, m *model.BausteinsichtModel, result *R
 		if m.Model == nil {
 			m.Model = make(map[string]model.Element)
 		}
+		if _, exists := m.Model[ch.ID]; exists {
+			result.Warnings = append(result.Warnings,
+				fmt.Sprintf("New element %q from draw.io skipped: ID already exists in model.", ch.ID))
+			return
+		}
 		m.Model[ch.ID] = model.Element{
 			Title: ch.NewValue,
 		}
