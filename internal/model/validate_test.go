@@ -339,6 +339,71 @@ func TestValidate_ViewIncludeValidElement(t *testing.T) {
 	}
 }
 
+func TestValidateWithWarnings_EmptyJSON(t *testing.T) {
+	m := &BausteinsichtModel{}
+	result := ValidateWithWarnings(m)
+	if len(result.Warnings) == 0 {
+		t.Fatal("expected warnings for empty model, got none")
+	}
+	foundSpec := false
+	foundModel := false
+	for _, w := range result.Warnings {
+		if w.Path == "specification" && strings.Contains(w.Message, "no element kinds defined") {
+			foundSpec = true
+		}
+		if w.Path == "model" && strings.Contains(w.Message, "no elements defined") {
+			foundModel = true
+		}
+	}
+	if !foundSpec {
+		t.Errorf("expected warning about empty specification, got: %v", result.Warnings)
+	}
+	if !foundModel {
+		t.Errorf("expected warning about empty model, got: %v", result.Warnings)
+	}
+	// Empty model should not produce errors
+	if len(result.Errors) != 0 {
+		t.Errorf("expected no errors for empty model, got %v", result.Errors)
+	}
+}
+
+func TestValidateWithWarnings_SpecOnly(t *testing.T) {
+	m := &BausteinsichtModel{
+		Specification: Specification{
+			Elements: map[string]ElementKind{
+				"system": {Notation: "System"},
+			},
+		},
+	}
+	result := ValidateWithWarnings(m)
+	foundModel := false
+	for _, w := range result.Warnings {
+		if w.Path == "model" && strings.Contains(w.Message, "no elements defined") {
+			foundModel = true
+		}
+	}
+	if !foundModel {
+		t.Errorf("expected warning about empty model, got: %v", result.Warnings)
+	}
+	// Should NOT warn about specification since it has elements defined
+	for _, w := range result.Warnings {
+		if w.Path == "specification" {
+			t.Errorf("should not warn about specification when elements are defined, got: %v", w)
+		}
+	}
+}
+
+func TestValidateWithWarnings_ValidModel_NoWarnings(t *testing.T) {
+	m := buildValidModel()
+	result := ValidateWithWarnings(m)
+	if len(result.Warnings) != 0 {
+		t.Errorf("expected no warnings for valid model, got %v", result.Warnings)
+	}
+	if len(result.Errors) != 0 {
+		t.Errorf("expected no errors for valid model, got %v", result.Errors)
+	}
+}
+
 // containsPath checks whether any error has the given path.
 func containsPath(errs []ValidationError, path string) bool {
 	for _, e := range errs {
