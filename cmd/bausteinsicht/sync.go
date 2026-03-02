@@ -2,7 +2,9 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 
@@ -48,16 +50,35 @@ func runSync(cmd *cobra.Command, _ []string) error {
 		return exitWithCode(fmt.Errorf("loading model: %w", err), 2)
 	}
 
-	// Load draw.io document.
+	// Load draw.io document. If the file was deleted, recreate it from the
+	// template and reset sync state so the forward sync repopulates it (#149).
+	var recreated bool
 	doc, err := drawio.LoadDocument(drawioPath)
 	if err != nil {
-		return exitWithCode(fmt.Errorf("loading draw.io file: %w", err), 2)
+		if !errors.Is(err, fs.ErrNotExist) {
+			return exitWithCode(fmt.Errorf("loading draw.io file: %w", err), 2)
+		}
+		_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "WARNING: Draw.io file not found, recreating from template")
+		doc = drawio.NewDocument()
+		recreated = true
 	}
 
 	// Load sync state (empty on first sync).
-	state, err := bsync.LoadState(statePath)
-	if err != nil {
-		return exitWithCode(fmt.Errorf("loading sync state: %w", err), 2)
+	// When the draw.io file was recreated, discard any stale state so the
+	// sync engine treats all model elements as new.
+	var state *bsync.SyncState
+	if recreated {
+		// Remove stale state file if it exists.
+		_ = os.Remove(statePath)
+		state = &bsync.SyncState{
+			Elements:      make(map[string]bsync.ElementState),
+			Relationships: []bsync.RelationshipState{},
+		}
+	} else {
+		state, err = bsync.LoadState(statePath)
+		if err != nil {
+			return exitWithCode(fmt.Errorf("loading sync state: %w", err), 2)
+		}
 	}
 
 	// Load template.
