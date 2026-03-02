@@ -485,3 +485,70 @@ func TestApplyReverse_NewElementCollidingIDSkipped(t *testing.T) {
 		t.Errorf("expected collision warning mentioning 'already exists', got: %v", result.Warnings)
 	}
 }
+
+// TestApplyReverse_NewElementGetsDefaultKind verifies that a new element
+// imported from draw.io receives a default kind from the specification
+// rather than an empty string (#206).
+func TestApplyReverse_NewElementGetsDefaultKind(t *testing.T) {
+	m := &model.BausteinsichtModel{
+		Specification: model.Specification{
+			Elements: map[string]model.ElementKind{
+				"system":    {Notation: "System"},
+				"container": {Notation: "Container"},
+			},
+		},
+		Model: map[string]model.Element{},
+	}
+
+	cs := &ChangeSet{
+		DrawioElementChanges: []ElementChange{
+			{ID: "newservice", Type: Added, NewValue: "New Service"},
+		},
+	}
+
+	ApplyReverse(cs, m)
+
+	elem, ok := m.Model["newservice"]
+	if !ok {
+		t.Fatal("expected element 'newservice' to be added")
+	}
+	if elem.Kind == "" {
+		t.Error("expected non-empty kind on new element, got empty string")
+	}
+	// Should be one of the specification kinds.
+	if _, valid := m.Specification.Elements[elem.Kind]; !valid {
+		t.Errorf("expected kind to be a valid spec kind, got %q", elem.Kind)
+	}
+}
+
+// TestApplyReverse_NewElementWarningMentionsKind verifies that the warning
+// for a new element mentions the assigned kind (#206).
+func TestApplyReverse_NewElementWarningMentionsKind(t *testing.T) {
+	m := &model.BausteinsichtModel{
+		Specification: model.Specification{
+			Elements: map[string]model.ElementKind{
+				"system": {Notation: "System"},
+			},
+		},
+		Model: map[string]model.Element{},
+	}
+
+	cs := &ChangeSet{
+		DrawioElementChanges: []ElementChange{
+			{ID: "svc", Type: Added, NewValue: "Service"},
+		},
+	}
+
+	result := ApplyReverse(cs, m)
+
+	var found bool
+	for _, w := range result.Warnings {
+		if strings.Contains(w, "kind") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected warning to mention 'kind', got: %v", result.Warnings)
+	}
+}
