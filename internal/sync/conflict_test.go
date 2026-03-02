@@ -85,6 +85,27 @@ func TestModelWinsResolver_WarningFormat(t *testing.T) {
 	}
 }
 
+func TestModelWinsResolver_NoDoubleWarningPrefix(t *testing.T) {
+	r := NewModelWinsResolver()
+	conflicts := []Conflict{
+		{
+			ElementID:     "svc",
+			Field:         "title",
+			ModelValue:    "A",
+			DrawioValue:   "B",
+			LastSyncValue: "A",
+		},
+	}
+	result := r.Resolve(conflicts)
+	if len(result) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(result))
+	}
+	w := result[0].Warning
+	if strings.HasPrefix(w, "WARNING:") {
+		t.Errorf("warning should not start with 'WARNING:' (caller adds prefix), got:\n%s", w)
+	}
+}
+
 func TestConflictResolverInterface(t *testing.T) {
 	// Ensure ModelWinsResolver satisfies the ConflictResolver interface.
 	var _ ConflictResolver = NewModelWinsResolver()

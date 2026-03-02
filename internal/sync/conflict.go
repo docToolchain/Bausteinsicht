@@ -37,7 +37,7 @@ func (r *ModelWinsResolver) Resolve(conflicts []Conflict) []ResolvedConflict {
 	resolved := make([]ResolvedConflict, 0, len(conflicts))
 	for _, c := range conflicts {
 		warning := fmt.Sprintf(
-			"WARNING: Conflict detected for element %q:\n"+
+			"Conflict detected for element %q:\n"+
 				"  Field: %s\n"+
 				"  Model value:   %q\n"+
 				"  draw.io value: %q\n"+
