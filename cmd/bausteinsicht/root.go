@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -22,6 +23,13 @@ func NewRootCmd() *cobra.Command {
 			}
 			// Normalize to lowercase for all subcommands.
 			_ = cmd.Flags().Set("format", format)
+
+			// Validate --template extension when provided.
+			templatePath, _ := cmd.Flags().GetString("template")
+			if templatePath != "" && filepath.Ext(templatePath) != ".drawio" {
+				return fmt.Errorf("template file %q must have a .drawio extension", templatePath)
+			}
+
 			return nil
 		},
 	}
