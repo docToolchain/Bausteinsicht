@@ -423,7 +423,7 @@ func applyElementAdded(
 		result.Warnings = append(result.Warnings, "no template style for kind: "+elem.Kind)
 	}
 
-	style := ts.Style + newElementMarker
+	style := mergeStyles(ts.Style, newElementMarker)
 
 	width := ts.Width
 	if width == 0 {
@@ -650,4 +650,53 @@ func reconcileOrphanedElements(
 		page.DeleteElement(id)
 		result.ElementsDeleted++
 	}
+}
+
+// mergeStyles merges overlay style properties into a base style string.
+// If both base and overlay define the same key (e.g., strokeColor), the
+// overlay value wins. This prevents duplicate keys in the style string (#187).
+func mergeStyles(base, overlay string) string {
+	if overlay == "" {
+		return base
+	}
+	if base == "" {
+		return overlay
+	}
+
+	// Parse overlay keys.
+	overlayKeys := make(map[string]string)
+	for _, part := range strings.Split(overlay, ";") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		if idx := strings.IndexByte(part, '='); idx > 0 {
+			overlayKeys[part[:idx]] = part
+		} else {
+			overlayKeys[part] = part
+		}
+	}
+
+	// Build result: base properties (skipping those overridden) + overlay.
+	var sb strings.Builder
+	for _, part := range strings.Split(base, ";") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		key := part
+		if idx := strings.IndexByte(part, '='); idx > 0 {
+			key = part[:idx]
+		}
+		if _, overridden := overlayKeys[key]; overridden {
+			continue
+		}
+		sb.WriteString(part)
+		sb.WriteByte(';')
+	}
+	for _, v := range overlayKeys {
+		sb.WriteString(v)
+		sb.WriteByte(';')
+	}
+	return sb.String()
 }
