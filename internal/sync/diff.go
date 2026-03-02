@@ -185,6 +185,7 @@ func DetectChanges(m *model.BausteinsichtModel, doc *drawio.Document, lastState 
 	visibleElems := computeVisibleElements(m)
 	newPageOnly := computeNewPageOnlyElements(m, newPageIDs)
 	detectElementChanges(cs, flatModel, drawioElems, lastState, visibleElems, newPageOnly)
+	detectUnmanagedDrawioElements(cs, doc)
 
 	modelRels := buildModelRelMap(m)
 	drawioRels := extractDrawioRelationships(doc)
@@ -223,6 +224,56 @@ func extractDrawioElements(doc *drawio.Document) map[string]drawioElemSnapshot {
 		}
 	}
 	return result
+}
+
+// detectUnmanagedDrawioElements finds shapes in draw.io that have no
+// bausteinsicht_id attribute and emits Added element changes for them.
+// This allows reverse sync to import new elements drawn by the user (#196).
+func detectUnmanagedDrawioElements(cs *ChangeSet, doc *drawio.Document) {
+	for _, page := range doc.Pages() {
+		root := page.Root()
+		if root == nil {
+			continue
+		}
+		for _, obj := range root.SelectElements("object") {
+			if obj.SelectAttrValue("bausteinsicht_id", "") != "" {
+				continue // managed element, already handled
+			}
+			// Skip navigation buttons created by forward sync.
+			objID := obj.SelectAttrValue("id", "")
+			if strings.HasPrefix(objID, "nav-back-") {
+				continue
+			}
+			// Check that it wraps a vertex cell (not a connector).
+			cell := obj.SelectElement("mxCell")
+			if cell == nil || cell.SelectAttrValue("vertex", "") != "1" {
+				continue
+			}
+			label := obj.SelectAttrValue("label", "")
+			if label == "" {
+				continue
+			}
+			title, _, _ := drawio.ParseLabel(label)
+			id := sanitizeID(title)
+			if id == "" {
+				continue
+			}
+			cs.DrawioElementChanges = append(cs.DrawioElementChanges, ElementChange{
+				ID:       id,
+				Type:     Added,
+				NewValue: title,
+			})
+		}
+	}
+}
+
+// sanitizeID converts a title to a lowercase, hyphen-separated ID suitable
+// for use as a model element key.
+func sanitizeID(title string) string {
+	title = strings.TrimSpace(title)
+	title = strings.ToLower(title)
+	title = strings.ReplaceAll(title, " ", "-")
+	return title
 }
 
 // stripScopedPrefix removes the view prefix from a scoped cell ID.
