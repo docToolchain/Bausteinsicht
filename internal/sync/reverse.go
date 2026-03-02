@@ -36,6 +36,12 @@ func ApplyReverse(changes *ChangeSet, m *model.BausteinsichtModel) *ReverseResul
 func applyElementChange(ch ElementChange, m *model.BausteinsichtModel, result *ReverseResult) {
 	switch ch.Type {
 	case Modified:
+		// Reject empty title updates from draw.io (#150).
+		if ch.Field == "title" && strings.TrimSpace(ch.NewValue) == "" {
+			result.Warnings = append(result.Warnings,
+				fmt.Sprintf("Element %q: ignoring empty title from draw.io", ch.ID))
+			return
+		}
 		err := modifyElement(m, ch.ID, func(e *model.Element) {
 			switch ch.Field {
 			case "title":
