@@ -68,8 +68,8 @@ func runAddRelationship(cmd *cobra.Command, args []string) error {
 	}
 
 	for _, r := range m.Relationships {
-		if r.From == from && r.To == to {
-			return exitWithCode(fmt.Errorf("relationship %s -> %s already exists", from, to), 1)
+		if r.From == from && r.To == to && r.Kind == kind {
+			return exitWithCode(fmt.Errorf("relationship %s -> %s (kind %q) already exists", from, to, kind), 1)
 		}
 	}
 
