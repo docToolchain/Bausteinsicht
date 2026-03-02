@@ -240,3 +240,22 @@ func TestAppendArrayEntry_PreservesComments(t *testing.T) {
 		t.Error("new entry not found")
 	}
 }
+
+func TestPatchValue_WithBlockComments(t *testing.T) {
+	input := `{
+  /* block comment */
+  "name": "old",
+  "age": 42
+}`
+	got, err := PatchValue([]byte(input), []string{"name"}, `"new"`)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(string(got), `"name": "new"`) {
+		t.Errorf("expected name to be patched, got:\n%s", got)
+	}
+	// Block comment should be preserved
+	if !strings.Contains(string(got), "/* block comment */") {
+		t.Errorf("expected block comment to be preserved, got:\n%s", got)
+	}
+}
