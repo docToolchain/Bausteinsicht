@@ -76,7 +76,7 @@ func runInit(cmd *cobra.Command, _ []string) error {
 		doc.AddPage("view-"+viewID, view.Title)
 	}
 
-	_ = sync.Run(m, doc, emptyState, tmpl)
+	_ = sync.Run(m, doc, emptyState, tmpl, nil)
 
 	// Save generated draw.io file.
 	if err := drawio.SaveDocument(defaultDrawioFile, doc); err != nil {

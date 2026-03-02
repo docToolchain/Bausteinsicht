@@ -132,15 +132,59 @@ func computeVisibleRelationships(m *model.BausteinsichtModel) map[string]bool {
 	return visible
 }
 
+// computeNewPageOnlyElements returns the set of element IDs that are visible
+// exclusively on newly created view pages (not on any pre-existing page).
+// Elements on new pages should not be treated as "deleted from draw.io" because
+// they simply haven't been forward-synced to those pages yet (#184, #188, #189).
+func computeNewPageOnlyElements(m *model.BausteinsichtModel, newPageIDs map[string]bool) map[string]bool {
+	if len(newPageIDs) == 0 || len(m.Views) == 0 {
+		return nil
+	}
+
+	// Compute elements visible on existing (non-new) pages.
+	existingPageElems := make(map[string]bool)
+	for viewID, view := range m.Views {
+		pageID := "view-" + viewID
+		if newPageIDs[pageID] {
+			continue // Skip new pages.
+		}
+		v := view
+		resolved, _ := model.ResolveView(m, &v)
+		for _, id := range resolved {
+			existingPageElems[id] = true
+		}
+		if view.Scope != "" {
+			existingPageElems[view.Scope] = true
+		}
+	}
+
+	// Find elements that are visible but ONLY on new pages.
+	allVisible := computeVisibleElements(m)
+	if allVisible == nil {
+		return nil
+	}
+	newOnly := make(map[string]bool)
+	for id := range allVisible {
+		if !existingPageElems[id] {
+			newOnly[id] = true
+		}
+	}
+	return newOnly
+}
+
 // DetectChanges performs a three-way diff between the model, draw.io document,
 // and the last known sync state.
-func DetectChanges(m *model.BausteinsichtModel, doc *drawio.Document, lastState *SyncState) *ChangeSet {
+// newPageIDs is the set of page IDs that were just created (not yet populated
+// by forward sync). Elements expected only on new pages are excluded from
+// draw.io-side deletion detection (#184, #188, #189).
+func DetectChanges(m *model.BausteinsichtModel, doc *drawio.Document, lastState *SyncState, newPageIDs map[string]bool) *ChangeSet {
 	cs := &ChangeSet{}
 
 	flatModel := model.FlattenElements(m)
 	drawioElems := extractDrawioElements(doc)
 	visibleElems := computeVisibleElements(m)
-	detectElementChanges(cs, flatModel, drawioElems, lastState, visibleElems)
+	newPageOnly := computeNewPageOnlyElements(m, newPageIDs)
+	detectElementChanges(cs, flatModel, drawioElems, lastState, visibleElems, newPageOnly)
 
 	modelRels := buildModelRelMap(m)
 	drawioRels := extractDrawioRelationships(doc)
@@ -292,12 +336,16 @@ func buildModelRelMap(m *model.BausteinsichtModel) map[string]RelationshipState 
 // detectElementChanges performs three-way comparison for elements.
 // visibleElems is the set of element IDs visible across all views. If nil,
 // all elements are considered visible (no views defined).
+// newPageOnly is the set of elements visible ONLY on newly created pages
+// (not yet populated by forward sync). These are excluded from draw.io-side
+// deletion detection (#184, #188, #189).
 func detectElementChanges(
 	cs *ChangeSet,
 	flatModel map[string]*model.Element,
 	drawioElems map[string]drawioElemSnapshot,
 	lastState *SyncState,
 	visibleElems map[string]bool,
+	newPageOnly map[string]bool,
 ) {
 	allIDs := unionElementIDs(flatModel, drawioElems, lastState)
 
@@ -327,7 +375,12 @@ func detectElementChanges(
 			// Only treat as deleted if the element should be visible on at least one
 			// view page. Elements not in any view's resolved set are simply filtered
 			// out and their absence from draw.io is expected, not a deletion. (#108, #118)
+			// Also skip elements that are only expected on newly created pages — those
+			// pages haven't been populated by forward sync yet (#184, #188, #189).
 			if visibleElems == nil || visibleElems[id] {
+				if newPageOnly != nil && newPageOnly[id] {
+					continue
+				}
 				cs.DrawioElementChanges = append(cs.DrawioElementChanges, ElementChange{ID: id, Type: Deleted})
 			}
 		case inDrawio && inLast:

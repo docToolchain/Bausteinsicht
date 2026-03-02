@@ -67,7 +67,7 @@ func TestApplyForward_ElementOnCorrectViewPage(t *testing.T) {
 		},
 	}
 
-	ApplyForward(cs, doc, ts, m)
+	ApplyForward(cs, doc, ts, m, nil)
 
 	// Context view should have customer and webshop.
 	contextPage := doc.GetPage("view-context")
@@ -125,7 +125,7 @@ func TestApplyForward_RelationshipOnlyOnPageWithBothEndpoints(t *testing.T) {
 		},
 	}
 
-	ApplyForward(cs, doc, ts, m)
+	ApplyForward(cs, doc, ts, m, nil)
 
 	// Context page: customer→webshop connector should exist (using scoped cell IDs).
 	contextPage := doc.GetPage("view-context")
@@ -193,7 +193,7 @@ func TestApplyForward_RelationshipLifting(t *testing.T) {
 		},
 	}
 
-	ApplyForward(cs, doc, ts, m)
+	ApplyForward(cs, doc, ts, m, nil)
 
 	// Context page: customer → webshop.frontend should be lifted to customer → webshop
 	contextPage := doc.GetPage("view-context")
@@ -273,7 +273,7 @@ func TestApplyForward_RelationshipLiftingDedup(t *testing.T) {
 		},
 	}
 
-	ApplyForward(cs, doc, ts, m)
+	ApplyForward(cs, doc, ts, m, nil)
 
 	contextPage := doc.GetPage("view-context")
 	conns := contextPage.FindAllConnectors()
@@ -317,7 +317,7 @@ func TestApplyForward_ScopeBoundingBox(t *testing.T) {
 		},
 	}
 
-	ApplyForward(cs, doc, ts, m)
+	ApplyForward(cs, doc, ts, m, nil)
 
 	page := doc.GetPage("view-containers")
 	if page == nil {
@@ -387,7 +387,7 @@ func TestApplyForward_DeletedElementRemovedFromViewPages(t *testing.T) {
 			{From: "webshop.api", To: "webshop.db", Index: 1, Type: Added, NewValue: "reads"},
 		},
 	}
-	ApplyForward(csAdd, doc, ts, m)
+	ApplyForward(csAdd, doc, ts, m, nil)
 
 	// Verify db exists on container page before deletion.
 	containerPage := doc.GetPage("view-containers")
@@ -416,7 +416,7 @@ func TestApplyForward_DeletedElementRemovedFromViewPages(t *testing.T) {
 			{From: "webshop.api", To: "webshop.db", Index: 1, Type: Deleted},
 		},
 	}
-	result := ApplyForward(csDel, doc, ts, m)
+	result := ApplyForward(csDel, doc, ts, m, nil)
 
 	// The element should be removed from the container page.
 	if containerPage.FindElement("webshop.db") != nil {
@@ -449,7 +449,7 @@ func TestApplyForward_DeletedRelationshipRemovedFromViewPages(t *testing.T) {
 			{From: "webshop.api", To: "webshop.db", Index: 1, Type: Added, NewValue: "reads"},
 		},
 	}
-	ApplyForward(csAdd, doc, ts, m)
+	ApplyForward(csAdd, doc, ts, m, nil)
 
 	// Verify connector exists before deletion.
 	containerPage := doc.GetPage("view-containers")
@@ -467,7 +467,7 @@ func TestApplyForward_DeletedRelationshipRemovedFromViewPages(t *testing.T) {
 			{From: "webshop.api", To: "webshop.db", Index: 1, Type: Deleted},
 		},
 	}
-	result := ApplyForward(csDel, doc, ts, m)
+	result := ApplyForward(csDel, doc, ts, m, nil)
 
 	// The connector should be removed from the container page.
 	if containerPage.FindConnector("containers--webshop.api", "containers--webshop.db", 1) != nil {
@@ -496,7 +496,7 @@ func TestApplyForward_ScopeBoundaryUpdatedOnModify(t *testing.T) {
 			{ID: "webshop.db", Type: Added},
 		},
 	}
-	ApplyForward(csAdd, doc, ts, m)
+	ApplyForward(csAdd, doc, ts, m, nil)
 
 	// Verify boundary exists with original title.
 	containerPage := doc.GetPage("view-containers")
@@ -525,7 +525,7 @@ func TestApplyForward_ScopeBoundaryUpdatedOnModify(t *testing.T) {
 			{ID: "webshop", Type: Modified},
 		},
 	}
-	result := ApplyForward(csMod, doc, ts, m)
+	result := ApplyForward(csMod, doc, ts, m, nil)
 
 	// The boundary label on the containers page should reflect the new technology.
 	boundary = containerPage.FindElement("webshop")
@@ -565,7 +565,7 @@ func TestExcludeRemovesElementFromPage(t *testing.T) {
 			{From: "webshop.api", To: "webshop.db", Index: 1, Type: Added, NewValue: "reads"},
 		},
 	}
-	ApplyForward(csAdd, doc, ts, m)
+	ApplyForward(csAdd, doc, ts, m, nil)
 
 	// Verify preconditions: webshop.db is on the container page with a connector.
 	containerPage := doc.GetPage("view-containers")
@@ -590,7 +590,7 @@ func TestExcludeRemovesElementFromPage(t *testing.T) {
 
 	// Empty ChangeSet: no model changes, only view exclude changed.
 	csEmpty := &ChangeSet{}
-	result := ApplyForward(csEmpty, doc, ts, m)
+	result := ApplyForward(csEmpty, doc, ts, m, nil)
 
 	// The excluded element should be removed from the page.
 	if containerPage.FindElement("webshop.db") != nil {
@@ -642,7 +642,7 @@ func TestApplyForward_DeleteElementRemovesConnectors(t *testing.T) {
 			{From: "webshop.api", To: "webshop.db", Index: 1, Type: Added, NewValue: "reads"},
 		},
 	}
-	ApplyForward(csAdd, doc, ts, m)
+	ApplyForward(csAdd, doc, ts, m, nil)
 
 	// Verify preconditions on the container page.
 	containerPage := doc.GetPage("view-containers")
@@ -673,7 +673,7 @@ func TestApplyForward_DeleteElementRemovesConnectors(t *testing.T) {
 		// No ModelRelationshipChanges — the element deletion should
 		// clean up connectors referencing the deleted element.
 	}
-	result := ApplyForward(csDel, doc, ts, m)
+	result := ApplyForward(csDel, doc, ts, m, nil)
 
 	// The element should be removed.
 	if containerPage.FindElement("webshop.db") != nil {
@@ -713,7 +713,7 @@ func TestApplyForward_NoViewsFallback(t *testing.T) {
 		},
 	}
 
-	result := ApplyForward(cs, doc, ts, m)
+	result := ApplyForward(cs, doc, ts, m, nil)
 
 	if result.ElementsCreated != 1 {
 		t.Fatalf("expected 1 element created, got %d", result.ElementsCreated)

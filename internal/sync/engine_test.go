@@ -16,7 +16,7 @@ func TestRun_NoChanges(t *testing.T) {
 	state := stateWithElem("api", "API", "A service", "Go")
 	ts := minimalTemplates(t)
 
-	result := Run(m, doc, state, ts)
+	result := Run(m, doc, state, ts, nil)
 
 	if result.Forward.ElementsCreated != 0 {
 		t.Errorf("expected 0 elements created, got %d", result.Forward.ElementsCreated)
@@ -40,7 +40,7 @@ func TestRun_ModelAddedElement(t *testing.T) {
 	state := emptyState()
 	ts := minimalTemplates(t)
 
-	result := Run(m, doc, state, ts)
+	result := Run(m, doc, state, ts, nil)
 
 	if result.Forward.ElementsCreated != 1 {
 		t.Errorf("expected 1 element created, got %d", result.Forward.ElementsCreated)
@@ -78,7 +78,7 @@ func TestRun_DrawioModifiedTitle(t *testing.T) {
 	state := stateWithElem("api", "Old Title", "", "")
 	ts := minimalTemplates(t)
 
-	result := Run(m, doc, state, ts)
+	result := Run(m, doc, state, ts, nil)
 
 	if result.Reverse.ElementsUpdated != 1 {
 		t.Errorf("expected 1 element updated in reverse, got %d", result.Reverse.ElementsUpdated)
@@ -106,7 +106,7 @@ func TestRun_ConflictModelWins(t *testing.T) {
 	state := stateWithElem("api", "Old Title", "", "")
 	ts := minimalTemplates(t)
 
-	result := Run(m, doc, state, ts)
+	result := Run(m, doc, state, ts, nil)
 
 	if len(result.Conflicts) != 1 {
 		t.Fatalf("expected 1 conflict, got %d", len(result.Conflicts))
@@ -165,7 +165,7 @@ func TestRun_ViewBasedSyncNoPhantomChanges(t *testing.T) {
 	state := emptyState()
 
 	// Round 1: forward sync populates the doc.
-	r1 := Run(m, doc, state, ts)
+	r1 := Run(m, doc, state, ts, nil)
 	if r1.Forward.ElementsCreated != 2 {
 		t.Fatalf("round 1: expected 2 elements created, got %d", r1.Forward.ElementsCreated)
 	}
@@ -185,7 +185,7 @@ func TestRun_ViewBasedSyncNoPhantomChanges(t *testing.T) {
 	}
 
 	// Round 2: nothing changed — sync should be a complete no-op.
-	r2 := Run(m, doc, state1, ts)
+	r2 := Run(m, doc, state1, ts, nil)
 
 	if r2.Forward.ElementsCreated != 0 || r2.Forward.ElementsUpdated != 0 || r2.Forward.ElementsDeleted != 0 {
 		t.Errorf("round 2: expected no forward element changes, got created=%d updated=%d deleted=%d",
@@ -236,7 +236,7 @@ func TestRun_OrphanedViewPageRemoved(t *testing.T) {
 	state := emptyState()
 
 	// Round 1: forward sync populates both pages.
-	r1 := Run(m, doc, state, ts)
+	r1 := Run(m, doc, state, ts, nil)
 	if r1.Forward.ElementsCreated < 2 {
 		t.Fatalf("round 1: expected at least 2 elements created, got %d", r1.Forward.ElementsCreated)
 	}
@@ -316,7 +316,7 @@ func TestRun_FullRoundTrip(t *testing.T) {
 	doc := emptyDoc()
 	state := emptyState()
 
-	r1 := Run(m, doc, state, ts)
+	r1 := Run(m, doc, state, ts, nil)
 	if r1.Forward.ElementsCreated != 1 {
 		t.Fatalf("round 1: expected 1 element created, got %d", r1.Forward.ElementsCreated)
 	}
@@ -334,7 +334,7 @@ func TestRun_FullRoundTrip(t *testing.T) {
 	updated.Title = "Service v2"
 	m.Model["svc"] = updated
 
-	r2 := Run(m, doc, state1, ts)
+	r2 := Run(m, doc, state1, ts, nil)
 	if r2.Forward.ElementsUpdated != 1 {
 		t.Errorf("round 2: expected 1 element updated, got %d", r2.Forward.ElementsUpdated)
 	}
@@ -381,7 +381,7 @@ func TestRun_ViewFilterChangeDoesNotDeleteModelElements(t *testing.T) {
 	state := emptyState()
 
 	// --- Round 1: initial sync with include ["**"] ---
-	r1 := Run(m, doc, state, ts)
+	r1 := Run(m, doc, state, ts, nil)
 	if r1.Forward.ElementsCreated < 3 {
 		t.Fatalf("round 1: expected at least 3 elements created, got %d", r1.Forward.ElementsCreated)
 	}
@@ -401,7 +401,7 @@ func TestRun_ViewFilterChangeDoesNotDeleteModelElements(t *testing.T) {
 	// --- Round 2: narrow the view filter to ["webshop.*"] ---
 	m.Views["main"] = model.View{Title: "Main", Include: []string{"webshop.*"}}
 
-	r2 := Run(m, doc, state1, ts)
+	r2 := Run(m, doc, state1, ts, nil)
 
 	// Forward sync should remove customer from the page (reconcileViewPage).
 	// That's expected and correct.
@@ -461,7 +461,7 @@ func TestRun_ViewFilterChangeDoesNotDeleteRelationships(t *testing.T) {
 	state := emptyState()
 
 	// --- Round 1: initial sync with include ["**"] ---
-	r1 := Run(m, doc, state, ts)
+	r1 := Run(m, doc, state, ts, nil)
 	if r1.Forward.ElementsCreated < 3 {
 		t.Fatalf("round 1: expected at least 3 elements created, got %d", r1.Forward.ElementsCreated)
 	}
@@ -485,7 +485,7 @@ func TestRun_ViewFilterChangeDoesNotDeleteRelationships(t *testing.T) {
 	// This removes customer from the page AND its connector customer→webshop.
 	m.Views["main"] = model.View{Title: "Main", Include: []string{"webshop.*"}}
 
-	r2 := Run(m, doc, state1, ts)
+	r2 := Run(m, doc, state1, ts, nil)
 
 	// Forward sync should remove customer and the connector from the page.
 
@@ -502,7 +502,7 @@ func TestRun_ViewFilterChangeDoesNotDeleteRelationships(t *testing.T) {
 	}
 
 	// --- Round 3: sync again — the connector is gone from draw.io ---
-	r3 := Run(m, doc, state2, ts)
+	r3 := Run(m, doc, state2, ts, nil)
 
 	// CRITICAL: customer must still be in the model.
 	if _, ok := m.Model["customer"]; !ok {
@@ -575,7 +575,7 @@ func TestRun_UserDeletionInDrawioStillWorksWithViews(t *testing.T) {
 	page.DeleteElement("customer")
 
 	// Run sync — reverse should detect and apply the deletion.
-	r := Run(m, doc, state, ts)
+	r := Run(m, doc, state, ts, nil)
 
 	// customer should be deleted from the model (user intended this).
 	if _, ok := m.Model["customer"]; ok {
@@ -615,7 +615,7 @@ func TestRun_MultipleRelsSamePair(t *testing.T) {
 	state := emptyState()
 
 	// Round 1: first sync populates an empty doc.
-	r1 := Run(m, doc, state, ts)
+	r1 := Run(m, doc, state, ts, nil)
 	if r1.Forward.ElementsCreated != 2 {
 		t.Fatalf("round 1: expected 2 elements created, got %d", r1.Forward.ElementsCreated)
 	}
@@ -643,7 +643,7 @@ func TestRun_MultipleRelsSamePair(t *testing.T) {
 	}
 
 	// Round 2: nothing changed — sync should be a complete no-op.
-	r2 := Run(m, doc, state1, ts)
+	r2 := Run(m, doc, state1, ts, nil)
 
 	if r2.Forward.ConnectorsCreated != 0 || r2.Forward.ConnectorsUpdated != 0 || r2.Forward.ConnectorsDeleted != 0 {
 		t.Errorf("round 2: expected no forward connector changes, got created=%d updated=%d deleted=%d",
@@ -684,7 +684,7 @@ func TestRun_WarnsAboutInvisibleElements(t *testing.T) {
 	doc.AddPage("view-v1", "V1")
 	state := emptyState()
 
-	result := Run(m, doc, state, ts)
+	result := Run(m, doc, state, ts, nil)
 
 	// Elements "a" and "b" should be created on the page.
 	if result.Forward.ElementsCreated != 2 {
@@ -718,11 +718,187 @@ func TestRun_NoWarningWithoutViews(t *testing.T) {
 	doc := emptyDoc()
 	state := emptyState()
 
-	result := Run(m, doc, state, ts)
+	result := Run(m, doc, state, ts, nil)
 
 	for _, w := range result.Warnings {
 		if strings.Contains(w, "not visible") {
 			t.Errorf("unexpected visibility warning without views: %s", w)
 		}
+	}
+}
+
+// --- Test: Adding a new view doesn't delete elements from model (#184) ---
+//
+// Round 1: model has "a" and "b", view v1 includes only "a".
+// Round 2: add view v2 that includes "b".
+// Element "b" should NOT be deleted from the model.
+
+func TestRun_AddingNewViewDoesNotDeleteElements(t *testing.T) {
+	ts := minimalTemplates(t)
+
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"a": {Kind: "container", Title: "A"},
+			"b": {Kind: "container", Title: "B"},
+		},
+		Relationships: []model.Relationship{},
+		Views: map[string]model.View{
+			"v1": {Title: "V1", Include: []string{"a"}},
+		},
+	}
+
+	doc := drawio.NewDocument()
+	doc.AddPage("view-v1", "V1")
+	state := emptyState()
+
+	// Round 1: forward sync populates v1 with "a".
+	r1 := Run(m, doc, state, ts, nil)
+	if r1.Forward.ElementsCreated != 1 {
+		t.Fatalf("round 1: expected 1 element created, got %d", r1.Forward.ElementsCreated)
+	}
+
+	// Build state after round 1.
+	state1 := &SyncState{
+		Elements: map[string]ElementState{
+			"a": {Title: "A", Kind: "container"},
+			"b": {Title: "B", Kind: "container"},
+		},
+		Relationships: []RelationshipState{},
+	}
+
+	// Round 2: add view v2 that includes "b".
+	m.Views["v2"] = model.View{Title: "V2", Include: []string{"b"}}
+	newPage := doc.AddPage("view-v2", "V2")
+	_ = newPage
+
+	newPageIDs := map[string]bool{"view-v2": true}
+	r2 := Run(m, doc, state1, ts, newPageIDs)
+
+	// Element "b" should NOT be deleted by reverse sync.
+	if r2.Reverse.ElementsDeleted != 0 {
+		t.Errorf("round 2: expected 0 reverse deletions, got %d", r2.Reverse.ElementsDeleted)
+	}
+
+	// Element "b" should be created on v2 by forward sync.
+	if r2.Forward.ElementsCreated < 1 {
+		t.Errorf("round 2: expected at least 1 forward creation (b on v2), got %d", r2.Forward.ElementsCreated)
+	}
+
+	// Model should still have "b".
+	if _, ok := m.Model["b"]; !ok {
+		t.Errorf("element 'b' was deleted from model — data loss!")
+	}
+}
+
+// --- Test: Renaming a view key doesn't delete elements (#189) ---
+//
+// Round 1: view "all" includes "a".
+// Round 2: view "all" renamed to "overview" (same include).
+// Element "a" should NOT be deleted.
+
+func TestRun_RenamingViewDoesNotDeleteElements(t *testing.T) {
+	ts := minimalTemplates(t)
+
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"a": {Kind: "container", Title: "A"},
+		},
+		Relationships: []model.Relationship{},
+		Views: map[string]model.View{
+			"all": {Title: "All", Include: []string{"a"}},
+		},
+	}
+
+	doc := drawio.NewDocument()
+	doc.AddPage("view-all", "All")
+	state := emptyState()
+
+	// Round 1: forward sync populates view "all" with "a".
+	r1 := Run(m, doc, state, ts, nil)
+	if r1.Forward.ElementsCreated != 1 {
+		t.Fatalf("round 1: expected 1 element created, got %d", r1.Forward.ElementsCreated)
+	}
+
+	state1 := &SyncState{
+		Elements: map[string]ElementState{
+			"a": {Title: "A", Kind: "container"},
+		},
+		Relationships: []RelationshipState{},
+	}
+
+	// Round 2: rename view "all" → "overview".
+	delete(m.Views, "all")
+	m.Views["overview"] = model.View{Title: "Overview", Include: []string{"a"}}
+
+	// Remove orphaned page and add new one (simulating what sync.go does).
+	RemoveOrphanedViewPages(doc, m)
+	doc.AddPage("view-overview", "Overview")
+
+	newPageIDs := map[string]bool{"view-overview": true}
+	r2 := Run(m, doc, state1, ts, newPageIDs)
+
+	// "a" should NOT be deleted.
+	if r2.Reverse.ElementsDeleted != 0 {
+		t.Errorf("round 2: expected 0 reverse deletions, got %d", r2.Reverse.ElementsDeleted)
+	}
+
+	if _, ok := m.Model["a"]; !ok {
+		t.Errorf("element 'a' was deleted from model — data loss!")
+	}
+}
+
+// --- Test: New view pages get populated (#188) ---
+//
+// After adding a new view and syncing, the new page should contain elements.
+
+func TestRun_NewViewPageGetsPopulated(t *testing.T) {
+	ts := minimalTemplates(t)
+
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"a": {Kind: "container", Title: "A"},
+			"b": {Kind: "container", Title: "B"},
+		},
+		Relationships: []model.Relationship{},
+		Views: map[string]model.View{
+			"v1": {Title: "V1", Include: []string{"a"}},
+		},
+	}
+
+	doc := drawio.NewDocument()
+	doc.AddPage("view-v1", "V1")
+	state := emptyState()
+
+	// Round 1: populate v1.
+	r1 := Run(m, doc, state, ts, nil)
+	_ = r1
+
+	state1 := &SyncState{
+		Elements: map[string]ElementState{
+			"a": {Title: "A", Kind: "container"},
+			"b": {Title: "B", Kind: "container"},
+		},
+		Relationships: []RelationshipState{},
+	}
+
+	// Round 2: add v2.
+	m.Views["v2"] = model.View{Title: "V2", Include: []string{"b"}}
+	doc.AddPage("view-v2", "V2")
+
+	newPageIDs := map[string]bool{"view-v2": true}
+	r2 := Run(m, doc, state1, ts, newPageIDs)
+
+	// "b" should be created on v2.
+	if r2.Forward.ElementsCreated < 1 {
+		t.Errorf("expected at least 1 forward creation, got %d", r2.Forward.ElementsCreated)
+	}
+
+	// Verify "b" is actually on v2 page.
+	v2Page := doc.GetPage("view-v2")
+	if v2Page == nil {
+		t.Fatal("v2 page not found")
+	}
+	if v2Page.FindElement("b") == nil {
+		t.Error("element 'b' not found on v2 page")
 	}
 }

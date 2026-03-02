@@ -65,7 +65,7 @@ func TestDetectChanges_NoChanges(t *testing.T) {
 	m := simpleModel("app", "App", "Desc", "Go")
 	doc := docWithElem("app", "App", "Go", "Desc")
 
-	cs := DetectChanges(m, doc, state)
+	cs := DetectChanges(m, doc, state, nil)
 
 	if len(cs.ModelElementChanges) != 0 {
 		t.Errorf("expected no model element changes, got %d", len(cs.ModelElementChanges))
@@ -83,7 +83,7 @@ func TestDetectChanges_ModelAddedElement(t *testing.T) {
 	m := simpleModel("app", "App", "", "")
 	doc := emptyDoc()
 
-	cs := DetectChanges(m, doc, state)
+	cs := DetectChanges(m, doc, state, nil)
 
 	if len(cs.ModelElementChanges) != 1 {
 		t.Fatalf("expected 1 model element change, got %d", len(cs.ModelElementChanges))
@@ -99,7 +99,7 @@ func TestDetectChanges_ModelModifiedTitle(t *testing.T) {
 	m := simpleModel("app", "NewTitle", "", "")
 	doc := docWithElem("app", "OldTitle", "", "")
 
-	cs := DetectChanges(m, doc, state)
+	cs := DetectChanges(m, doc, state, nil)
 
 	found := false
 	for _, ch := range cs.ModelElementChanges {
@@ -121,7 +121,7 @@ func TestDetectChanges_ModelDeletedElement(t *testing.T) {
 	m := emptyModel()
 	doc := docWithElem("app", "App", "", "")
 
-	cs := DetectChanges(m, doc, state)
+	cs := DetectChanges(m, doc, state, nil)
 
 	found := false
 	for _, ch := range cs.ModelElementChanges {
@@ -139,7 +139,7 @@ func TestDetectChanges_DrawioModifiedTitle(t *testing.T) {
 	m := simpleModel("app", "OldTitle", "", "")
 	doc := docWithElem("app", "NewTitle", "", "")
 
-	cs := DetectChanges(m, doc, state)
+	cs := DetectChanges(m, doc, state, nil)
 
 	found := false
 	for _, ch := range cs.DrawioElementChanges {
@@ -161,7 +161,7 @@ func TestDetectChanges_ConflictBothModifiedSameField(t *testing.T) {
 	m := simpleModel("app", "ModelTitle", "", "")
 	doc := docWithElem("app", "DrawioTitle", "", "")
 
-	cs := DetectChanges(m, doc, state)
+	cs := DetectChanges(m, doc, state, nil)
 
 	found := false
 	for _, c := range cs.Conflicts {
@@ -182,7 +182,7 @@ func TestDetectChanges_NoDuplicateConflictWhenDifferentFields(t *testing.T) {
 	m := simpleModel("app", "NewTitle", "OldDesc", "")
 	doc := docWithElem("app", "OldTitle", "", "NewDesc")
 
-	cs := DetectChanges(m, doc, state)
+	cs := DetectChanges(m, doc, state, nil)
 
 	if len(cs.Conflicts) != 0 {
 		t.Errorf("expected no conflicts for different-field changes, got: %+v", cs.Conflicts)
@@ -220,7 +220,7 @@ func TestDetectChanges_RelationshipAdded(t *testing.T) {
 	}
 	doc := emptyDoc()
 
-	cs := DetectChanges(m, doc, state)
+	cs := DetectChanges(m, doc, state, nil)
 
 	found := false
 	for _, ch := range cs.ModelRelationshipChanges {
@@ -244,7 +244,7 @@ func TestDetectChanges_RelationshipModifiedLabel(t *testing.T) {
 	}
 	doc := emptyDoc()
 
-	cs := DetectChanges(m, doc, state)
+	cs := DetectChanges(m, doc, state, nil)
 
 	found := false
 	for _, ch := range cs.ModelRelationshipChanges {
@@ -269,7 +269,7 @@ func TestDetectChanges_RelationshipDeleted(t *testing.T) {
 	}
 	doc := emptyDoc()
 
-	cs := DetectChanges(m, doc, state)
+	cs := DetectChanges(m, doc, state, nil)
 
 	found := false
 	for _, ch := range cs.ModelRelationshipChanges {
@@ -289,7 +289,7 @@ func TestDetectChanges_DrawioRelationshipAdded(t *testing.T) {
 	page := doc.AddPage("p1", "Page 1")
 	page.CreateConnector(drawio.ConnectorData{From: "x", To: "y", Label: "uses"}, "")
 
-	cs := DetectChanges(m, doc, state)
+	cs := DetectChanges(m, doc, state, nil)
 
 	found := false
 	for _, ch := range cs.DrawioRelationshipChanges {
@@ -353,7 +353,7 @@ func TestDetectChanges_ScopedConnectorsMappedToElementIDs(t *testing.T) {
 	// draw.io has scoped cell IDs (e.g., context--customer) on connectors.
 	doc := docWithScopedConnector("context", "customer", "webshop", "uses")
 
-	cs := DetectChanges(m, doc, state)
+	cs := DetectChanges(m, doc, state, nil)
 
 	// There should be NO drawio relationship changes — the connector represents
 	// the same relationship as in state, just with scoped cell IDs.
@@ -403,7 +403,7 @@ func TestDetectChanges_ScopedConnectorsMultipleViews(t *testing.T) {
 		}, "")
 	}
 
-	cs := DetectChanges(m, doc, state)
+	cs := DetectChanges(m, doc, state, nil)
 
 	if len(cs.DrawioRelationshipChanges) != 0 {
 		t.Errorf("expected no drawio relationship changes for multi-view scoped connectors, got %d: %+v",
@@ -455,7 +455,7 @@ func TestDetectChanges_LiftedConnectorIgnored(t *testing.T) {
 		TargetRef: "ctx--shop",
 	}, "")
 
-	cs := DetectChanges(m, doc, state)
+	cs := DetectChanges(m, doc, state, nil)
 
 	// The lifted connector (customer → shop) should NOT appear as a new
 	// drawio relationship, because it's a visual representation of an
@@ -491,7 +491,7 @@ func TestDetectChanges_TooltipChangeDetected(t *testing.T) {
 		}
 	}
 
-	cs := DetectChanges(m, doc, state)
+	cs := DetectChanges(m, doc, state, nil)
 
 	// Should detect a drawio-side description change from "Old Desc" to "New Desc"
 	found := false
@@ -520,7 +520,7 @@ func TestDetectChanges_ModelModifiedKind(t *testing.T) {
 	m := simpleModelWithKind("app", "App", "Desc", "Go", "component")
 	doc := docWithElem("app", "App", "Go", "Desc")
 
-	cs := DetectChanges(m, doc, state)
+	cs := DetectChanges(m, doc, state, nil)
 
 	found := false
 	for _, ch := range cs.ModelElementChanges {
@@ -557,7 +557,7 @@ func TestDetectChanges_ScopedConnectorLabelChange(t *testing.T) {
 
 	doc := docWithScopedConnector("ctx", "a", "b", "calls")
 
-	cs := DetectChanges(m, doc, state)
+	cs := DetectChanges(m, doc, state, nil)
 
 	found := false
 	for _, ch := range cs.DrawioRelationshipChanges {
@@ -625,7 +625,7 @@ func TestDetectChanges_ElementNotOnViewNotTreatedAsDeleted(t *testing.T) {
 	state := stateWithElems("a", "b", "c")
 	doc := docWithElems("a", "b")
 
-	cs := DetectChanges(m, doc, state)
+	cs := DetectChanges(m, doc, state, nil)
 
 	for _, ch := range cs.DrawioElementChanges {
 		if ch.ID == "c" && ch.Type == Deleted {
@@ -653,7 +653,7 @@ func TestDetectChanges_ExcludedElementNotTreatedAsDeleted(t *testing.T) {
 	state := stateWithElems("a", "b")
 	doc := docWithElems("a")
 
-	cs := DetectChanges(m, doc, state)
+	cs := DetectChanges(m, doc, state, nil)
 
 	for _, ch := range cs.DrawioElementChanges {
 		if ch.ID == "b" && ch.Type == Deleted {
@@ -681,7 +681,7 @@ func TestDetectChanges_TrueDeletionStillDetected(t *testing.T) {
 	state := stateWithElems("a", "b")
 	doc := docWithElems("a")
 
-	cs := DetectChanges(m, doc, state)
+	cs := DetectChanges(m, doc, state, nil)
 
 	found := false
 	for _, ch := range cs.DrawioElementChanges {
@@ -711,7 +711,7 @@ func TestDetectChanges_NoViewsAllDeletionsDetected(t *testing.T) {
 	state := stateWithElems("a", "b")
 	doc := docWithElems("a")
 
-	cs := DetectChanges(m, doc, state)
+	cs := DetectChanges(m, doc, state, nil)
 
 	found := false
 	for _, ch := range cs.DrawioElementChanges {
@@ -743,7 +743,7 @@ func TestDetectChanges_MultipleRelsSamePairBothAdded(t *testing.T) {
 	}
 	doc := emptyDoc()
 
-	cs := DetectChanges(m, doc, state)
+	cs := DetectChanges(m, doc, state, nil)
 
 	addedCount := 0
 	for _, ch := range cs.ModelRelationshipChanges {
@@ -776,7 +776,7 @@ func TestDetectChanges_MultipleRelsSamePairLabelModified(t *testing.T) {
 	}
 	doc := emptyDoc()
 
-	cs := DetectChanges(m, doc, state)
+	cs := DetectChanges(m, doc, state, nil)
 
 	found := false
 	for _, ch := range cs.ModelRelationshipChanges {
@@ -851,7 +851,7 @@ func TestDetectChanges_DeletedElementConnectorUsesCanonicalIDs(t *testing.T) {
 		TargetRef: "components--onlineshop.db",
 	}, "")
 
-	cs := DetectChanges(m, doc, state)
+	cs := DetectChanges(m, doc, state, nil)
 
 	// Check all drawio relationship changes: none should contain scoped cell IDs.
 	for _, ch := range cs.DrawioRelationshipChanges {
