@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -13,6 +14,16 @@ func NewRootCmd() *cobra.Command {
 		Use:     "bausteinsicht",
 		Short:   "Architecture-as-code with draw.io synchronization",
 		Version: version,
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			format, _ := cmd.Flags().GetString("format")
+			format = strings.ToLower(format)
+			if format != "" && format != "text" && format != "json" {
+				return fmt.Errorf("unknown format %q: valid values are \"text\" and \"json\"", format)
+			}
+			// Normalize to lowercase for all subcommands.
+			_ = cmd.Flags().Set("format", format)
+			return nil
+		},
 	}
 
 	rootCmd.PersistentFlags().String("format", "text", "Output format: text or json")
