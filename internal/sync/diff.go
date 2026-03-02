@@ -560,7 +560,7 @@ func detectRelationshipChanges(
 				continue
 			}
 			cs.DrawioRelationshipChanges = append(cs.DrawioRelationshipChanges, RelationshipChange{
-				From: from, To: to, Index: index, Type: Added,
+				From: from, To: to, Index: index, Type: Added, NewValue: dr.Label,
 			})
 		case !inDrawio && inLast:
 			// Only treat as deleted if the relationship should have a connector
