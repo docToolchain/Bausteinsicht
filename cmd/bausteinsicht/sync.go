@@ -74,8 +74,8 @@ func runSync(cmd *cobra.Command, _ []string) error {
 	// Verbose output goes to stderr so it doesn't interfere with JSON on stdout.
 	if verbose && format != "json" {
 		flat := model.FlattenElements(m)
-		fmt.Fprintf(cmd.ErrOrStderr(), "Syncing model: %s\n", modelPath)
-		fmt.Fprintf(cmd.ErrOrStderr(), "  %d elements, %d relationships, %d views\n",
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Syncing model: %s\n", modelPath)
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "  %d elements, %d relationships, %d views\n",
 			len(flat), len(m.Relationships), len(m.Views))
 	}
 
@@ -115,17 +115,17 @@ func runSync(cmd *cobra.Command, _ []string) error {
 	// Verbose post-sync details to stderr.
 	if verbose && format != "json" {
 		if result.Forward != nil {
-			fmt.Fprintf(cmd.ErrOrStderr(), "Forward sync: %d elements created, %d updated, %d deleted; %d connectors created, %d updated, %d deleted\n",
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Forward sync: %d elements created, %d updated, %d deleted; %d connectors created, %d updated, %d deleted\n",
 				result.Forward.ElementsCreated, result.Forward.ElementsUpdated, result.Forward.ElementsDeleted,
 				result.Forward.ConnectorsCreated, result.Forward.ConnectorsUpdated, result.Forward.ConnectorsDeleted)
 		}
 		if result.Reverse != nil {
-			fmt.Fprintf(cmd.ErrOrStderr(), "Reverse sync: %d elements created, %d updated, %d deleted; %d relationships created, %d updated, %d deleted\n",
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Reverse sync: %d elements created, %d updated, %d deleted; %d relationships created, %d updated, %d deleted\n",
 				result.Reverse.ElementsCreated, result.Reverse.ElementsUpdated, result.Reverse.ElementsDeleted,
 				result.Reverse.RelationshipsCreated, result.Reverse.RelationshipsUpdated, result.Reverse.RelationshipsDeleted)
 		}
 		if len(result.Conflicts) > 0 {
-			fmt.Fprintf(cmd.ErrOrStderr(), "Conflicts resolved: %d (model wins)\n", len(result.Conflicts))
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Conflicts resolved: %d (model wins)\n", len(result.Conflicts))
 		}
 	}
 
