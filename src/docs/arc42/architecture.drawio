@@ -5,8 +5,8 @@
       <root>
         <mxCell id="0"/>
         <mxCell id="1" parent="0"/>
-        <object label="&lt;b&gt;draw.io App&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#999999&quot;&gt;draw.io desktop or web application for visual diagram editing&lt;/font&gt;" id="context--drawio_app" bausteinsicht_id="drawio_app" bausteinsicht_kind="actor" tooltip="draw.io desktop or web application for visual diagram editing">
-          <mxCell style="shape=mxgraph.c4.person2;whiteSpace=wrap;html=1;align=center;verticalAlign=top;verticalLabelPosition=bottom;fillColor=#08427B;fontColor=#ffffff;fontSize=11;strokeColor=#FF0000;dashed=1;" vertex="1" parent="1">
+        <object label="&lt;b&gt;draw.io App&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#999999&quot;&gt;draw.io desktop or web application for visual diagram editing&lt;/font&gt;" id="context--drawio_app" bausteinsicht_id="drawio_app" bausteinsicht_kind="external_system" tooltip="draw.io desktop or web application for visual diagram editing">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#999999;fontColor=#ffffff;strokeColor=#8A8A8A;arcSize=5;fontSize=11;align=center;verticalAlign=middle;" vertex="1" parent="1">
             <mxGeometry x="40" y="0" width="100" height="120" as="geometry"/>
           </mxCell>
         </object>
@@ -20,8 +20,8 @@
             <mxGeometry x="320" y="0" width="200" height="120" as="geometry"/>
           </mxCell>
         </object>
-        <object label="&lt;b&gt;IDE&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#999999&quot;&gt;IDE with JSON Schema support for JSONC editing with autocompletion&lt;/font&gt;" id="context--ide" bausteinsicht_id="ide" bausteinsicht_kind="actor" tooltip="IDE with JSON Schema support for JSONC editing with autocompletion">
-          <mxCell style="shape=mxgraph.c4.person2;whiteSpace=wrap;html=1;align=center;verticalAlign=top;verticalLabelPosition=bottom;fillColor=#08427B;fontColor=#ffffff;fontSize=11;dashed=1;strokeColor=#FF0000;" vertex="1" parent="1">
+        <object label="&lt;b&gt;IDE&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#999999&quot;&gt;IDE with JSON Schema support for JSONC editing with autocompletion&lt;/font&gt;" id="context--ide" bausteinsicht_id="ide" bausteinsicht_kind="external_system" tooltip="IDE with JSON Schema support for JSONC editing with autocompletion">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#999999;fontColor=#ffffff;strokeColor=#8A8A8A;arcSize=5;fontSize=11;align=center;verticalAlign=middle;" vertex="1" parent="1">
             <mxGeometry x="560" y="0" width="100" height="120" as="geometry"/>
           </mxCell>
         </object>
@@ -63,8 +63,8 @@
             <mxGeometry x="280" y="330" width="200" height="120" as="geometry"/>
           </mxCell>
         </object>
-        <object label="&lt;b&gt;draw.io App&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#999999&quot;&gt;draw.io desktop or web application for visual diagram editing&lt;/font&gt;" id="containers--drawio_app" bausteinsicht_id="drawio_app" bausteinsicht_kind="actor" tooltip="draw.io desktop or web application for visual diagram editing">
-          <mxCell style="shape=mxgraph.c4.person2;whiteSpace=wrap;html=1;align=center;verticalAlign=top;verticalLabelPosition=bottom;fillColor=#08427B;fontColor=#ffffff;fontSize=11;strokeColor=#FF0000;dashed=1;" vertex="1" parent="1">
+        <object label="&lt;b&gt;draw.io App&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#999999&quot;&gt;draw.io desktop or web application for visual diagram editing&lt;/font&gt;" id="containers--drawio_app" bausteinsicht_id="drawio_app" bausteinsicht_kind="external_system" tooltip="draw.io desktop or web application for visual diagram editing">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#999999;fontColor=#ffffff;strokeColor=#8A8A8A;arcSize=5;fontSize=11;align=center;verticalAlign=middle;" vertex="1" parent="1">
             <mxGeometry x="520" y="330" width="100" height="120" as="geometry"/>
           </mxCell>
         </object>
@@ -73,8 +73,8 @@
             <mxGeometry x="660" y="330" width="100" height="120" as="geometry"/>
           </mxCell>
         </object>
-        <object label="&lt;b&gt;IDE&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#999999&quot;&gt;IDE with JSON Schema support for JSONC editing with autocompletion&lt;/font&gt;" id="containers--ide" bausteinsicht_id="ide" bausteinsicht_kind="actor" tooltip="IDE with JSON Schema support for JSONC editing with autocompletion">
-          <mxCell style="shape=mxgraph.c4.person2;whiteSpace=wrap;html=1;align=center;verticalAlign=top;verticalLabelPosition=bottom;fillColor=#08427B;fontColor=#ffffff;fontSize=11;strokeColor=#FF0000;dashed=1;" vertex="1" parent="1">
+        <object label="&lt;b&gt;IDE&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#999999&quot;&gt;IDE with JSON Schema support for JSONC editing with autocompletion&lt;/font&gt;" id="containers--ide" bausteinsicht_id="ide" bausteinsicht_kind="external_system" tooltip="IDE with JSON Schema support for JSONC editing with autocompletion">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#999999;fontColor=#ffffff;strokeColor=#8A8A8A;arcSize=5;fontSize=11;align=center;verticalAlign=middle;" vertex="1" parent="1">
             <mxGeometry x="800" y="330" width="100" height="120" as="geometry"/>
           </mxCell>
         </object>
