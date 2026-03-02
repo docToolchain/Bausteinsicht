@@ -16,6 +16,14 @@ func Load(path string) (*BausteinsichtModel, error) {
 		return nil, fmt.Errorf("reading %s: %w", path, err)
 	}
 	clean := StripJSONC(data)
+
+	// Reject null JSON root — json.Unmarshal silently accepts "null"
+	// and produces a zero-value struct, which passes validation vacuously.
+	trimmed := strings.TrimSpace(string(clean))
+	if trimmed == "null" || trimmed == "" {
+		return nil, fmt.Errorf("parsing %s: model file is empty or contains a null JSON root", path)
+	}
+
 	var m BausteinsichtModel
 	if err := json.Unmarshal(clean, &m); err != nil {
 		return nil, fmt.Errorf("parsing %s: %w", path, err)

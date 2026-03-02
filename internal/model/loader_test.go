@@ -242,3 +242,16 @@ func TestLoad_ModelWithBOM(t *testing.T) {
 		t.Error("expected non-empty model")
 	}
 }
+
+func TestLoad_NullJSONRoot(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "null-model.jsonc")
+	if err := os.WriteFile(path, []byte("null"), 0644); err != nil {
+		t.Fatalf("failed to write null model: %v", err)
+	}
+
+	_, err := Load(path)
+	if err == nil {
+		t.Error("expected error for null JSON root, got nil")
+	}
+}
