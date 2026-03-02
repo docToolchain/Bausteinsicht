@@ -439,3 +439,49 @@ func TestApplyReverse_NewElementFromDrawio(t *testing.T) {
 		t.Error("expected warning about the auto-generated ID")
 	}
 }
+
+// TestApplyReverse_NewElementCollidingIDSkipped verifies that a new element
+// from draw.io whose auto-generated ID collides with an existing model element
+// is NOT imported and a warning is issued instead of overwriting (#203).
+func TestApplyReverse_NewElementCollidingIDSkipped(t *testing.T) {
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"api": {Kind: "container", Title: "API Gateway", Description: "Main service", Technology: "Go"},
+		},
+	}
+
+	cs := &ChangeSet{
+		DrawioElementChanges: []ElementChange{
+			{ID: "api", Type: Added, NewValue: "API"},
+		},
+	}
+
+	result := ApplyReverse(cs, m)
+
+	// Existing element must NOT be overwritten.
+	elem := m.Model["api"]
+	if elem.Title != "API Gateway" {
+		t.Errorf("existing element overwritten: title=%q, want %q", elem.Title, "API Gateway")
+	}
+	if elem.Description != "Main service" {
+		t.Errorf("existing element overwritten: description=%q, want %q", elem.Description, "Main service")
+	}
+	if elem.Technology != "Go" {
+		t.Errorf("existing element overwritten: technology=%q, want %q", elem.Technology, "Go")
+	}
+	// Should NOT count as created.
+	if result.ElementsCreated != 0 {
+		t.Errorf("expected ElementsCreated=0, got %d", result.ElementsCreated)
+	}
+	// Should have a warning about the collision.
+	var found bool
+	for _, w := range result.Warnings {
+		if strings.Contains(w, "api") && strings.Contains(w, "already exists") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected collision warning mentioning 'already exists', got: %v", result.Warnings)
+	}
+}
