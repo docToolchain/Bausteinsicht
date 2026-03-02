@@ -152,8 +152,15 @@ func applyElementChange(ch ElementChange, m *model.BausteinsichtModel, result *R
 			fmt.Sprintf("Element %q was deleted in draw.io and removed from model", ch.ID))
 
 	case Added:
+		if m.Model == nil {
+			m.Model = make(map[string]model.Element)
+		}
+		m.Model[ch.ID] = model.Element{
+			Title: ch.NewValue,
+		}
+		result.ElementsCreated++
 		result.Warnings = append(result.Warnings,
-			fmt.Sprintf("New element %q detected in draw.io. Add it to the model to keep it synchronized.", ch.ID))
+			fmt.Sprintf("New element %q added from draw.io — review and assign a meaningful ID if needed.", ch.ID))
 	}
 }
 

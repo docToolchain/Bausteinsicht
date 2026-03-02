@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/docToolchain/Bauteinsicht/internal/drawio"
 	"github.com/docToolchain/Bauteinsicht/internal/model"
 )
 
@@ -142,16 +143,13 @@ func TestApplyReverse_AddedElementWarning(t *testing.T) {
 	if len(r.Warnings) != 1 {
 		t.Fatalf("expected 1 warning, got %d: %v", len(r.Warnings), r.Warnings)
 	}
-	// The warning should include the element ID and mention the model. (#115)
+	// The warning should include the element ID. (#115, #196)
 	w := r.Warnings[0]
 	if !strings.Contains(w, `"unknown"`) {
 		t.Errorf("expected warning to include element ID %q, got: %s", "unknown", w)
 	}
-	if !strings.Contains(w, "model") {
-		t.Errorf("expected warning to mention 'model', got: %s", w)
-	}
-	if r.ElementsCreated != 0 {
-		t.Errorf("expected ElementsCreated=0, got %d", r.ElementsCreated)
+	if r.ElementsCreated != 1 {
+		t.Errorf("expected ElementsCreated=1, got %d", r.ElementsCreated)
 	}
 }
 
@@ -334,5 +332,110 @@ func TestApplyReverse_SwapConnectorDirectionPreservesMetadata(t *testing.T) {
 	}
 	if result.RelationshipsUpdated != 1 {
 		t.Errorf("expected RelationshipsUpdated=1, got %d", result.RelationshipsUpdated)
+	}
+}
+
+// TestDetectChanges_NewElementFromDrawio verifies that a new shape added in
+// draw.io (without bausteinsicht_id) is detected as an Added element change. (#196)
+func TestDetectChanges_NewElementFromDrawio(t *testing.T) {
+	m := &model.BausteinsichtModel{
+		Specification: model.Specification{
+			Elements: map[string]model.ElementKind{
+				"system": {Notation: "System"},
+			},
+		},
+		Model: map[string]model.Element{
+			"existing": {Kind: "system", Title: "Existing"},
+		},
+		Views: map[string]model.View{
+			"context": {Title: "System Context", Include: []string{"existing"}},
+		},
+	}
+
+	// Create a drawio doc with the existing element plus a new unmanaged shape.
+	doc := drawio.NewDocument()
+	doc.AddPage("view-context", "System Context")
+	page := doc.GetPage("view-context")
+	if err := page.CreateElement(drawio.ElementData{
+		ID: "existing", CellID: "context--existing",
+		Kind: "system", Title: "Existing",
+	}, "shape=test;"); err != nil {
+		t.Fatal(err)
+	}
+
+	// Add a new shape WITHOUT bausteinsicht_id — simulates user drawing in draw.io.
+	root := page.Root()
+	obj := root.CreateElement("object")
+	obj.CreateAttr("label", "New Service")
+	obj.CreateAttr("id", "new-shape-1")
+	cell := obj.CreateElement("mxCell")
+	cell.CreateAttr("style", "rounded=1;")
+	cell.CreateAttr("vertex", "1")
+	cell.CreateAttr("parent", "1")
+
+	lastState := &SyncState{
+		Elements: map[string]ElementState{
+			"existing": {Title: "Existing"},
+		},
+	}
+
+	cs := DetectChanges(m, doc, lastState, nil)
+
+	// Should detect the new element as a drawio Added change.
+	var found bool
+	for _, ch := range cs.DrawioElementChanges {
+		if ch.Type == Added && ch.NewValue == "New Service" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected Added change for new drawio element 'New Service', got changes: %+v", cs.DrawioElementChanges)
+	}
+}
+
+// TestApplyReverse_NewElementFromDrawio verifies that a new element detected
+// from draw.io is added to the model with an auto-generated ID. (#196)
+func TestApplyReverse_NewElementFromDrawio(t *testing.T) {
+	m := &model.BausteinsichtModel{
+		Specification: model.Specification{
+			Elements: map[string]model.ElementKind{
+				"system": {Notation: "System"},
+			},
+		},
+		Model: map[string]model.Element{
+			"existing": {Kind: "system", Title: "Existing"},
+		},
+	}
+
+	cs := &ChangeSet{
+		DrawioElementChanges: []ElementChange{
+			{
+				ID:       "newservice",
+				Type:     Added,
+				NewValue: "New Service",
+			},
+		},
+	}
+
+	result := ApplyReverse(cs, m)
+
+	// The new element should be added to the model.
+	if _, ok := m.Model["newservice"]; !ok {
+		t.Error("expected element 'newservice' to be added to model")
+	}
+	if result.ElementsCreated != 1 {
+		t.Errorf("expected ElementsCreated=1, got %d", result.ElementsCreated)
+	}
+	// Should warn the user to assign a meaningful ID.
+	var hasWarning bool
+	for _, w := range result.Warnings {
+		if strings.Contains(w, "newservice") {
+			hasWarning = true
+			break
+		}
+	}
+	if !hasWarning {
+		t.Error("expected warning about the auto-generated ID")
 	}
 }
