@@ -23,6 +23,15 @@
           </mxCell>
         </object>
 
+        <!-- EXTERNAL SYSTEM template -->
+        <object label="&lt;b&gt;External System&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#cccccc&quot;&gt;[External]&lt;/font&gt;"
+                id="template-external_system"
+                bausteinsicht_template="external_system">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#999999;fontColor=#ffffff;strokeColor=#8A8A8A;arcSize=5;fontSize=11;align=center;verticalAlign=middle;" vertex="1" parent="1">
+            <mxGeometry x="140" y="60" width="200" height="120" as="geometry" />
+          </mxCell>
+        </object>
+
         <!-- SYSTEM template -->
         <object label="&lt;b&gt;System Name&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#cccccc&quot;&gt;[Software System]&lt;/font&gt;"
                 id="template-system"

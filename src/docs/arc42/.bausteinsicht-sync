@@ -1,7 +1,7 @@
 {
-  "timestamp": "2026-03-02T22:34:07Z",
-  "model_hash": "sha256:945c6de61c94beaa028cbbd5479d602921cda609cbc8b7fe0565ed661904b8fb",
-  "drawio_hash": "sha256:5066c8890f43d9aa23222ab5bde8214a977a4ec9398ecfe072a55092ff639b1d",
+  "timestamp": "2026-03-02T22:41:43Z",
+  "model_hash": "sha256:347dcadf81c75781188970e47fa3494a7554dadf2b3328f1a5882bf39f6e1a8f",
+  "drawio_hash": "sha256:44c209bd38a5bdabea00d6e86bc75103728fdbc252060cf388e73b495e6942f5",
   "elements": {
     "bausteinsicht": {
       "title": "Bausteinsicht",
@@ -148,12 +148,12 @@
     "drawio_app": {
       "title": "draw.io App",
       "description": "draw.io desktop or web application for visual diagram editing",
-      "kind": "actor"
+      "kind": "external_system"
     },
     "ide": {
       "title": "IDE",
       "description": "IDE with JSON Schema support for JSONC editing with autocompletion",
-      "kind": "actor"
+      "kind": "external_system"
     }
   },
   "relationships": [
@@ -189,85 +189,67 @@
       "from": "bausteinsicht.cli",
       "to": "bausteinsicht.watcher",
       "index": 4,
-      "label": "starts watch mode",
-      "kind": "uses"
-    },
-    {
-      "from": "bausteinsicht.cli",
-      "to": "bausteinsicht.export",
-      "index": 5,
-      "label": "triggers export",
-      "kind": "uses"
-    },
-    {
-      "from": "bausteinsicht.sync.engine",
-      "to": "bausteinsicht.sync.diff",
-      "index": 6,
-      "label": "detects changes",
-      "kind": "uses"
-    },
-    {
-      "from": "bausteinsicht.sync.engine",
-      "to": "bausteinsicht.sync.forward",
-      "index": 7,
-      "label": "model → drawio",
-      "kind": "uses"
-    },
-    {
-      "from": "bausteinsicht.sync.engine",
-      "to": "bausteinsicht.sync.reverse",
-      "index": 8,
-      "label": "drawio → model",
-      "kind": "uses"
-    },
-    {
-      "from": "bausteinsicht.sync.engine",
-      "to": "bausteinsicht.sync.state",
-      "index": 9,
-      "label": "loads/saves state",
-      "kind": "uses"
-    },
-    {
-      "from": "bausteinsicht.sync.engine",
-      "to": "bausteinsicht.sync.conflict",
-      "index": 10,
-      "label": "resolves conflicts",
-      "kind": "uses"
-    },
-    {
-      "from": "bausteinsicht.sync.forward",
-      "to": "bausteinsicht.drawio.element",
-      "index": 11,
-      "label": "creates/updates elements",
-      "kind": "uses"
+      "label": "starts watch mode"
     },
     {
       "from": "bausteinsicht.sync.forward",
       "to": "bausteinsicht.drawio.connector",
+      "index": 5,
+      "label": "creates/updates connectors"
+    },
+    {
+      "from": "drawio_app",
+      "to": "bausteinsicht",
+      "index": 6,
+      "label": "modifies .drawio file"
+    },
+    {
+      "from": "bausteinsicht.watcher",
+      "to": "bausteinsicht.sync",
+      "index": 7,
+      "label": "triggers on file change"
+    },
+    {
+      "from": "bausteinsicht.export",
+      "to": "bausteinsicht.drawio",
+      "index": 8,
+      "label": "reads diagram pages"
+    },
+    {
+      "from": "drawio_app",
+      "to": "bausteinsicht.drawio",
+      "index": 9,
+      "label": "modifies .drawio file"
+    },
+    {
+      "from": "bausteinsicht.drawio.element",
+      "to": "bausteinsicht.drawio.template",
+      "index": 10,
+      "label": "looks up styles"
+    },
+    {
+      "from": "bausteinsicht.cli",
+      "to": "bausteinsicht.sync",
+      "index": 11,
+      "label": "triggers sync"
+    },
+    {
+      "from": "bausteinsicht.sync.engine",
+      "to": "bausteinsicht.sync.forward",
       "index": 12,
-      "label": "creates/updates connectors",
-      "kind": "uses"
+      "label": "model → drawio"
     },
     {
       "from": "bausteinsicht.sync.reverse",
       "to": "bausteinsicht.model.patch",
       "index": 13,
-      "label": "comment-preserving updates",
-      "kind": "uses"
+      "label": "comment-preserving updates"
     },
     {
-      "from": "bausteinsicht.drawio.element",
-      "to": "bausteinsicht.drawio.label",
+      "from": "bausteinsicht.cli",
+      "to": "bausteinsicht.model",
       "index": 14,
-      "label": "generates labels",
-      "kind": "uses"
-    },
-    {
-      "from": "bausteinsicht.drawio.element",
-      "to": "bausteinsicht.drawio.template",
-      "index": 15,
-      "label": "looks up styles",
-      "kind": "uses"
+      "label": "validates model"
     }
   ]
 }
