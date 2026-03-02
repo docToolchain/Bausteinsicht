@@ -657,3 +657,72 @@ func TestRun_MultipleRelsSamePair(t *testing.T) {
 		t.Errorf("round 2: expected no conflicts, got %d", len(r2.Conflicts))
 	}
 }
+
+// --- Test: Sync warns when model elements aren't visible in any view (#183) ---
+//
+// Model has 3 elements: "a", "b", "c".
+// View only includes "a" and "b".
+// After sync, result.Warnings should contain a warning about "c" not being
+// visible in any view.
+
+func TestRun_WarnsAboutInvisibleElements(t *testing.T) {
+	ts := minimalTemplates(t)
+
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"a": {Kind: "container", Title: "A"},
+			"b": {Kind: "container", Title: "B"},
+			"c": {Kind: "container", Title: "C"},
+		},
+		Relationships: []model.Relationship{},
+		Views: map[string]model.View{
+			"v1": {Title: "V1", Include: []string{"a", "b"}},
+		},
+	}
+
+	doc := drawio.NewDocument()
+	doc.AddPage("view-v1", "V1")
+	state := emptyState()
+
+	result := Run(m, doc, state, ts)
+
+	// Elements "a" and "b" should be created on the page.
+	if result.Forward.ElementsCreated != 2 {
+		t.Errorf("expected 2 elements created, got %d", result.Forward.ElementsCreated)
+	}
+
+	// There should be a warning about "c" not being visible in any view.
+	found := false
+	for _, w := range result.Warnings {
+		if strings.Contains(w, "c") && strings.Contains(w, "not visible") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected warning about element 'c' not visible in any view, got warnings: %v", result.Warnings)
+	}
+}
+
+// Test: No warning about invisible elements when model has no views.
+func TestRun_NoWarningWithoutViews(t *testing.T) {
+	ts := minimalTemplates(t)
+
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"a": {Kind: "container", Title: "A"},
+		},
+		Relationships: []model.Relationship{},
+	}
+
+	doc := emptyDoc()
+	state := emptyState()
+
+	result := Run(m, doc, state, ts)
+
+	for _, w := range result.Warnings {
+		if strings.Contains(w, "not visible") {
+			t.Errorf("unexpected visibility warning without views: %s", w)
+		}
+	}
+}
