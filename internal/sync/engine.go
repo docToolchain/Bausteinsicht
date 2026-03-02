@@ -1,6 +1,8 @@
 package sync
 
 import (
+	"strings"
+
 	"github.com/docToolchain/Bauteinsicht/internal/drawio"
 	"github.com/docToolchain/Bauteinsicht/internal/model"
 )
@@ -63,6 +65,35 @@ func Run(
 	}
 
 	return result
+}
+
+// RemoveOrphanedViewPages removes pages from the draw.io document that were
+// created for views that no longer exist in the model. Pages are identified as
+// view-managed if their id starts with the "view-" prefix. Pages whose id does
+// not start with "view-" are preserved (e.g., default template pages).
+func RemoveOrphanedViewPages(doc *drawio.Document, m *model.BausteinsichtModel) {
+	// Build the set of expected view page IDs from the model.
+	expectedPages := make(map[string]bool, len(m.Views))
+	for viewID := range m.Views {
+		expectedPages["view-"+viewID] = true
+	}
+
+	// Iterate pages and collect orphaned view page IDs.
+	var orphans []string
+	for _, page := range doc.Pages() {
+		pageID := page.ID()
+		if !strings.HasPrefix(pageID, "view-") {
+			continue // Not a view-managed page; preserve it.
+		}
+		if !expectedPages[pageID] {
+			orphans = append(orphans, pageID)
+		}
+	}
+
+	// Remove orphaned pages.
+	for _, id := range orphans {
+		doc.RemovePage(id)
+	}
 }
 
 // filterConflictingDrawioChanges removes draw.io element changes for fields

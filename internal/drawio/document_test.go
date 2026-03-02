@@ -159,6 +159,66 @@ func TestLoadDocument_AcceptsValidDocument(t *testing.T) {
 	}
 }
 
+func TestRemovePage(t *testing.T) {
+	doc := drawio.NewDocument()
+	doc.AddPage("p1", "Page 1")
+	doc.AddPage("p2", "Page 2")
+	doc.AddPage("p3", "Page 3")
+
+	if len(doc.Pages()) != 3 {
+		t.Fatalf("precondition: expected 3 pages, got %d", len(doc.Pages()))
+	}
+
+	doc.RemovePage("p2")
+
+	if len(doc.Pages()) != 2 {
+		t.Errorf("expected 2 pages after RemovePage, got %d", len(doc.Pages()))
+	}
+	if doc.GetPage("p2") != nil {
+		t.Error("page p2 should be removed")
+	}
+	if doc.GetPage("p1") == nil {
+		t.Error("page p1 should still exist")
+	}
+	if doc.GetPage("p3") == nil {
+		t.Error("page p3 should still exist")
+	}
+}
+
+func TestRemovePage_NonExistent(t *testing.T) {
+	doc := drawio.NewDocument()
+	doc.AddPage("p1", "Page 1")
+
+	// Removing a non-existent page should be a no-op.
+	doc.RemovePage("does-not-exist")
+
+	if len(doc.Pages()) != 1 {
+		t.Errorf("expected 1 page (no-op), got %d", len(doc.Pages()))
+	}
+}
+
+func TestPageID(t *testing.T) {
+	doc := drawio.NewDocument()
+	doc.AddPage("view-context", "System Context")
+	doc.AddPage("view-containers", "Container View")
+
+	pages := doc.Pages()
+	if len(pages) != 2 {
+		t.Fatalf("expected 2 pages, got %d", len(pages))
+	}
+
+	ids := make(map[string]bool)
+	for _, p := range pages {
+		ids[p.ID()] = true
+	}
+	if !ids["view-context"] {
+		t.Error("expected page with ID 'view-context'")
+	}
+	if !ids["view-containers"] {
+		t.Error("expected page with ID 'view-containers'")
+	}
+}
+
 func TestSaveDocument_Atomic(t *testing.T) {
 	doc := drawio.NewDocument()
 	doc.AddPage("p1", "Page 1")

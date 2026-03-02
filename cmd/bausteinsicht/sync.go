@@ -78,6 +78,9 @@ func runSync(cmd *cobra.Command, _ []string) error {
 		}
 	}
 
+	// Remove orphaned view pages (views deleted or renamed in model). (#143)
+	bsync.RemoveOrphanedViewPages(doc, m)
+
 	// Run sync.
 	result := bsync.Run(m, doc, state, tmpl)
 

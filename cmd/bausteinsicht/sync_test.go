@@ -428,6 +428,77 @@ func TestSyncPreservesUserAddedDrawioElement(t *testing.T) {
 	}
 }
 
+// TestSyncRemovesOrphanedViewPages verifies that when a view is removed from
+// the model, the corresponding draw.io page is also removed during sync.
+// Regression test for #143.
+func TestSyncRemovesOrphanedViewPages(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
+
+	// Init the project.
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"init"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("init failed: %v", err)
+	}
+
+	// First sync to establish state.
+	captureStdout(t, func() {
+		cmd2 := NewRootCmd()
+		cmd2.SetArgs([]string{"sync"})
+		if err := cmd2.Execute(); err != nil {
+			t.Fatalf("first sync failed: %v", err)
+		}
+	})
+
+	// Verify the init template has a view and corresponding page.
+	m, err := model.Load("architecture.jsonc")
+	if err != nil {
+		t.Fatalf("load model: %v", err)
+	}
+	if len(m.Views) == 0 {
+		t.Skip("init template has no views; cannot test orphan removal")
+	}
+
+	// Count pages in the drawio file before removing a view.
+	drawioData, err := os.ReadFile("architecture.drawio")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pageCountBefore := strings.Count(string(drawioData), "<diagram ")
+
+	// Remove all views from the model except none (remove all).
+	m.Views = map[string]model.View{}
+	if err := model.Save("architecture.jsonc", m); err != nil {
+		t.Fatalf("save model: %v", err)
+	}
+
+	// Sync again — orphaned view pages should be removed.
+	captureStdout(t, func() {
+		cmd3 := NewRootCmd()
+		cmd3.SetArgs([]string{"sync"})
+		if err := cmd3.Execute(); err != nil {
+			t.Fatalf("second sync failed: %v", err)
+		}
+	})
+
+	// Read the draw.io file after sync.
+	afterSync, err := os.ReadFile("architecture.drawio")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pageCountAfter := strings.Count(string(afterSync), "<diagram ")
+
+	if pageCountAfter >= pageCountBefore {
+		t.Errorf("expected fewer pages after removing views: before=%d, after=%d",
+			pageCountBefore, pageCountAfter)
+	}
+}
+
 func TestSyncWithExplicitModelPath(t *testing.T) {
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
