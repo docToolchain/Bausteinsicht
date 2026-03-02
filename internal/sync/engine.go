@@ -1,6 +1,8 @@
 package sync
 
 import (
+	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/docToolchain/Bauteinsicht/internal/drawio"
@@ -57,7 +59,26 @@ func Run(
 	// Step 5: Reverse sync (draw.io → model).
 	result.Reverse = ApplyReverse(changes, m)
 
-	// Step 6: Collect all warnings.
+	// Step 6: Warn about model elements not visible in any view (#183).
+	if len(m.Views) > 0 {
+		visible := computeVisibleElements(m)
+		flat := model.FlattenElements(m)
+		var invisible []string
+		for id := range flat {
+			if visible != nil && !visible[id] {
+				invisible = append(invisible, id)
+			}
+		}
+		if len(invisible) > 0 {
+			sort.Strings(invisible)
+			for _, id := range invisible {
+				result.Warnings = append(result.Warnings,
+					fmt.Sprintf("Element %q exists in the model but is not visible in any view — add it to a view's include list", id))
+			}
+		}
+	}
+
+	// Step 7: Collect all warnings.
 	result.Warnings = append(result.Warnings, result.Forward.Warnings...)
 	result.Warnings = append(result.Warnings, result.Reverse.Warnings...)
 	for _, rc := range result.Conflicts {
