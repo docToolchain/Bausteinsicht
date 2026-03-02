@@ -215,7 +215,11 @@ func extractDrawioElements(doc *drawio.Document) map[string]drawioElemSnapshot {
 			if description == "" {
 				description = labelDesc
 			}
-			result[id] = drawioElemSnapshot{
+			// Skip duplicate bausteinsicht_id — keep first occurrence (#213).
+		if _, exists := result[id]; exists {
+			continue
+		}
+		result[id] = drawioElemSnapshot{
 				title:       title,
 				technology:  technology,
 				description: description,

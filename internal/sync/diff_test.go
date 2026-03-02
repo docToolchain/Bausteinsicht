@@ -1182,3 +1182,51 @@ func TestDetectChanges_ConnectorToNewUnmanagedElementUsesModelID(t *testing.T) {
 		t.Errorf("expected Added relationship customer→gateway, got: %+v", cs.DrawioRelationshipChanges)
 	}
 }
+
+func TestDetectChanges_DuplicateBausteinsichtIDKeepsFirst(t *testing.T) {
+	// When draw.io contains two <object> elements with the same
+	// bausteinsicht_id (e.g., copy-paste), the first occurrence should
+	// win. The duplicate should not overwrite the original's data (#213).
+	state := emptyState()
+	state.Elements["svc"] = ElementState{
+		Title:       "Original Service",
+		Description: "Original description",
+		Kind:        "system",
+	}
+
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"svc": {Kind: "system", Title: "Original Service", Description: "Original description"},
+		},
+	}
+
+	doc := drawio.NewDocument()
+	page := doc.AddPage("view-ctx", "Context")
+	// First element: matches the model (no change expected).
+	_ = page.CreateElement(drawio.ElementData{
+		ID:          "svc",
+		CellID:      "ctx--svc",
+		Kind:        "system",
+		Title:       "Original Service",
+		Description: "Original description",
+	}, "")
+	// Second element: duplicate bausteinsicht_id with different title.
+	// Simulates a copy-paste in draw.io.
+	_ = page.CreateElement(drawio.ElementData{
+		ID:     "svc",
+		CellID: "ctx--svc-copy",
+		Kind:   "system",
+		Title:  "Collision Copy",
+	}, "")
+
+	cs := DetectChanges(m, doc, state, nil)
+
+	// There should be NO Modified element change for "svc" — the first
+	// occurrence matches the model/last-sync state exactly.
+	for _, ch := range cs.DrawioElementChanges {
+		if ch.ID == "svc" && ch.Type == Modified {
+			t.Errorf("duplicate bausteinsicht_id caused spurious Modified change: field=%q old=%q new=%q",
+				ch.Field, ch.OldValue, ch.NewValue)
+		}
+	}
+}
