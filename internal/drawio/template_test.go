@@ -104,7 +104,7 @@ func TestLoadTemplate_InvalidXMLFile(t *testing.T) {
 	if _, err := tmpFile.WriteString("this is not xml"); err != nil {
 		t.Fatalf("WriteString: %v", err)
 	}
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	_, err = drawio.LoadTemplate(tmpFile.Name())
 	if err == nil {
