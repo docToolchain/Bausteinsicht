@@ -61,6 +61,12 @@ func applyElementChange(ch ElementChange, m *model.BausteinsichtModel, result *R
 			return
 		}
 		result.ElementsDeleted++
+		// Clean stale references from view include/exclude lists.
+		for viewID, v := range m.Views {
+			v.Include = removeFromSlice(v.Include, ch.ID)
+			v.Exclude = removeFromSlice(v.Exclude, ch.ID)
+			m.Views[viewID] = v
+		}
 		result.Warnings = append(result.Warnings,
 			fmt.Sprintf("Element %q was deleted in draw.io and removed from model", ch.ID))
 
@@ -180,4 +186,18 @@ func deleteFromMap(elems map[string]model.Element, parts []string, fullID string
 	}
 	elems[key] = elem
 	return nil
+}
+
+// removeFromSlice returns a new slice with all occurrences of val removed.
+func removeFromSlice(s []string, val string) []string {
+	result := make([]string, 0, len(s))
+	for _, v := range s {
+		if v != val {
+			result = append(result, v)
+		}
+	}
+	if len(result) == 0 {
+		return nil
+	}
+	return result
 }

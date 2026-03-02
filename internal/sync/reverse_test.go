@@ -199,6 +199,48 @@ func TestApplyReverse_RelationshipDeleted(t *testing.T) {
 	}
 }
 
+func TestApplyReverse_DeleteElementCleansViewIncludes(t *testing.T) {
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"api":    {Kind: "container", Title: "API"},
+			"webapp": {Kind: "container", Title: "WebApp"},
+		},
+		Relationships: []model.Relationship{},
+		Views: map[string]model.View{
+			"overview": {
+				Title:   "Overview",
+				Include: []string{"api", "webapp"},
+				Exclude: []string{"api"},
+			},
+		},
+	}
+
+	cs := elemChangeSet("api", Deleted, "", "", "")
+	ApplyReverse(cs, m)
+
+	v := m.Views["overview"]
+	for _, inc := range v.Include {
+		if inc == "api" {
+			t.Error("deleted element 'api' should be removed from view Include")
+		}
+	}
+	for _, exc := range v.Exclude {
+		if exc == "api" {
+			t.Error("deleted element 'api' should be removed from view Exclude")
+		}
+	}
+	// "webapp" should remain
+	found := false
+	for _, inc := range v.Include {
+		if inc == "webapp" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected 'webapp' to remain in Include")
+	}
+}
+
 func TestApplyReverse_RelationshipAdded(t *testing.T) {
 	m := emptyModel()
 	cs := relChangeSet("x", "y", Added, "", "", "uses")
