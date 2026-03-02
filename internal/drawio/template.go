@@ -39,6 +39,12 @@ func LoadTemplateFromBytes(data []byte) (*TemplateSet, error) {
 		return nil, fmt.Errorf("LoadTemplateFromBytes: %w", err)
 	}
 
+	// Validate that the document is a valid draw.io file with an <mxfile> root.
+	root := tree.Root()
+	if root == nil || root.Tag != "mxfile" {
+		return nil, fmt.Errorf("LoadTemplateFromBytes: not a valid draw.io template (missing <mxfile> root element)")
+	}
+
 	ts := &TemplateSet{
 		elements:   make(map[string]TemplateStyle),
 		boundaries: make(map[string]TemplateStyle),
