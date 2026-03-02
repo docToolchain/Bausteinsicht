@@ -51,6 +51,16 @@ func runSync(cmd *cobra.Command, _ []string) error {
 		return exitWithCode(fmt.Errorf("loading model: %w", err), 2)
 	}
 
+	// Validate model before syncing to catch invalid view include/exclude
+	// patterns and other consistency errors. Without this, typos like
+	// "customer." (trailing dot) silently remove elements from draw.io. (#176)
+	if validationErrs := model.Validate(m); len(validationErrs) > 0 {
+		for _, ve := range validationErrs {
+			fmt.Fprintln(os.Stderr, "ERROR:", ve)
+		}
+		return exitWithCode(fmt.Errorf("model validation failed with %d error(s); fix the model before syncing", len(validationErrs)), 1)
+	}
+
 	// Load draw.io document. If the file was deleted or is an empty mxfile
 	// (no diagram pages — e.g., after all views were removed), recreate it
 	// from the template and reset sync state so forward sync repopulates it
