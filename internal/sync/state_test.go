@@ -26,6 +26,30 @@ func TestLoadState_MissingFileReturnsEmpty(t *testing.T) {
 	}
 }
 
+func TestLoadState_ZeroByteFileReturnsEmpty(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, ".bausteinsicht-sync")
+
+	// Create a zero-byte file (simulates truncated/corrupt sync state).
+	if err := os.WriteFile(path, []byte{}, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	state, err := LoadState(path)
+	if err != nil {
+		t.Fatalf("expected no error for zero-byte file, got: %v", err)
+	}
+	if state == nil {
+		t.Fatal("expected non-nil state")
+	}
+	if len(state.Elements) != 0 {
+		t.Errorf("expected empty elements, got %d", len(state.Elements))
+	}
+	if len(state.Relationships) != 0 {
+		t.Errorf("expected empty relationships, got %d", len(state.Relationships))
+	}
+}
+
 func TestSaveLoadState_RoundTrip(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, ".bausteinsicht-sync")
