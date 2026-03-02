@@ -9,8 +9,9 @@ import (
 )
 
 type validateResult struct {
-	Valid  bool              `json:"valid"`
-	Errors []validateErrJSON `json:"errors"`
+	Valid    bool              `json:"valid"`
+	Errors   []validateErrJSON `json:"errors"`
+	Warnings []validateErrJSON `json:"warnings,omitempty"`
 }
 
 type validateErrJSON struct {
@@ -55,21 +56,27 @@ func runValidate(cmd *cobra.Command, args []string) error {
 			len(flat), len(m.Relationships), len(m.Views))
 	}
 
-	errs := model.Validate(m)
+	result := model.ValidateWithWarnings(m)
 
 	if format == "json" {
-		return outputJSON(cmd, errs)
+		return outputJSON(cmd, result)
 	}
-	return outputText(cmd, errs)
+	return outputText(cmd, result)
 }
 
-func outputJSON(cmd *cobra.Command, errs []model.ValidationError) error {
+func outputJSON(cmd *cobra.Command, vr model.ValidationResult) error {
 	result := validateResult{
-		Valid:  len(errs) == 0,
-		Errors: make([]validateErrJSON, len(errs)),
+		Valid:  len(vr.Errors) == 0,
+		Errors: make([]validateErrJSON, len(vr.Errors)),
 	}
-	for i, e := range errs {
+	for i, e := range vr.Errors {
 		result.Errors[i] = validateErrJSON{Path: e.Path, Message: e.Message}
+	}
+	if len(vr.Warnings) > 0 {
+		result.Warnings = make([]validateErrJSON, len(vr.Warnings))
+		for i, w := range vr.Warnings {
+			result.Warnings[i] = validateErrJSON{Path: w.Path, Message: w.Message}
+		}
 	}
 	data, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {
@@ -84,12 +91,17 @@ func outputJSON(cmd *cobra.Command, errs []model.ValidationError) error {
 	return nil
 }
 
-func outputText(cmd *cobra.Command, errs []model.ValidationError) error {
-	if len(errs) == 0 {
+func outputText(cmd *cobra.Command, vr model.ValidationResult) error {
+	for _, w := range vr.Warnings {
+		if _, err := fmt.Fprintf(cmd.OutOrStdout(), "WARNING: [%s] %s\n", w.Path, w.Message); err != nil {
+			return err
+		}
+	}
+	if len(vr.Errors) == 0 {
 		_, err := fmt.Fprintln(cmd.OutOrStdout(), "Model is valid.")
 		return err
 	}
-	for _, e := range errs {
+	for _, e := range vr.Errors {
 		if _, err := fmt.Fprintf(cmd.OutOrStdout(), "ERROR: [%s] %s\n", e.Path, e.Message); err != nil {
 			return err
 		}

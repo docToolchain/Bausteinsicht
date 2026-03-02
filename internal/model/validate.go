@@ -15,13 +15,50 @@ func (e ValidationError) Error() string {
 	return fmt.Sprintf("%s: %s", e.Path, e.Message)
 }
 
+// ValidationWarning describes a non-fatal issue with the model.
+type ValidationWarning struct {
+	Path    string
+	Message string
+}
+
+// ValidationResult holds both errors and warnings from validation.
+type ValidationResult struct {
+	Errors   []ValidationError
+	Warnings []ValidationWarning
+}
+
 // Validate checks the model for consistency and returns all found errors.
 func Validate(m *BausteinsichtModel) []ValidationError {
-	var errs []ValidationError
-	errs = append(errs, validateElements(m)...)
-	errs = append(errs, validateRelationships(m)...)
-	errs = append(errs, validateViews(m)...)
-	return errs
+	result := ValidateWithWarnings(m)
+	return result.Errors
+}
+
+// ValidateWithWarnings checks the model for consistency and returns errors and warnings.
+func ValidateWithWarnings(m *BausteinsichtModel) ValidationResult {
+	var result ValidationResult
+	result.Errors = append(result.Errors, validateElements(m)...)
+	result.Errors = append(result.Errors, validateRelationships(m)...)
+	result.Errors = append(result.Errors, validateViews(m)...)
+	result.Warnings = append(result.Warnings, validateEmptyModel(m)...)
+	return result
+}
+
+// validateEmptyModel checks for models with no specification or no elements.
+func validateEmptyModel(m *BausteinsichtModel) []ValidationWarning {
+	var warnings []ValidationWarning
+	if len(m.Specification.Elements) == 0 {
+		warnings = append(warnings, ValidationWarning{
+			Path:    "specification",
+			Message: "no element kinds defined in specification",
+		})
+	}
+	if len(m.Model) == 0 {
+		warnings = append(warnings, ValidationWarning{
+			Path:    "model",
+			Message: "model is empty (no elements defined)",
+		})
+	}
+	return warnings
 }
 
 func validateElements(m *BausteinsichtModel) []ValidationError {

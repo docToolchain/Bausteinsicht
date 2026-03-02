@@ -206,6 +206,78 @@ func TestValidate_AutoDetect_NoFile(t *testing.T) {
 	}
 }
 
+func TestValidate_EmptyJSON_WarnsButPasses(t *testing.T) {
+	dir := t.TempDir()
+	modelPath := filepath.Join(dir, "model.jsonc")
+	if err := os.WriteFile(modelPath, []byte(`{}`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := executeValidateCmd("validate", "--model", modelPath)
+	if err != nil {
+		t.Fatalf("expected no error (exit 0) for empty model, got %v", err)
+	}
+	if !strings.Contains(out, "WARNING:") {
+		t.Errorf("expected WARNING in output for empty model, got %q", out)
+	}
+	if !strings.Contains(out, "Model is valid.") {
+		t.Errorf("expected 'Model is valid.' in output, got %q", out)
+	}
+}
+
+func TestValidate_SpecOnly_WarnsNoElements(t *testing.T) {
+	dir := t.TempDir()
+	modelPath := filepath.Join(dir, "model.jsonc")
+	specOnly := `{
+		"specification": {
+			"elements": {
+				"system": {"notation": "System"}
+			}
+		}
+	}`
+	if err := os.WriteFile(modelPath, []byte(specOnly), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := executeValidateCmd("validate", "--model", modelPath)
+	if err != nil {
+		t.Fatalf("expected no error (exit 0) for spec-only model, got %v", err)
+	}
+	if !strings.Contains(out, "WARNING:") {
+		t.Errorf("expected WARNING in output for spec-only model, got %q", out)
+	}
+	if !strings.Contains(out, "no elements defined") {
+		t.Errorf("expected warning about no elements, got %q", out)
+	}
+	if !strings.Contains(out, "Model is valid.") {
+		t.Errorf("expected 'Model is valid.' in output, got %q", out)
+	}
+}
+
+func TestValidate_EmptyJSON_JSONFormat_IncludesWarnings(t *testing.T) {
+	dir := t.TempDir()
+	modelPath := filepath.Join(dir, "model.jsonc")
+	if err := os.WriteFile(modelPath, []byte(`{}`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := executeValidateCmd("validate", "--model", modelPath, "--format", "json")
+	if err != nil {
+		t.Fatalf("expected no error for empty model in JSON format, got %v", err)
+	}
+
+	var result validateResult
+	if err := json.Unmarshal([]byte(strings.TrimSpace(out)), &result); err != nil {
+		t.Fatalf("failed to parse JSON output: %v\nOutput: %s", err, out)
+	}
+	if !result.Valid {
+		t.Errorf("expected valid=true for empty model, got false")
+	}
+	if len(result.Warnings) == 0 {
+		t.Errorf("expected warnings in JSON output for empty model, got none")
+	}
+}
+
 // executeValidateCmdSplit runs the validate command and captures stdout and
 // stderr into separate buffers so verbose output (written to stderr) can be
 // verified independently.
