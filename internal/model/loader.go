@@ -67,6 +67,11 @@ func AutoDetect(dir string) (string, error) {
 // StripJSONC removes single-line comments and trailing commas from JSONC data.
 // Comments inside strings are preserved.
 func StripJSONC(data []byte) []byte {
+	// Strip UTF-8 BOM if present.
+	if len(data) >= 3 && data[0] == 0xEF && data[1] == 0xBB && data[2] == 0xBF {
+		data = data[3:]
+	}
+
 	var sb strings.Builder
 	src := string(data)
 	i := 0

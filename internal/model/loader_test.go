@@ -208,3 +208,37 @@ func TestStripJSONC_RemovesTrailingCommaBeforeArrayEnd(t *testing.T) {
 		t.Errorf("expected trailing comma in array removed, got: %s", string(out))
 	}
 }
+
+func TestStripJSONC_StripsBOM(t *testing.T) {
+	bom := []byte{0xEF, 0xBB, 0xBF}
+	input := append(bom, []byte(`{"key": "value"}`)...)
+	out := StripJSONC(input)
+	expected := `{"key": "value"}`
+	if string(out) != expected {
+		t.Errorf("expected BOM stripped, got: %q", string(out))
+	}
+}
+
+func TestLoad_ModelWithBOM(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "model.jsonc")
+
+	// Read a valid model, prepend BOM, write it out
+	original, err := os.ReadFile("testdata/minimal-model.jsonc")
+	if err != nil {
+		t.Fatalf("failed to read testdata: %v", err)
+	}
+	bom := []byte{0xEF, 0xBB, 0xBF}
+	withBOM := append(bom, original...)
+	if err := os.WriteFile(path, withBOM, 0644); err != nil {
+		t.Fatalf("failed to write: %v", err)
+	}
+
+	m, err := Load(path)
+	if err != nil {
+		t.Fatalf("expected no error for BOM file, got: %v", err)
+	}
+	if len(m.Model) == 0 {
+		t.Error("expected non-empty model")
+	}
+}
