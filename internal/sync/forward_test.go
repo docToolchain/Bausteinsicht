@@ -707,3 +707,22 @@ func TestApplyForward_MultipleRelsSamePairNoDuplicateConnectors(t *testing.T) {
 		t.Errorf("expected 0 connectors created, got %d", result.ConnectorsCreated)
 	}
 }
+
+func TestMergeStyles_NoDuplicateKeys(t *testing.T) {
+	base := "shape=mxgraph.c4.person2;strokeColor=#073B6F;fillColor=#08427B;"
+	overlay := "strokeColor=#FF0000;dashed=1;"
+	got := mergeStyles(base, overlay)
+	// strokeColor should appear exactly once (the overlay value wins).
+	if count := strings.Count(got, "strokeColor"); count != 1 {
+		t.Errorf("expected exactly 1 strokeColor, got %d in %q", count, got)
+	}
+	if !strings.Contains(got, "strokeColor=#FF0000") {
+		t.Errorf("expected overlay strokeColor=#FF0000 in %q", got)
+	}
+	if !strings.Contains(got, "dashed=1") {
+		t.Errorf("expected dashed=1 in %q", got)
+	}
+	if !strings.Contains(got, "shape=mxgraph.c4.person2") {
+		t.Errorf("expected shape preserved in %q", got)
+	}
+}
