@@ -26,11 +26,86 @@ func ApplyReverse(changes *ChangeSet, m *model.BausteinsichtModel) *ReverseResul
 		applyElementChange(ch, m, result)
 	}
 
+	// Detect direction-swap pairs (Deleted a→b + Added b→a) so we can
+	// update the relationship in-place and preserve metadata (#185).
+	swaps := detectRelSwaps(changes.DrawioRelationshipChanges)
+
 	for _, ch := range changes.DrawioRelationshipChanges {
+		if swaps[relSwapKey{ch.From, ch.To, ch.Type}] {
+			continue // handled as part of a swap pair
+		}
 		applyRelationshipChange(ch, m, result)
 	}
 
+	// Apply swaps: update direction in-place, preserving kind/label/description.
+	for _, sw := range collectSwapPairs(changes.DrawioRelationshipChanges) {
+		applyRelSwap(sw.from, sw.to, m, result)
+	}
+
 	return result
+}
+
+type relSwapKey struct {
+	from, to string
+	typ      ChangeType
+}
+
+type swapPair struct {
+	from, to string // new direction (from the Added change)
+}
+
+// detectRelSwaps returns a set of (from, to, type) triples that are part of
+// a direction-swap pair. A swap is a Deleted(a→b) paired with Added(b→a).
+func detectRelSwaps(changes []RelationshipChange) map[relSwapKey]bool {
+	deleted := make(map[[2]string]bool)
+	added := make(map[[2]string]bool)
+	for _, ch := range changes {
+		switch ch.Type {
+		case Deleted:
+			deleted[[2]string{ch.From, ch.To}] = true
+		case Added:
+			added[[2]string{ch.From, ch.To}] = true
+		}
+	}
+	result := make(map[relSwapKey]bool)
+	for pair := range deleted {
+		reverse := [2]string{pair[1], pair[0]}
+		if added[reverse] {
+			result[relSwapKey{pair[0], pair[1], Deleted}] = true
+			result[relSwapKey{pair[1], pair[0], Added}] = true
+		}
+	}
+	return result
+}
+
+// collectSwapPairs returns the new-direction pairs for detected swaps.
+func collectSwapPairs(changes []RelationshipChange) []swapPair {
+	swaps := detectRelSwaps(changes)
+	var pairs []swapPair
+	for key := range swaps {
+		if key.typ == Added {
+			pairs = append(pairs, swapPair{from: key.from, to: key.to})
+		}
+	}
+	return pairs
+}
+
+// applyRelSwap updates a relationship's direction in-place, preserving metadata.
+func applyRelSwap(newFrom, newTo string, m *model.BausteinsichtModel, result *ReverseResult) {
+	for i, r := range m.Relationships {
+		if r.From == newTo && r.To == newFrom {
+			m.Relationships[i].From = newFrom
+			m.Relationships[i].To = newTo
+			result.RelationshipsUpdated++
+			return
+		}
+	}
+	// Fallback: original already deleted somehow; create new.
+	m.Relationships = append(m.Relationships, model.Relationship{
+		From: newFrom,
+		To:   newTo,
+	})
+	result.RelationshipsCreated++
 }
 
 func applyElementChange(ch ElementChange, m *model.BausteinsichtModel, result *ReverseResult) {

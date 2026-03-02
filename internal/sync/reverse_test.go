@@ -287,3 +287,52 @@ func TestApplyReverse_RelationshipAdded(t *testing.T) {
 		t.Errorf("expected RelationshipsCreated=1, got %d", r.RelationshipsCreated)
 	}
 }
+
+// TestApplyReverse_SwapConnectorDirectionPreservesMetadata verifies that
+// swapping a connector's source and target in draw.io preserves the
+// relationship's kind, label, and description (#185).
+func TestApplyReverse_SwapConnectorDirectionPreservesMetadata(t *testing.T) {
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"a": {Kind: "system", Title: "A"},
+			"b": {Kind: "system", Title: "B"},
+		},
+		Relationships: []model.Relationship{
+			{From: "a", To: "b", Kind: "uses", Label: "important-label", Description: "important desc"},
+		},
+	}
+
+	// Simulate draw.io direction swap: old connector deleted, new one added with swapped endpoints.
+	cs := &ChangeSet{
+		DrawioRelationshipChanges: []RelationshipChange{
+			{From: "a", To: "b", Index: 0, Type: Deleted},
+			{From: "b", To: "a", Type: Added},
+		},
+	}
+
+	result := ApplyReverse(cs, m)
+
+	if len(m.Relationships) != 1 {
+		t.Fatalf("expected 1 relationship, got %d", len(m.Relationships))
+	}
+	rel := m.Relationships[0]
+	if rel.From != "b" || rel.To != "a" {
+		t.Errorf("expected from=b, to=a; got from=%s, to=%s", rel.From, rel.To)
+	}
+	if rel.Kind != "uses" {
+		t.Errorf("expected kind=uses, got %q", rel.Kind)
+	}
+	if rel.Label != "important-label" {
+		t.Errorf("expected label=important-label, got %q", rel.Label)
+	}
+	if rel.Description != "important desc" {
+		t.Errorf("expected description='important desc', got %q", rel.Description)
+	}
+	// Should be an update, not a delete+create.
+	if result.RelationshipsDeleted != 0 {
+		t.Errorf("expected RelationshipsDeleted=0 (swap, not delete), got %d", result.RelationshipsDeleted)
+	}
+	if result.RelationshipsUpdated != 1 {
+		t.Errorf("expected RelationshipsUpdated=1, got %d", result.RelationshipsUpdated)
+	}
+}
