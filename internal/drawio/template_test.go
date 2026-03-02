@@ -87,6 +87,39 @@ func TestGetStyle_UnknownKind(t *testing.T) {
 	}
 }
 
+func TestLoadTemplateFromBytes_InvalidXML(t *testing.T) {
+	data := []byte("this is not xml")
+	_, err := drawio.LoadTemplateFromBytes(data)
+	if err == nil {
+		t.Fatal("LoadTemplateFromBytes: expected error for non-XML input, got nil")
+	}
+}
+
+func TestLoadTemplate_InvalidXMLFile(t *testing.T) {
+	// Create a temp file with .drawio extension but invalid XML content.
+	tmpFile, err := os.CreateTemp(t.TempDir(), "bad-*.drawio")
+	if err != nil {
+		t.Fatalf("CreateTemp: %v", err)
+	}
+	if _, err := tmpFile.WriteString("this is not xml"); err != nil {
+		t.Fatalf("WriteString: %v", err)
+	}
+	_ = tmpFile.Close()
+
+	_, err = drawio.LoadTemplate(tmpFile.Name())
+	if err == nil {
+		t.Fatal("LoadTemplate: expected error for invalid XML template, got nil")
+	}
+}
+
+func TestLoadTemplateFromBytes_ValidXMLButNotDrawio(t *testing.T) {
+	data := []byte(`<?xml version="1.0" encoding="UTF-8"?><html><body>not drawio</body></html>`)
+	_, err := drawio.LoadTemplateFromBytes(data)
+	if err == nil {
+		t.Fatal("LoadTemplateFromBytes: expected error for non-drawio XML, got nil")
+	}
+}
+
 func TestLoadTemplateFromBytes(t *testing.T) {
 	data, err := os.ReadFile(defaultTemplatePath)
 	if err != nil {
