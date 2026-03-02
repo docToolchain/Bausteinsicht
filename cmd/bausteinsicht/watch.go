@@ -98,16 +98,35 @@ func doSync(changedFile, modelPath, drawioPath, templatePath string) {
 		return
 	}
 
+	// Load draw.io document. If the file is an empty mxfile (no diagram
+	// pages — e.g., after all views were removed), recreate it and reset
+	// sync state (#175).
+	var watchRecreated bool
 	doc, err := drawio.LoadDocument(drawioPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "ERROR loading draw.io file: %v\n", err)
-		return
+		if isEmptyMxfileError(err) {
+			fmt.Fprintln(os.Stderr, "WARNING: Draw.io file has no diagram pages, recreating structure")
+			doc = drawio.NewDocument()
+			watchRecreated = true
+		} else {
+			fmt.Fprintf(os.Stderr, "ERROR loading draw.io file: %v\n", err)
+			return
+		}
 	}
 
-	state, err := bsync.LoadState(statePath)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "ERROR loading sync state: %v\n", err)
-		return
+	var state *bsync.SyncState
+	if watchRecreated {
+		_ = os.Remove(statePath)
+		state = &bsync.SyncState{
+			Elements:      make(map[string]bsync.ElementState),
+			Relationships: []bsync.RelationshipState{},
+		}
+	} else {
+		state, err = bsync.LoadState(statePath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "ERROR loading sync state: %v\n", err)
+			return
+		}
 	}
 
 	var tmpl *drawio.TemplateSet

@@ -771,6 +771,110 @@ func TestSyncRecreatesDeletedDrawioFile(t *testing.T) {
 	})
 }
 
+// TestSyncRecoversEmptyMxfile verifies that when all views are removed from the
+// model (causing sync to remove all diagram pages, leaving an empty <mxfile>),
+// a subsequent sync with views added back recovers by recreating the drawio
+// structure instead of failing permanently. Regression test for #175.
+func TestSyncRecoversEmptyMxfile(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
+
+	// Init project.
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"init"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("init failed: %v", err)
+	}
+
+	// First sync to establish baseline state.
+	captureStdout(t, func() {
+		cmd2 := NewRootCmd()
+		cmd2.SetArgs([]string{"sync"})
+		if err := cmd2.Execute(); err != nil {
+			t.Fatalf("first sync failed: %v", err)
+		}
+	})
+
+	// Save the original model for later restoration.
+	originalModel, err := os.ReadFile("architecture.jsonc")
+	if err != nil {
+		t.Fatalf("reading original model: %v", err)
+	}
+
+	// Remove all views AND elements from the model.
+	m, err := model.Load("architecture.jsonc")
+	if err != nil {
+		t.Fatalf("load model: %v", err)
+	}
+	if len(m.Views) == 0 {
+		t.Skip("init template has no views; cannot test empty mxfile recovery")
+	}
+
+	m.Views = map[string]model.View{}
+	m.Model = map[string]model.Element{}
+	m.Relationships = nil
+	if err := model.Save("architecture.jsonc", m); err != nil {
+		t.Fatalf("save emptied model: %v", err)
+	}
+
+	// Sync with empty model — this removes all view pages, leaving empty mxfile.
+	captureStdout(t, func() {
+		cmd3 := NewRootCmd()
+		cmd3.SetArgs([]string{"sync"})
+		if err := cmd3.Execute(); err != nil {
+			t.Fatalf("sync with empty model failed: %v", err)
+		}
+	})
+
+	// Verify the drawio file is now an empty mxfile (no diagrams).
+	drawioData, err := os.ReadFile("architecture.drawio")
+	if err != nil {
+		t.Fatalf("reading drawio after empty sync: %v", err)
+	}
+	if strings.Contains(string(drawioData), "<diagram") {
+		t.Fatal("precondition: drawio should have no <diagram> elements after removing all views")
+	}
+
+	// Restore the original model with views and elements.
+	if err := os.WriteFile("architecture.jsonc", originalModel, 0644); err != nil {
+		t.Fatalf("restoring model: %v", err)
+	}
+
+	// Sync again — this should recover from the empty mxfile, NOT fail.
+	captureStdout(t, func() {
+		cmd4 := NewRootCmd()
+		cmd4.SetArgs([]string{"sync"})
+		if err := cmd4.Execute(); err != nil {
+			t.Fatalf("sync after restoring model failed (should recover empty mxfile): %v", err)
+		}
+	})
+
+	// Verify the drawio file was recovered and has content.
+	afterRecovery, err := os.ReadFile("architecture.drawio")
+	if err != nil {
+		t.Fatalf("reading drawio after recovery: %v", err)
+	}
+	if !strings.Contains(string(afterRecovery), "<diagram") {
+		t.Error("recovered drawio should contain <diagram> elements")
+	}
+	if !strings.Contains(string(afterRecovery), "Customer") {
+		t.Error("recovered drawio should contain model elements (e.g., Customer)")
+	}
+
+	// A subsequent sync should be a no-op.
+	captureStdout(t, func() {
+		cmd5 := NewRootCmd()
+		cmd5.SetArgs([]string{"sync"})
+		if err := cmd5.Execute(); err != nil {
+			t.Fatalf("follow-up sync after recovery failed: %v", err)
+		}
+	})
+}
+
 // TestSyncRecreatesDeletedDrawioFileWithCustomTemplate verifies that when the
 // draw.io file is deleted and a custom template path is specified, the file is
 // recreated using the custom template.
