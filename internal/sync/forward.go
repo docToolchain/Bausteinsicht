@@ -117,6 +117,9 @@ func applyForwardPerView(
 		scopeID := view.Scope
 		if scopeID != "" {
 			createScopeBoundary(scopeID, viewID, page, templates, flat, result)
+			// Include scope element in the filter so connectors targeting the
+			// boundary element are rendered (#217).
+			elemSet[scopeID] = true
 		}
 
 		applyChangesToPage(cs, page, templates, flat, elemSet, viewID, scopeID, result)
