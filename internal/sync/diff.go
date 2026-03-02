@@ -129,6 +129,16 @@ func extractDrawioElements(doc *drawio.Document) map[string]drawioElemSnapshot {
 	return result
 }
 
+// stripScopedPrefix removes the view prefix from a scoped cell ID.
+// Scoped cell IDs have the format "viewID--elemID" where "--" is the separator.
+// If the ID does not contain "--", it is returned unchanged (legacy documents).
+func stripScopedPrefix(cellID string) string {
+	if idx := strings.Index(cellID, "--"); idx >= 0 {
+		return cellID[idx+2:]
+	}
+	return cellID
+}
+
 // buildCellIDToElemID builds a mapping from draw.io cell IDs to bausteinsicht
 // element IDs. When views are used, cell IDs are scoped (e.g., "context--customer")
 // while element IDs are un-scoped (e.g., "customer").
@@ -163,14 +173,21 @@ func extractDrawioRelationships(doc *drawio.Document) map[string]RelationshipSta
 				continue
 			}
 			// Resolve scoped cell IDs to element IDs.
-			// Fall back to raw cell ID for legacy (non-view) documents.
+			// Fall back to stripping the view prefix from scoped cell IDs
+			// (e.g., "components--onlineshop.db" → "onlineshop.db") when
+			// the element was deleted and is no longer in cellToElem (#166).
+			// For legacy (non-view) documents the raw cell ID is used as-is.
 			from := fromCell
 			if elemID, ok := cellToElem[fromCell]; ok {
 				from = elemID
+			} else {
+				from = stripScopedPrefix(fromCell)
 			}
 			to := toCell
 			if elemID, ok := cellToElem[toCell]; ok {
 				to = elemID
+			} else {
+				to = stripScopedPrefix(toCell)
 			}
 			// Extract the relationship index from the connector ID.
 			cellID := cell.SelectAttrValue("id", "")
