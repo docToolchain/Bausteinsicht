@@ -1116,3 +1116,69 @@ func TestDetectChanges_SelfRefConnectorNotClassifiedAsLifted(t *testing.T) {
 			cs.DrawioRelationshipChanges)
 	}
 }
+
+func TestDetectChanges_ConnectorToNewUnmanagedElementUsesModelID(t *testing.T) {
+	// When a user draws both a new element AND a connector to it in the
+	// same draw.io session, the connector endpoint should resolve to the
+	// sanitized model ID (not the raw cell ID). See #211.
+	state := emptyState()
+	state.Elements["customer"] = ElementState{Title: "Customer", Kind: "system"}
+
+	m := &model.BausteinsichtModel{
+		Specification: model.Specification{
+			Elements: map[string]model.ElementKind{
+				"system": {Notation: "System"},
+			},
+		},
+		Model: map[string]model.Element{
+			"customer": {Kind: "system", Title: "Customer"},
+		},
+	}
+
+	doc := drawio.NewDocument()
+	page := doc.AddPage("view-ctx", "Context")
+	_ = page.CreateElement(drawio.ElementData{
+		ID: "customer", CellID: "ctx--customer", Kind: "system", Title: "Customer",
+	}, "")
+	// Add an unmanaged element (no bausteinsicht_id) — simulates user drawing a shape.
+	root := page.Root()
+	obj := root.CreateElement("object")
+	obj.CreateAttr("label", "Gateway")
+	obj.CreateAttr("id", "new-gw-elem")
+	cell := obj.CreateElement("mxCell")
+	cell.CreateAttr("style", "rounded=1;whiteSpace=wrap;html=1;")
+	cell.CreateAttr("vertex", "1")
+	cell.CreateAttr("parent", "1")
+	geo := cell.CreateElement("mxGeometry")
+	geo.CreateAttr("x", "400")
+	geo.CreateAttr("y", "200")
+	geo.CreateAttr("width", "160")
+	geo.CreateAttr("height", "70")
+	geo.CreateAttr("as", "geometry")
+
+	// Add connector from customer to the new unmanaged element.
+	page.CreateConnector(drawio.ConnectorData{
+		From:      "customer",
+		To:        "gateway", // won't matter — source/target use cell IDs
+		Label:     "routes",
+		SourceRef: "ctx--customer",
+		TargetRef: "new-gw-elem",
+	}, "")
+
+	cs := DetectChanges(m, doc, state, nil)
+
+	// The connector's target should resolve to "gateway" (sanitized from label),
+	// not "new-gw-elem" (raw cell ID).
+	found := false
+	for _, ch := range cs.DrawioRelationshipChanges {
+		if ch.Type == Added && ch.From == "customer" && ch.To == "gateway" {
+			found = true
+		}
+		if ch.Type == Added && ch.To == "new-gw-elem" {
+			t.Errorf("connector resolved to raw cell ID 'new-gw-elem' instead of sanitized model ID 'gateway'")
+		}
+	}
+	if !found {
+		t.Errorf("expected Added relationship customer→gateway, got: %+v", cs.DrawioRelationshipChanges)
+	}
+}
