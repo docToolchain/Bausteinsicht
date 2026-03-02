@@ -126,6 +126,28 @@ func validateViews(m *BausteinsichtModel) []ValidationError {
 				})
 			}
 		}
+		for _, entry := range view.Include {
+			if strings.Contains(entry, "*") {
+				continue
+			}
+			if _, err := lookupElement(m, entry); err != nil {
+				errs = append(errs, ValidationError{
+					Path:    path + ".include",
+					Message: fmt.Sprintf("element %q does not exist", entry),
+				})
+			}
+		}
+		for _, entry := range view.Exclude {
+			if strings.Contains(entry, "*") {
+				continue
+			}
+			if _, err := lookupElement(m, entry); err != nil {
+				errs = append(errs, ValidationError{
+					Path:    path + ".exclude",
+					Message: fmt.Sprintf("element %q does not exist", entry),
+				})
+			}
+		}
 	}
 	return errs
 }

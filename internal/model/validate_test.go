@@ -240,6 +240,70 @@ func TestValidate_EmptyChildID(t *testing.T) {
 	}
 }
 
+func TestValidate_ViewIncludeNonExistentElement(t *testing.T) {
+	m := buildValidModel()
+	m.Views["overview"] = View{
+		Title:   "Overview",
+		Include: []string{"nonexistent"},
+	}
+
+	errs := Validate(m)
+	if !containsPath(errs, "views.overview.include") {
+		t.Errorf("expected error at views.overview.include, got %v", errs)
+	}
+	if !containsMessage(errs, `element "nonexistent" does not exist`) {
+		t.Errorf("expected error message about element not existing, got %v", errs)
+	}
+}
+
+func TestValidate_ViewExcludeNonExistentElement(t *testing.T) {
+	m := buildValidModel()
+	m.Views["overview"] = View{
+		Title:   "Overview",
+		Include: []string{"customer"},
+		Exclude: []string{"nonexistent"},
+	}
+
+	errs := Validate(m)
+	if !containsPath(errs, "views.overview.exclude") {
+		t.Errorf("expected error at views.overview.exclude, got %v", errs)
+	}
+	if !containsMessage(errs, `element "nonexistent" does not exist`) {
+		t.Errorf("expected error message about element not existing, got %v", errs)
+	}
+}
+
+func TestValidate_ViewWildcardPatternsNoError(t *testing.T) {
+	m := buildValidModel()
+	m.Views["overview"] = View{
+		Title:   "Overview",
+		Include: []string{"*", "**", "foo.*"},
+		Exclude: []string{"bar.**"},
+	}
+
+	errs := Validate(m)
+	for _, e := range errs {
+		if strings.Contains(e.Path, "views.overview.include") || strings.Contains(e.Path, "views.overview.exclude") {
+			t.Errorf("wildcard patterns should not produce errors, got %v", e)
+		}
+	}
+}
+
+func TestValidate_ViewIncludeValidElement(t *testing.T) {
+	m := buildValidModel()
+	m.Views["overview"] = View{
+		Title:   "Overview",
+		Include: []string{"customer", "shop.api"},
+	}
+
+	errs := Validate(m)
+	for _, e := range errs {
+		if strings.Contains(e.Path, "views.overview.include") {
+			t.Errorf("valid element references should not produce errors, got %v", e)
+		}
+	}
+}
+
 // containsPath checks whether any error has the given path.
 func containsPath(errs []ValidationError, path string) bool {
 	for _, e := range errs {
