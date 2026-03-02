@@ -113,6 +113,30 @@ func TestOutputFileName(t *testing.T) {
 	}
 }
 
+// TestExportPage_ErrorWhenOutputMissing verifies that ExportPage returns an
+// error when the draw.io CLI exits successfully but the output file does not
+// exist (e.g., permission denied on output directory). (#195)
+func TestExportPage_ErrorWhenOutputMissing(t *testing.T) {
+	// Create a fake "draw.io" binary that exits 0 but writes nothing.
+	dir := t.TempDir()
+	fakeBin := filepath.Join(dir, "drawio-fake")
+	if err := os.WriteFile(fakeBin, []byte("#!/bin/sh\nexit 0\n"), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	outFile := filepath.Join(dir, "should-not-exist.png")
+
+	err := ExportPage(fakeBin, ExportOptions{
+		Format:     "png",
+		PageIndex:  1,
+		OutputPath: outFile,
+		InputFile:  "/dev/null",
+	})
+	if err == nil {
+		t.Error("expected error when output file not created, got nil")
+	}
+}
+
 func TestExportPage_Integration(t *testing.T) {
 	// Skip if draw.io CLI is not available.
 	if _, err := exec.LookPath("drawio-export"); err != nil {
