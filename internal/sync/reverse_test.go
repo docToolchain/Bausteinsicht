@@ -241,6 +241,35 @@ func TestApplyReverse_DeleteElementCleansViewIncludes(t *testing.T) {
 	}
 }
 
+func TestApplyReverse_EmptyTitleSkipped(t *testing.T) {
+	m := simpleModel("api", "Original Title", "", "")
+	cs := elemChangeSet("api", Modified, "title", "Original Title", "")
+
+	r := ApplyReverse(cs, m)
+
+	// Title should remain unchanged
+	if m.Model["api"].Title != "Original Title" {
+		t.Errorf("expected title to remain %q, got %q", "Original Title", m.Model["api"].Title)
+	}
+	// Should have a warning
+	if len(r.Warnings) == 0 {
+		t.Error("expected warning about empty title")
+	}
+	found := false
+	for _, w := range r.Warnings {
+		if strings.Contains(w, "empty title") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected warning containing 'empty title', got: %v", r.Warnings)
+	}
+	// Should NOT count as an update
+	if r.ElementsUpdated != 0 {
+		t.Errorf("expected 0 updates (skipped), got %d", r.ElementsUpdated)
+	}
+}
+
 func TestApplyReverse_RelationshipAdded(t *testing.T) {
 	m := emptyModel()
 	cs := relChangeSet("x", "y", Added, "", "", "uses")
