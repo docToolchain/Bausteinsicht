@@ -27,6 +27,9 @@ func Validate(m *BausteinsichtModel) []ValidationError {
 func validateElements(m *BausteinsichtModel) []ValidationError {
 	var errs []ValidationError
 	for id, elem := range m.Model {
+		if err := validateElementID(id); err != nil {
+			errs = append(errs, ValidationError{Path: "model." + id, Message: err.Error()})
+		}
 		errs = append(errs, validateElement(m, "model."+id, elem)...)
 	}
 	return errs
@@ -57,6 +60,9 @@ func validateElement(m *BausteinsichtModel, path string, elem Element) []Validat
 	}
 
 	for childID, child := range elem.Children {
+		if err := validateElementID(childID); err != nil {
+			errs = append(errs, ValidationError{Path: path + "." + childID, Message: err.Error()})
+		}
 		errs = append(errs, validateElement(m, path+"."+childID, child)...)
 	}
 
@@ -122,6 +128,14 @@ func validateViews(m *BausteinsichtModel) []ValidationError {
 		}
 	}
 	return errs
+}
+
+// validateElementID checks that an element ID is valid.
+func validateElementID(id string) error {
+	if strings.TrimSpace(id) == "" {
+		return fmt.Errorf("invalid element ID %q: must not be empty or whitespace", id)
+	}
+	return nil
 }
 
 // lookupElement resolves a dot-notation path to an Element within the model.
