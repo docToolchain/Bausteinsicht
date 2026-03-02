@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/docToolchain/Bauteinsicht/internal/drawio"
 	"github.com/docToolchain/Bauteinsicht/internal/model"
@@ -50,15 +51,21 @@ func runSync(cmd *cobra.Command, _ []string) error {
 		return exitWithCode(fmt.Errorf("loading model: %w", err), 2)
 	}
 
-	// Load draw.io document. If the file was deleted, recreate it from the
-	// template and reset sync state so the forward sync repopulates it (#149).
+	// Load draw.io document. If the file was deleted or is an empty mxfile
+	// (no diagram pages — e.g., after all views were removed), recreate it
+	// from the template and reset sync state so forward sync repopulates it
+	// (#149, #175).
 	var recreated bool
 	doc, err := drawio.LoadDocument(drawioPath)
 	if err != nil {
-		if !errors.Is(err, fs.ErrNotExist) {
+		if !errors.Is(err, fs.ErrNotExist) && !isEmptyMxfileError(err) {
 			return exitWithCode(fmt.Errorf("loading draw.io file: %w", err), 2)
 		}
-		_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "WARNING: Draw.io file not found, recreating from template")
+		if errors.Is(err, fs.ErrNotExist) {
+			_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "WARNING: Draw.io file not found, recreating from template")
+		} else {
+			_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "WARNING: Draw.io file has no diagram pages, recreating structure")
+		}
 		doc = drawio.NewDocument()
 		recreated = true
 	}
@@ -230,6 +237,13 @@ func saveModel(path string, m *model.BausteinsichtModel, result *bsync.SyncResul
 	}
 
 	return model.Save(path, m)
+}
+
+// isEmptyMxfileError returns true if the error indicates that the draw.io file
+// is a valid XML mxfile but contains no <diagram> elements. This happens when
+// all views are removed from the model and sync removes all diagram pages (#175).
+func isEmptyMxfileError(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "no <diagram> elements")
 }
 
 func printSyncSummary(s syncSummary) {
