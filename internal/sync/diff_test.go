@@ -957,3 +957,48 @@ func TestDetectChanges_TechnologyFromXMLAttribute(t *testing.T) {
 		t.Errorf("expected drawio technology change for 'customer', got changes: %+v", cs.DrawioElementChanges)
 	}
 }
+
+// TestExtractDrawioRelationships_IgnoresNavBackConnectors verifies that
+// connectors targeting navigation buttons (nav-back-*) are excluded from
+// relationship extraction to prevent phantom relationships (#205).
+func TestExtractDrawioRelationships_IgnoresNavBackConnectors(t *testing.T) {
+	doc := drawio.NewDocument()
+	doc.AddPage("view-ctx", "Context")
+	page := doc.GetPage("view-ctx")
+
+	// Create a managed element.
+	if err := page.CreateElement(drawio.ElementData{
+		ID: "svc", CellID: "ctx--svc",
+		Kind: "system", Title: "Service",
+	}, "shape=test;"); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a nav-back button (no bausteinsicht_id).
+	root := page.Root()
+	navObj := root.CreateElement("object")
+	navObj.CreateAttr("label", "&larr; Overview")
+	navObj.CreateAttr("id", "nav-back-ctx")
+	navObj.CreateAttr("link", "data:page/id,view-overview")
+	navCell := navObj.CreateElement("mxCell")
+	navCell.CreateAttr("style", "rounded=1;")
+	navCell.CreateAttr("vertex", "1")
+	navCell.CreateAttr("parent", "1")
+
+	// Create a connector from svc to the nav-back button.
+	conn := root.CreateElement("mxCell")
+	conn.CreateAttr("id", "user-edge-1")
+	conn.CreateAttr("edge", "1")
+	conn.CreateAttr("source", "ctx--svc")
+	conn.CreateAttr("target", "nav-back-ctx")
+	conn.CreateAttr("parent", "1")
+
+	rels := extractDrawioRelationships(doc)
+
+	// Should NOT contain any relationship targeting nav-back-ctx.
+	for key, rel := range rels {
+		if strings.Contains(rel.From, "nav-back") || strings.Contains(rel.To, "nav-back") {
+			t.Errorf("expected nav-back connector to be excluded, got relationship %q: %+v", key, rel)
+		}
+	}
+}
