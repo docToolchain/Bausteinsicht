@@ -1,0 +1,267 @@
+:jbake-title: Template Guide
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: Specification
+:jbake-order: 7
+
+ifndef::imagesdir[:imagesdir: ../../images]
+
+:toc:
+
+== Template Guide
+
+=== Overview
+
+Bausteinsicht uses a **template draw.io file** to define the visual appearance of elements and connectors. When new elements are created during forward sync, their style (color, shape, size) comes from this template.
+
+The template file is a regular `.drawio` file that you can open and edit in draw.io. It contains one sample shape for each element kind, plus a connector sample. Bausteinsicht identifies these samples via special `bausteinsicht_template` attributes.
+
+=== How It Works
+
+During forward sync, when Bausteinsicht needs to create a new element on the diagram:
+
+1. It looks up the element's `kind` (e.g., `"container"`)
+2. It searches the template file for an `<object>` with `bausteinsicht_template="container"`
+3. It copies the **style**, **width**, and **height** from the template shape
+4. It applies these to the new element on the diagram
+
+If no matching template is found, a default rectangle (160×70) is used and a warning is displayed.
+
+=== Template File Structure
+
+The template file (`template.drawio` by default) is created by `bausteinsicht init`. It contains:
+
+[cols="2,3"]
+|===
+| Template Type | Purpose
+
+| **Element templates** (`actor`, `system`, `container`, `component`)
+| Define the visual style for each element kind
+
+| **Boundary templates** (`system_boundary`, `container_boundary`)
+| Define the swimlane style when an element is used as a view scope
+
+| **Connector template** (`relationship`)
+| Defines the arrow/line style for all relationships
+|===
+
+=== Identifying Templates
+
+Templates are identified by the `bausteinsicht_template` attribute:
+
+**Element templates** use an `<object>` wrapper:
+[source,xml]
+----
+<object label="Container Name"
+        bausteinsicht_template="container">  <!--1-->
+  <mxCell style="rounded=1;fillColor=#438DD5;..." <!--2-->
+          vertex="1" parent="1">
+    <mxGeometry width="200" height="120" />   <!--3-->
+  </mxCell>
+</object>
+----
+<1> The `bausteinsicht_template` attribute must match the element kind name from your model's `specification.elements`
+<2> The `style` string is copied to new elements
+<3> The `width` and `height` are used as default dimensions
+
+**Boundary templates** follow the same pattern but with a `_boundary` suffix:
+[source,xml]
+----
+<object label="System Boundary"
+        bausteinsicht_template="system_boundary">
+  <mxCell style="swimlane;startSize=30;fillColor=#E8E8E8;..."
+          vertex="1" parent="1">
+    <mxGeometry width="400" height="250" />
+  </mxCell>
+</object>
+----
+
+**The connector template** is a bare `<mxCell>` (no `<object>` wrapper needed):
+[source,xml]
+----
+<mxCell bausteinsicht_template="relationship"
+        style="edgeStyle=orthogonalEdgeStyle;endArrow=block;..."
+        edge="1" parent="1">
+  <mxGeometry relative="1" as="geometry" />
+</mxCell>
+----
+
+=== Customizing the Template in draw.io
+
+==== Step 1: Open the Template File
+
+Open `template.drawio` in draw.io (desktop app or VS Code extension). You will see the template shapes arranged on a single page:
+
+* **Top row**: Element templates (Actor, System, Container, Component)
+* **Bottom row**: Boundary templates (swimlanes)
+* **Arrow**: Connector template linking two elements
+
+==== Step 2: Edit a Shape's Style
+
+To change an existing element's appearance:
+
+1. Click on the template shape you want to modify
+2. Use draw.io's formatting tools:
+   - **Fill color**: Right-click → Edit Style, or use the Format panel
+   - **Border**: Change `strokeColor` in the style
+   - **Font**: Change `fontSize`, `fontColor`
+   - **Shape**: Change the shape type (e.g., `shape=mxgraph.c4.person2` for the person icon)
+   - **Size**: Drag the handles to resize — the new width/height become the default for new elements
+3. Save the file
+
+IMPORTANT: Do **not** remove or rename the `bausteinsicht_template` attribute. Bausteinsicht reads this attribute to match templates to element kinds. If you edit the XML directly, keep `bausteinsicht_template="<kind>"` intact.
+
+==== Step 3: Edit the Connector Style
+
+1. Click on the arrow connecting two template elements
+2. Use draw.io's edge formatting:
+   - **Line style**: Straight, orthogonal, curved
+   - **Arrow head**: Block, open, diamond, etc.
+   - **Color**: Change `strokeColor`
+   - **Line width**: Add `strokeWidth=2` to style
+3. Save the file
+
+==== Example: Changing Container Color to Green
+
+In draw.io:
+
+1. Click the "Container Name" template shape
+2. In the Format panel, change Fill Color to `#2D8659`
+3. Change Font Color to `#FFFFFF`
+4. Save
+
+Or edit the XML directly (Right-click → Edit Style):
+[source]
+----
+rounded=1;whiteSpace=wrap;html=1;fillColor=#2D8659;fontColor=#ffffff;strokeColor=#1E5C3D;arcSize=5;fontSize=11;align=center;verticalAlign=middle;
+----
+
+After the next `bausteinsicht sync`, all **new** container elements will use the green style. Existing elements keep their current style.
+
+=== Adding a New Element Kind
+
+When you define a new element kind in your model's specification (e.g., `"database"`), you should also add a template for it.
+
+==== Step 1: Define the Kind in the Model
+
+[source,jsonc]
+----
+{
+  "specification": {
+    "elements": {
+      "database": {
+        "notation": "DB",
+        "description": "A database or data store"
+      }
+      // ... other kinds
+    }
+  }
+}
+----
+
+==== Step 2: Add the Template Shape
+
+Open `template.drawio` in draw.io and create a new shape:
+
+1. Draw a rectangle (or any shape) on the template page
+2. Style it as desired (color, border, size)
+3. Right-click → **Edit Data** (or Edit Metadata)
+4. Add a custom property: `bausteinsicht_template` = `database`
+5. Save
+
+Alternatively, edit the XML directly. Add inside `<root>`:
+[source,xml]
+----
+<object label="Database"
+        id="template-database"
+        bausteinsicht_template="database">
+  <mxCell style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#60A917;fontColor=#ffffff;strokeColor=#4B8412;size=12;fontSize=11;align=center;verticalAlign=middle;"
+          vertex="1" parent="1">
+    <mxGeometry x="0" y="0" width="120" height="100" as="geometry" />
+  </mxCell>
+</object>
+----
+
+==== Step 3: Add a Boundary Template (Optional)
+
+If the new kind can act as a container (has `"container": true` in the specification), add a boundary template too:
+
+[source,xml]
+----
+<object label="Database Boundary"
+        id="template-database-boundary"
+        bausteinsicht_template="database_boundary">
+  <mxCell style="swimlane;startSize=30;fillColor=#E8F5E9;strokeColor=#4B8412;fontColor=#4B8412;fontStyle=1;rounded=1;arcSize=5;whiteSpace=wrap;html=1;container=1;collapsible=0;fontSize=12;"
+          vertex="1" parent="1">
+    <mxGeometry x="0" y="0" width="400" height="250" as="geometry" />
+  </mxCell>
+</object>
+----
+
+The boundary template is used when this element is the `scope` of a view and renders as a swimlane.
+
+=== Fallback Behavior
+
+[cols="2,3"]
+|===
+| Situation | Behavior
+
+| Element kind has no matching template
+| A default rectangle (160×70 px, no style) is used. Warning: `no template style for kind: <kind>`
+
+| Boundary kind has no matching template
+| A default swimlane (400×300 px) is used. Warning: `no boundary template for kind: <kind>_boundary`
+
+| Connector has no template
+| A plain edge with default draw.io styling is used
+
+| Template shape has width/height of 0
+| Default dimensions are used (160×70 for elements, 400×300 for boundaries)
+|===
+
+=== What Gets Copied from the Template
+
+[cols="1,1,3"]
+|===
+| Property | Copied? | Notes
+
+| `style` string | Yes | The full mxCell style (colors, shape, borders, fonts, etc.)
+| `width` | Yes | Default width for new elements
+| `height` | Yes | Default height for new elements
+| `label` | No | Labels come from the model (title, technology, description)
+| Position (x, y) | No | New elements are placed by the layout algorithm
+| `id` | No | IDs are generated from the model element ID
+|===
+
+=== Template vs. Existing Elements
+
+Templates only affect **newly created** elements during forward sync. Changing a template does **not** retroactively restyle existing elements on the diagram.
+
+To restyle existing elements, either:
+
+1. Delete them from the draw.io file and re-sync (they will be recreated with the new template)
+2. Manually edit their style in draw.io (layout changes are preserved during sync)
+
+=== Using `--template` Flag
+
+By default, Bausteinsicht looks for the template file next to the model file (same directory, matching name pattern). You can override this:
+
+[source,bash]
+----
+bausteinsicht sync --template /path/to/custom-template.drawio
+----
+
+This is useful for:
+
+* Sharing a template across multiple projects
+* Switching between different visual themes
+* CI/CD pipelines with a centralized template
+
+=== Tips
+
+* **Keep the template file in version control** — it defines your project's visual language
+* **Use draw.io's "Edit Data" dialog** to set `bausteinsicht_template` — it's safer than editing XML
+* **Test changes** by adding a new element to your model and running `bausteinsicht sync`
+* **The template page is never shown in your architecture diagram** — it's only read during sync
+* **The `id` attribute on template shapes** (e.g., `template-actor`) is arbitrary and only needs to be unique within the template file
+* **New element marker**: New elements get a temporary red dashed border (`strokeColor=#FF0000;dashed=1`) on top of the template style, so you can spot them easily in draw.io

@@ -19,6 +19,12 @@ Bausteinsicht synchronizes bidirectionally between:
 
 The sync process reads both files, detects changes relative to a last-sync state, and applies non-conflicting changes in both directions.
 
+==== Validation Before Sync
+
+Before any sync cycle begins, the model is validated using `model.Validate()`.
+If validation errors are found (e.g., invalid view include/exclude patterns, dangling references), sync aborts with an error message listing all validation failures.
+This prevents silent data loss from typos such as a trailing dot in an element ID (`"customer."`) which would otherwise silently remove elements from draw.io (#176).
+
 === ID Mapping Strategy
 
 ==== Element IDs
@@ -28,8 +34,8 @@ Nested elements use dot notation: `webshop.api.auth`.
 
 In draw.io, the ID is stored in two places for reliability:
 
-1. **`id` attribute on `<object>`** — used by draw.io as the cell identifier
-2. **`bausteinsicht_id` attribute on `<object>`** — redundant copy that survives if draw.io reassigns cell IDs
+1. **`id` attribute on `<object>`** -- used by draw.io as the cell identifier
+2. **`bausteinsicht_id` attribute on `<object>`** -- redundant copy that survives if draw.io reassigns cell IDs
 
 [source,xml]
 ----
@@ -40,14 +46,31 @@ In draw.io, the ID is stored in two places for reliability:
 </object>
 ----
 
+When views are used, cell IDs are scoped to ensure file-wide uniqueness: `<viewID>--<elementID>` (e.g., `context--customer`).
+The `bausteinsicht_id` attribute always stores the un-scoped element ID.
+
+===== Duplicate bausteinsicht_id Handling
+
+When multiple `<object>` elements share the same `bausteinsicht_id` (e.g., across different view pages), the first occurrence encountered wins during draw.io element extraction.
+Duplicate occurrences are silently skipped (#213).
+
 ==== Relationship IDs
 
-Connector cells use a derived ID: `rel-<from>-<to>`.
+Connector cells use a derived ID: `rel-<from>-<to>-<index>` where `<index>` is the 0-based position of the relationship in the model's relationship array.
+The index disambiguates multiple relationships between the same element pair (#142).
 
 [source,xml]
 ----
-<mxCell id="rel-customer-webshop.api" value="uses"
+<mxCell id="rel-customer-webshop.api-0" value="uses"
         edge="1" source="customer" target="webshop.api" ... />
+----
+
+When multiple relationships exist between the same pair (e.g., `customer -> webshop.api` at indices 0 and 3), each gets a distinct connector ID:
+
+[source,xml]
+----
+<mxCell id="rel-customer-webshop.api-0" value="uses" ... />
+<mxCell id="rel-customer-webshop.api-3" value="manages" ... />
 ----
 
 ==== ID Matching Priority
@@ -60,7 +83,7 @@ During reverse sync, elements are matched in this order:
 
 === Sync Directions
 
-==== Forward Sync (Model → draw.io)
+==== Forward Sync (Model -> draw.io)
 
 Triggered when the JSON model changes.
 
@@ -69,10 +92,10 @@ Triggered when the JSON model changes.
 | Change Type | Action
 
 | New element
-| Create `<object>` + `<mxCell>` from template style. Set `bausteinsicht_id`, `bausteinsicht_kind`, `technology`, `tooltip`. Place side-by-side with a visual marker (e.g., red border). If element has a detail view, add `link="data:page/id,<view-id>"`.
+| Create `<object>` + `<mxCell>` from template style. Set `bausteinsicht_id`, `bausteinsicht_kind`, `technology`, `tooltip`. Place side-by-side with a visual marker (`strokeColor=#FF0000;dashed=1;`). If element has a detail view, add `link="data:page/id,view-<viewID>"` for drill-down navigation.
 
 | Updated element (title)
-| Update `label` attribute on `<object>` with new HTML-formatted title.
+| Update `label` attribute on `<object>` with new HTML-formatted title. Only the changed field is overwritten; other fields retain their current draw.io values.
 
 | Updated element (description)
 | Update `tooltip` attribute on `<object>`.
@@ -80,11 +103,14 @@ Triggered when the JSON model changes.
 | Updated element (technology)
 | Update `technology` attribute on `<object>` and the technology line in the HTML label.
 
+| Updated element (kind)
+| Update `bausteinsicht_kind` attribute and apply the new kind's template style.
+
 | Deleted element
-| Remove `<object>` and all connectors where `source` or `target` matches the element ID.
+| Remove `<object>` and all connectors where `source` or `target` matches the element's cell ID.
 
 | New relationship
-| Create `<mxCell>` with `edge="1"`, `source`, `target`, and label. Use `id="rel-<from>-<to>"`. No `exitX`/`entryX` (auto-routing). Use `parent="1"` (layer, not container).
+| Create `<mxCell>` with `edge="1"`, `source`, `target`, and label. Use `id="rel-<from>-<to>-<index>"`. No `exitX`/`entryX` (auto-routing). Use `parent="1"` (layer, not container).
 
 | Updated relationship (label)
 | Update `value` attribute on the connector `<mxCell>`.
@@ -93,20 +119,23 @@ Triggered when the JSON model changes.
 | Remove the connector `<mxCell>`.
 
 | New view
-| Create new `<diagram>` element with view ID and title. Generate all included elements and relationships. Add back-navigation button if parent view exists.
+| Create new `<diagram>` element with `id="view-<viewID>"` and view title. Populate all resolved elements and relationships. Add back-navigation button if the view has a scope and a parent view exists.
+
+| Deleted view
+| Remove the orphaned `<diagram>` page from the draw.io document (#143).
 |===
 
-==== Reverse Sync (draw.io → Model)
+==== Reverse Sync (draw.io -> Model)
 
 Triggered when the draw.io file changes.
 
-[cols="1,3"]
+[cols="1,3,2"]
 |===
 | Change Type | Detection Method | Action
 
 | Element renamed
 | `label` on `<object>` differs from model `title` (parse HTML label to extract title)
-| Update model element title
+| Update model element title. Empty titles are rejected (#150).
 
 | Element description changed
 | `tooltip` on `<object>` differs from model `description`
@@ -117,41 +146,134 @@ Triggered when the draw.io file changes.
 | Update model element technology
 
 | New element (from draw.io)
-| `<object>` or `<mxCell>` with `vertex="1"` and no `bausteinsicht_id`
-| Add to model with auto-generated ID based on label. Warn user to assign meaningful ID. Detect kind from style or container parent.
+| `<object>` wrapping a vertex `<mxCell>` with no `bausteinsicht_id` and a non-empty label
+| Generate ID via `sanitizeID` (lowercase, hyphen-separated from title). Default kind = first alphabetically-sorted kind from `specification.elements` (#206). Collision guard: skip import if generated ID already exists in the model (#203). Navigation buttons (`nav-back-*`) are excluded from import (#205). Bare `<mxCell>` elements without an `<object>` wrapper are excluded.
 
 | New relationship (from draw.io)
 | `<mxCell>` with `edge="1"`, `source` and `target` matching known element IDs, not present in model
-| Add relationship to model with label from `value` attribute.
+| Add relationship to model. Connector label captured from `value` attribute (#204).
 
 | Element deleted in draw.io
-| Known `bausteinsicht_id` no longer present in any `<object>`
-| Remove from model. Display warning listing removed elements.
+| Known `bausteinsicht_id` no longer present in any `<object>` on visible view pages
+| Remove from model. Clean stale references from view include/exclude lists. Display warning listing removed elements.
 
 | Relationship deleted in draw.io
-| Connector with known `source`/`target` pair no longer present
+| Connector with known `source`/`target` pair no longer present on any visible view page
 | Remove relationship from model.
+
+| Relationship direction swap
+| Deleted(a->b) paired with Added(b->a) detected in draw.io changes
+| Update the existing relationship in-place (swap `from`/`to`), preserving kind, label, and description (#185).
 
 | Element moved (position only)
 | `<mxGeometry>` x/y/width/height changed but no metadata changed
 | **No model change.** Layout is a draw.io concern.
 |===
 
-==== Label Parsing (Reverse Sync)
+==== Label Format
 
 HTML labels follow a predictable format generated by forward sync:
 
 [source,html]
 ----
-<b>Title</b><br><font color="#666666">Technology</font>
+<b>Title</b><br><font color="#666666">[Technology]</font><br><font color="#999999">Description</font>
+----
+
+* **Title**: bold text, always present.
+* **Technology**: wrapped in square brackets per C4 convention, displayed in `#666666` (gray). Omitted if technology is empty.
+* **Description**: displayed in `#999999` (lighter gray). Omitted if description is empty.
+
+Examples with varying fields present:
+
+[source,html]
+----
+<!-- Title only -->
+<b>REST API</b>
+
+<!-- Title + Technology -->
+<b>REST API</b><br><font color="#666666">[Spring Boot]</font>
+
+<!-- Title + Technology + Description -->
+<b>REST API</b><br><font color="#666666">[Spring Boot]</font><br><font color="#999999">Handles all HTTP requests</font>
+
+<!-- Title + Description (no technology) -->
+<b>REST API</b><br><font color="#999999">Handles all HTTP requests</font>
 ----
 
 During reverse sync, the parser extracts:
 
-* **Title**: text content of the first `<b>` element
-* **Technology**: text content of the `<font>` element (if present)
+* **Title**: text content of the `<b>` element
+* **Technology**: text content of the first `<font>` element with `color="#666666"` (brackets stripped)
+* **Description**: text content of the `<font>` element with `color="#999999"`
 
-If the label does not match this pattern (user manually formatted), fall back to the full label text as title.
+If the label does not match this pattern (user manually formatted), fall back to the full text (tags stripped) as title.
+
+===== Empty Title Rejection
+
+Reverse sync rejects empty title updates from draw.io.
+If a user clears the label in draw.io, the update is ignored and a warning is emitted (#150).
+
+=== Scope Boundary Handling
+
+When a view defines a `scope` element, the scope element is rendered as a boundary/swimlane on the view page.
+
+==== Boundary Creation
+
+1. Look up the scope element's kind in the model (e.g., `system`)
+2. Derive the boundary kind by appending `_boundary` (e.g., `system_boundary`)
+3. Look up the boundary template style in the template set
+4. Create the boundary element with the scope element's title, technology, and description
+5. The scope element is included in the view's element filter so that connectors targeting the boundary element are rendered correctly (#217)
+
+==== Child Parenting
+
+Children of the scope element (identified by dot-notation prefix, e.g., `shop.api` is a child of `shop`) are parented to the scope boundary cell.
+Their `parent` attribute on `<mxCell>` is set to the scoped cell ID of the boundary, so they appear visually inside the swimlane.
+Child coordinates are relative to the boundary's top-left.
+
+=== Drill-Down Navigation
+
+Elements that have a detail view (a view whose `scope` matches the element) receive interactive drill-down navigation.
+
+==== Forward Link
+
+On any view page where the element appears, the `link` attribute is set to `data:page/id,view-<viewID>`.
+Clicking the element in draw.io navigates to its detail view (#198).
+
+==== Back-Navigation Button
+
+Detail views (views with a `scope`) get a back-navigation button that links to the parent view.
+The parent view is identified as any view whose resolved element set includes the scope element.
+
+The button is an `<object>` with:
+
+* `id="nav-back-<viewID>"`
+* `label="&larr; <parentViewTitle>"`
+* `link="data:page/id,view-<parentViewID>"`
+* A small rounded rectangle at position (20, 20) with `width=140`, `height=30`
+
+Back-navigation buttons are excluded from reverse sync element import (#205).
+
+=== Lifted Connector Deduplication
+
+When a view does not include an endpoint of a relationship, the endpoint is "lifted" to the nearest visible ancestor in the element hierarchy.
+For example, if the model has a relationship `shop.api -> db` but only `shop` and `db` are on the view, the connector is lifted to `shop -> db`.
+
+==== Self-Referencing Relationships
+
+True self-loops (where `from == to` in the model) are rendered as connectors.
+However, when lifting causes both endpoints to collapse to the same element (e.g., `shop.api -> shop.db` lifted to `shop -> shop`), the resulting self-reference is skipped because it does not represent a meaningful relationship at the view's abstraction level (#111, #212).
+
+==== Two-Pass Deduplication
+
+Relationships are processed in two passes to ensure correct deduplication (#197):
+
+1. **Pass 1 -- Direct relationships**: Only non-lifted relationships are processed. Each direct relationship records its `from->to` pair in a seen-set.
+2. **Pass 2 -- Lifted relationships**: Only lifted relationships are processed. A lifted relationship is skipped if:
+** Its `from->to` pair already exists from a direct relationship in Pass 1 (direct suppresses lifted).
+** Its `from->to` pair already exists from another lifted relationship (first lifted wins, duplicates deduplicated).
+
+This ensures that when a direct relationship (e.g., `api->db`) and a lifted relationship (e.g., `api.catalog->db` lifted to `api->db`) map to the same pair, only one connector is created with the direct relationship's label (#142, #197).
 
 === Placement Strategy for New Elements
 
@@ -159,8 +281,8 @@ New elements from forward sync are placed using a simple side-by-side algorithm:
 
 1. Find the bounding box of all existing elements on the page
 2. Place new elements in a row below the existing content
-3. Use a fixed spacing (e.g., 40px horizontal gap, 40px below existing)
-4. Set a visual marker on new elements (e.g., red dashed border via style `strokeColor=#FF0000;dashed=1;`)
+3. Use a fixed spacing (40px horizontal gap, 40px below existing)
+4. Set a visual marker on new elements (`strokeColor=#FF0000;dashed=1;`)
 
 New elements from reverse sync (added in draw.io) keep their draw.io position.
 
@@ -183,13 +305,40 @@ When detecting containment from draw.io:
 2. Map the parent-child relationship to the model hierarchy
 3. If a new element is placed inside a container in draw.io, add it as a child of that container in the model
 
+=== View Reconciliation
+
+After forward sync applies element and relationship changes, a reconciliation step removes elements from a view page that are no longer in the view's resolved element set.
+This handles cases where view include/exclude rules change without corresponding model element changes (#102).
+
+==== Reconciliation Rules
+
+* Elements with a `bausteinsicht_id` that is not in the view's resolved set are removed along with their connectors.
+* The scope boundary element is excluded from reconciliation (handled separately).
+* Elements without a `bausteinsicht_id` (user-added shapes in draw.io) are preserved -- they are not subject to view filtering (#115).
+* In no-views mode, orphaned elements (whose `bausteinsicht_id` is not in the model at all) are removed (#110).
+
+=== Orphaned View Page Removal
+
+When views are deleted from the model, their corresponding draw.io `<diagram>` pages are removed.
+Pages are identified as view-managed if their `id` starts with the `"view-"` prefix.
+Non-view pages (e.g., default template pages without the prefix) are preserved (#143).
+
+=== New Page Population
+
+When a new view is added to the model, forward sync creates the `<diagram>` page and populates it with all elements from the view's resolved set.
+This is necessary because elements that already exist in the sync state are not emitted as "Added" in the ChangeSet -- they are only detected as changes relative to the last-sync state.
+
+The population step iterates over the resolved element set and creates any element not already present on the page.
+The scope boundary element is excluded (handled by `createScopeBoundary` separately).
+Elements expected only on newly created pages are excluded from draw.io-side deletion detection to prevent false "deleted from draw.io" changes (#184, #188, #189).
+
 === Conflict Detection
 
 ==== Last-Sync State File
 
 A `.bausteinsicht-sync` file stores the state after each successful sync:
 
-[source,jsonc]
+[source,json]
 ----
 {
   "timestamp": "2026-02-28T12:00:00Z",
@@ -199,16 +348,62 @@ A `.bausteinsicht-sync` file stores the state after each successful sync:
     "webshop.api": {
       "title": "REST API",
       "description": "Handles all HTTP requests",
-      "technology": "Spring Boot"
+      "technology": "Spring Boot",
+      "kind": "container"
     }
-    // ... all synced element states
   },
   "relationships": [
-    { "from": "customer", "to": "webshop.api", "label": "uses" }
-    // ... all synced relationships
+    {
+      "from": "customer",
+      "to": "webshop.api",
+      "index": 0,
+      "label": "uses",
+      "kind": "sync"
+    }
   ]
 }
 ----
+
+===== ElementState Fields
+
+[cols="1,3"]
+|===
+| Field | Description
+
+| `title`
+| Element title (always present)
+
+| `description`
+| Element description (omitted if empty)
+
+| `technology`
+| Technology label (omitted if empty)
+
+| `kind`
+| Element kind from the specification (e.g., `"container"`, `"system"`)
+|===
+
+===== RelationshipState Fields
+
+[cols="1,3"]
+|===
+| Field | Description
+
+| `from`
+| Source element ID
+
+| `to`
+| Target element ID
+
+| `index`
+| 0-based position in the model's relationship array (for disambiguation)
+
+| `label`
+| Relationship label (omitted if empty)
+
+| `kind`
+| Relationship kind (omitted if empty)
+|===
 
 This file should be committed to version control alongside the model and draw.io files.
 
@@ -232,10 +427,23 @@ WARNING: Conflict detected for element "webshop.api":
   Model value:   "REST API v2"
   draw.io value: "Backend API"
   Last sync:     "REST API"
-  → Keeping model value. Edit draw.io manually if needed.
+  -> Keeping model value. Edit draw.io manually if needed.
 ----
 
 In v1, the model value wins on conflict. This is the safer default since the JSON model is the declared source of truth for structure.
+
+=== JSONC Comment Preservation
+
+When reverse sync writes changes back to the model file, a `PatchSave` approach is used to preserve JSONC comments, formatting, and key ordering.
+
+==== PatchSave Approach
+
+For simple field value changes (title, description, technology), `PatchSave` locates the target value in the raw JSONC text by walking the JSON path and replaces only the value bytes.
+The rest of the document -- including `//` single-line comments, `/* */` block comments, whitespace, and key ordering -- is preserved.
+
+For structural changes (new elements, new relationships), `InsertObjectEntry` and `AppendArrayEntry` are used to insert new JSON entries before the closing `}` or `]` of the target container, preserving surrounding comments and detecting indentation from context.
+
+When structural changes cannot be applied via patching (e.g., element deletion), a full `Save` is used which re-serializes the model and does not preserve comments.
 
 === Sync Algorithm
 
@@ -243,6 +451,9 @@ In v1, the model value wins on conflict. This is the safer default since the JSO
 ....
 @startuml
 start
+:Validate JSON model;
+note right: Abort on errors (#176)
+
 :Read JSON model;
 :Read draw.io XML (uncompressed);
 :Read .bausteinsicht-sync state;
@@ -259,10 +470,10 @@ partition "Parse draw.io" {
 partition "Detect Changes" {
   :Compare model elements
   to last-sync state
-  → model changes (added/modified/deleted);
+  -> model changes (added/modified/deleted);
   :Compare draw.io elements
   to last-sync state
-  → drawio changes (added/modified/deleted);
+  -> drawio changes (added/modified/deleted);
   :Identify conflicts
   (same element changed in both);
 }
@@ -274,26 +485,38 @@ else (no)
 endif
 
 partition "Apply Forward Sync" {
+  :Remove orphaned view pages (#143);
+  :Create scope boundaries for views with scope;
   :Add new model elements to draw.io
   (from template, side-by-side);
   :Update modified elements in draw.io
-  (label, tooltip, technology);
+  (label, tooltip, technology, kind);
   :Remove deleted elements from draw.io
   (and their connectors);
-  :Add/update/remove connectors;
+  :Add/update/remove connectors
+  (two-pass: direct then lifted);
+  :Populate new view pages with
+  all resolved elements (#184);
+  :Reconcile view pages:
+  remove elements not in resolved set (#102);
+  :Apply drill-down links (#198);
+  :Create back-navigation buttons (#198);
 }
 
 partition "Apply Reverse Sync" {
+  :Detect direction-swap pairs (#185);
   :Add new draw.io elements to model
-  (generate ID, warn user);
+  (sanitizeID, collision guard);
   :Update modified elements in model
   (title, description, technology);
   :Remove deleted elements from model
-  (with warning);
+  (with warning, clean view references);
   :Add/update/remove relationships;
+  :Apply direction swaps in-place;
 }
 
-:Write updated JSON model;
+:Write updated JSON model
+(PatchSave for field changes);
 :Write updated draw.io XML;
 :Write new .bausteinsicht-sync state;
 :Display summary of all changes;
@@ -352,7 +575,7 @@ NOTE: Unlike element templates which use `<object>` wrappers, the connector temp
 ==== Element appears in multiple views
 
 The same element ID may appear in multiple `<diagram>` pages.
-Each page has its own `<object>` with independent position.
+Each page has its own `<object>` with independent position and a scoped cell ID (`<viewID>--<elementID>`).
 Changes to metadata (title, description) in one view propagate to all views during sync.
 
 ==== Orphaned connectors

@@ -234,18 +234,50 @@ Nested elements are referenced using dot notation: `"webshop.api.auth"`.
 | `include`
 | string[]
 | no
-| Element IDs to include (supports `*` wildcard for children)
+| Element IDs to include (supports wildcard patterns, see <<Wildcard Patterns>>)
 
 | `exclude`
 | string[]
 | no
-| Element IDs to exclude from the view
+| Element IDs to exclude from the view (supports wildcard patterns, see <<Wildcard Patterns>>)
 
 | `description`
 | string
 | no
 | View description
 |===
+
+[[Wildcard Patterns]]
+==== Wildcard Patterns
+
+The `include` and `exclude` arrays support the following patterns for matching elements:
+
+[cols="1,3"]
+|===
+| Pattern | Description
+
+| `"id"`
+| Exact match — includes only the element with the given ID
+
+| `"*"`
+| All top-level elements only (IDs without dots)
+
+| `"**"`
+| All elements at all levels (entire model)
+
+| `"prefix.*"`
+| Direct children of `prefix` (one level deep, e.g., `"webshop.*"` matches `webshop.api` and `webshop.db` but not `webshop.api.auth`)
+
+| `"prefix.**"`
+| All descendants of `prefix` (recursive, e.g., `"webshop.**"` matches `webshop.api`, `webshop.db`, and `webshop.api.auth`)
+|===
+
+==== JSONC Comment Support
+
+Model files use the JSONC (JSON with Comments) format. Both comment styles are supported:
+
+* `//` — single-line comments
+* `/\* ... */` — block comments (can span multiple lines)
 
 === draw.io XML Structure
 
@@ -292,7 +324,7 @@ The nested `<mxCell>` has no `id` — the `<object>` owns the ID.
 
 [source,xml]
 ----
-<object label="&lt;b&gt;REST API&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;Spring Boot&lt;/font&gt;"
+<object label="&lt;b&gt;REST API&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;[Spring Boot]&lt;/font&gt;&lt;br&gt;&lt;font color=&quot;#999999&quot;&gt;Handles all HTTP requests&lt;/font&gt;"
         id="containers--webshop.api"
         bausteinsicht_id="webshop.api"
         bausteinsicht_kind="container"
@@ -337,15 +369,28 @@ Custom properties on `<object>`:
 
 ==== HTML Labels
 
-Labels use HTML formatting with `html=1` in the style. HTML is XML-entity-escaped in the `label` attribute:
+Labels use HTML formatting with `html=1` in the style. HTML is XML-entity-escaped in the `label` attribute.
+
+The label format has up to three lines:
+
+. **Title** — bold (`<b>Title</b>`)
+. **Technology** — grey `#666666`, wrapped in square brackets (`<font color="#666666">[Technology]</font>`)
+. **Description** — lighter grey `#999999` (`<font color="#999999">Description</font>`)
+
+Lines are separated by `<br>`. Empty technology or description lines are omitted.
 
 [cols="1,1"]
 |===
 | Displayed | Stored as
 
 | **REST API** +
-Spring Boot (grey)
-| `&lt;b&gt;REST API&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;Spring Boot&lt;/font&gt;`
+[Spring Boot] (grey) +
+Handles all HTTP requests (lighter grey)
+| `&lt;b&gt;REST API&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;[Spring Boot]&lt;/font&gt;&lt;br&gt;&lt;font color=&quot;#999999&quot;&gt;Handles all HTTP requests&lt;/font&gt;`
+
+| **Customer** +
+End user (lighter grey, no technology)
+| `&lt;b&gt;Customer&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#999999&quot;&gt;End user&lt;/font&gt;`
 |===
 
 Entity escaping rules:
@@ -381,7 +426,7 @@ Child coordinates are **relative** to the container's top-left corner (below the
 </object>
 
 <!-- Child element — parent references the container -->
-<object label="&lt;b&gt;REST API&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;Spring Boot&lt;/font&gt;"
+<object label="&lt;b&gt;REST API&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;[Spring Boot]&lt;/font&gt;&lt;br&gt;&lt;font color=&quot;#999999&quot;&gt;Handles all HTTP requests&lt;/font&gt;"
         id="containers--webshop.api"
         bausteinsicht_id="webshop.api"
         bausteinsicht_kind="container"
@@ -402,7 +447,7 @@ Connectors always use `parent="1"` (the layer), even when connecting shapes insi
 
 [source,xml]
 ----
-<mxCell id="rel-containers--customer-containers--webshop.api"
+<mxCell id="rel-containers--customer-containers--webshop.api-0"
         value="uses"
         style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;
                endArrow=block;endFill=1;strokeColor=#666666;"
@@ -418,7 +463,7 @@ Connectors always use `parent="1"` (the layer), even when connecting shapes insi
 
 By **omitting** `exitX`/`exitY`/`entryX`/`entryY` style properties, draw.io auto-routes connectors from the nearest perimeter point. This ensures connectors look correct when elements are moved by the user.
 
-**Connector ID convention:** `rel-<scopedSource>-<scopedTarget>` where scoped IDs use the `<viewID>--<elementID>` format (e.g., `rel-containers--customer-containers--webshop.api`).
+**Connector ID convention:** `rel-<scopedSource>-<scopedTarget>-<index>` where scoped IDs use the `<viewID>--<elementID>` format and `<index>` is a zero-based integer for disambiguation when multiple relationships exist between the same pair (e.g., `rel-containers--customer-containers--webshop.api-0`).
 
 ==== Cross-Page Navigation (Drill-Down)
 
@@ -454,7 +499,7 @@ Back-navigation buttons are generated in detail views:
 
 ==== Multi-Page Structure
 
-Each view is a separate `<diagram>` element. The `id` attribute is the view key from the model.
+Each view is a separate `<diagram>` element. The `id` attribute uses the format `view-<viewKey>` (e.g., `view-context` for a view with key `"context"`).
 The `name` attribute is the view title displayed as the tab label.
 
 [source,xml]

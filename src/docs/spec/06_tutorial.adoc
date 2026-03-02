@@ -209,6 +209,13 @@ bausteinsicht sync --format json
 
 This makes Bausteinsicht ideal for AI-assisted architecture work — an LLM can modify the model via CLI commands without parsing JSON directly.
 
+=== Next Steps
+
+* **Customize the template** — Edit `template.drawio` in draw.io to change colors, shapes, and sizes for your element kinds. See the link:07_template_guide.html[Template Guide] for details.
+* **Add custom element kinds** — Define new kinds in `specification.elements` and add matching template shapes.
+* **Set up watch mode** — Use `bausteinsicht watch` during development for automatic sync on every save.
+* **Export diagrams** — Use `bausteinsicht export` to generate PNG/SVG images for documentation.
+
 === Command Reference
 
 [cols="2,3"]
@@ -232,6 +239,9 @@ This makes Bausteinsicht ideal for AI-assisted architecture work — an LLM can 
 
 | `bausteinsicht add relationship`
 | Add relationship to model (flags: `--from`, `--to`, `--label`, `--kind`, `--description`)
+
+| `bausteinsicht export`
+| Export diagram views as PNG or SVG images (flags: `--image-format` png/svg, `--view`, `--output`, `--embed-diagram`)
 |===
 
 === Global Flags
@@ -251,7 +261,6 @@ This makes Bausteinsicht ideal for AI-assisted architecture work — an LLM can 
 
 | `--verbose`
 | Enable debug output
-
-| `--version`
-| Show version number
 |===
+
+NOTE: The `--version` flag is only available on the root command (`bausteinsicht --version`), not on subcommands.

@@ -8,7 +8,7 @@
 
 == Status
 
-Proposed
+Accepted
 
 == Context
 
@@ -42,7 +42,12 @@ A JSON Schema defines the structure and enables automatic validation and IDE sup
 {
   // Bausteinsicht architecture model
   "specification": {
-    "elements": ["actor", "system", "container", "component"]
+    "elements": {
+      "actor": { "notation": "Actor", "description": "A person or external system" },
+      "system": { "notation": "Software System", "description": "A top-level system", "container": true },
+      "container": { "notation": "Container", "description": "A deployable unit", "container": true },
+      "component": { "notation": "Component", "description": "A logical grouping", "container": true }
+    }
   },
   "model": {
     "customer": {

@@ -50,6 +50,8 @@ with standard element kinds
 with sample elements;
 :Bausteinsicht creates default template
 (.drawio file with styled reference elements);
+:Bausteinsicht creates **.bausteinsicht-sync** state file
+to track sync state between model and draw.io;
 :Architect opens model file in IDE;
 :IDE provides autocompletion
 via JSON Schema;
@@ -60,6 +62,7 @@ stop
 ==== Postconditions
 * A valid JSON model file exists with specification and example content
 * A default draw.io template file exists
+* A `.bausteinsicht-sync` state file exists for change tracking
 * JSON Schema is referenced for IDE support
 
 ==== Error Scenarios
@@ -124,7 +127,8 @@ start
 :Architect runs **bausteinsicht sync**;
 :Bausteinsicht reads JSON model;
 :Bausteinsicht validates model
-against JSON Schema;
+against JSON Schema and
+semantic rules (#176);
 if (Validation errors?) then (yes)
   :Display errors and abort;
   stop
@@ -132,7 +136,10 @@ else (no)
 endif
 :Bausteinsicht reads template
 for element styling;
-if (draw.io file exists?) then (yes)
+if (draw.io file missing or empty?) then (yes)
+  :Recreate draw.io file from template (#149);
+  :Place all elements side-by-side;
+elseif (draw.io file exists?) then (yes)
   :Read existing draw.io XML;
   :Match elements by ID;
   :Update changed descriptions/titles;
@@ -140,9 +147,6 @@ if (draw.io file exists?) then (yes)
   with visual marker;
   :Remove deleted elements;
   :Preserve layout of existing elements;
-else (no)
-  :Create new draw.io file;
-  :Place all elements side-by-side;
 endif
 :Add/update relationship connectors
 (centered attachment);
@@ -159,8 +163,9 @@ stop
 * Relationship connectors are attached to element centers
 
 ==== Error Scenarios
-* Invalid model → validation errors displayed, sync aborted
+* Invalid model → validation errors displayed, sync aborted (includes semantic validation)
 * Template file missing → error with instructions to create one
+* draw.io file missing or empty → automatically recreated from template (#149)
 * draw.io file locked by another process → warning
 
 === UC-4: Edit in draw.io and Reverse Sync
@@ -196,15 +201,25 @@ end note
 :Match elements by ID;
 
 partition "For each element in draw.io" {
-  if (Element has Bausteinsicht ID?) then (yes)
+  if (Element is a navigation button\n  (nav-back-*)?) then (yes)
+    :Skip — excluded from detection (#205);
+  elseif (Element has Bausteinsicht ID?) then (yes)
     if (Title/description changed?) then (yes)
       :Update model element;
     else (no)
     endif
   else (no)
     :New element detected;
-    :Add to model with generated ID;
-    :Warn user to assign proper ID;
+    :Generate ID from label via sanitization
+    (lowercase, hyphen-separated) (#206);
+    if (Generated ID already exists\n    in model?) then (yes)
+      :Skip import with warning (#203);
+    else (no)
+      :Add to model with sanitized ID;
+      :Assign default kind = first
+      alphabetically-sorted kind
+      from specification (#206);
+    endif
   endif
 }
 
@@ -227,11 +242,15 @@ stop
 
 ==== Postconditions
 * Model reflects changes made in draw.io
-* New elements have IDs (generated or user-assigned)
+* New elements have IDs derived from their label (sanitized: lowercase, hyphen-separated)
+* New elements are assigned the first alphabetically-sorted kind from the specification
+* Elements with colliding IDs are skipped with a warning
+* Navigation buttons (nav-back-*) are ignored during reverse sync
 * Layout changes (element positions) do NOT modify the model
 
 ==== Error Scenarios
 * Element in draw.io has no ID and cannot be auto-matched → warning with manual resolution instructions
+* Generated ID collides with existing element → import skipped with warning (#203)
 * Conflicting changes in both model and draw.io → warning displayed, no silent overwrite
 
 === UC-5: Watch Mode
@@ -368,3 +387,61 @@ stop
 
 ==== Error Scenarios
 * Target view does not exist → element is not clickable (no link generated)
+
+=== UC-8: Export Diagram Views
+
+==== Description
+A developer or CI pipeline exports diagram views as PNG or SVG images for use in documentation or reports.
+
+==== Actors
+* Developer
+* CI pipeline
+
+==== Preconditions
+* A synced architecture model exists with at least one view
+* draw.io CLI is available (headless via `xvfb-run` in CI environments)
+
+==== Flow
+
+[plantuml, uc08-export, png]
+....
+@startuml
+start
+:User runs **bausteinsicht export**;
+note right
+  Options:
+  * --image-format png|svg (default: png)
+  * --view <name> (filter specific view)
+  * --output <directory> (output path)
+end note
+:Bausteinsicht reads model to
+determine available views;
+if (--view filter specified?) then (yes)
+  if (View exists?) then (yes)
+    :Select matching view;
+  else (no)
+    :Display error "view not found";
+    :Exit with code 2;
+    stop
+  endif
+else (no)
+  :Select all views;
+endif
+:For each selected view,
+invoke draw.io CLI to render
+page as image;
+:Write image files to output directory;
+:Display export summary;
+stop
+@enduml
+....
+
+==== Postconditions
+* Image files (PNG or SVG) exist for each exported view
+* File names correspond to view names
+* Exit code is 0 on success
+
+==== Error Scenarios
+* View name not found → exit code 2, error message mentions "view not found"
+* draw.io CLI not available → error with installation instructions
+* Output directory not writable → error with path information
