@@ -71,7 +71,12 @@ func validateElement(m *BausteinsichtModel, path string, elem Element) []Validat
 
 func validateRelationships(m *BausteinsichtModel) []ValidationError {
 	var errs []ValidationError
-	seen := make(map[string]int) // "from->to" → first index
+	// Track seen relationships keyed by "from->to->kind->label" to allow
+	// multiple relationships between the same pair with different kind or label. (#142)
+	type relSig struct {
+		from, to, kind, label string
+	}
+	seen := make(map[relSig]int) // signature → first index
 
 	for i, rel := range m.Relationships {
 		path := fmt.Sprintf("relationships[%d]", i)
@@ -97,15 +102,17 @@ func validateRelationships(m *BausteinsichtModel) []ValidationError {
 			}
 		}
 
-		// Detect duplicate from/to pairs. (#117)
-		key := rel.From + "->" + rel.To
-		if firstIdx, exists := seen[key]; exists {
+		// Detect fully duplicate relationships (same from, to, kind, and label). (#117, #142)
+		// Multiple relationships between the same pair are allowed if they
+		// differ in kind or label.
+		sig := relSig{from: rel.From, to: rel.To, kind: rel.Kind, label: rel.Label}
+		if firstIdx, exists := seen[sig]; exists {
 			errs = append(errs, ValidationError{
 				Path:    path,
 				Message: fmt.Sprintf("duplicate relationship %s → %s (first at relationships[%d])", rel.From, rel.To, firstIdx),
 			})
 		} else {
-			seen[key] = i
+			seen[sig] = i
 		}
 	}
 	return errs

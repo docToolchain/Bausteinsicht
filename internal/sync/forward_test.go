@@ -268,7 +268,7 @@ func TestApplyForward_NewRelationship(t *testing.T) {
 	}
 
 	page := doc.Pages()[0]
-	if page.FindConnector("frontend", "backend") == nil {
+	if page.FindConnector("frontend", "backend", 0) == nil {
 		t.Fatal("connector 'frontend→backend' not found")
 	}
 }
@@ -591,5 +591,119 @@ func TestApplyForward_NoDuplicateElements(t *testing.T) {
 	// Should report 0 elements created (already exists).
 	if result.ElementsCreated != 0 {
 		t.Errorf("expected 0 elements created, got %d", result.ElementsCreated)
+	}
+}
+
+// TestApplyForward_MultipleRelationshipsSamePair verifies that two
+// relationships between the same pair of elements create two separate
+// connectors with distinct IDs. Regression test for #142.
+func TestApplyForward_MultipleRelationshipsSamePair(t *testing.T) {
+	doc := emptyDoc()
+	ts := minimalTemplates(t)
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"a": {Kind: "container", Title: "A"},
+			"b": {Kind: "container", Title: "B"},
+		},
+		Relationships: []model.Relationship{
+			{From: "a", To: "b", Label: "uses"},
+			{From: "a", To: "b", Label: "calls"},
+		},
+	}
+
+	cs := &ChangeSet{
+		ModelElementChanges: []ElementChange{
+			{ID: "a", Type: Added},
+			{ID: "b", Type: Added},
+		},
+		ModelRelationshipChanges: []RelationshipChange{
+			{From: "a", To: "b", Index: 0, Type: Added, NewValue: "uses"},
+			{From: "a", To: "b", Index: 1, Type: Added, NewValue: "calls"},
+		},
+	}
+
+	result := ApplyForward(cs, doc, ts, m)
+
+	if result.ConnectorsCreated != 2 {
+		t.Fatalf("expected 2 connectors created, got %d", result.ConnectorsCreated)
+	}
+
+	page := doc.Pages()[0]
+	conns := page.FindAllConnectors()
+	if len(conns) != 2 {
+		t.Fatalf("expected 2 connectors on page, got %d", len(conns))
+	}
+
+	// Verify each connector has the correct label.
+	conn0 := page.FindConnector("a", "b", 0)
+	if conn0 == nil {
+		t.Fatal("connector index=0 not found")
+	}
+	if got := conn0.SelectAttrValue("value", ""); got != "uses" {
+		t.Errorf("connector 0 label = %q, want %q", got, "uses")
+	}
+
+	conn1 := page.FindConnector("a", "b", 1)
+	if conn1 == nil {
+		t.Fatal("connector index=1 not found")
+	}
+	if got := conn1.SelectAttrValue("value", ""); got != "calls" {
+		t.Errorf("connector 1 label = %q, want %q", got, "calls")
+	}
+}
+
+// TestApplyForward_MultipleRelsSamePairNoDuplicateConnectors verifies that
+// when connectors already exist for multiple relationships between the same
+// pair, forward sync does not create duplicates. Regression test for #142/#119.
+func TestApplyForward_MultipleRelsSamePairNoDuplicateConnectors(t *testing.T) {
+	doc := drawio.NewDocument()
+	page := doc.AddPage("p1", "Page 1")
+	_ = page.CreateElement(drawio.ElementData{
+		ID: "a", CellID: "a", Kind: "container", Title: "A",
+	}, "")
+	_ = page.CreateElement(drawio.ElementData{
+		ID: "b", CellID: "b", Kind: "container", Title: "B",
+	}, "")
+	// Pre-existing connectors.
+	page.CreateConnector(drawio.ConnectorData{
+		From: "a", To: "b", Label: "uses",
+		SourceRef: "a", TargetRef: "b", Index: 0,
+	}, "endArrow=block;")
+	page.CreateConnector(drawio.ConnectorData{
+		From: "a", To: "b", Label: "calls",
+		SourceRef: "a", TargetRef: "b", Index: 1,
+	}, "endArrow=block;")
+
+	if len(page.FindAllConnectors()) != 2 {
+		t.Fatalf("precondition: expected 2 connectors, got %d", len(page.FindAllConnectors()))
+	}
+
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"a": {Kind: "container", Title: "A"},
+			"b": {Kind: "container", Title: "B"},
+		},
+		Relationships: []model.Relationship{
+			{From: "a", To: "b", Label: "uses"},
+			{From: "a", To: "b", Label: "calls"},
+		},
+	}
+	ts := minimalTemplates(t)
+
+	// Simulate sync state deletion: both relationships appear as Added.
+	cs := &ChangeSet{
+		ModelRelationshipChanges: []RelationshipChange{
+			{From: "a", To: "b", Index: 0, Type: Added, NewValue: "uses"},
+			{From: "a", To: "b", Index: 1, Type: Added, NewValue: "calls"},
+		},
+	}
+
+	result := ApplyForward(cs, doc, ts, m)
+
+	if len(page.FindAllConnectors()) != 2 {
+		t.Errorf("expected 2 connectors (no duplicates), got %d", len(page.FindAllConnectors()))
+	}
+	if result.ConnectorsCreated != 0 {
+		t.Errorf("expected 0 connectors created, got %d", result.ConnectorsCreated)
 	}
 }

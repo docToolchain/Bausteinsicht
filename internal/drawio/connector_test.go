@@ -28,8 +28,8 @@ func TestCreateConnector(t *testing.T) {
 	}
 
 	conn := cells[2]
-	if got := conn.SelectAttrValue("id", ""); got != "rel-customer-webshop.api" {
-		t.Errorf("id = %q, want %q", got, "rel-customer-webshop.api")
+	if got := conn.SelectAttrValue("id", ""); got != "rel-customer-webshop.api-0" {
+		t.Errorf("id = %q, want %q", got, "rel-customer-webshop.api-0")
 	}
 	if got := conn.SelectAttrValue("value", ""); got != "uses" {
 		t.Errorf("value = %q, want %q", got, "uses")
@@ -67,15 +67,15 @@ func TestFindConnector(t *testing.T) {
 	data := drawio.ConnectorData{From: "a", To: "b", Label: "link"}
 	p.CreateConnector(data, testStyle)
 
-	got := p.FindConnector("a", "b")
+	got := p.FindConnector("a", "b", 0)
 	if got == nil {
 		t.Fatal("FindConnector returned nil, expected element")
 	}
-	if got.SelectAttrValue("id", "") != "rel-a-b" {
+	if got.SelectAttrValue("id", "") != "rel-a-b-0" {
 		t.Errorf("unexpected id: %q", got.SelectAttrValue("id", ""))
 	}
 
-	if p.FindConnector("x", "y") != nil {
+	if p.FindConnector("x", "y", 0) != nil {
 		t.Error("FindConnector should return nil for non-existent connector")
 	}
 }
@@ -95,9 +95,9 @@ func TestUpdateConnectorLabel(t *testing.T) {
 	p := newTestPage(t)
 	p.CreateConnector(drawio.ConnectorData{From: "x", To: "y", Label: "old"}, testStyle)
 
-	p.UpdateConnectorLabel("x", "y", "new")
+	p.UpdateConnectorLabel("x", "y", 0, "new")
 
-	conn := p.FindConnector("x", "y")
+	conn := p.FindConnector("x", "y", 0)
 	if conn == nil {
 		t.Fatal("connector not found after update")
 	}
@@ -111,12 +111,12 @@ func TestDeleteConnector(t *testing.T) {
 	p.CreateConnector(drawio.ConnectorData{From: "a", To: "b"}, testStyle)
 	p.CreateConnector(drawio.ConnectorData{From: "c", To: "d"}, testStyle)
 
-	p.DeleteConnector("a", "b")
+	p.DeleteConnector("a", "b", 0)
 
-	if p.FindConnector("a", "b") != nil {
+	if p.FindConnector("a", "b", 0) != nil {
 		t.Error("deleted connector still found")
 	}
-	if p.FindConnector("c", "d") == nil {
+	if p.FindConnector("c", "d", 0) == nil {
 		t.Error("unrelated connector was removed")
 	}
 }
@@ -132,13 +132,64 @@ func TestDeleteConnectorsFor(t *testing.T) {
 
 	p.DeleteConnectorsFor("node1")
 
-	if p.FindConnector("node1", "node2") != nil {
+	if p.FindConnector("node1", "node2", 0) != nil {
 		t.Error("source connector should have been deleted")
 	}
-	if p.FindConnector("node3", "node1") != nil {
+	if p.FindConnector("node3", "node1", 0) != nil {
 		t.Error("target connector should have been deleted")
 	}
-	if p.FindConnector("nodeA", "nodeB") == nil {
+	if p.FindConnector("nodeA", "nodeB", 0) == nil {
 		t.Error("unrelated connector should remain")
+	}
+}
+
+// TestMultipleConnectorsSamePair verifies that multiple connectors between the
+// same pair of elements are stored separately using distinct indices. (#142)
+func TestMultipleConnectorsSamePair(t *testing.T) {
+	p := newTestPage(t)
+
+	// Create two connectors between A and B with different indices.
+	p.CreateConnector(drawio.ConnectorData{
+		From: "a", To: "b", Label: "uses", Index: 0,
+	}, testStyle)
+	p.CreateConnector(drawio.ConnectorData{
+		From: "a", To: "b", Label: "calls", Index: 1,
+	}, testStyle)
+
+	all := p.FindAllConnectors()
+	if len(all) != 2 {
+		t.Fatalf("expected 2 connectors, got %d", len(all))
+	}
+
+	// Verify each connector has a distinct ID.
+	conn0 := p.FindConnector("a", "b", 0)
+	if conn0 == nil {
+		t.Fatal("connector index=0 not found")
+	}
+	if got := conn0.SelectAttrValue("id", ""); got != "rel-a-b-0" {
+		t.Errorf("connector 0 id = %q, want %q", got, "rel-a-b-0")
+	}
+	if got := conn0.SelectAttrValue("value", ""); got != "uses" {
+		t.Errorf("connector 0 value = %q, want %q", got, "uses")
+	}
+
+	conn1 := p.FindConnector("a", "b", 1)
+	if conn1 == nil {
+		t.Fatal("connector index=1 not found")
+	}
+	if got := conn1.SelectAttrValue("id", ""); got != "rel-a-b-1" {
+		t.Errorf("connector 1 id = %q, want %q", got, "rel-a-b-1")
+	}
+	if got := conn1.SelectAttrValue("value", ""); got != "calls" {
+		t.Errorf("connector 1 value = %q, want %q", got, "calls")
+	}
+
+	// Delete only index=0; index=1 should remain.
+	p.DeleteConnector("a", "b", 0)
+	if p.FindConnector("a", "b", 0) != nil {
+		t.Error("connector index=0 should be deleted")
+	}
+	if p.FindConnector("a", "b", 1) == nil {
+		t.Error("connector index=1 should remain after deleting index=0")
 	}
 }

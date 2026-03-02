@@ -1,6 +1,7 @@
 package sync
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/docToolchain/Bauteinsicht/internal/drawio"
@@ -29,6 +30,7 @@ type ElementChange struct {
 type RelationshipChange struct {
 	From     string
 	To       string
+	Index    int    // relationship array index for disambiguation
 	Type     ChangeType
 	Field    string // "label", "" for add/delete
 	OldValue string
@@ -53,8 +55,9 @@ type drawioElemSnapshot struct {
 }
 
 // relKey returns a canonical key for a relationship.
-func relKey(from, to string) string {
-	return from + ":" + to
+// The index disambiguates multiple relationships between the same pair.
+func relKey(from, to string, index int) string {
+	return fmt.Sprintf("%s:%s:%d", from, to, index)
 }
 
 // computeVisibleElements returns the set of element IDs that should be visible
@@ -169,11 +172,15 @@ func extractDrawioRelationships(doc *drawio.Document) map[string]RelationshipSta
 			if elemID, ok := cellToElem[toCell]; ok {
 				to = elemID
 			}
-			key := relKey(from, to)
+			// Extract the relationship index from the connector ID.
+			cellID := cell.SelectAttrValue("id", "")
+			index := parseConnectorIndex(cellID)
+			key := relKey(from, to, index)
 			if _, exists := result[key]; !exists {
 				result[key] = RelationshipState{
 					From:  from,
 					To:    to,
+					Index: index,
 					Label: cell.SelectAttrValue("value", ""),
 				}
 			}
@@ -182,13 +189,34 @@ func extractDrawioRelationships(doc *drawio.Document) map[string]RelationshipSta
 	return result
 }
 
+// parseConnectorIndex extracts the index from a connector ID of the form
+// "rel-<from>-<to>-<index>". Returns 0 if the ID does not contain an index
+// (backward compatibility with old connector IDs "rel-<from>-<to>").
+func parseConnectorIndex(id string) int {
+	if !strings.HasPrefix(id, "rel-") {
+		return 0
+	}
+	// The index is the last segment after the last '-'.
+	lastDash := strings.LastIndex(id, "-")
+	if lastDash < 0 {
+		return 0
+	}
+	indexStr := id[lastDash+1:]
+	var index int
+	if _, err := fmt.Sscanf(indexStr, "%d", &index); err != nil {
+		return 0
+	}
+	return index
+}
+
 // buildModelRelMap converts model relationships to a map keyed by relKey.
 func buildModelRelMap(m *model.BausteinsichtModel) map[string]RelationshipState {
 	modelRels := make(map[string]RelationshipState, len(m.Relationships))
-	for _, r := range m.Relationships {
-		modelRels[relKey(r.From, r.To)] = RelationshipState{
+	for i, r := range m.Relationships {
+		modelRels[relKey(r.From, r.To, i)] = RelationshipState{
 			From:  r.From,
 			To:    r.To,
+			Index: i,
 			Label: r.Label,
 			Kind:  r.Kind,
 		}
@@ -311,7 +339,7 @@ func detectRelationshipChanges(
 ) {
 	lastRels := make(map[string]RelationshipState, len(lastState.Relationships))
 	for _, r := range lastState.Relationships {
-		lastRels[relKey(r.From, r.To)] = r
+		lastRels[relKey(r.From, r.To, r.Index)] = r
 	}
 
 	allKeys := unionRelKeys(modelRels, drawioRels, lastRels)
@@ -321,21 +349,21 @@ func detectRelationshipChanges(
 		dr, inDrawio := drawioRels[k]
 		lr, inLast := lastRels[k]
 
-		from, to := resolveRelFromTo(mr, lr, dr)
+		from, to, index := resolveRelFromTo(mr, lr, dr)
 
 		// Model side
 		switch {
 		case inModel && !inLast:
 			cs.ModelRelationshipChanges = append(cs.ModelRelationshipChanges, RelationshipChange{
-				From: from, To: to, Type: Added, NewValue: mr.Label,
+				From: from, To: to, Index: index, Type: Added, NewValue: mr.Label,
 			})
 		case !inModel && inLast:
 			cs.ModelRelationshipChanges = append(cs.ModelRelationshipChanges, RelationshipChange{
-				From: from, To: to, Type: Deleted,
+				From: from, To: to, Index: index, Type: Deleted,
 			})
 		case inModel && inLast && mr.Label != lr.Label:
 			cs.ModelRelationshipChanges = append(cs.ModelRelationshipChanges, RelationshipChange{
-				From: from, To: to, Type: Modified, Field: "label",
+				From: from, To: to, Index: index, Type: Modified, Field: "label",
 				OldValue: lr.Label, NewValue: mr.Label,
 			})
 		}
@@ -350,15 +378,15 @@ func detectRelationshipChanges(
 				continue
 			}
 			cs.DrawioRelationshipChanges = append(cs.DrawioRelationshipChanges, RelationshipChange{
-				From: from, To: to, Type: Added,
+				From: from, To: to, Index: index, Type: Added,
 			})
 		case !inDrawio && inLast:
 			cs.DrawioRelationshipChanges = append(cs.DrawioRelationshipChanges, RelationshipChange{
-				From: from, To: to, Type: Deleted,
+				From: from, To: to, Index: index, Type: Deleted,
 			})
 		case inDrawio && inLast && dr.Label != lr.Label:
 			cs.DrawioRelationshipChanges = append(cs.DrawioRelationshipChanges, RelationshipChange{
-				From: from, To: to, Type: Modified, Field: "label",
+				From: from, To: to, Index: index, Type: Modified, Field: "label",
 				OldValue: lr.Label, NewValue: dr.Label,
 			})
 		}
@@ -406,14 +434,14 @@ func isLiftedRelationship(from, to string, modelRels map[string]RelationshipStat
 	return false
 }
 
-// resolveRelFromTo returns the from/to pair from the first non-empty source.
-func resolveRelFromTo(mr, lr, dr RelationshipState) (from, to string) {
-	from, to = mr.From, mr.To
+// resolveRelFromTo returns the from/to/index from the first non-empty source.
+func resolveRelFromTo(mr, lr, dr RelationshipState) (from, to string, index int) {
+	from, to, index = mr.From, mr.To, mr.Index
 	if from == "" {
-		from, to = lr.From, lr.To
+		from, to, index = lr.From, lr.To, lr.Index
 	}
 	if from == "" {
-		from, to = dr.From, dr.To
+		from, to, index = dr.From, dr.To, dr.Index
 	}
-	return from, to
+	return from, to, index
 }

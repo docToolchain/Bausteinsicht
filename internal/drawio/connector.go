@@ -13,11 +13,13 @@ type ConnectorData struct {
 	Label     string // display label on the connector
 	SourceRef string // source cell ID (defaults to From if empty)
 	TargetRef string // target cell ID (defaults to To if empty)
+	Index     int    // relationship index for disambiguation (0-based)
 }
 
 // connectorID returns the canonical ID for a connector between two elements.
-func connectorID(from, to string) string {
-	return fmt.Sprintf("rel-%s-%s", from, to)
+// The index disambiguates multiple relationships between the same pair.
+func connectorID(from, to string, index int) string {
+	return fmt.Sprintf("rel-%s-%s-%d", from, to, index)
 }
 
 // CreateConnector creates an edge mxCell connecting From to To.
@@ -38,7 +40,7 @@ func (p *Page) CreateConnector(data ConnectorData, style string) {
 	}
 
 	cell := root.CreateElement("mxCell")
-	cell.CreateAttr("id", connectorID(srcRef, tgtRef))
+	cell.CreateAttr("id", connectorID(srcRef, tgtRef, data.Index))
 	cell.CreateAttr("value", data.Label)
 	cell.CreateAttr("style", style)
 	cell.CreateAttr("edge", "1")
@@ -51,13 +53,13 @@ func (p *Page) CreateConnector(data ConnectorData, style string) {
 	geom.CreateAttr("as", "geometry")
 }
 
-// FindConnector returns the mxCell edge with id="rel-<from>-<to>", or nil.
-func (p *Page) FindConnector(from, to string) *etree.Element {
+// FindConnector returns the mxCell edge with id="rel-<from>-<to>-<index>", or nil.
+func (p *Page) FindConnector(from, to string, index int) *etree.Element {
 	root := p.Root()
 	if root == nil {
 		return nil
 	}
-	id := connectorID(from, to)
+	id := connectorID(from, to, index)
 	for _, cell := range root.SelectElements("mxCell") {
 		if cell.SelectAttrValue("id", "") == id {
 			return cell
@@ -82,8 +84,8 @@ func (p *Page) FindAllConnectors() []*etree.Element {
 }
 
 // UpdateConnectorLabel sets the value attribute on the connector between from and to.
-func (p *Page) UpdateConnectorLabel(from, to, label string) {
-	conn := p.FindConnector(from, to)
+func (p *Page) UpdateConnectorLabel(from, to string, index int, label string) {
+	conn := p.FindConnector(from, to, index)
 	if conn == nil {
 		return
 	}
@@ -95,13 +97,13 @@ func (p *Page) UpdateConnectorLabel(from, to, label string) {
 	}
 }
 
-// DeleteConnector removes the connector between from and to.
-func (p *Page) DeleteConnector(from, to string) {
+// DeleteConnector removes the connector between from and to at the given index.
+func (p *Page) DeleteConnector(from, to string, index int) {
 	root := p.Root()
 	if root == nil {
 		return
 	}
-	id := connectorID(from, to)
+	id := connectorID(from, to, index)
 	for _, cell := range root.SelectElements("mxCell") {
 		if cell.SelectAttrValue("id", "") == id {
 			root.RemoveChild(cell)

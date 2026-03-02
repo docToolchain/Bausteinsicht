@@ -723,3 +723,77 @@ func TestDetectChanges_NoViewsAllDeletionsDetected(t *testing.T) {
 			cs.DrawioElementChanges)
 	}
 }
+
+// --- Multiple relationships between same pair (#142) ---
+
+func TestDetectChanges_MultipleRelsSamePairBothAdded(t *testing.T) {
+	// Model has two relationships from A to B with different labels.
+	// State is empty (first sync). Both should be detected as Added.
+	state := emptyState()
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"a": {Kind: "container", Title: "A"},
+			"b": {Kind: "container", Title: "B"},
+		},
+		Relationships: []model.Relationship{
+			{From: "a", To: "b", Label: "uses"},
+			{From: "a", To: "b", Label: "calls"},
+		},
+	}
+	doc := emptyDoc()
+
+	cs := DetectChanges(m, doc, state)
+
+	addedCount := 0
+	for _, ch := range cs.ModelRelationshipChanges {
+		if ch.From == "a" && ch.To == "b" && ch.Type == Added {
+			addedCount++
+		}
+	}
+	if addedCount != 2 {
+		t.Errorf("expected 2 Added relationship changes for a→b, got %d: %+v",
+			addedCount, cs.ModelRelationshipChanges)
+	}
+}
+
+func TestDetectChanges_MultipleRelsSamePairLabelModified(t *testing.T) {
+	// State has two rels from A to B. Model modifies label of the second.
+	state := emptyState()
+	state.Relationships = []RelationshipState{
+		{From: "a", To: "b", Index: 0, Label: "uses"},
+		{From: "a", To: "b", Index: 1, Label: "calls"},
+	}
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"a": {Kind: "container", Title: "A"},
+			"b": {Kind: "container", Title: "B"},
+		},
+		Relationships: []model.Relationship{
+			{From: "a", To: "b", Label: "uses"},
+			{From: "a", To: "b", Label: "invokes"}, // changed from "calls"
+		},
+	}
+	doc := emptyDoc()
+
+	cs := DetectChanges(m, doc, state)
+
+	found := false
+	for _, ch := range cs.ModelRelationshipChanges {
+		if ch.From == "a" && ch.To == "b" && ch.Index == 1 &&
+			ch.Type == Modified && ch.Field == "label" &&
+			ch.OldValue == "calls" && ch.NewValue == "invokes" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected label modification for a→b index=1, got: %+v",
+			cs.ModelRelationshipChanges)
+	}
+
+	// The first relationship (index 0) should NOT be modified.
+	for _, ch := range cs.ModelRelationshipChanges {
+		if ch.From == "a" && ch.To == "b" && ch.Index == 0 && ch.Type == Modified {
+			t.Errorf("first relationship (index=0) should not be modified, got: %+v", ch)
+		}
+	}
+}

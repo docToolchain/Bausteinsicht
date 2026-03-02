@@ -34,6 +34,7 @@ type ElementState struct {
 type RelationshipState struct {
 	From  string `json:"from"`
 	To    string `json:"to"`
+	Index int    `json:"index"`
 	Label string `json:"label,omitempty"`
 	Kind  string `json:"kind,omitempty"`
 }
@@ -130,10 +131,11 @@ func BuildState(m *model.BausteinsichtModel, _ *drawio.Document, modelPath, draw
 	}
 
 	rels := make([]RelationshipState, 0, len(m.Relationships))
-	for _, r := range m.Relationships {
+	for i, r := range m.Relationships {
 		rels = append(rels, RelationshipState{
 			From:  r.From,
 			To:    r.To,
+			Index: i,
 			Label: r.Label,
 			Kind:  r.Kind,
 		})
