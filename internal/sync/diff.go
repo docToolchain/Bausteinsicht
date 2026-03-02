@@ -85,6 +85,53 @@ func computeVisibleElements(m *model.BausteinsichtModel) map[string]bool {
 	return visible
 }
 
+// computeVisibleRelationships returns the set of relationship keys (from relKey)
+// that should have a connector on at least one view page. A relationship is
+// visible if both endpoints (or a lifted ancestor of each) are present on the
+// same view's resolved element set.
+// If the model has no views, returns nil (meaning ALL relationships are visible).
+// This prevents reverse sync from treating connectors removed by view filter
+// changes as user deletions (#167).
+func computeVisibleRelationships(m *model.BausteinsichtModel) map[string]bool {
+	if len(m.Views) == 0 {
+		return nil // all relationships visible
+	}
+
+	// Resolve each view's element set.
+	type viewSet struct {
+		elems map[string]bool
+	}
+	var views []viewSet
+	for _, view := range m.Views {
+		v := view
+		resolved, err := model.ResolveView(m, &v)
+		if err != nil {
+			continue
+		}
+		elemSet := make(map[string]bool, len(resolved)+1)
+		for _, id := range resolved {
+			elemSet[id] = true
+		}
+		if view.Scope != "" {
+			elemSet[view.Scope] = true
+		}
+		views = append(views, viewSet{elems: elemSet})
+	}
+
+	visible := make(map[string]bool)
+	for i, r := range m.Relationships {
+		for _, vs := range views {
+			from := liftEndpoint(r.From, vs.elems)
+			to := liftEndpoint(r.To, vs.elems)
+			if from != "" && to != "" && from != to {
+				visible[relKey(r.From, r.To, i)] = true
+				break // found on at least one view
+			}
+		}
+	}
+	return visible
+}
+
 // DetectChanges performs a three-way diff between the model, draw.io document,
 // and the last known sync state.
 func DetectChanges(m *model.BausteinsichtModel, doc *drawio.Document, lastState *SyncState) *ChangeSet {
@@ -97,7 +144,8 @@ func DetectChanges(m *model.BausteinsichtModel, doc *drawio.Document, lastState 
 
 	modelRels := buildModelRelMap(m)
 	drawioRels := extractDrawioRelationships(doc)
-	detectRelationshipChanges(cs, modelRels, drawioRels, lastState)
+	visibleRels := computeVisibleRelationships(m)
+	detectRelationshipChanges(cs, modelRels, drawioRels, lastState, visibleRels)
 
 	return cs
 }
@@ -348,11 +396,16 @@ func checkElemConflict(cs *ChangeSet, id, field, last, modelVal, drawioVal strin
 }
 
 // detectRelationshipChanges performs three-way comparison for relationships.
+// visibleRels is the set of relationship keys that should have a connector on
+// at least one view page. If nil, all relationships are considered visible
+// (no views defined). Used to prevent treating filter-removed connectors as
+// user deletions (#167).
 func detectRelationshipChanges(
 	cs *ChangeSet,
 	modelRels map[string]RelationshipState,
 	drawioRels map[string]RelationshipState,
 	lastState *SyncState,
+	visibleRels map[string]bool,
 ) {
 	lastRels := make(map[string]RelationshipState, len(lastState.Relationships))
 	for _, r := range lastState.Relationships {
@@ -398,6 +451,13 @@ func detectRelationshipChanges(
 				From: from, To: to, Index: index, Type: Added,
 			})
 		case !inDrawio && inLast:
+			// Only treat as deleted if the relationship should have a connector
+			// on at least one view page. Relationships whose endpoints are not
+			// visible on any view (due to filter changes) are simply absent from
+			// draw.io — not user deletions. (#167)
+			if visibleRels != nil && !visibleRels[k] {
+				continue
+			}
 			cs.DrawioRelationshipChanges = append(cs.DrawioRelationshipChanges, RelationshipChange{
 				From: from, To: to, Index: index, Type: Deleted,
 			})
