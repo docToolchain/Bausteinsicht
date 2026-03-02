@@ -309,6 +309,38 @@ func buildCellIDToElemID(doc *drawio.Document) map[string]string {
 				m[cellID] = elemID
 			}
 		}
+		// Also map unmanaged elements (no bausteinsicht_id) to their
+		// sanitized label-based IDs so that connectors targeting them
+		// resolve correctly during reverse sync (#211).
+		root := page.Root()
+		if root == nil {
+			continue
+		}
+		for _, obj := range root.SelectElements("object") {
+			if obj.SelectAttrValue("bausteinsicht_id", "") != "" {
+				continue
+			}
+			cellID := obj.SelectAttrValue("id", "")
+			if cellID == "" {
+				continue
+			}
+			if strings.HasPrefix(cellID, "nav-back-") {
+				continue
+			}
+			cell := obj.SelectElement("mxCell")
+			if cell == nil || cell.SelectAttrValue("vertex", "") != "1" {
+				continue
+			}
+			label := obj.SelectAttrValue("label", "")
+			if label == "" {
+				continue
+			}
+			title, _, _ := drawio.ParseLabel(label)
+			id := sanitizeID(title)
+			if id != "" {
+				m[cellID] = id
+			}
+		}
 	}
 	return m
 }
