@@ -922,12 +922,14 @@ func TestDetectChanges_TechnologyFromXMLAttribute(t *testing.T) {
 	doc := drawio.NewDocument()
 	doc.AddPage("1", "Page 1")
 	page := doc.GetPage("1")
-	page.CreateElement(drawio.ElementData{
+	if err := page.CreateElement(drawio.ElementData{
 		ID:     "customer",
 		CellID: "customer",
 		Kind:   "actor",
 		Title:  "Customer",
-	}, "shape=actor;")
+	}, "shape=actor;"); err != nil {
+		t.Fatal(err)
+	}
 	// Simulate user adding technology attribute directly in XML.
 	elem := page.FindElement("customer")
 	if elem == nil {
