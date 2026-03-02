@@ -26,6 +26,7 @@ func runSync(cmd *cobra.Command, _ []string) error {
 	format, _ := cmd.Flags().GetString("format")
 	modelPath, _ := cmd.Flags().GetString("model")
 	templatePath, _ := cmd.Flags().GetString("template")
+	verbose, _ := cmd.Flags().GetBool("verbose")
 
 	// Auto-detect model file.
 	if modelPath == "" {
@@ -70,6 +71,14 @@ func runSync(cmd *cobra.Command, _ []string) error {
 		return exitWithCode(fmt.Errorf("loading template: %w", err), 2)
 	}
 
+	// Verbose output goes to stderr so it doesn't interfere with JSON on stdout.
+	if verbose && format != "json" {
+		flat := model.FlattenElements(m)
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Syncing model: %s\n", modelPath)
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "  %d elements, %d relationships, %d views\n",
+			len(flat), len(m.Relationships), len(m.Views))
+	}
+
 	// Ensure pages exist for all views.
 	for viewID, view := range m.Views {
 		pageID := "view-" + viewID
@@ -101,6 +110,23 @@ func runSync(cmd *cobra.Command, _ []string) error {
 	}
 	if err := bsync.SaveState(statePath, newState); err != nil {
 		return exitWithCode(fmt.Errorf("saving sync state: %w", err), 2)
+	}
+
+	// Verbose post-sync details to stderr.
+	if verbose && format != "json" {
+		if result.Forward != nil {
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Forward sync: %d elements created, %d updated, %d deleted; %d connectors created, %d updated, %d deleted\n",
+				result.Forward.ElementsCreated, result.Forward.ElementsUpdated, result.Forward.ElementsDeleted,
+				result.Forward.ConnectorsCreated, result.Forward.ConnectorsUpdated, result.Forward.ConnectorsDeleted)
+		}
+		if result.Reverse != nil {
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Reverse sync: %d elements created, %d updated, %d deleted; %d relationships created, %d updated, %d deleted\n",
+				result.Reverse.ElementsCreated, result.Reverse.ElementsUpdated, result.Reverse.ElementsDeleted,
+				result.Reverse.RelationshipsCreated, result.Reverse.RelationshipsUpdated, result.Reverse.RelationshipsDeleted)
+		}
+		if len(result.Conflicts) > 0 {
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Conflicts resolved: %d (model wins)\n", len(result.Conflicts))
+		}
 	}
 
 	// Print warnings to stderr.

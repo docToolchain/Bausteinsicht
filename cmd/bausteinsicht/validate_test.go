@@ -205,3 +205,86 @@ func TestValidate_AutoDetect_NoFile(t *testing.T) {
 		t.Errorf("expected exit code 2, got %d", ee.code)
 	}
 }
+
+// executeValidateCmdSplit runs the validate command and captures stdout and
+// stderr into separate buffers so verbose output (written to stderr) can be
+// verified independently.
+func executeValidateCmdSplit(args ...string) (stdout, stderr string, err error) {
+	cmd := NewRootCmd()
+	outBuf := new(bytes.Buffer)
+	errBuf := new(bytes.Buffer)
+	cmd.SetOut(outBuf)
+	cmd.SetErr(errBuf)
+	cmd.SetArgs(args)
+	err = cmd.Execute()
+	return outBuf.String(), errBuf.String(), err
+}
+
+func TestValidate_Verbose_PrintsModelPathAndElementCount(t *testing.T) {
+	dir := t.TempDir()
+	modelPath := filepath.Join(dir, "model.jsonc")
+	if err := os.WriteFile(modelPath, templates.SampleModel, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, stderr, err := executeValidateCmdSplit("validate", "--model", modelPath, "--verbose")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if !strings.Contains(stderr, "Validating model:") {
+		t.Errorf("verbose output should contain 'Validating model:', got stderr=%q", stderr)
+	}
+	if !strings.Contains(stderr, modelPath) {
+		t.Errorf("verbose output should contain model path %q, got stderr=%q", modelPath, stderr)
+	}
+	if !strings.Contains(stderr, "elements") {
+		t.Errorf("verbose output should mention element count, got stderr=%q", stderr)
+	}
+	if !strings.Contains(stderr, "relationships") {
+		t.Errorf("verbose output should mention relationship count, got stderr=%q", stderr)
+	}
+	if !strings.Contains(stderr, "views") {
+		t.Errorf("verbose output should mention view count, got stderr=%q", stderr)
+	}
+}
+
+func TestValidate_Verbose_NotShownWithoutFlag(t *testing.T) {
+	dir := t.TempDir()
+	modelPath := filepath.Join(dir, "model.jsonc")
+	if err := os.WriteFile(modelPath, templates.SampleModel, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, stderr, err := executeValidateCmdSplit("validate", "--model", modelPath)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if strings.Contains(stderr, "Validating model:") {
+		t.Errorf("verbose output should NOT appear without --verbose flag, got stderr=%q", stderr)
+	}
+}
+
+func TestValidate_Verbose_SuppressedWithJSONFormat(t *testing.T) {
+	dir := t.TempDir()
+	modelPath := filepath.Join(dir, "model.jsonc")
+	if err := os.WriteFile(modelPath, templates.SampleModel, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	stdout, stderr, err := executeValidateCmdSplit("validate", "--model", modelPath, "--verbose", "--format", "json")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if strings.Contains(stderr, "Validating model:") {
+		t.Errorf("verbose output should be suppressed with --format json, got stderr=%q", stderr)
+	}
+
+	// JSON output should still be valid.
+	var result validateResult
+	if err := json.Unmarshal([]byte(strings.TrimSpace(stdout)), &result); err != nil {
+		t.Fatalf("failed to parse JSON output: %v\nOutput: %s", err, stdout)
+	}
+}

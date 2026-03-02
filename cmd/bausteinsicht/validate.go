@@ -32,6 +32,7 @@ func newValidateCmd() *cobra.Command {
 func runValidate(cmd *cobra.Command, args []string) error {
 	format, _ := cmd.Flags().GetString("format")
 	modelPath, _ := cmd.Flags().GetString("model")
+	verbose, _ := cmd.Flags().GetBool("verbose")
 
 	if modelPath == "" {
 		detected, err := model.AutoDetect(".")
@@ -44,6 +45,14 @@ func runValidate(cmd *cobra.Command, args []string) error {
 	m, err := model.Load(modelPath)
 	if err != nil {
 		return exitWithCode(err, 2)
+	}
+
+	// Verbose output goes to stderr so it doesn't interfere with JSON on stdout.
+	if verbose && format != "json" {
+		flat := model.FlattenElements(m)
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Validating model: %s\n", modelPath)
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "  %d elements, %d relationships, %d views\n",
+			len(flat), len(m.Relationships), len(m.Views))
 	}
 
 	errs := model.Validate(m)

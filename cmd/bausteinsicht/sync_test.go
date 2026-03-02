@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"strings"
@@ -496,6 +497,139 @@ func TestSyncRemovesOrphanedViewPages(t *testing.T) {
 	if pageCountAfter >= pageCountBefore {
 		t.Errorf("expected fewer pages after removing views: before=%d, after=%d",
 			pageCountBefore, pageCountAfter)
+	}
+}
+
+func TestSync_Verbose_PrintsSyncDetails(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
+
+	// Init first.
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"init"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("init failed: %v", err)
+	}
+
+	// Add an element so the next sync has something to do.
+	cmd2 := NewRootCmd()
+	cmd2.SetArgs([]string{"add", "element", "--id", "verbose_test_svc", "--kind", "system", "--title", "Verbose Test Service"})
+	if err := cmd2.Execute(); err != nil {
+		t.Fatalf("add element failed: %v", err)
+	}
+
+	// Add element to the context view.
+	m, err := model.Load("architecture.jsonc")
+	if err != nil {
+		t.Fatalf("load model: %v", err)
+	}
+	if v, ok := m.Views["context"]; ok {
+		v.Include = append(v.Include, "verbose_test_svc")
+		m.Views["context"] = v
+	}
+	if err := model.Save("architecture.jsonc", m); err != nil {
+		t.Fatalf("save model: %v", err)
+	}
+
+	// Sync with --verbose; capture stderr via cmd.SetErr.
+	syncCmd := NewRootCmd()
+	errBuf := new(bytes.Buffer)
+	syncCmd.SetErr(errBuf)
+	syncCmd.SetArgs([]string{"sync", "--verbose"})
+
+	captureStdout(t, func() {
+		if err := syncCmd.Execute(); err != nil {
+			t.Fatalf("sync failed: %v", err)
+		}
+	})
+
+	stderr := errBuf.String()
+
+	if !strings.Contains(stderr, "Syncing model:") {
+		t.Errorf("verbose sync should print 'Syncing model:', got stderr=%q", stderr)
+	}
+	if !strings.Contains(stderr, "elements") {
+		t.Errorf("verbose sync should mention element counts, got stderr=%q", stderr)
+	}
+	if !strings.Contains(stderr, "relationships") {
+		t.Errorf("verbose sync should mention relationship counts, got stderr=%q", stderr)
+	}
+	if !strings.Contains(stderr, "views") {
+		t.Errorf("verbose sync should mention view counts, got stderr=%q", stderr)
+	}
+	// Post-sync details should also be present.
+	if !strings.Contains(stderr, "Forward sync:") {
+		t.Errorf("verbose sync should print 'Forward sync:' details, got stderr=%q", stderr)
+	}
+}
+
+func TestSync_Verbose_NotShownWithoutFlag(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
+
+	// Init first.
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"init"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("init failed: %v", err)
+	}
+
+	// Sync without --verbose.
+	syncCmd := NewRootCmd()
+	errBuf := new(bytes.Buffer)
+	syncCmd.SetErr(errBuf)
+	syncCmd.SetArgs([]string{"sync"})
+
+	captureStdout(t, func() {
+		if err := syncCmd.Execute(); err != nil {
+			t.Fatalf("sync failed: %v", err)
+		}
+	})
+
+	stderr := errBuf.String()
+	if strings.Contains(stderr, "Syncing model:") {
+		t.Errorf("verbose output should NOT appear without --verbose, got stderr=%q", stderr)
+	}
+}
+
+func TestSync_Verbose_SuppressedWithJSONFormat(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
+
+	// Init first.
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"init"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("init failed: %v", err)
+	}
+
+	// Sync with --verbose --format json.
+	syncCmd := NewRootCmd()
+	errBuf := new(bytes.Buffer)
+	syncCmd.SetErr(errBuf)
+	syncCmd.SetArgs([]string{"sync", "--verbose", "--format", "json"})
+
+	captureStdout(t, func() {
+		if err := syncCmd.Execute(); err != nil {
+			t.Fatalf("sync failed: %v", err)
+		}
+	})
+
+	stderr := errBuf.String()
+	if strings.Contains(stderr, "Syncing model:") {
+		t.Errorf("verbose output should be suppressed with --format json, got stderr=%q", stderr)
 	}
 }
 
