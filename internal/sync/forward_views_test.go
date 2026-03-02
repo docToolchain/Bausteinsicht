@@ -63,7 +63,7 @@ func TestApplyForward_ElementOnCorrectViewPage(t *testing.T) {
 		},
 		ModelRelationshipChanges: []RelationshipChange{
 			{From: "customer", To: "webshop", Type: Added, NewValue: "uses"},
-			{From: "webshop.api", To: "webshop.db", Type: Added, NewValue: "reads"},
+			{From: "webshop.api", To: "webshop.db", Index: 1, Type: Added, NewValue: "reads"},
 		},
 	}
 
@@ -121,7 +121,7 @@ func TestApplyForward_RelationshipOnlyOnPageWithBothEndpoints(t *testing.T) {
 		},
 		ModelRelationshipChanges: []RelationshipChange{
 			{From: "customer", To: "webshop", Type: Added, NewValue: "uses"},
-			{From: "webshop.api", To: "webshop.db", Type: Added, NewValue: "reads"},
+			{From: "webshop.api", To: "webshop.db", Index: 1, Type: Added, NewValue: "reads"},
 		},
 	}
 
@@ -129,7 +129,7 @@ func TestApplyForward_RelationshipOnlyOnPageWithBothEndpoints(t *testing.T) {
 
 	// Context page: customer→webshop connector should exist (using scoped cell IDs).
 	contextPage := doc.GetPage("view-context")
-	if contextPage.FindConnector("context--customer", "context--webshop") == nil {
+	if contextPage.FindConnector("context--customer", "context--webshop", 0) == nil {
 		t.Error("expected connector customer→webshop on context page")
 	}
 
@@ -140,7 +140,7 @@ func TestApplyForward_RelationshipOnlyOnPageWithBothEndpoints(t *testing.T) {
 
 	// Container page: api→db connector should exist (using scoped cell IDs).
 	containerPage := doc.GetPage("view-containers")
-	if containerPage.FindConnector("containers--webshop.api", "containers--webshop.db") == nil {
+	if containerPage.FindConnector("containers--webshop.api", "containers--webshop.db", 1) == nil {
 		t.Error("expected connector api→db on container page")
 	}
 }
@@ -188,8 +188,8 @@ func TestApplyForward_RelationshipLifting(t *testing.T) {
 			{ID: "webshop.api", Type: Added},
 		},
 		ModelRelationshipChanges: []RelationshipChange{
-			{From: "customer", To: "webshop.frontend", Type: Added, NewValue: "uses"},
-			{From: "webshop.frontend", To: "webshop.api", Type: Added, NewValue: "calls"},
+			{From: "customer", To: "webshop.frontend", Index: 0, Type: Added, NewValue: "uses"},
+			{From: "webshop.frontend", To: "webshop.api", Index: 1, Type: Added, NewValue: "calls"},
 		},
 	}
 
@@ -225,7 +225,7 @@ func TestApplyForward_RelationshipLifting(t *testing.T) {
 	if containerPage == nil {
 		t.Fatal("container page not found")
 	}
-	if containerPage.FindConnector("containers--customer", "containers--webshop.frontend") == nil {
+	if containerPage.FindConnector("containers--customer", "containers--webshop.frontend", 0) == nil {
 		t.Error("expected original connector customer→webshop.frontend on container page")
 	}
 }
@@ -268,8 +268,8 @@ func TestApplyForward_RelationshipLiftingDedup(t *testing.T) {
 			{ID: "b.z", Type: Added},
 		},
 		ModelRelationshipChanges: []RelationshipChange{
-			{From: "a.x", To: "b.z", Type: Added, NewValue: "calls"},
-			{From: "a.y", To: "b.z", Type: Added, NewValue: "reads"},
+			{From: "a.x", To: "b.z", Index: 0, Type: Added, NewValue: "calls"},
+			{From: "a.y", To: "b.z", Index: 1, Type: Added, NewValue: "reads"},
 		},
 	}
 
@@ -384,7 +384,7 @@ func TestApplyForward_DeletedElementRemovedFromViewPages(t *testing.T) {
 		},
 		ModelRelationshipChanges: []RelationshipChange{
 			{From: "customer", To: "webshop", Type: Added, NewValue: "uses"},
-			{From: "webshop.api", To: "webshop.db", Type: Added, NewValue: "reads"},
+			{From: "webshop.api", To: "webshop.db", Index: 1, Type: Added, NewValue: "reads"},
 		},
 	}
 	ApplyForward(csAdd, doc, ts, m)
@@ -413,7 +413,7 @@ func TestApplyForward_DeletedElementRemovedFromViewPages(t *testing.T) {
 			{ID: "webshop.db", Type: Deleted},
 		},
 		ModelRelationshipChanges: []RelationshipChange{
-			{From: "webshop.api", To: "webshop.db", Type: Deleted},
+			{From: "webshop.api", To: "webshop.db", Index: 1, Type: Deleted},
 		},
 	}
 	result := ApplyForward(csDel, doc, ts, m)
@@ -446,14 +446,14 @@ func TestApplyForward_DeletedRelationshipRemovedFromViewPages(t *testing.T) {
 		},
 		ModelRelationshipChanges: []RelationshipChange{
 			{From: "customer", To: "webshop", Type: Added, NewValue: "uses"},
-			{From: "webshop.api", To: "webshop.db", Type: Added, NewValue: "reads"},
+			{From: "webshop.api", To: "webshop.db", Index: 1, Type: Added, NewValue: "reads"},
 		},
 	}
 	ApplyForward(csAdd, doc, ts, m)
 
 	// Verify connector exists before deletion.
 	containerPage := doc.GetPage("view-containers")
-	if containerPage.FindConnector("containers--webshop.api", "containers--webshop.db") == nil {
+	if containerPage.FindConnector("containers--webshop.api", "containers--webshop.db", 1) == nil {
 		t.Fatal("precondition: api→db connector should exist on container page")
 	}
 
@@ -464,13 +464,13 @@ func TestApplyForward_DeletedRelationshipRemovedFromViewPages(t *testing.T) {
 
 	csDel := &ChangeSet{
 		ModelRelationshipChanges: []RelationshipChange{
-			{From: "webshop.api", To: "webshop.db", Type: Deleted},
+			{From: "webshop.api", To: "webshop.db", Index: 1, Type: Deleted},
 		},
 	}
 	result := ApplyForward(csDel, doc, ts, m)
 
 	// The connector should be removed from the container page.
-	if containerPage.FindConnector("containers--webshop.api", "containers--webshop.db") != nil {
+	if containerPage.FindConnector("containers--webshop.api", "containers--webshop.db", 1) != nil {
 		t.Error("api→db connector should be removed from container page after deletion")
 	}
 
@@ -562,7 +562,7 @@ func TestExcludeRemovesElementFromPage(t *testing.T) {
 		},
 		ModelRelationshipChanges: []RelationshipChange{
 			{From: "customer", To: "webshop", Type: Added, NewValue: "uses"},
-			{From: "webshop.api", To: "webshop.db", Type: Added, NewValue: "reads"},
+			{From: "webshop.api", To: "webshop.db", Index: 1, Type: Added, NewValue: "reads"},
 		},
 	}
 	ApplyForward(csAdd, doc, ts, m)
@@ -575,7 +575,7 @@ func TestExcludeRemovesElementFromPage(t *testing.T) {
 	if containerPage.FindElement("webshop.db") == nil {
 		t.Fatal("precondition: webshop.db should exist on container page")
 	}
-	if containerPage.FindConnector("containers--webshop.api", "containers--webshop.db") == nil {
+	if containerPage.FindConnector("containers--webshop.api", "containers--webshop.db", 1) == nil {
 		t.Fatal("precondition: api→db connector should exist on container page")
 	}
 
@@ -598,7 +598,7 @@ func TestExcludeRemovesElementFromPage(t *testing.T) {
 	}
 
 	// Connectors referencing the excluded element should also be removed.
-	if containerPage.FindConnector("containers--webshop.api", "containers--webshop.db") != nil {
+	if containerPage.FindConnector("containers--webshop.api", "containers--webshop.db", 1) != nil {
 		t.Error("api→db connector should be removed after webshop.db is excluded from view")
 	}
 
@@ -639,7 +639,7 @@ func TestApplyForward_DeleteElementRemovesConnectors(t *testing.T) {
 		},
 		ModelRelationshipChanges: []RelationshipChange{
 			{From: "customer", To: "webshop", Type: Added, NewValue: "uses"},
-			{From: "webshop.api", To: "webshop.db", Type: Added, NewValue: "reads"},
+			{From: "webshop.api", To: "webshop.db", Index: 1, Type: Added, NewValue: "reads"},
 		},
 	}
 	ApplyForward(csAdd, doc, ts, m)
@@ -649,7 +649,7 @@ func TestApplyForward_DeleteElementRemovesConnectors(t *testing.T) {
 	if containerPage.FindElement("webshop.db") == nil {
 		t.Fatal("precondition: webshop.db should exist on container page")
 	}
-	if containerPage.FindConnector("containers--webshop.api", "containers--webshop.db") == nil {
+	if containerPage.FindConnector("containers--webshop.api", "containers--webshop.db", 1) == nil {
 		t.Fatal("precondition: api→db connector should exist on container page")
 	}
 
@@ -681,13 +681,13 @@ func TestApplyForward_DeleteElementRemovesConnectors(t *testing.T) {
 	}
 
 	// The connector referencing the deleted element should also be removed.
-	if containerPage.FindConnector("containers--webshop.api", "containers--webshop.db") != nil {
+	if containerPage.FindConnector("containers--webshop.api", "containers--webshop.db", 1) != nil {
 		t.Error("api→db connector should be removed when webshop.db is deleted")
 	}
 
 	// The customer→webshop connector on the context page should be unaffected.
 	contextPage := doc.GetPage("view-context")
-	if contextPage.FindConnector("context--customer", "context--webshop") == nil {
+	if contextPage.FindConnector("context--customer", "context--webshop", 0) == nil {
 		t.Error("customer→webshop connector on context page should be unaffected")
 	}
 

@@ -269,8 +269,8 @@ func applyChangesToPage(
 				// view's element filter, so we bypass lifting entirely.
 				fromRef := scopedCellID(viewID, ch.From)
 				toRef := scopedCellID(viewID, ch.To)
-				if page.FindConnector(fromRef, toRef) != nil {
-					page.DeleteConnector(fromRef, toRef)
+				if page.FindConnector(fromRef, toRef, ch.Index) != nil {
+					page.DeleteConnector(fromRef, toRef, ch.Index)
 					result.ConnectorsDeleted++
 				}
 			default:
@@ -290,17 +290,24 @@ func applyChangesToPage(
 				if pass == 1 && !isLifted {
 					continue // Second pass: only lifted relationships
 				}
-				lifted := RelationshipChange{From: from, To: to, Type: ch.Type, NewValue: ch.NewValue}
-				pairKey := from + "->" + to
+				lifted := RelationshipChange{From: from, To: to, Index: ch.Index, Type: ch.Type, NewValue: ch.NewValue}
 				switch ch.Type {
 				case Added:
-					if liftedSeen[pairKey] {
-						continue
+					// Only deduplicate lifted relationships. When multiple
+					// child relationships (e.g., a.x→b.z and a.y→b.z) are
+					// lifted to the same parent pair (a→b), only one connector
+					// should be created. Direct (non-lifted) relationships
+					// with the same pair must not be deduplicated. (#142)
+					if isLifted {
+						pairKey := from + "->" + to
+						if liftedSeen[pairKey] {
+							continue
+						}
+						liftedSeen[pairKey] = true
 					}
-					liftedSeen[pairKey] = true
 					applyRelAdded(lifted, viewID, page, templates, result)
 				case Modified:
-					page.UpdateConnectorLabel(from, to, ch.NewValue)
+					page.UpdateConnectorLabel(from, to, ch.Index, ch.NewValue)
 					result.ConnectorsUpdated++
 				}
 			}
@@ -515,7 +522,7 @@ func applyRelAdded(
 	tgtRef := scopedCellID(viewID, ch.To)
 
 	// Skip if connector already exists to prevent duplicates. (#119)
-	if page.FindConnector(srcRef, tgtRef) != nil {
+	if page.FindConnector(srcRef, tgtRef, ch.Index) != nil {
 		return
 	}
 
@@ -526,6 +533,7 @@ func applyRelAdded(
 		Label:     ch.NewValue,
 		SourceRef: srcRef,
 		TargetRef: tgtRef,
+		Index:     ch.Index,
 	}
 	page.CreateConnector(data, style)
 	result.ConnectorsCreated++

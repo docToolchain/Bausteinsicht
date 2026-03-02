@@ -170,6 +170,41 @@ func TestValidate_DuplicateRelationship(t *testing.T) {
 	}
 }
 
+// TestValidate_MultipleRelsSamePairDifferentLabel verifies that multiple
+// relationships between the same pair with different labels are allowed. (#142)
+func TestValidate_MultipleRelsSamePairDifferentLabel(t *testing.T) {
+	m := buildValidModel()
+	m.Relationships = []Relationship{
+		{From: "customer", To: "shop", Kind: "uses", Label: "browses"},
+		{From: "customer", To: "shop", Kind: "uses", Label: "buys from"},
+	}
+
+	errs := Validate(m)
+	for _, e := range errs {
+		if contains(e.Message, "duplicate") {
+			t.Errorf("should not report duplicate for different labels, got: %v", e)
+		}
+	}
+}
+
+// TestValidate_MultipleRelsSamePairDifferentKind verifies that multiple
+// relationships between the same pair with different kinds are allowed. (#142)
+func TestValidate_MultipleRelsSamePairDifferentKind(t *testing.T) {
+	m := buildValidModel()
+	m.Specification.Relationships["calls"] = RelationshipKind{Notation: "calls"}
+	m.Relationships = []Relationship{
+		{From: "customer", To: "shop", Kind: "uses"},
+		{From: "customer", To: "shop", Kind: "calls"},
+	}
+
+	errs := Validate(m)
+	for _, e := range errs {
+		if contains(e.Message, "duplicate") {
+			t.Errorf("should not report duplicate for different kinds, got: %v", e)
+		}
+	}
+}
+
 func TestValidate_EmptyElementID(t *testing.T) {
 	m := &BausteinsichtModel{
 		Specification: Specification{

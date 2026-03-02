@@ -86,13 +86,25 @@ func applyRelationshipChange(ch RelationshipChange, m *model.BausteinsichtModel,
 	switch ch.Type {
 	case Modified:
 		updated := false
-		for i, r := range m.Relationships {
+		if ch.Index >= 0 && ch.Index < len(m.Relationships) {
+			r := m.Relationships[ch.Index]
 			if r.From == ch.From && r.To == ch.To {
 				if ch.Field == "label" {
-					m.Relationships[i].Label = ch.NewValue
+					m.Relationships[ch.Index].Label = ch.NewValue
 				}
 				updated = true
-				break
+			}
+		}
+		// Fallback: search by from/to if index does not match.
+		if !updated {
+			for i, r := range m.Relationships {
+				if r.From == ch.From && r.To == ch.To {
+					if ch.Field == "label" {
+						m.Relationships[i].Label = ch.NewValue
+					}
+					updated = true
+					break
+				}
 			}
 		}
 		if updated {
@@ -104,7 +116,17 @@ func applyRelationshipChange(ch RelationshipChange, m *model.BausteinsichtModel,
 
 	case Deleted:
 		before := len(m.Relationships)
-		m.Relationships = filterRelationships(m.Relationships, ch.From, ch.To)
+		if ch.Index >= 0 && ch.Index < len(m.Relationships) {
+			r := m.Relationships[ch.Index]
+			if r.From == ch.From && r.To == ch.To {
+				m.Relationships = append(m.Relationships[:ch.Index], m.Relationships[ch.Index+1:]...)
+			} else {
+				// Fallback: filter by from/to.
+				m.Relationships = filterRelationships(m.Relationships, ch.From, ch.To)
+			}
+		} else {
+			m.Relationships = filterRelationships(m.Relationships, ch.From, ch.To)
+		}
 		if len(m.Relationships) < before {
 			result.RelationshipsDeleted++
 		}

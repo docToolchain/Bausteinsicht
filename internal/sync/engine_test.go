@@ -345,3 +345,69 @@ func TestRun_FullRoundTrip(t *testing.T) {
 		t.Errorf("round 2: expected no conflicts, got %d", len(r2.Conflicts))
 	}
 }
+
+// --- Test 7: Multiple relationships between same pair (#142) ---
+//
+// Verifies that two relationships from A to B with different labels both
+// survive a full sync round-trip and produce two distinct connectors.
+
+func TestRun_MultipleRelsSamePair(t *testing.T) {
+	ts := minimalTemplates(t)
+
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"a": {Kind: "container", Title: "A"},
+			"b": {Kind: "container", Title: "B"},
+		},
+		Relationships: []model.Relationship{
+			{From: "a", To: "b", Label: "uses"},
+			{From: "a", To: "b", Label: "calls"},
+		},
+	}
+
+	doc := emptyDoc()
+	state := emptyState()
+
+	// Round 1: first sync populates an empty doc.
+	r1 := Run(m, doc, state, ts)
+	if r1.Forward.ElementsCreated != 2 {
+		t.Fatalf("round 1: expected 2 elements created, got %d", r1.Forward.ElementsCreated)
+	}
+	if r1.Forward.ConnectorsCreated != 2 {
+		t.Fatalf("round 1: expected 2 connectors created, got %d", r1.Forward.ConnectorsCreated)
+	}
+
+	// Verify both connectors exist on the page.
+	page := doc.Pages()[0]
+	conns := page.FindAllConnectors()
+	if len(conns) != 2 {
+		t.Fatalf("round 1: expected 2 connectors on page, got %d", len(conns))
+	}
+
+	// Build state after round 1.
+	state1 := &SyncState{
+		Elements: map[string]ElementState{
+			"a": {Title: "A", Kind: "container"},
+			"b": {Title: "B", Kind: "container"},
+		},
+		Relationships: []RelationshipState{
+			{From: "a", To: "b", Index: 0, Label: "uses"},
+			{From: "a", To: "b", Index: 1, Label: "calls"},
+		},
+	}
+
+	// Round 2: nothing changed — sync should be a complete no-op.
+	r2 := Run(m, doc, state1, ts)
+
+	if r2.Forward.ConnectorsCreated != 0 || r2.Forward.ConnectorsUpdated != 0 || r2.Forward.ConnectorsDeleted != 0 {
+		t.Errorf("round 2: expected no forward connector changes, got created=%d updated=%d deleted=%d",
+			r2.Forward.ConnectorsCreated, r2.Forward.ConnectorsUpdated, r2.Forward.ConnectorsDeleted)
+	}
+	if r2.Reverse.RelationshipsCreated != 0 || r2.Reverse.RelationshipsUpdated != 0 || r2.Reverse.RelationshipsDeleted != 0 {
+		t.Errorf("round 2: expected no reverse relationship changes, got created=%d updated=%d deleted=%d",
+			r2.Reverse.RelationshipsCreated, r2.Reverse.RelationshipsUpdated, r2.Reverse.RelationshipsDeleted)
+	}
+	if len(r2.Conflicts) != 0 {
+		t.Errorf("round 2: expected no conflicts, got %d", len(r2.Conflicts))
+	}
+}
