@@ -916,3 +916,138 @@ func TestSyncRecreatesDeletedDrawioFileWithCustomTemplate(t *testing.T) {
 		t.Error("recreated drawio missing <mxfile> element")
 	}
 }
+
+// TestSyncAbortsOnInvalidIncludePattern verifies that sync returns an error
+// when the model contains a view with an include pattern that references a
+// non-existent element (e.g., "customer." with trailing dot). This prevents
+// silent element removal from draw.io pages. Regression test for #176.
+func TestSyncAbortsOnInvalidIncludePattern(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
+
+	// Init project.
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"init"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("init failed: %v", err)
+	}
+
+	// First sync to establish baseline state.
+	captureStdout(t, func() {
+		cmd2 := NewRootCmd()
+		cmd2.SetArgs([]string{"sync"})
+		if err := cmd2.Execute(); err != nil {
+			t.Fatalf("first sync failed: %v", err)
+		}
+	})
+
+	// Corrupt the include pattern: "customer" → "customer." (trailing dot).
+	m, err := model.Load("architecture.jsonc")
+	if err != nil {
+		t.Fatalf("load model: %v", err)
+	}
+
+	// Find a view with includes and corrupt one.
+	var modified bool
+	for id, view := range m.Views {
+		for i, inc := range view.Include {
+			if !strings.Contains(inc, "*") {
+				view.Include[i] = inc + "." // trailing dot = invalid
+				m.Views[id] = view
+				modified = true
+				break
+			}
+		}
+		if modified {
+			break
+		}
+	}
+	if !modified {
+		t.Skip("no non-wildcard include pattern found in init template views")
+	}
+
+	if err := model.Save("architecture.jsonc", m); err != nil {
+		t.Fatalf("save model: %v", err)
+	}
+
+	// Sync should fail because of the invalid include pattern.
+	syncCmd := NewRootCmd()
+	syncCmd.SetArgs([]string{"sync"})
+	syncCmd.SilenceErrors = true
+	syncCmd.SilenceUsage = true
+
+	captureStdout(t, func() {
+		err = syncCmd.Execute()
+	})
+
+	if err == nil {
+		t.Fatal("expected sync to fail with invalid include pattern, but it succeeded")
+	}
+
+	// The error should mention validation.
+	if !strings.Contains(err.Error(), "validation") {
+		t.Errorf("expected error to mention 'validation', got: %v", err)
+	}
+}
+
+// TestSyncAbortsOnInvalidExcludePattern verifies that sync returns an error
+// when the model contains a view with an exclude pattern that references a
+// non-existent element. Regression test for #176.
+func TestSyncAbortsOnInvalidExcludePattern(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
+
+	// Init project.
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"init"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("init failed: %v", err)
+	}
+
+	// First sync to establish baseline state.
+	captureStdout(t, func() {
+		cmd2 := NewRootCmd()
+		cmd2.SetArgs([]string{"sync"})
+		if err := cmd2.Execute(); err != nil {
+			t.Fatalf("first sync failed: %v", err)
+		}
+	})
+
+	// Add an invalid exclude pattern: "..." (just dots, non-existent element).
+	m, err := model.Load("architecture.jsonc")
+	if err != nil {
+		t.Fatalf("load model: %v", err)
+	}
+
+	for id, view := range m.Views {
+		view.Exclude = append(view.Exclude, "...")
+		m.Views[id] = view
+		break
+	}
+
+	if err := model.Save("architecture.jsonc", m); err != nil {
+		t.Fatalf("save model: %v", err)
+	}
+
+	// Sync should fail because of the invalid exclude pattern.
+	syncCmd := NewRootCmd()
+	syncCmd.SetArgs([]string{"sync"})
+	syncCmd.SilenceErrors = true
+	syncCmd.SilenceUsage = true
+
+	captureStdout(t, func() {
+		err = syncCmd.Execute()
+	})
+
+	if err == nil {
+		t.Fatal("expected sync to fail with invalid exclude pattern, but it succeeded")
+	}
+}
