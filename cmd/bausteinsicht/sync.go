@@ -58,7 +58,7 @@ func runSync(cmd *cobra.Command, _ []string) error {
 		if !errors.Is(err, fs.ErrNotExist) {
 			return exitWithCode(fmt.Errorf("loading draw.io file: %w", err), 2)
 		}
-		fmt.Fprintln(cmd.ErrOrStderr(), "WARNING: Draw.io file not found, recreating from template")
+		_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "WARNING: Draw.io file not found, recreating from template")
 		doc = drawio.NewDocument()
 		recreated = true
 	}
