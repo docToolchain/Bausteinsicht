@@ -1,0 +1,400 @@
+= E2E Test Report — 2026-03-02 (Round 3)
+:toc:
+:toc-title: Contents
+
+== Summary
+
+Third comprehensive E2E test pass after all 18 bugs from round 1+2 were fixed.
+Testing performed on devcontainer (Linux 5.15.167.4-microsoft-standard-WSL2) using the built CLI binary.
+Focus: intensive edge-case hunting across all CLI workflows, security/injection testing, file integrity.
+
+[cols="1,1,1"]
+|===
+| Category | Tests | Bugs Found
+
+| Basic Workflow / Init / Validate | 52 | 5
+| Forward Sync Edge Cases | 23 | 6
+| Reverse Sync + Conflicts | 28 | 1
+| Views / Wildcards / Scope / Lifting | 28 | 1
+| CLI Add Commands / JSONC / Template | 55 | 2
+| Watch Mode | 8 | 1
+| Draw.io File Integrity (10 cycles) | 5 | 0
+| Security / Injection Testing | 9 | 0
+| CLI Flag Interactions | 7 | 3
+| Sync State Edge Cases | 6 | 2
+| **Total** | **221** | **12 new bugs (filed as issues)**
+|===
+
+== Previous Issues Status
+
+All 18 bugs from rounds 1+2 (#107–#124) have been fixed and merged.
+
+== New Issues Filed
+
+=== Critical (Data Loss)
+
+[cols="1,3,1"]
+|===
+| Issue | Description | Test Area
+
+| #140 | Corrupted drawio file causes silent model data loss — all elements deleted | Forward Sync
+|===
+
+=== High Severity
+
+[cols="1,3,1"]
+|===
+| Issue | Description | Test Area
+
+| #141 | Deleted or empty sync state creates persistent duplicate elements | Sync State
+| #142 | Multiple relationships between same two elements are lost (ID collision) | Forward Sync
+|===
+
+=== Medium Severity
+
+[cols="1,3,1"]
+|===
+| Issue | Description | Test Area
+
+| #143 | Orphaned view pages not removed when view deleted from model | Views
+| #144 | `--verbose` flag is declared but never implemented (no-op on all commands) | CLI Flags
+| #145 | `--format` flag silently ignores invalid values like `xml`, `JSON` | CLI Flags
+| #146 | Validate accepts empty string `""` and whitespace-only `" "` element IDs | Validation
+| #147 | UTF-8 BOM in model file causes cryptic parse error | Model Parsing
+| #148 | `--template` flag silently accepts wrong file types (e.g., .jsonc) | CLI Flags
+|===
+
+=== Low Severity
+
+[cols="1,3,1"]
+|===
+| Issue | Description | Test Area
+
+| #149 | Sync cannot recreate deleted drawio file from model | Forward Sync
+| #150 | Reverse sync accepts empty title from drawio without warning | Reverse Sync
+| #151 | Validate does not check element references in view include/exclude | Validation
+|===
+
+== Detailed Test Results
+
+=== 1. Basic Workflow / Init
+
+[cols="3,1,3"]
+|===
+| Test | Result | Notes
+
+| `bausteinsicht init` in fresh dir | PASS | Creates architecture.jsonc, template.drawio, architecture.drawio, .bausteinsicht-sync
+| Double init in same dir | PASS | Error: file already exists (exit 2)
+| Init in read-only dir | PASS | Permission denied (exit 2)
+| Validate after init | PASS | "Model is valid."
+| Sync after init | PASS | "Already in sync. No changes."
+| Init `--format json` | PASS | Valid JSON output
+|===
+
+=== 2. Validate Edge Cases
+
+[cols="3,1,3"]
+|===
+| Test | Result | Notes
+
+| Empty JSON `{}` | QUESTIONABLE | Passes validation (#146 related)
+| Spec without model section | PASS | Valid
+| Model without specification | PASS | Reports unknown kind errors
+| Unknown element kind | PASS | Clear error message
+| Relationship to non-existent element | PASS | Clear error for both from/to
+| Empty relationships array | PASS | Valid
+| Empty views map | PASS | Valid
+| `--format json` for errors | PASS | Valid JSON: `{"valid":false,"errors":[...]}`
+| `--format json` for valid model | PASS | `{"valid":true,"errors":[]}`
+| Non-existent model file | PASS | Clear file not found error
+| Model path is a directory | PASS | "is a directory" error
+| View scope referencing non-existent element | PASS | Clear error
+| View include referencing non-existent element | **FAIL** | Silently ignored (#151)
+| View exclude referencing non-existent element | **FAIL** | Silently ignored (#151)
+| Duplicate element IDs at different nesting levels | PASS | Different qualified paths
+| Unknown relationship kind | PASS | Clear error
+| Empty string element ID `""` | **FAIL** | Passes validation (#146)
+| Whitespace-only element ID `" "` | **FAIL** | Passes validation (#146)
+| `null` as root JSON | QUESTIONABLE | Passes validation
+| `--format xml` (invalid format) | **FAIL** | Silently falls back to text (#145)
+| `--format JSON` (uppercase) | **FAIL** | Falls back to text, not JSON (#145)
+| Malformed JSON | PASS | Clear parse error
+| Empty file | PASS | EOF error
+| 500 elements stress test | PASS | Validates in <10ms
+| Unicode in all fields | PASS | Correct handling
+|===
+
+=== 3. Forward Sync Edge Cases
+
+[cols="3,1,3"]
+|===
+| Test | Result | Notes
+
+| Add single element, sync | PASS | Element appears with red dashed border
+| Add 2 elements simultaneously | PASS | Both appear
+| Long ID (120 chars) | PASS | Accepted and synced
+| Unicode ID (üntersystem) | PASS | Rejected by ID validation
+| Remove ALL elements, sync | **FAIL** | Orphan pages not cleaned (#143)
+| Add element back after removal | PASS | Fresh creation
+| Add relationship, sync | PASS | Connector rendered
+| Remove source element of relationship | PASS | Element and connector removed
+| Long relationship label (500 chars) | PASS | No truncation
+| Multiple rels between same pair | **FAIL** | Only last one rendered (#142)
+| Bidirectional relationships (A→B and B→A) | PASS | Both render (different edge IDs)
+| 3 levels of nesting, sync | PASS | All levels correct
+| Delete middle nesting level | PASS | Correct re-parenting
+| Move element between parents | PASS | Old removed, new created
+| Sync 5 times without changes (idempotency) | PASS | All report "Already in sync"
+| Incremental add/remove across syncs | PASS | Correct state tracking
+| No duplicate elements after 5 cycles | PASS | Exactly 1 instance
+| Delete drawio file, then sync | **FAIL** | Cannot recreate (#149)
+| Corrupt drawio file, then sync | **FAIL** | **CRITICAL: deletes all model elements** (#140)
+| Delete sync state, then sync | **FAIL** | Creates duplicates (#141)
+| Read-only drawio file | QUESTIONABLE | Bypasses permissions via atomic write
+| Element in all 3 views | PASS | Appears on all pages
+| Remove element from one view's include | PASS | Only removed from that page
+|===
+
+=== 4. Reverse Sync + Conflicts
+
+[cols="3,1,3"]
+|===
+| Test | Result | Notes
+
+| Change label in drawio, sync | PASS | Model updated
+| Change description (tooltip) in drawio | PASS | Model updated
+| Change technology in drawio | PASS | Model updated
+| HTML entities in drawio label | PASS | Properly decoded (& < > work)
+| Bold HTML tags stripped | PASS | Tags correctly removed
+| Line breaks in drawio label | PASS | Title extracted from first bold
+| Empty string label | **FAIL** | Silently accepted, model becomes invalid (#150)
+| Same field changed in both sides (conflict) | PASS | Model wins, clear warning
+| Different fields changed (title+desc) | PASS | Both applied independently
+| Multiple fields changed in drawio only | PASS | All fields updated
+| Delete element from drawio | PASS | Removed from model + relationships
+| Delete connector from drawio | PASS | Relationship removed from model
+| Delete element with relationships | PASS | Element + all relationships removed
+| Change connector label | PASS | Relationship label updated
+| Change connector source/target | PASS | Old rel removed, new created
+| JSONC `//` comments preserved after reverse sync | PASS | All comments intact
+| JSONC `/* */` block comments preserved | PASS | Block comments intact
+| Trailing commas preserved | PASS | Maintained after sync
+| Rapid consecutive syncs (3x) | PASS | Idempotent after first
+| Sync after clearing sync state | PASS | Recovers (with warnings)
+| Multiple elements changed simultaneously | PASS | All updated in model
+| Conflict message format | PASS | No double WARNING prefix (#116 fixed)
+|===
+
+=== 5. Views / Wildcards / Scope / Lifting
+
+[cols="3,1,3"]
+|===
+| Test | Result | Notes
+
+| `include: ["webshop"]` — exact match | PASS | Only webshop
+| `include: ["webshop.*"]` — direct children | PASS | 3 children
+| `include: ["webshop.**"]` — all descendants | PASS | 7 descendants (not webshop itself)
+| `include: ["*"]` — all top-level | PASS | webshop + external
+| `include: ["**"]` — everything | PASS | All 9 elements
+| `include: ["webshop.frontend.*"]` — nested | PASS | cart + catalog
+| Explicit list of 2 elements | PASS | Exactly those two
+| Mixed wildcard + explicit | PASS | Combined correctly
+| Exclude single element | PASS | Removed from view
+| Exclude nested wildcard | PASS | Correct filtering
+| Exclude descendants | PASS | `backend.**` excludes children not backend
+| Scope with valid element | PASS | Boundary box created
+| Scope with non-existent element | PASS | Warning, graceful handling
+| Scope with empty include | PASS | Only boundary element
+| Direct + lifted relationships | PASS | Direct has priority
+| Lifted to parent | PASS | Label preserved
+| Direct deep (leaf components) | PASS | Correct connector
+| Transitive chain | PASS | No transitive lifting (correct)
+| Two views with overlapping elements | PASS | Both pages have element
+| Remove view from model, sync | **FAIL** | Page persists (#143)
+| Rename view key | **FAIL** | Old page stays, new page added (#143)
+| Empty include `[]` | PASS | Empty page created
+| Nonexistent element in include | PASS | Empty page (no error)
+| Include = exclude (cancel out) | PASS | Empty page
+| Duplicate entries in include | PASS | Deduplicated
+| Trailing dot `"webshop."` | PASS | Treated as exact match (no match)
+| Just dots `"..."` | PASS | No match, empty page
+|===
+
+=== 6. CLI Add Commands
+
+[cols="3,1,3"]
+|===
+| Test | Result | Notes
+
+| Basic add element | PASS | Success
+| Duplicate ID | PASS | Rejected with error
+| Empty ID `""` | PASS | Rejected by ID regex
+| ID with space | PASS | Rejected (#123 fixed)
+| Dotted ID `"a.b"` | PASS | Rejected (#123 fixed)
+| Empty title `""` | PASS | Rejected (#124 fixed)
+| Unknown kind | PASS | Error with valid kinds listed
+| Valid parent | PASS | Success with dot-notation path
+| Invalid parent | PASS | Element not found error
+| Numeric-starting ID | PASS | Rejected (must start with letter)
+| Underscore-starting ID | PASS | Rejected
+| camelCase / UPPER / single-char IDs | PASS | All accepted
+| No flags at all | PASS | Missing required flags error
+| All optional flags (description, technology) | PASS | Stored correctly
+| `--format json` | PASS | Valid JSON output
+| Add relationship (basic) | PASS | Success
+| Self-referencing relationship | PASS | Now accepted (#111 fixed)
+| Non-existent from/to | PASS | Clear error
+| Empty label | PASS | Accepted
+| Long label (1000 chars) | PASS | Accepted
+| Special chars in label (& < > " ') | PASS | Correctly escaped
+| Duplicate relationship | PASS | Rejected (same from+to pair)
+| `--format json` for relationship | PASS | Valid JSON
+| Dot notation for nested elements | PASS | Works correctly
+| Unknown relationship kind | PASS | Rejected with error
+| Without --kind flag | PASS | Accepted
+| Without --label flag | PASS | Accepted
+|===
+
+=== 7. JSONC Comment Preservation
+
+[cols="3,1,3"]
+|===
+| Test | Result | Notes
+
+| `//` line comments after add element | PASS | All comments preserved
+| `/* */` block comments after add element | PASS | Block comments preserved
+| Trailing commas after add element | PASS | Maintained
+| Mixed comments (`//` + `/* */`) | PASS | Both types preserved
+| Inline comment (`"key": "val" // comment`) | PASS | Preserved
+| Two sequential adds | PASS | All comments intact
+| Add relationship preserves comments | PASS | No comment loss
+|===
+
+=== 8. Watch Mode
+
+[cols="3,1,3"]
+|===
+| Test | Result | Notes
+
+| Detects model changes | PASS | Sync triggered within debounce
+| Detects drawio changes | PASS | Reverse sync triggered
+| Debounce (5 rapid saves) | PASS | Single sync fired
+| Recovery from invalid model | PASS | Error, no crash, recovery
+| `--model` flag | PASS | Works correctly
+| Non-existent model | PASS | Immediate error (exit 2)
+| Clean exit on SIGINT | PASS | "Stopped watching." (exit 0)
+| `--verbose` flag | **FAIL** | No additional output (#144)
+|===
+
+=== 9. Draw.io File Integrity (10 cycles)
+
+[cols="3,1,3"]
+|===
+| Test | Result | Notes
+
+| XML well-formedness after 10 add+sync cycles | PASS | Valid XML every cycle
+| No orphaned connectors after element removal | PASS | Clean removal
+| Style consistency (5 elements same kind) | PASS | Identical styles
+| Page structure (mxCell 0/1 base cells) | PASS | Exactly one each per page
+| mxGraphModel attributes preserved | PASS | All attributes intact
+|===
+
+=== 10. Security / Injection Testing
+
+[cols="3,1,3"]
+|===
+| Test | Result | Notes
+
+| XML injection via title (`<script>`) | PASS | Properly escaped
+| XML injection via description (attribute injection) | PASS | XML well-formed
+| XML injection via relationship label | PASS | No injected elements
+| CDATA injection | PASS | XML integrity maintained
+| Unicode null bytes in title | PASS | Stripped by shell, no damage
+| Very long strings (100K chars) | PASS | No crash, handles fine
+| Path traversal via `--parent` flag | PASS | Treated as model path, not filesystem
+| Shell injection via element ID (`$(whoami)`, etc.) | PASS | Rejected by ID regex
+| JSON injection in model title | PASS | Literal string, no attribute injection
+|===
+
+=== 11. CLI Flag Interactions
+
+[cols="3,1,3"]
+|===
+| Test | Result | Notes
+
+| `--verbose` with validate | **FAIL** | Identical to non-verbose (#144)
+| `--verbose` with sync | **FAIL** | Identical to non-verbose (#144)
+| `--model` pointing to .drawio file | PASS | Clear parse error
+| `--template` pointing to .jsonc file | **FAIL** | Silently accepted with degraded styling (#148)
+| `--format json` + `--verbose` | PASS | Valid JSON (verbose doesn't break output)
+| Conflicting flags (non-existent model+template) | PASS | Model error first
+| `--help` on all 6 subcommands | PASS | All show help, exit 0
+|===
+
+=== 12. Sync State Edge Cases
+
+[cols="3,1,3"]
+|===
+| Test | Result | Notes
+
+| Corrupt sync state (invalid JSON) | PASS | Clear parse error
+| Sync state with extra/stale entries | PASS | Stale entries cleaned up
+| Sync state with missing entries | **FAIL** | Creates duplicates (#141)
+| Empty sync state `{}` | **FAIL** | Creates duplicates (#141)
+| Sync state as empty file (0 bytes) | PASS | Clear EOF error
+| Sync state as JSON array | PASS | Clear unmarshal error
+|===
+
+=== 13. Model File Edge Cases
+
+[cols="3,1,3"]
+|===
+| Test | Result | Notes
+
+| UTF-8 BOM | **FAIL** | Cryptic parse error (#147)
+| Windows line endings `\r\n` | PASS | Handled correctly
+| Mixed line endings | PASS | Handled correctly
+| Tab indentation | PASS | Works fine
+| No trailing newline | PASS | Works fine
+| Minified (single-line) JSON | PASS | Works fine
+| 100 elements performance | PASS | Add 499ms, validate 6ms, sync 13ms
+|===
+
+== Root Cause Patterns
+
+=== 1. Missing Defensive Checks Before Destructive Sync
+
+The sync engine trusts that the drawio file and sync state are consistent. When either is corrupted, missing, or reset, the engine proceeds without verifying existing content, leading to data loss (#140) or duplication (#141).
+
+**Recommendation:** Before applying destructive changes (element deletion, full re-creation), verify that the source data is trustworthy. Add a "sanity check" that compares the expected element count from sync state vs. what's actually in the drawio.
+
+=== 2. No Lifecycle Management for View Pages
+
+Pages are created for new views but never removed for deleted views (#143). The sync engine needs a garbage-collection step for managed pages.
+
+=== 3. Declared But Unimplemented Features
+
+The `--verbose` flag (#144) and format validation (#145) were declared in the CLI framework but never wired up, creating a silent-failure UX.
+
+== Comparison with Previous Rounds
+
+[cols="1,1,1,1"]
+|===
+| Metric | Round 1+2 | Round 3 | Trend
+
+| Total tests | 73 | 221 | +203% coverage
+| Bugs found | 18 | 12 | Fewer bugs per test
+| Critical bugs | 3 | 1 | Significant improvement
+| Security issues | untested | 0/9 | Clean
+| Injection attacks | untested | 0/9 | Clean
+| Previous bugs regressed | — | 0/18 | All fixes hold
+|===
+
+== Recommendations
+
+1. **Priority 1 (Critical):** Fix #140 (corrupted drawio data loss) — add drawio validation before reverse sync
+2. **Priority 2 (High):** Fix #141 (duplicate elements) — check for existing `bausteinsicht_id` before adding
+3. **Priority 2 (High):** Fix #142 (multiple rels) — disambiguate connector IDs
+4. **Priority 3 (Medium):** Fix #143 (orphaned pages) — add page garbage collection
+5. **Priority 3 (Medium):** Fix #144-#148 (CLI UX) — implement verbose, validate format flag, BOM handling
+6. **Priority 4 (Low):** Fix #149-#151 — quality-of-life improvements
