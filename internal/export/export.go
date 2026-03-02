@@ -4,6 +4,7 @@ package export
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"strconv"
 )
@@ -56,6 +57,10 @@ func ExportPage(binary string, opts ExportOptions) error {
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("draw.io export failed: %w\nOutput: %s", err, string(output))
+	}
+	// Verify the output file was actually created (#195).
+	if _, err := os.Stat(opts.OutputPath); err != nil {
+		return fmt.Errorf("draw.io CLI exited successfully but output file not created: %s", opts.OutputPath)
 	}
 	return nil
 }
