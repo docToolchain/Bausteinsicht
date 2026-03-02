@@ -1062,3 +1062,57 @@ func TestDetectChanges_NewRelationshipFromDrawioHasLabel(t *testing.T) {
 		t.Errorf("expected Added relationship change a->b, got: %+v", cs.DrawioRelationshipChanges)
 	}
 }
+
+func TestDetectChanges_SelfRefConnectorNotClassifiedAsLifted(t *testing.T) {
+	// Model has "backend" with children "backend.api" and "backend.db",
+	// and a child-to-child relationship backend.api → backend.db.
+	// A user draws a self-referencing connector backend → backend in draw.io.
+	// This should NOT be classified as a "lifted" version of backend.api → backend.db.
+	state := emptyState()
+	state.Elements["backend"] = ElementState{Title: "Backend", Kind: "system"}
+	state.Relationships = []RelationshipState{
+		{From: "backend.api", To: "backend.db", Label: "queries"},
+	}
+
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"backend": {Kind: "system", Title: "Backend", Children: map[string]model.Element{
+				"api": {Kind: "container", Title: "API"},
+				"db":  {Kind: "container", Title: "DB"},
+			}},
+		},
+		Relationships: []model.Relationship{
+			{From: "backend.api", To: "backend.db", Label: "queries"},
+		},
+	}
+
+	doc := drawio.NewDocument()
+	page := doc.AddPage("view-ctx", "Context")
+	_ = page.CreateElement(drawio.ElementData{
+		ID: "backend", CellID: "ctx--backend", Kind: "system", Title: "Backend",
+	}, "")
+	// Existing lifted connector for backend.api → backend.db
+	page.CreateConnector(drawio.ConnectorData{
+		From: "backend", To: "backend",
+		Label:     "monitors",
+		SourceRef: "ctx--backend",
+		TargetRef: "ctx--backend",
+	}, "")
+
+	cs := DetectChanges(m, doc, state, nil)
+
+	// The self-referencing connector should be detected as Added, not ignored.
+	found := false
+	for _, ch := range cs.DrawioRelationshipChanges {
+		if ch.From == "backend" && ch.To == "backend" && ch.Type == Added {
+			found = true
+			if ch.NewValue != "monitors" {
+				t.Errorf("expected label 'monitors', got %q", ch.NewValue)
+			}
+		}
+	}
+	if !found {
+		t.Errorf("self-referencing connector backend→backend should be detected as Added, got: %+v",
+			cs.DrawioRelationshipChanges)
+	}
+}

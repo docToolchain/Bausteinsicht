@@ -605,6 +605,12 @@ func unionRelKeys(
 // is not visible. For example, model has A→B.child but the view only shows A
 // and B, so the connector is lifted to A→B.
 func isLiftedRelationship(from, to string, modelRels map[string]RelationshipState) bool {
+	// A self-referencing relationship (from == to) can never be a lifted
+	// version of a child-to-child relationship, because lifting never
+	// collapses two distinct endpoints into the same element (#212).
+	if from == to {
+		return false
+	}
 	for _, mr := range modelRels {
 		// Same from, model to is more specific (to is ancestor of mr.To)
 		if mr.From == from && mr.To != to && strings.HasPrefix(mr.To, to+".") {
