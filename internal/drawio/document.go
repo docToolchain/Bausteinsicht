@@ -147,6 +147,26 @@ func (d *Document) AddPage(id, name string) *Page {
 	return &Page{diagram: diagram}
 }
 
+// RemovePage removes the page (diagram element) with the given id from the document.
+// If no page with the given id exists, RemovePage is a no-op.
+func (d *Document) RemovePage(id string) {
+	root := d.tree.Root()
+	if root == nil {
+		return
+	}
+	for _, el := range root.SelectElements("diagram") {
+		if el.SelectAttrValue("id", "") == id {
+			root.RemoveChild(el)
+			return
+		}
+	}
+}
+
+// ID returns the id attribute of the page's diagram element.
+func (p *Page) ID() string {
+	return p.diagram.SelectAttrValue("id", "")
+}
+
 // Root returns the <root> element of the page for direct manipulation.
 func (p *Page) Root() *etree.Element {
 	model := p.diagram.FindElement("mxGraphModel")

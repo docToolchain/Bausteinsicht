@@ -208,6 +208,100 @@ func TestRun_ViewBasedSyncNoPhantomChanges(t *testing.T) {
 	}
 }
 
+// --- Test 5b: Orphaned view pages removed when view is deleted (#143) ---
+//
+// Round 1: model has 2 views → creates 2 pages.
+// Round 2: model has 1 view → orphaned page should be removed.
+
+func TestRun_OrphanedViewPageRemoved(t *testing.T) {
+	ts := minimalTemplates(t)
+
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"customer": {Kind: "container", Title: "Customer"},
+			"shop":     {Kind: "container", Title: "Shop"},
+		},
+		Relationships: []model.Relationship{},
+		Views: map[string]model.View{
+			"ctx":    {Title: "Context", Include: []string{"customer", "shop"}},
+			"detail": {Title: "Detail", Include: []string{"shop"}},
+		},
+	}
+
+	// Build doc with pages for both views.
+	doc := drawio.NewDocument()
+	doc.AddPage("view-ctx", "Context")
+	doc.AddPage("view-detail", "Detail")
+
+	state := emptyState()
+
+	// Round 1: forward sync populates both pages.
+	r1 := Run(m, doc, state, ts)
+	if r1.Forward.ElementsCreated < 2 {
+		t.Fatalf("round 1: expected at least 2 elements created, got %d", r1.Forward.ElementsCreated)
+	}
+
+	// Verify both pages exist.
+	if len(doc.Pages()) != 2 {
+		t.Fatalf("round 1: expected 2 pages, got %d", len(doc.Pages()))
+	}
+
+	// Round 2: remove the "detail" view from the model.
+	delete(m.Views, "detail")
+
+	// Remove the orphaned page — this is what the sync command should do.
+	// We call RemoveOrphanedViewPages to simulate the sync command behavior.
+	RemoveOrphanedViewPages(doc, m)
+
+	// The doc should now have only 1 page.
+	if len(doc.Pages()) != 1 {
+		t.Errorf("after removing orphaned pages: expected 1 page, got %d", len(doc.Pages()))
+	}
+
+	// The remaining page should be the "Context" page.
+	if doc.GetPage("view-ctx") == nil {
+		t.Error("context page should still exist")
+	}
+	if doc.GetPage("view-detail") != nil {
+		t.Error("detail page should be removed (orphaned)")
+	}
+}
+
+// --- Test 5c: Non-view pages preserved when removing orphans (#143) ---
+//
+// Verifies that pages not managed by bausteinsicht (e.g., default template
+// pages) are NOT removed when cleaning up orphaned view pages.
+
+func TestRun_NonViewPagesPreserved(t *testing.T) {
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"customer": {Kind: "container", Title: "Customer"},
+		},
+		Relationships: []model.Relationship{},
+		Views: map[string]model.View{
+			"ctx": {Title: "Context", Include: []string{"customer"}},
+		},
+	}
+
+	// Build doc with a default page (not a view page) and a view page.
+	doc := drawio.NewDocument()
+	doc.AddPage("default-page", "Welcome")
+	doc.AddPage("view-ctx", "Context")
+
+	RemoveOrphanedViewPages(doc, m)
+
+	// Both pages should still exist — the default page is not a view page.
+	if len(doc.Pages()) != 2 {
+		t.Errorf("expected 2 pages (default + view), got %d", len(doc.Pages()))
+	}
+	if doc.GetPage("default-page") == nil {
+		t.Error("default page should be preserved (not a view page)")
+	}
+	if doc.GetPage("view-ctx") == nil {
+		t.Error("context view page should be preserved")
+	}
+}
+
 // --- Test 6: Full round-trip ---
 //
 // Round 1: model has one element, doc is empty, state is empty → forward populates doc.
