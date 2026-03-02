@@ -53,6 +53,14 @@ func LoadState(path string) (*SyncState, error) {
 		return nil, fmt.Errorf("LoadState %q: %w", path, err)
 	}
 
+	// Treat a zero-byte file as empty/missing state (e.g. truncated write).
+	if len(data) == 0 {
+		return &SyncState{
+			Elements:      make(map[string]ElementState),
+			Relationships: []RelationshipState{},
+		}, nil
+	}
+
 	var state SyncState
 	if err := json.Unmarshal(data, &state); err != nil {
 		return nil, fmt.Errorf("LoadState %q: %w", path, err)
