@@ -1,6 +1,7 @@
 package sync
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/docToolchain/Bauteinsicht/internal/drawio"
@@ -794,6 +795,116 @@ func TestDetectChanges_MultipleRelsSamePairLabelModified(t *testing.T) {
 	for _, ch := range cs.ModelRelationshipChanges {
 		if ch.From == "a" && ch.To == "b" && ch.Index == 0 && ch.Type == Modified {
 			t.Errorf("first relationship (index=0) should not be modified, got: %+v", ch)
+		}
+	}
+}
+
+// --- Scoped cell ID leak on element deletion (#166) ---
+
+func TestDetectChanges_DeletedElementConnectorUsesCanonicalIDs(t *testing.T) {
+	// Scenario: element "db" (scoped cell ID "components--onlineshop.db") was
+	// deleted from the draw.io document, but a connector referencing it via the
+	// scoped cell ID still exists. The connector's source/target should be
+	// resolved to canonical element IDs, not leaked as scoped cell IDs.
+	//
+	// Setup:
+	// - Model has elements "webapp" and "onlineshop.db" with a relationship.
+	// - State recorded the relationship from previous sync.
+	// - draw.io doc: "onlineshop.db" element was deleted, but a connector from
+	//   "components--webapp" to "components--onlineshop.db" remains.
+	//   "webapp" element still exists with bausteinsicht_id="webapp".
+	state := emptyState()
+	state.Elements["webapp"] = ElementState{Title: "WebApp", Kind: "container"}
+	state.Elements["onlineshop.db"] = ElementState{Title: "Database", Kind: "container"}
+	state.Relationships = []RelationshipState{
+		{From: "webapp", To: "onlineshop.db", Label: "reads"},
+	}
+
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"webapp": {Kind: "container", Title: "WebApp"},
+			"onlineshop": {Kind: "system", Title: "Onlineshop", Children: map[string]model.Element{
+				"db": {Kind: "container", Title: "Database"},
+			}},
+		},
+		Relationships: []model.Relationship{
+			{From: "webapp", To: "onlineshop.db", Label: "reads"},
+		},
+	}
+
+	// Build draw.io doc manually: webapp exists (scoped), db is gone, connector remains.
+	doc := drawio.NewDocument()
+	page := doc.AddPage("view-components", "Components View")
+	// webapp element with scoped cell ID
+	_ = page.CreateElement(drawio.ElementData{
+		ID:     "webapp",
+		CellID: "components--webapp",
+		Kind:   "container",
+		Title:  "WebApp",
+	}, "")
+	// Note: onlineshop.db element is NOT in the document (deleted).
+	// But the connector still references its scoped cell ID.
+	page.CreateConnector(drawio.ConnectorData{
+		From:      "webapp",
+		To:        "onlineshop.db",
+		SourceRef: "components--webapp",
+		TargetRef: "components--onlineshop.db",
+	}, "")
+
+	cs := DetectChanges(m, doc, state)
+
+	// Check all drawio relationship changes: none should contain scoped cell IDs.
+	for _, ch := range cs.DrawioRelationshipChanges {
+		if strings.Contains(ch.From, "--") {
+			t.Errorf("DrawioRelationshipChange.From contains scoped cell ID %q, expected canonical element ID", ch.From)
+		}
+		if strings.Contains(ch.To, "--") {
+			t.Errorf("DrawioRelationshipChange.To contains scoped cell ID %q, expected canonical element ID", ch.To)
+		}
+	}
+
+	// Also verify via ApplyReverse: if changes are applied, the model should
+	// not contain relationships with scoped cell IDs.
+	ApplyReverse(cs, m)
+	for _, rel := range m.Relationships {
+		if strings.Contains(rel.From, "--") {
+			t.Errorf("Model relationship From contains scoped cell ID %q after reverse sync", rel.From)
+		}
+		if strings.Contains(rel.To, "--") {
+			t.Errorf("Model relationship To contains scoped cell ID %q after reverse sync", rel.To)
+		}
+	}
+}
+
+func TestExtractDrawioRelationships_FallbackStripsViewPrefix(t *testing.T) {
+	// When a connector references a scoped cell ID that is NOT in the
+	// cellToElem map (e.g., because the element was deleted), the fallback
+	// should strip the view prefix ("viewID--") to recover the element ID.
+	doc := drawio.NewDocument()
+	page := doc.AddPage("view-ctx", "Context View")
+	// Only "a" exists as an element. "b" was deleted.
+	_ = page.CreateElement(drawio.ElementData{
+		ID:     "a",
+		CellID: "ctx--a",
+		Kind:   "system",
+		Title:  "A",
+	}, "")
+	// Connector still references "ctx--b" which has no element in the doc.
+	page.CreateConnector(drawio.ConnectorData{
+		From:      "a",
+		To:        "b",
+		SourceRef: "ctx--a",
+		TargetRef: "ctx--b",
+	}, "")
+
+	rels := extractDrawioRelationships(doc)
+
+	for key, rel := range rels {
+		if strings.Contains(rel.From, "--") {
+			t.Errorf("relationship key=%s: From=%q contains scoped cell ID prefix", key, rel.From)
+		}
+		if strings.Contains(rel.To, "--") {
+			t.Errorf("relationship key=%s: To=%q contains scoped cell ID prefix", key, rel.To)
 		}
 	}
 }
