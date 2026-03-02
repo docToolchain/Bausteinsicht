@@ -674,3 +674,141 @@ func TestSyncWithExplicitModelPath(t *testing.T) {
 		t.Error("expected some output from sync")
 	}
 }
+
+// TestSyncRecreatesDeletedDrawioFile verifies that when the draw.io file is
+// deleted after a successful sync, running sync again recreates it from the
+// template and populates it with all model elements. Regression test for #149.
+func TestSyncRecreatesDeletedDrawioFile(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
+
+	// Init project.
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"init"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("init failed: %v", err)
+	}
+
+	// First sync to establish baseline state.
+	captureStdout(t, func() {
+		cmd2 := NewRootCmd()
+		cmd2.SetArgs([]string{"sync"})
+		if err := cmd2.Execute(); err != nil {
+			t.Fatalf("first sync failed: %v", err)
+		}
+	})
+
+	// Verify draw.io file exists and has content.
+	beforeDelete, err := os.ReadFile("architecture.drawio")
+	if err != nil {
+		t.Fatalf("reading drawio before delete: %v", err)
+	}
+	if !strings.Contains(string(beforeDelete), "Customer") {
+		t.Fatal("precondition: drawio should contain Customer element")
+	}
+
+	// Delete the draw.io file.
+	if err := os.Remove("architecture.drawio"); err != nil {
+		t.Fatalf("removing drawio: %v", err)
+	}
+
+	// Sync again — should recreate the draw.io file from template.
+	var stderrBuf strings.Builder
+	captureStdout(t, func() {
+		cmd3 := NewRootCmd()
+		cmd3.SetArgs([]string{"sync"})
+		cmd3.SetErr(&stderrBuf)
+		if err := cmd3.Execute(); err != nil {
+			t.Fatalf("sync after delete failed: %v", err)
+		}
+	})
+
+	// Verify the draw.io file was recreated.
+	afterRecreate, err := os.ReadFile("architecture.drawio")
+	if err != nil {
+		t.Fatalf("reading drawio after recreate: %v", err)
+	}
+
+	// File should be a valid draw.io document.
+	if !strings.Contains(string(afterRecreate), "<mxfile") {
+		t.Error("recreated drawio missing <mxfile> element")
+	}
+	if !strings.Contains(string(afterRecreate), "<diagram") {
+		t.Error("recreated drawio missing <diagram> element")
+	}
+
+	// Model elements should have been synced into the recreated file.
+	if !strings.Contains(string(afterRecreate), "Customer") {
+		t.Error("recreated drawio should contain Customer element from model")
+	}
+
+	// Warning should have been printed.
+	if !strings.Contains(stderrBuf.String(), "Draw.io file not found") {
+		t.Error("expected warning about recreating draw.io file on stderr")
+	}
+
+	// Sync state should exist and be valid after recreation.
+	stateData, err := os.ReadFile(".bausteinsicht-sync")
+	if err != nil {
+		t.Fatalf("reading sync state after recreate: %v", err)
+	}
+	var state map[string]interface{}
+	if err := json.Unmarshal(stateData, &state); err != nil {
+		t.Fatalf("invalid sync state JSON after recreate: %v", err)
+	}
+
+	// A subsequent sync should be a no-op (already in sync).
+	captureStdout(t, func() {
+		cmd4 := NewRootCmd()
+		cmd4.SetArgs([]string{"sync"})
+		if err := cmd4.Execute(); err != nil {
+			t.Fatalf("follow-up sync failed: %v", err)
+		}
+	})
+}
+
+// TestSyncRecreatesDeletedDrawioFileWithCustomTemplate verifies that when the
+// draw.io file is deleted and a custom template path is specified, the file is
+// recreated using the custom template.
+func TestSyncRecreatesDeletedDrawioFileWithCustomTemplate(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
+
+	// Init project.
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"init"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("init failed: %v", err)
+	}
+
+	// Delete the draw.io file.
+	if err := os.Remove("architecture.drawio"); err != nil {
+		t.Fatalf("removing drawio: %v", err)
+	}
+
+	// Sync with explicit template — should recreate using that template.
+	captureStdout(t, func() {
+		cmd2 := NewRootCmd()
+		cmd2.SetArgs([]string{"sync", "--template", "template.drawio"})
+		if err := cmd2.Execute(); err != nil {
+			t.Fatalf("sync with template after delete failed: %v", err)
+		}
+	})
+
+	// Verify the draw.io file was recreated.
+	afterRecreate, err := os.ReadFile("architecture.drawio")
+	if err != nil {
+		t.Fatalf("reading drawio after recreate: %v", err)
+	}
+	if !strings.Contains(string(afterRecreate), "<mxfile") {
+		t.Error("recreated drawio missing <mxfile> element")
+	}
+}
