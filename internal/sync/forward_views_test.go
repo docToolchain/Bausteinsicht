@@ -284,6 +284,61 @@ func TestApplyForward_RelationshipLiftingDedup(t *testing.T) {
 	}
 }
 
+// TestApplyForward_DirectRelSuppressesLifted verifies that when a direct
+// relationship a→b exists AND a child relationship a→b.c lifts to a→b,
+// only one connector is created (the direct one wins). (#197)
+func TestApplyForward_DirectRelSuppressesLifted(t *testing.T) {
+	doc := drawio.NewDocument()
+	doc.AddPage("view-overview", "Overview")
+	ts := minimalTemplates(t)
+
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"a": {Kind: "system", Title: "A"},
+			"b": {Kind: "system", Title: "B", Children: map[string]model.Element{
+				"c": {Kind: "container", Title: "C"},
+			}},
+		},
+		Relationships: []model.Relationship{
+			{From: "a", To: "b", Label: "direct", Kind: "uses"},
+			{From: "a", To: "b.c", Label: "indirect", Kind: "uses"},
+		},
+		Views: map[string]model.View{
+			"overview": {
+				Title:   "Overview",
+				Include: []string{"a", "b"},
+			},
+		},
+	}
+
+	cs := &ChangeSet{
+		ModelElementChanges: []ElementChange{
+			{ID: "a", Type: Added},
+			{ID: "b", Type: Added},
+			{ID: "b.c", Type: Added},
+		},
+		ModelRelationshipChanges: []RelationshipChange{
+			{From: "a", To: "b", Index: 0, Type: Added, NewValue: "direct"},
+			{From: "a", To: "b.c", Index: 1, Type: Added, NewValue: "indirect"},
+		},
+	}
+
+	ApplyForward(cs, doc, ts, m, nil)
+
+	page := doc.GetPage("view-overview")
+	conns := page.FindAllConnectors()
+
+	if len(conns) != 1 {
+		t.Errorf("expected 1 connector (direct suppresses lifted), got %d", len(conns))
+	}
+	if len(conns) == 1 {
+		label := conns[0].SelectAttrValue("value", "")
+		if label != "direct" {
+			t.Errorf("expected connector label %q, got %q", "direct", label)
+		}
+	}
+}
+
 // TestApplyForward_ScopeBoundingBox verifies that the scope element of a view
 // is rendered as a boundary/swimlane on the page, with children nested inside.
 func TestApplyForward_ScopeBoundingBox(t *testing.T) {

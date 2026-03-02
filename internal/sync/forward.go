@@ -334,11 +334,18 @@ func applyChangesToPage(
 					// lifted to the same parent pair (a→b), only one connector
 					// should be created. Direct (non-lifted) relationships
 					// with the same pair must not be deduplicated. (#142)
+					pairKey := from + "->" + to
 					if isLifted {
-						pairKey := from + "->" + to
+						// Skip lifted relationships when a direct relationship
+						// or another lifted relationship already covers this
+						// pair. (#142, #197)
 						if liftedSeen[pairKey] {
 							continue
 						}
+						liftedSeen[pairKey] = true
+					} else {
+						// Record direct relationships so lifted ones targeting
+						// the same pair are suppressed in pass 1. (#197)
 						liftedSeen[pairKey] = true
 					}
 					applyRelAdded(lifted, viewID, page, templates, result)
