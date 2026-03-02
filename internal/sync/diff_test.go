@@ -1002,3 +1002,63 @@ func TestExtractDrawioRelationships_IgnoresNavBackConnectors(t *testing.T) {
 		}
 	}
 }
+
+// TestDetectChanges_NewRelationshipFromDrawioHasLabel verifies that a new
+// connector added in draw.io carries its label (value attribute) through to
+// the Added relationship change (#204).
+func TestDetectChanges_NewRelationshipFromDrawioHasLabel(t *testing.T) {
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"a": {Kind: "system", Title: "A"},
+			"b": {Kind: "system", Title: "B"},
+		},
+		Relationships: []model.Relationship{},
+	}
+
+	// Create drawio doc with a connector from a to b.
+	doc := drawio.NewDocument()
+	doc.AddPage("view-ctx", "Context")
+	page := doc.GetPage("view-ctx")
+	for _, id := range []string{"a", "b"} {
+		if err := page.CreateElement(drawio.ElementData{
+			ID: id, CellID: "ctx--" + id,
+			Kind: "system", Title: strings.ToUpper(id),
+		}, "shape=test;"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Add a connector with a label.
+	root := page.Root()
+	conn := root.CreateElement("mxCell")
+	conn.CreateAttr("id", "user-edge-1")
+	conn.CreateAttr("value", "reads from")
+	conn.CreateAttr("edge", "1")
+	conn.CreateAttr("source", "ctx--a")
+	conn.CreateAttr("target", "ctx--b")
+	conn.CreateAttr("parent", "1")
+
+	lastState := &SyncState{
+		Elements: map[string]ElementState{
+			"a": {Title: "A"},
+			"b": {Title: "B"},
+		},
+		Relationships: []RelationshipState{},
+	}
+
+	cs := DetectChanges(m, doc, lastState, nil)
+
+	// Should detect an Added relationship change with the label.
+	var found bool
+	for _, ch := range cs.DrawioRelationshipChanges {
+		if ch.Type == Added && ch.From == "a" && ch.To == "b" {
+			if ch.NewValue != "reads from" {
+				t.Errorf("expected NewValue=%q, got %q", "reads from", ch.NewValue)
+			}
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected Added relationship change a->b, got: %+v", cs.DrawioRelationshipChanges)
+	}
+}
