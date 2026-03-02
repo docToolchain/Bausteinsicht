@@ -174,6 +174,7 @@ func TestAddRelationshipDuplicateBlocked(t *testing.T) {
 		"--model", modelPath,
 		"--from", "webshop.api",
 		"--to", "webshop.db",
+		"--kind", "uses",
 	})
 	if err := cmd1.Execute(); err != nil {
 		t.Fatalf("first add failed: %v", err)
@@ -184,6 +185,7 @@ func TestAddRelationshipDuplicateBlocked(t *testing.T) {
 		"--model", modelPath,
 		"--from", "webshop.api",
 		"--to", "webshop.db",
+		"--kind", "uses",
 		"--label", "also reads",
 	})
 	cmd2.SilenceErrors = true
@@ -191,7 +193,7 @@ func TestAddRelationshipDuplicateBlocked(t *testing.T) {
 	err := cmd2.Execute()
 
 	if err == nil {
-		t.Fatal("expected error for duplicate relationship, got nil")
+		t.Fatal("expected error for duplicate relationship (same from, to, kind), got nil")
 	}
 
 	// Verify the duplicate was NOT added.
@@ -201,6 +203,52 @@ func TestAddRelationshipDuplicateBlocked(t *testing.T) {
 	}
 	if len(m.Relationships) != 1 {
 		t.Errorf("expected 1 relationship (duplicate blocked), got %d", len(m.Relationships))
+	}
+}
+
+func TestAddRelationshipDifferentKindAllowed(t *testing.T) {
+	dir := t.TempDir()
+	modelPath := writeRelTestModel(t, dir)
+
+	// Add first relationship with kind "uses".
+	cmd1 := NewRootCmd()
+	cmd1.SetArgs([]string{"add", "relationship",
+		"--model", modelPath,
+		"--from", "webshop.api",
+		"--to", "webshop.db",
+		"--kind", "uses",
+		"--label", "reads from",
+	})
+	if err := cmd1.Execute(); err != nil {
+		t.Fatalf("first add failed: %v", err)
+	}
+
+	// Add second relationship with different kind "depends_on" — should succeed.
+	cmd2 := NewRootCmd()
+	cmd2.SetArgs([]string{"add", "relationship",
+		"--model", modelPath,
+		"--from", "webshop.api",
+		"--to", "webshop.db",
+		"--kind", "depends_on",
+		"--label", "depends on",
+	})
+	if err := cmd2.Execute(); err != nil {
+		t.Fatalf("second add with different kind should succeed, got: %v", err)
+	}
+
+	// Verify both relationships exist.
+	m, err := model.Load(modelPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(m.Relationships) != 2 {
+		t.Fatalf("expected 2 relationships, got %d", len(m.Relationships))
+	}
+	if m.Relationships[0].Kind != "uses" {
+		t.Errorf("expected first relationship kind 'uses', got %q", m.Relationships[0].Kind)
+	}
+	if m.Relationships[1].Kind != "depends_on" {
+		t.Errorf("expected second relationship kind 'depends_on', got %q", m.Relationships[1].Kind)
 	}
 }
 
