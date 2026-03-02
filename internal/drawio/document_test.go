@@ -107,6 +107,50 @@ func TestAddPage_BaseCells(t *testing.T) {
 	}
 }
 
+func TestLoadDocument_RejectsCorruptContent(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test.drawio")
+	os.WriteFile(path, []byte("THIS IS NOT XML"), 0644)
+	_, err := drawio.LoadDocument(path)
+	if err == nil {
+		t.Fatal("expected error for corrupt drawio content")
+	}
+}
+
+func TestLoadDocument_RejectsEmptyMxfile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test.drawio")
+	os.WriteFile(path, []byte(`<?xml version="1.0"?><mxfile></mxfile>`), 0644)
+	_, err := drawio.LoadDocument(path)
+	if err == nil {
+		t.Fatal("expected error for mxfile with no diagrams")
+	}
+}
+
+func TestLoadDocument_RejectsMissingRoot(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test.drawio")
+	os.WriteFile(path, []byte(`<?xml version="1.0"?><mxfile><diagram id="d1" name="Page"><mxGraphModel></mxGraphModel></diagram></mxfile>`), 0644)
+	_, err := drawio.LoadDocument(path)
+	if err == nil {
+		t.Fatal("expected error for diagram missing root element")
+	}
+}
+
+func TestLoadDocument_AcceptsValidDocument(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test.drawio")
+	xml := `<?xml version="1.0"?><mxfile><diagram id="d1" name="Page"><mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/></root></mxGraphModel></diagram></mxfile>`
+	os.WriteFile(path, []byte(xml), 0644)
+	doc, err := drawio.LoadDocument(path)
+	if err != nil {
+		t.Fatalf("expected valid document, got error: %v", err)
+	}
+	if len(doc.Pages()) != 1 {
+		t.Errorf("expected 1 page, got %d", len(doc.Pages()))
+	}
+}
+
 func TestSaveDocument_Atomic(t *testing.T) {
 	doc := drawio.NewDocument()
 	doc.AddPage("p1", "Page 1")

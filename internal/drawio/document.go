@@ -20,11 +20,34 @@ type Page struct {
 }
 
 // LoadDocument parses a draw.io XML file from disk.
+// It validates the document structure to prevent data loss from corrupt files.
 func LoadDocument(path string) (*Document, error) {
 	tree := etree.NewDocument()
 	if err := tree.ReadFromFile(path); err != nil {
 		return nil, fmt.Errorf("LoadDocument %q: %w", path, err)
 	}
+
+	// Validate document structure to prevent data loss from corrupt files.
+	root := tree.Root()
+	if root == nil || root.Tag != "mxfile" {
+		return nil, fmt.Errorf("LoadDocument %q: not a valid draw.io file (missing <mxfile> root)", path)
+	}
+	diagrams := root.SelectElements("diagram")
+	if len(diagrams) == 0 {
+		return nil, fmt.Errorf("LoadDocument %q: not a valid draw.io file (no <diagram> elements)", path)
+	}
+	for _, d := range diagrams {
+		model := d.FindElement("mxGraphModel")
+		if model == nil {
+			return nil, fmt.Errorf("LoadDocument %q: diagram %q missing <mxGraphModel>",
+				path, d.SelectAttrValue("id", "?"))
+		}
+		if model.FindElement("root") == nil {
+			return nil, fmt.Errorf("LoadDocument %q: diagram %q missing <root> element",
+				path, d.SelectAttrValue("id", "?"))
+		}
+	}
+
 	return &Document{tree: tree}, nil
 }
 
