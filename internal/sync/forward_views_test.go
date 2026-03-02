@@ -898,3 +898,71 @@ func TestApplyForward_BackNavigationButton(t *testing.T) {
 		t.Error("expected back-navigation button on containers page")
 	}
 }
+
+// TestApplyForward_ConnectorToScopeElement verifies that a relationship
+// targeting the scope (boundary) element of a view is rendered as a connector.
+// Regression test for #217.
+func TestApplyForward_ConnectorToScopeElement(t *testing.T) {
+	doc := drawio.NewDocument()
+	doc.AddPage("view-detail", "Detail View")
+	ts := minimalTemplates(t)
+
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"parent": {Kind: "system", Title: "Parent System", Children: map[string]model.Element{
+				"child": {Kind: "container", Title: "Child Service"},
+			}},
+		},
+		Relationships: []model.Relationship{
+			{From: "parent.child", To: "parent", Label: "reports to"},
+		},
+		Views: map[string]model.View{
+			"detail": {
+				Title:   "Detail View",
+				Scope:   "parent",
+				Include: []string{"parent.*"},
+			},
+		},
+	}
+
+	cs := &ChangeSet{
+		ModelElementChanges: []ElementChange{
+			{ID: "parent.child", Type: Added},
+		},
+		ModelRelationshipChanges: []RelationshipChange{
+			{From: "parent.child", To: "parent", Index: 0, Type: Added, NewValue: "reports to"},
+		},
+	}
+
+	ApplyForward(cs, doc, ts, m, nil)
+
+	page := doc.GetPage("view-detail")
+	if page == nil {
+		t.Fatal("detail page not found")
+	}
+
+	// The scope element "parent" should be rendered as a boundary.
+	if page.FindElement("parent") == nil {
+		t.Fatal("expected scope element 'parent' as boundary on detail page")
+	}
+
+	// The child element should be on the page.
+	if page.FindElement("parent.child") == nil {
+		t.Fatal("expected 'parent.child' on detail page")
+	}
+
+	// A connector from parent.child to parent (the scope/boundary) should exist.
+	conns := page.FindAllConnectors()
+	found := false
+	for _, c := range conns {
+		src := c.SelectAttrValue("source", "")
+		tgt := c.SelectAttrValue("target", "")
+		if src == "detail--parent.child" && tgt == "detail--parent" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected connector parent.child→parent (scope) on detail page, got %d connectors", len(conns))
+	}
+}
