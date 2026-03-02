@@ -205,6 +205,10 @@ func extractDrawioElements(doc *drawio.Document) map[string]drawioElemSnapshot {
 			}
 			label := obj.SelectAttrValue("label", "")
 			title, technology, labelDesc := drawio.ParseLabel(label)
+			// Fall back to XML attribute if label doesn't contain technology (#186).
+			if technology == "" {
+				technology = obj.SelectAttrValue("technology", "")
+			}
 			tooltipDesc := obj.SelectAttrValue("tooltip", "")
 			description := tooltipDesc
 			if description == "" {

@@ -908,3 +908,52 @@ func TestExtractDrawioRelationships_FallbackStripsViewPrefix(t *testing.T) {
 		}
 	}
 }
+
+// TestDetectChanges_TechnologyFromXMLAttribute verifies that when a user adds
+// a technology XML attribute to a draw.io element (without changing the label),
+// the reverse sync detects the change (#186).
+func TestDetectChanges_TechnologyFromXMLAttribute(t *testing.T) {
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"customer": {Kind: "actor", Title: "Customer"},
+		},
+	}
+
+	doc := drawio.NewDocument()
+	doc.AddPage("1", "Page 1")
+	page := doc.GetPage("1")
+	if err := page.CreateElement(drawio.ElementData{
+		ID:     "customer",
+		CellID: "customer",
+		Kind:   "actor",
+		Title:  "Customer",
+	}, "shape=actor;"); err != nil {
+		t.Fatal(err)
+	}
+	// Simulate user adding technology attribute directly in XML.
+	elem := page.FindElement("customer")
+	if elem == nil {
+		t.Fatal("element not found")
+	}
+	elem.CreateAttr("technology", "Human")
+
+	lastState := &SyncState{
+		Elements: map[string]ElementState{
+			"customer": {Title: "Customer", Kind: "actor"},
+		},
+	}
+
+	cs := DetectChanges(m, doc, lastState, nil)
+
+	// Should detect a drawio-side technology change.
+	found := false
+	for _, ch := range cs.DrawioElementChanges {
+		if ch.ID == "customer" && ch.Field == "technology" && ch.NewValue == "Human" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected drawio technology change for 'customer', got changes: %+v", cs.DrawioElementChanges)
+	}
+}
