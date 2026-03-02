@@ -140,15 +140,20 @@ func doSync(changedFile, modelPath, drawioPath, templatePath string) {
 		return
 	}
 
-	// Ensure pages exist for all views.
+	// Ensure pages exist for all views; track new pages (#184, #188, #189).
+	newPageIDs := make(map[string]bool)
 	for viewID, view := range m.Views {
 		pageID := "view-" + viewID
 		if doc.GetPage(pageID) == nil {
 			doc.AddPage(pageID, view.Title)
+			newPageIDs[pageID] = true
 		}
 	}
 
-	result := bsync.Run(m, doc, state, tmpl)
+	// Remove orphaned view pages (views deleted or renamed in model). (#143)
+	bsync.RemoveOrphanedViewPages(doc, m)
+
+	result := bsync.Run(m, doc, state, tmpl, newPageIDs)
 
 	if err := saveModel(modelPath, m, result); err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR saving model: %v\n", err)

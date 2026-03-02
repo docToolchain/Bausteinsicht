@@ -44,7 +44,7 @@ func TestApplyForward_ScopedIDs(t *testing.T) {
 		},
 	}
 
-	ApplyForward(cs, doc, ts, m)
+	ApplyForward(cs, doc, ts, m, nil)
 
 	contextPage := doc.GetPage("view-context")
 	containerPage := doc.GetPage("view-containers")
@@ -110,7 +110,7 @@ func TestApplyForward_ScopedConnectorRefs(t *testing.T) {
 		},
 	}
 
-	ApplyForward(cs, doc, ts, m)
+	ApplyForward(cs, doc, ts, m, nil)
 
 	page := doc.GetPage("view-containers")
 

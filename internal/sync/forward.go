@@ -35,6 +35,7 @@ func ApplyForward(
 	doc *drawio.Document,
 	templates *drawio.TemplateSet,
 	m *model.BausteinsichtModel,
+	newPageIDs map[string]bool,
 ) *ForwardResult {
 	result := &ForwardResult{}
 	flat := model.FlattenElements(m)
@@ -44,7 +45,7 @@ func ApplyForward(
 		return result
 	}
 
-	applyForwardPerView(cs, doc, templates, flat, m, result)
+	applyForwardPerView(cs, doc, templates, flat, m, newPageIDs, result)
 	return result
 }
 
@@ -71,12 +72,14 @@ func applyForwardToPage(
 }
 
 // applyForwardPerView iterates over model views and applies changes per page.
+// newPageIDs identifies pages that were just created and need full population.
 func applyForwardPerView(
 	cs *ChangeSet,
 	doc *drawio.Document,
 	templates *drawio.TemplateSet,
 	flat map[string]*model.Element,
 	m *model.BausteinsichtModel,
+	newPageIDs map[string]bool,
 	result *ForwardResult,
 ) {
 	for viewID, view := range m.Views {
@@ -108,9 +111,42 @@ func applyForwardPerView(
 
 		applyChangesToPage(cs, page, templates, flat, elemSet, viewID, scopeID, result)
 
+		// For newly created pages, populate all resolved elements that aren't
+		// already on the page. This handles the case where elements exist in
+		// the sync state but haven't been rendered to this new page yet
+		// (#184, #188, #189).
+		if newPageIDs[pageID] {
+			populateNewPage(page, viewID, scopeID, templates, flat, elemSet, result)
+		}
+
 		// Reconciliation: remove elements on the page that are no longer
 		// in the resolved view (e.g., after exclude list changes). #102
 		reconcileViewPage(page, elemSet, flat, scopeID, viewID, result)
+	}
+}
+
+// populateNewPage creates elements on a newly created view page for all
+// elements in the view's resolved set that aren't already present.
+// This ensures new pages are fully populated even when the elements are
+// already in the sync state and thus not in the ChangeSet as "Added".
+func populateNewPage(
+	page *drawio.Page,
+	viewID string,
+	scopeID string,
+	templates *drawio.TemplateSet,
+	flat map[string]*model.Element,
+	elemSet map[string]bool,
+	result *ForwardResult,
+) {
+	pl := computePlacement(page)
+	for id := range elemSet {
+		if id == scopeID {
+			continue // Scope boundary handled separately.
+		}
+		if page.FindElement(id) != nil {
+			continue // Already created by applyChangesToPage.
+		}
+		applyElementAdded(id, viewID, scopeID, page, templates, flat, &pl, result)
 	}
 }
 

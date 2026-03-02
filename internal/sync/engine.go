@@ -33,11 +33,14 @@ func Run(
 	doc *drawio.Document,
 	lastState *SyncState,
 	templates *drawio.TemplateSet,
+	newPageIDs map[string]bool,
 ) *SyncResult {
 	result := &SyncResult{}
 
 	// Step 1: Detect changes from both sides.
-	changes := DetectChanges(m, doc, lastState)
+	// Pass newPageIDs so that elements expected only on newly created pages
+	// are not mistakenly treated as "deleted from draw.io" (#184, #188, #189).
+	changes := DetectChanges(m, doc, lastState, newPageIDs)
 
 	// Step 2: Resolve conflicts.
 	if len(changes.Conflicts) > 0 {
@@ -54,7 +57,10 @@ func Run(
 	result.Changes = changes
 
 	// Step 4: Forward sync (model → draw.io).
-	result.Forward = ApplyForward(changes, doc, templates, m)
+	// Pass newPageIDs so that newly created view pages get fully populated
+	// with their resolved elements, even if those elements aren't in the
+	// ChangeSet as "Added" (because they're already in the sync state).
+	result.Forward = ApplyForward(changes, doc, templates, m, newPageIDs)
 
 	// Step 5: Reverse sync (draw.io → model).
 	result.Reverse = ApplyReverse(changes, m)
