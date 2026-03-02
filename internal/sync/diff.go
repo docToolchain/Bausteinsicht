@@ -139,6 +139,16 @@ func stripScopedPrefix(cellID string) string {
 	return cellID
 }
 
+// resolveCellID maps a draw.io cell ID to a canonical element ID using the
+// cellToElem lookup table. If the cell ID is not in the table (e.g., because
+// the element was deleted), it falls back to stripping the scoped view prefix.
+func resolveCellID(cellID string, cellToElem map[string]string) string {
+	if elemID, ok := cellToElem[cellID]; ok {
+		return elemID
+	}
+	return stripScopedPrefix(cellID)
+}
+
 // buildCellIDToElemID builds a mapping from draw.io cell IDs to bausteinsicht
 // element IDs. When views are used, cell IDs are scoped (e.g., "context--customer")
 // while element IDs are un-scoped (e.g., "customer").
@@ -177,18 +187,8 @@ func extractDrawioRelationships(doc *drawio.Document) map[string]RelationshipSta
 			// (e.g., "components--onlineshop.db" → "onlineshop.db") when
 			// the element was deleted and is no longer in cellToElem (#166).
 			// For legacy (non-view) documents the raw cell ID is used as-is.
-			from := fromCell
-			if elemID, ok := cellToElem[fromCell]; ok {
-				from = elemID
-			} else {
-				from = stripScopedPrefix(fromCell)
-			}
-			to := toCell
-			if elemID, ok := cellToElem[toCell]; ok {
-				to = elemID
-			} else {
-				to = stripScopedPrefix(toCell)
-			}
+			from := resolveCellID(fromCell, cellToElem)
+			to := resolveCellID(toCell, cellToElem)
 			// Extract the relationship index from the connector ID.
 			cellID := cell.SelectAttrValue("id", "")
 			index := parseConnectorIndex(cellID)
