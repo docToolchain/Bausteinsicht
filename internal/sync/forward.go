@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/beevik/etree"
 	"github.com/docToolchain/Bauteinsicht/internal/drawio"
 	"github.com/docToolchain/Bauteinsicht/internal/model"
 )
@@ -82,6 +83,15 @@ func applyForwardPerView(
 	newPageIDs map[string]bool,
 	result *ForwardResult,
 ) {
+	// Build drill-down link map: elementID → "data:page/id,view-<viewID>"
+	// An element gets a link when a view's scope matches that element.
+	drillDownLinks := make(map[string]string)
+	for vID, v := range m.Views {
+		if v.Scope != "" {
+			drillDownLinks[v.Scope] = "data:page/id,view-" + vID
+		}
+	}
+
 	for viewID, view := range m.Views {
 		pageID := "view-" + viewID
 		page := doc.GetPage(pageID)
@@ -122,6 +132,14 @@ func applyForwardPerView(
 		// Reconciliation: remove elements on the page that are no longer
 		// in the resolved view (e.g., after exclude list changes). #102
 		reconcileViewPage(page, elemSet, flat, scopeID, viewID, result)
+
+		// Set drill-down links on elements that have a detail view. (#198)
+		applyDrillDownLinks(page, drillDownLinks)
+
+		// Create back-navigation button on detail views (views with scope). (#198)
+		if scopeID != "" {
+			createBackNavButton(page, viewID, scopeID, m)
+		}
 	}
 }
 
@@ -706,4 +724,94 @@ func mergeStyles(base, overlay string) string {
 		sb.WriteByte(';')
 	}
 	return sb.String()
+}
+
+// applyDrillDownLinks sets the link attribute on elements that have a detail
+// view (a view whose scope matches the element's bausteinsicht_id). (#198)
+func applyDrillDownLinks(page *drawio.Page, links map[string]string) {
+	for _, obj := range page.FindAllElements() {
+		bid := obj.SelectAttrValue("bausteinsicht_id", "")
+		if link, ok := links[bid]; ok {
+			setAttrOn(obj, "link", link)
+		}
+	}
+}
+
+// setAttrOn sets or creates an attribute on an etree element.
+func setAttrOn(el *etree.Element, key, value string) {
+	for i, a := range el.Attr {
+		if a.Key == key {
+			el.Attr[i].Value = value
+			return
+		}
+	}
+	el.CreateAttr(key, value)
+}
+
+// createBackNavButton adds a small navigation button to a detail view page
+// that links back to the parent view. The parent view is the one that
+// contains the scope element. (#198)
+func createBackNavButton(
+	page *drawio.Page,
+	viewID string,
+	scopeID string,
+	m *model.BausteinsichtModel,
+) {
+	navCellID := "nav-back-" + viewID
+
+	// Don't create if already exists.
+	root := page.Root()
+	if root == nil {
+		return
+	}
+	for _, obj := range root.SelectElements("object") {
+		if obj.SelectAttrValue("id", "") == navCellID {
+			return
+		}
+	}
+
+	// Find the parent view: a view that includes the scope element.
+	var parentViewID string
+	var parentTitle string
+	for vID, v := range m.Views {
+		if vID == viewID {
+			continue
+		}
+		viewCopy := v
+		resolved, err := model.ResolveView(m, &viewCopy)
+		if err != nil {
+			continue
+		}
+		for _, id := range resolved {
+			if id == scopeID {
+				parentViewID = vID
+				parentTitle = v.Title
+				break
+			}
+		}
+		if parentViewID != "" {
+			break
+		}
+	}
+
+	if parentViewID == "" {
+		return // No parent view found.
+	}
+
+	obj := root.CreateElement("object")
+	obj.CreateAttr("label", "&larr; "+parentTitle)
+	obj.CreateAttr("id", navCellID)
+	obj.CreateAttr("link", "data:page/id,view-"+parentViewID)
+
+	cell := obj.CreateElement("mxCell")
+	cell.CreateAttr("style", "rounded=1;fillColor=#f8cecc;strokeColor=#b85450;html=1;fontSize=10;")
+	cell.CreateAttr("vertex", "1")
+	cell.CreateAttr("parent", "1")
+
+	geo := cell.CreateElement("mxGeometry")
+	geo.CreateAttr("x", "20")
+	geo.CreateAttr("y", "20")
+	geo.CreateAttr("width", "140")
+	geo.CreateAttr("height", "30")
+	geo.CreateAttr("as", "geometry")
 }

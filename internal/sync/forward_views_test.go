@@ -1,6 +1,7 @@
 package sync
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/docToolchain/Bauteinsicht/internal/drawio"
@@ -777,5 +778,123 @@ func TestApplyForward_NoViewsFallback(t *testing.T) {
 	page := doc.Pages()[0]
 	if page.FindElement("api") == nil {
 		t.Error("expected 'api' on first page when no views defined")
+	}
+}
+
+// TestApplyForward_DrillDownNavigationLinks verifies that elements with a
+// detail view (a view whose scope matches the element) get a link attribute
+// pointing to that view's page. (#198)
+func TestApplyForward_DrillDownNavigationLinks(t *testing.T) {
+	doc := drawio.NewDocument()
+	doc.AddPage("view-context", "System Context")
+	doc.AddPage("view-containers", "Container View")
+	ts := minimalTemplates(t)
+
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"customer": {Kind: "actor", Title: "Customer"},
+			"shop": {Kind: "system", Title: "Shop", Children: map[string]model.Element{
+				"api": {Kind: "container", Title: "API"},
+			}},
+		},
+		Relationships: []model.Relationship{},
+		Views: map[string]model.View{
+			"context": {
+				Title:   "System Context",
+				Include: []string{"customer", "shop"},
+			},
+			"containers": {
+				Title:   "Container View",
+				Scope:   "shop",
+				Include: []string{"customer", "shop.*"},
+			},
+		},
+	}
+
+	cs := &ChangeSet{
+		ModelElementChanges: []ElementChange{
+			{ID: "customer", Type: Added},
+			{ID: "shop", Type: Added},
+			{ID: "shop.api", Type: Added},
+		},
+	}
+
+	ApplyForward(cs, doc, ts, m, nil)
+
+	// "shop" on context page should have a link to the containers view.
+	contextPage := doc.GetPage("view-context")
+	shopElem := contextPage.FindElement("shop")
+	if shopElem == nil {
+		t.Fatal("shop element not found on context page")
+	}
+	link := shopElem.SelectAttrValue("link", "")
+	if link != "data:page/id,view-containers" {
+		t.Errorf("expected link %q on shop, got %q", "data:page/id,view-containers", link)
+	}
+
+	// "customer" should NOT have a link (no view scoped to customer).
+	custElem := contextPage.FindElement("customer")
+	if custElem == nil {
+		t.Fatal("customer element not found on context page")
+	}
+	custLink := custElem.SelectAttrValue("link", "")
+	if custLink != "" {
+		t.Errorf("expected no link on customer, got %q", custLink)
+	}
+}
+
+// TestApplyForward_BackNavigationButton verifies that detail views (views with
+// a scope) get a back-navigation button linking to the parent view. (#198)
+func TestApplyForward_BackNavigationButton(t *testing.T) {
+	doc := drawio.NewDocument()
+	doc.AddPage("view-context", "System Context")
+	doc.AddPage("view-containers", "Container View")
+	ts := minimalTemplates(t)
+
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"shop": {Kind: "system", Title: "Shop", Children: map[string]model.Element{
+				"api": {Kind: "container", Title: "API"},
+			}},
+		},
+		Relationships: []model.Relationship{},
+		Views: map[string]model.View{
+			"context": {
+				Title:   "System Context",
+				Include: []string{"shop"},
+			},
+			"containers": {
+				Title:   "Container View",
+				Scope:   "shop",
+				Include: []string{"shop.*"},
+			},
+		},
+	}
+
+	cs := &ChangeSet{
+		ModelElementChanges: []ElementChange{
+			{ID: "shop", Type: Added},
+			{ID: "shop.api", Type: Added},
+		},
+	}
+
+	ApplyForward(cs, doc, ts, m, nil)
+
+	// The containers page should have a back-navigation button.
+	containerPage := doc.GetPage("view-containers")
+	root := containerPage.Root()
+	var navFound bool
+	for _, obj := range root.SelectElements("object") {
+		if strings.Contains(obj.SelectAttrValue("id", ""), "nav-back") {
+			navFound = true
+			navLink := obj.SelectAttrValue("link", "")
+			if !strings.Contains(navLink, "data:page/id,view-") {
+				t.Errorf("expected navigation link on back button, got %q", navLink)
+			}
+			break
+		}
+	}
+	if !navFound {
+		t.Error("expected back-navigation button on containers page")
 	}
 }
