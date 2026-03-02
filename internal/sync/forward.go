@@ -279,7 +279,7 @@ func applyChangesToPage(
 				if elemFilter != nil {
 					from = liftEndpoint(from, elemFilter)
 					to = liftEndpoint(to, elemFilter)
-					if from == "" || to == "" || from == to {
+					if from == "" || to == "" || (from == to && (from != ch.From || to != ch.To)) {
 						continue
 					}
 				}

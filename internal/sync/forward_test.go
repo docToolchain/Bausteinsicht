@@ -518,3 +518,39 @@ func TestApplyForward_NoDuplicateConnectors(t *testing.T) {
 		t.Errorf("expected 0 connectors created, got %d", result.ConnectorsCreated)
 	}
 }
+
+// TestApplyForward_SelfReferencingRelationship verifies that a relationship
+// where From == To (self-referencing) creates a connector. The condition
+// that skips from == to after liftEndpoint should not skip genuine
+// self-references. Regression test for #111.
+func TestApplyForward_SelfReferencingRelationship(t *testing.T) {
+	doc := drawio.NewDocument()
+	doc.AddPage("view-default", "Default")
+	ts := minimalTemplates(t)
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"api": {Kind: "container", Title: "API"},
+		},
+		Relationships: []model.Relationship{
+			{From: "api", To: "api", Label: "calls self"},
+		},
+		Views: map[string]model.View{
+			"default": {Title: "Default", Include: []string{"*"}},
+		},
+	}
+
+	cs := &ChangeSet{
+		ModelRelationshipChanges: []RelationshipChange{
+			{From: "api", To: "api", Type: Added, NewValue: "calls self"},
+		},
+		ModelElementChanges: []ElementChange{
+			{ID: "api", Type: Added},
+		},
+	}
+
+	result := ApplyForward(cs, doc, ts, m)
+
+	if result.ConnectorsCreated < 1 {
+		t.Errorf("expected at least 1 connector for self-referencing relationship, got %d", result.ConnectorsCreated)
+	}
+}
