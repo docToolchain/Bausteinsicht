@@ -363,6 +363,11 @@ func applyElementAdded(
 	pl *placement,
 	result *ForwardResult,
 ) {
+	// Skip if element already exists on the page (prevents duplicates on sync state reset). (#141)
+	if page.FindElement(id) != nil {
+		return
+	}
+
 	elem, ok := flat[id]
 	if !ok {
 		result.Warnings = append(result.Warnings, "element not found in model: "+id)

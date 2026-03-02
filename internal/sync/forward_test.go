@@ -554,3 +554,42 @@ func TestApplyForward_SelfReferencingRelationship(t *testing.T) {
 		t.Errorf("expected at least 1 connector for self-referencing relationship, got %d", result.ConnectorsCreated)
 	}
 }
+
+// TestApplyForward_NoDuplicateElements verifies that when an element
+// already exists on the page, an Added element change does not create
+// a duplicate. This happens when sync state is deleted or reset to {}
+// and all elements are treated as new. Regression test for #141.
+func TestApplyForward_NoDuplicateElements(t *testing.T) {
+	// Create a doc that already has element "api" on the page.
+	doc := docWithElem("api", "API", "Go", "")
+	ts := minimalTemplates(t)
+	m := modelWithElem("api", "container", "API")
+
+	// Simulate a sync state reset: model says "api" is Added (because
+	// it's not in sync state) but the element already exists in the
+	// drawio doc.
+	cs := &ChangeSet{
+		ModelElementChanges: []ElementChange{
+			{ID: "api", Type: Added},
+		},
+	}
+
+	result := ApplyForward(cs, doc, ts, m)
+
+	// Should NOT create a duplicate — skip existing element.
+	page := doc.Pages()[0]
+	count := 0
+	for _, el := range page.Root().SelectElements("object") {
+		if el.SelectAttrValue("bausteinsicht_id", "") == "api" {
+			count++
+		}
+	}
+	if count > 1 {
+		t.Errorf("expected at most 1 element with bausteinsicht_id='api', got %d", count)
+	}
+
+	// Should report 0 elements created (already exists).
+	if result.ElementsCreated != 0 {
+		t.Errorf("expected 0 elements created, got %d", result.ElementsCreated)
+	}
+}
