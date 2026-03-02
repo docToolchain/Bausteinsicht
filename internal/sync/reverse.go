@@ -160,12 +160,14 @@ func applyElementChange(ch ElementChange, m *model.BausteinsichtModel, result *R
 				fmt.Sprintf("New element %q from draw.io skipped: ID already exists in model.", ch.ID))
 			return
 		}
+		kind := firstSpecKind(m)
 		m.Model[ch.ID] = model.Element{
+			Kind:  kind,
 			Title: ch.NewValue,
 		}
 		result.ElementsCreated++
 		result.Warnings = append(result.Warnings,
-			fmt.Sprintf("New element %q added from draw.io — review and assign a meaningful ID if needed.", ch.ID))
+			fmt.Sprintf("New element %q added from draw.io (kind=%q) — review and assign a meaningful ID and kind.", ch.ID, kind))
 	}
 }
 
@@ -301,6 +303,21 @@ func deleteFromMap(elems map[string]model.Element, parts []string, fullID string
 	}
 	elems[key] = elem
 	return nil
+}
+
+// firstSpecKind returns the first element kind defined in the specification,
+// sorted alphabetically for determinism. Returns "" if no kinds are defined.
+func firstSpecKind(m *model.BausteinsichtModel) string {
+	if len(m.Specification.Elements) == 0 {
+		return ""
+	}
+	var best string
+	for k := range m.Specification.Elements {
+		if best == "" || k < best {
+			best = k
+		}
+	}
+	return best
 }
 
 // removeFromSlice returns a new slice with all occurrences of val removed.
