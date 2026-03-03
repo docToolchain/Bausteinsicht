@@ -75,7 +75,7 @@ func runExportTable(cmd *cobra.Command, _ []string) error {
 	}
 
 	if outputDir == "" {
-		fmt.Fprint(cmd.OutOrStdout(), result)
+		_, _ = fmt.Fprint(cmd.OutOrStdout(), result)
 		return nil
 	}
 
@@ -87,6 +87,6 @@ func runExportTable(cmd *cobra.Command, _ []string) error {
 		return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
 	}
 
-	fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", outPath)
+	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", outPath)
 	return nil
 }
