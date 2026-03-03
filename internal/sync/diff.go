@@ -606,6 +606,14 @@ func detectRelationshipChanges(
 			if visibleRels != nil && !visibleRels[k] {
 				continue
 			}
+			// Skip if a lifted version of this relationship exists in draw.io.
+			// When a view lifts endpoints (e.g., cli→model.loader becomes
+			// cli→model), the connector has different keys but still represents
+			// this relationship. Without this check, the original relationship
+			// would be incorrectly deleted (#223).
+			if hasLiftedConnectorInDrawio(from, to, drawioRels) {
+				continue
+			}
 			cs.DrawioRelationshipChanges = append(cs.DrawioRelationshipChanges, RelationshipChange{
 				From: from, To: to, Index: index, Type: Deleted,
 			})
@@ -659,6 +667,22 @@ func isLiftedRelationship(from, to string, modelRels map[string]RelationshipStat
 		// Both endpoints lifted
 		if mr.From != from && mr.To != to &&
 			strings.HasPrefix(mr.From, from+".") && strings.HasPrefix(mr.To, to+".") {
+			return true
+		}
+	}
+	return false
+}
+
+// hasLiftedConnectorInDrawio returns true if a connector in drawioRels is a
+// lifted version of the relationship from→to. This is the inverse of
+// isLiftedRelationship: here we check if the drawio connector endpoints are
+// ancestors of the model relationship endpoints.
+// For example, model has cli→model.loader but drawio has cli→model (lifted).
+func hasLiftedConnectorInDrawio(from, to string, drawioRels map[string]RelationshipState) bool {
+	for _, dr := range drawioRels {
+		fromMatch := dr.From == from || (dr.From != from && strings.HasPrefix(from, dr.From+"."))
+		toMatch := dr.To == to || (dr.To != to && strings.HasPrefix(to, dr.To+"."))
+		if fromMatch && toMatch && (dr.From != from || dr.To != to) {
 			return true
 		}
 	}
