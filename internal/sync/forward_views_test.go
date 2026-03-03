@@ -68,7 +68,7 @@ func TestApplyForward_ElementOnCorrectViewPage(t *testing.T) {
 		},
 	}
 
-	ApplyForward(cs, doc, ts, m, nil)
+	ApplyForward(cs, doc, ts, m)
 
 	// Context view should have customer and webshop.
 	contextPage := doc.GetPage("view-context")
@@ -126,7 +126,7 @@ func TestApplyForward_RelationshipOnlyOnPageWithBothEndpoints(t *testing.T) {
 		},
 	}
 
-	ApplyForward(cs, doc, ts, m, nil)
+	ApplyForward(cs, doc, ts, m)
 
 	// Context page: customer→webshop connector should exist (using scoped cell IDs).
 	contextPage := doc.GetPage("view-context")
@@ -194,7 +194,7 @@ func TestApplyForward_RelationshipLifting(t *testing.T) {
 		},
 	}
 
-	ApplyForward(cs, doc, ts, m, nil)
+	ApplyForward(cs, doc, ts, m)
 
 	// Context page: customer → webshop.frontend should be lifted to customer → webshop
 	contextPage := doc.GetPage("view-context")
@@ -274,7 +274,7 @@ func TestApplyForward_RelationshipLiftingDedup(t *testing.T) {
 		},
 	}
 
-	ApplyForward(cs, doc, ts, m, nil)
+	ApplyForward(cs, doc, ts, m)
 
 	contextPage := doc.GetPage("view-context")
 	conns := contextPage.FindAllConnectors()
@@ -324,7 +324,7 @@ func TestApplyForward_DirectRelSuppressesLifted(t *testing.T) {
 		},
 	}
 
-	ApplyForward(cs, doc, ts, m, nil)
+	ApplyForward(cs, doc, ts, m)
 
 	page := doc.GetPage("view-overview")
 	conns := page.FindAllConnectors()
@@ -373,7 +373,7 @@ func TestApplyForward_ScopeBoundingBox(t *testing.T) {
 		},
 	}
 
-	ApplyForward(cs, doc, ts, m, nil)
+	ApplyForward(cs, doc, ts, m)
 
 	page := doc.GetPage("view-containers")
 	if page == nil {
@@ -443,7 +443,7 @@ func TestApplyForward_DeletedElementRemovedFromViewPages(t *testing.T) {
 			{From: "webshop.api", To: "webshop.db", Index: 1, Type: Added, NewValue: "reads"},
 		},
 	}
-	ApplyForward(csAdd, doc, ts, m, nil)
+	ApplyForward(csAdd, doc, ts, m)
 
 	// Verify db exists on container page before deletion.
 	containerPage := doc.GetPage("view-containers")
@@ -472,7 +472,7 @@ func TestApplyForward_DeletedElementRemovedFromViewPages(t *testing.T) {
 			{From: "webshop.api", To: "webshop.db", Index: 1, Type: Deleted},
 		},
 	}
-	result := ApplyForward(csDel, doc, ts, m, nil)
+	result := ApplyForward(csDel, doc, ts, m)
 
 	// The element should be removed from the container page.
 	if containerPage.FindElement("webshop.db") != nil {
@@ -505,7 +505,7 @@ func TestApplyForward_DeletedRelationshipRemovedFromViewPages(t *testing.T) {
 			{From: "webshop.api", To: "webshop.db", Index: 1, Type: Added, NewValue: "reads"},
 		},
 	}
-	ApplyForward(csAdd, doc, ts, m, nil)
+	ApplyForward(csAdd, doc, ts, m)
 
 	// Verify connector exists before deletion.
 	containerPage := doc.GetPage("view-containers")
@@ -523,7 +523,7 @@ func TestApplyForward_DeletedRelationshipRemovedFromViewPages(t *testing.T) {
 			{From: "webshop.api", To: "webshop.db", Index: 1, Type: Deleted},
 		},
 	}
-	result := ApplyForward(csDel, doc, ts, m, nil)
+	result := ApplyForward(csDel, doc, ts, m)
 
 	// The connector should be removed from the container page.
 	if containerPage.FindConnector("containers--webshop.api", "containers--webshop.db", 1) != nil {
@@ -552,7 +552,7 @@ func TestApplyForward_ScopeBoundaryUpdatedOnModify(t *testing.T) {
 			{ID: "webshop.db", Type: Added},
 		},
 	}
-	ApplyForward(csAdd, doc, ts, m, nil)
+	ApplyForward(csAdd, doc, ts, m)
 
 	// Verify boundary exists with original title.
 	containerPage := doc.GetPage("view-containers")
@@ -581,7 +581,7 @@ func TestApplyForward_ScopeBoundaryUpdatedOnModify(t *testing.T) {
 			{ID: "webshop", Type: Modified},
 		},
 	}
-	result := ApplyForward(csMod, doc, ts, m, nil)
+	result := ApplyForward(csMod, doc, ts, m)
 
 	// The boundary label on the containers page should reflect the new technology.
 	boundary = containerPage.FindElement("webshop")
@@ -621,7 +621,7 @@ func TestExcludeRemovesElementFromPage(t *testing.T) {
 			{From: "webshop.api", To: "webshop.db", Index: 1, Type: Added, NewValue: "reads"},
 		},
 	}
-	ApplyForward(csAdd, doc, ts, m, nil)
+	ApplyForward(csAdd, doc, ts, m)
 
 	// Verify preconditions: webshop.db is on the container page with a connector.
 	containerPage := doc.GetPage("view-containers")
@@ -646,7 +646,7 @@ func TestExcludeRemovesElementFromPage(t *testing.T) {
 
 	// Empty ChangeSet: no model changes, only view exclude changed.
 	csEmpty := &ChangeSet{}
-	result := ApplyForward(csEmpty, doc, ts, m, nil)
+	result := ApplyForward(csEmpty, doc, ts, m)
 
 	// The excluded element should be removed from the page.
 	if containerPage.FindElement("webshop.db") != nil {
@@ -698,7 +698,7 @@ func TestApplyForward_DeleteElementRemovesConnectors(t *testing.T) {
 			{From: "webshop.api", To: "webshop.db", Index: 1, Type: Added, NewValue: "reads"},
 		},
 	}
-	ApplyForward(csAdd, doc, ts, m, nil)
+	ApplyForward(csAdd, doc, ts, m)
 
 	// Verify preconditions on the container page.
 	containerPage := doc.GetPage("view-containers")
@@ -729,7 +729,7 @@ func TestApplyForward_DeleteElementRemovesConnectors(t *testing.T) {
 		// No ModelRelationshipChanges — the element deletion should
 		// clean up connectors referencing the deleted element.
 	}
-	result := ApplyForward(csDel, doc, ts, m, nil)
+	result := ApplyForward(csDel, doc, ts, m)
 
 	// The element should be removed.
 	if containerPage.FindElement("webshop.db") != nil {
@@ -769,7 +769,7 @@ func TestApplyForward_NoViewsFallback(t *testing.T) {
 		},
 	}
 
-	result := ApplyForward(cs, doc, ts, m, nil)
+	result := ApplyForward(cs, doc, ts, m)
 
 	if result.ElementsCreated != 1 {
 		t.Fatalf("expected 1 element created, got %d", result.ElementsCreated)
@@ -819,7 +819,7 @@ func TestApplyForward_DrillDownNavigationLinks(t *testing.T) {
 		},
 	}
 
-	ApplyForward(cs, doc, ts, m, nil)
+	ApplyForward(cs, doc, ts, m)
 
 	// "shop" on context page should have a link to the containers view.
 	contextPage := doc.GetPage("view-context")
@@ -878,7 +878,7 @@ func TestApplyForward_BackNavigationButton(t *testing.T) {
 		},
 	}
 
-	ApplyForward(cs, doc, ts, m, nil)
+	ApplyForward(cs, doc, ts, m)
 
 	// The containers page should have a back-navigation button.
 	containerPage := doc.GetPage("view-containers")
@@ -934,7 +934,7 @@ func TestApplyForward_ConnectorToScopeElement(t *testing.T) {
 		},
 	}
 
-	ApplyForward(cs, doc, ts, m, nil)
+	ApplyForward(cs, doc, ts, m)
 
 	page := doc.GetPage("view-detail")
 	if page == nil {
@@ -964,5 +964,61 @@ func TestApplyForward_ConnectorToScopeElement(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("expected connector parent.child→parent (scope) on detail page, got %d connectors", len(conns))
+	}
+}
+
+// TestApplyForward_NewlyIncludedElementOnExistingPage verifies that when a
+// view's include list changes to reference an element that already exists in
+// the model (and is therefore not in the ChangeSet), the forward sync creates
+// that element on the existing page. This is the bug reported in #231.
+func TestApplyForward_NewlyIncludedElementOnExistingPage(t *testing.T) {
+	// Setup: a model with two containers, a view that initially only shows one.
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"system": {Kind: "system", Title: "My System", Children: map[string]model.Element{
+				"svc_a": {Kind: "container", Title: "Service A"},
+				"svc_b": {Kind: "container", Title: "Service B"},
+			}},
+		},
+		Relationships: []model.Relationship{},
+		Views: map[string]model.View{
+			"detail": {
+				Title:   "Detail View",
+				Scope:   "system",
+				Include: []string{"system.svc_a", "system.svc_b"},
+			},
+		},
+	}
+
+	doc := drawio.NewDocument()
+	doc.AddPage("view-detail", "Detail View")
+
+	ts := minimalTemplates(t)
+
+	// First sync: only svc_a is added (svc_b already exists in sync state
+	// but is newly included in this view — no ChangeSet entry for it).
+	cs := &ChangeSet{
+		ModelElementChanges: []ElementChange{
+			{ID: "system.svc_a", Type: Added},
+		},
+	}
+
+	// The page already exists (not new), and svc_b is in the view's resolved
+	// set but NOT in the ChangeSet. The forward sync must still create it.
+	ApplyForward(cs, doc, ts, m)
+
+	page := doc.GetPage("view-detail")
+	if page == nil {
+		t.Fatal("detail page not found")
+	}
+
+	if page.FindElement("system.svc_a") == nil {
+		t.Error("expected 'system.svc_a' on detail page (was in ChangeSet)")
+	}
+
+	// This is the key assertion for #231: svc_b is in the view's resolved
+	// element set but was NOT in the ChangeSet. It must still be created.
+	if page.FindElement("system.svc_b") == nil {
+		t.Error("expected 'system.svc_b' on detail page (newly included, not in ChangeSet) — see #231")
 	}
 }

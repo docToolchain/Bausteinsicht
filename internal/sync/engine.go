@@ -57,10 +57,7 @@ func Run(
 	result.Changes = changes
 
 	// Step 4: Forward sync (model → draw.io).
-	// Pass newPageIDs so that newly created view pages get fully populated
-	// with their resolved elements, even if those elements aren't in the
-	// ChangeSet as "Added" (because they're already in the sync state).
-	result.Forward = ApplyForward(changes, doc, templates, m, newPageIDs)
+	result.Forward = ApplyForward(changes, doc, templates, m)
 
 	// Step 5: Reverse sync (draw.io → model).
 	result.Reverse = ApplyReverse(changes, m)

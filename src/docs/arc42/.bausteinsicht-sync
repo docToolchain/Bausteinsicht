@@ -1,7 +1,7 @@
 {
-  "timestamp": "2026-03-03T10:45:22Z",
+  "timestamp": "2026-03-03T11:58:15Z",
   "model_hash": "sha256:3e88692f8a71b7c8002e6f4cbdb6c006cb605a3d33ede10eaa48c45ed68d4e79",
-  "drawio_hash": "sha256:cb0ca73c62f956e2225c3639f92345b742d97762163d2e987468d51bcfe1ea4e",
+  "drawio_hash": "sha256:660d844b236152701a1a29af01769ad22b314701d7ffe16039e6c17b314124de",
   "elements": {
     "bausteinsicht": {
       "title": "Bausteinsicht",

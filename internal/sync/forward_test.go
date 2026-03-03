@@ -110,7 +110,7 @@ func TestApplyForward_ElementKindChanged(t *testing.T) {
 		},
 	}
 
-	result := ApplyForward(cs, doc, ts, m, nil)
+	result := ApplyForward(cs, doc, ts, m)
 
 	if result.ElementsUpdated != 1 {
 		t.Fatalf("expected 1 element updated, got %d", result.ElementsUpdated)
@@ -151,7 +151,7 @@ func TestApplyForward_NewElement(t *testing.T) {
 		},
 	}
 
-	result := ApplyForward(cs, doc, ts, m, nil)
+	result := ApplyForward(cs, doc, ts, m)
 
 	if result.ElementsCreated != 1 {
 		t.Fatalf("expected 1 element created, got %d", result.ElementsCreated)
@@ -176,7 +176,7 @@ func TestApplyForward_NewElementVisualMarker(t *testing.T) {
 	cs := &ChangeSet{
 		ModelElementChanges: []ElementChange{{ID: "api", Type: Added}},
 	}
-	ApplyForward(cs, doc, ts, m, nil)
+	ApplyForward(cs, doc, ts, m)
 
 	page := doc.Pages()[0]
 	obj := page.FindElement("api")
@@ -208,7 +208,7 @@ func TestApplyForward_UpdatedTitle(t *testing.T) {
 		},
 	}
 
-	result := ApplyForward(cs, doc, ts, m, nil)
+	result := ApplyForward(cs, doc, ts, m)
 
 	if result.ElementsUpdated != 1 {
 		t.Fatalf("expected 1 element updated, got %d", result.ElementsUpdated)
@@ -237,7 +237,7 @@ func TestApplyForward_DeletedElement(t *testing.T) {
 		},
 	}
 
-	result := ApplyForward(cs, doc, ts, m, nil)
+	result := ApplyForward(cs, doc, ts, m)
 
 	if result.ElementsDeleted != 1 {
 		t.Fatalf("expected 1 element deleted, got %d", result.ElementsDeleted)
@@ -261,7 +261,7 @@ func TestApplyForward_NewRelationship(t *testing.T) {
 		},
 	}
 
-	result := ApplyForward(cs, doc, ts, m, nil)
+	result := ApplyForward(cs, doc, ts, m)
 
 	if result.ConnectorsCreated != 1 {
 		t.Fatalf("expected 1 connector created, got %d", result.ConnectorsCreated)
@@ -292,7 +292,7 @@ func TestApplyForward_MultipleNewElementsNoOverlap(t *testing.T) {
 		},
 	}
 
-	result := ApplyForward(cs, doc, ts, m, nil)
+	result := ApplyForward(cs, doc, ts, m)
 
 	if result.ElementsCreated != 2 {
 		t.Fatalf("expected 2 elements created, got %d", result.ElementsCreated)
@@ -313,7 +313,7 @@ func TestApplyForward_NoPageWarning(t *testing.T) {
 	m := emptyModel()
 	cs := &ChangeSet{}
 
-	result := ApplyForward(cs, doc, ts, m, nil)
+	result := ApplyForward(cs, doc, ts, m)
 
 	if len(result.Warnings) == 0 {
 		t.Fatal("expected a warning for document with no pages")
@@ -420,7 +420,7 @@ func TestApplyForward_EmptyModelRemovesElements(t *testing.T) {
 		},
 	}
 
-	result := ApplyForward(cs, doc, ts, m, nil)
+	result := ApplyForward(cs, doc, ts, m)
 
 	if result.ElementsDeleted != 2 {
 		t.Errorf("expected 2 elements deleted, got %d", result.ElementsDeleted)
@@ -454,7 +454,7 @@ func TestApplyForward_NoViewsReconciliation(t *testing.T) {
 	ts := minimalTemplates(t)
 	cs := &ChangeSet{} // No changes — but orphan should still be cleaned up.
 
-	result := ApplyForward(cs, doc, ts, m, nil)
+	result := ApplyForward(cs, doc, ts, m)
 
 	// "a" should be preserved.
 	if page.FindElement("a") == nil {
@@ -505,7 +505,7 @@ func TestApplyForward_NoDuplicateConnectors(t *testing.T) {
 		},
 	}
 
-	result := ApplyForward(cs, doc, ts, m, nil)
+	result := ApplyForward(cs, doc, ts, m)
 
 	// Should NOT create a duplicate connector.
 	connectors := page.FindAllConnectors()
@@ -548,7 +548,7 @@ func TestApplyForward_SelfReferencingRelationship(t *testing.T) {
 		},
 	}
 
-	result := ApplyForward(cs, doc, ts, m, nil)
+	result := ApplyForward(cs, doc, ts, m)
 
 	if result.ConnectorsCreated < 1 {
 		t.Errorf("expected at least 1 connector for self-referencing relationship, got %d", result.ConnectorsCreated)
@@ -574,7 +574,7 @@ func TestApplyForward_NoDuplicateElements(t *testing.T) {
 		},
 	}
 
-	result := ApplyForward(cs, doc, ts, m, nil)
+	result := ApplyForward(cs, doc, ts, m)
 
 	// Should NOT create a duplicate — skip existing element.
 	page := doc.Pages()[0]
@@ -622,7 +622,7 @@ func TestApplyForward_MultipleRelationshipsSamePair(t *testing.T) {
 		},
 	}
 
-	result := ApplyForward(cs, doc, ts, m, nil)
+	result := ApplyForward(cs, doc, ts, m)
 
 	if result.ConnectorsCreated != 2 {
 		t.Fatalf("expected 2 connectors created, got %d", result.ConnectorsCreated)
@@ -698,7 +698,7 @@ func TestApplyForward_MultipleRelsSamePairNoDuplicateConnectors(t *testing.T) {
 		},
 	}
 
-	result := ApplyForward(cs, doc, ts, m, nil)
+	result := ApplyForward(cs, doc, ts, m)
 
 	if len(page.FindAllConnectors()) != 2 {
 		t.Errorf("expected 2 connectors (no duplicates), got %d", len(page.FindAllConnectors()))
