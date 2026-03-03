@@ -11,7 +11,7 @@ import (
 
 // Load reads a JSONC file, strips comments and trailing commas, and parses it.
 func Load(path string) (*BausteinsichtModel, error) {
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) // #nosec G304 -- path from CLI flag
 	if err != nil {
 		return nil, fmt.Errorf("reading %s: %w", path, err)
 	}

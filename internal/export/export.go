@@ -53,7 +53,7 @@ func OutputFileName(viewKey, format string) string {
 // ExportPage runs the draw.io CLI to export a single page.
 func ExportPage(binary string, opts ExportOptions) error {
 	args := BuildExportArgs(opts)
-	cmd := exec.Command(binary, args...)
+	cmd := exec.Command(binary, args...) // #nosec G204 -- binary is auto-detected draw.io CLI path
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("draw.io export failed: %w\nOutput: %s", err, string(output))

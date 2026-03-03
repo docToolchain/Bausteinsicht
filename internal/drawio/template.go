@@ -25,7 +25,7 @@ type TemplateSet struct {
 
 // LoadTemplate parses a draw.io template file from disk.
 func LoadTemplate(path string) (*TemplateSet, error) {
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) // #nosec G304 -- path from CLI flag
 	if err != nil {
 		return nil, fmt.Errorf("LoadTemplate %q: %w", path, err)
 	}

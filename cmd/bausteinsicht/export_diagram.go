@@ -80,11 +80,11 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 			continue
 		}
 
-		if err := os.MkdirAll(outputDir, 0755); err != nil {
+		if err := os.MkdirAll(outputDir, 0750); err != nil {
 			return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
 		}
 		outPath := filepath.Join(outputDir, key+"."+ext)
-		if err := os.WriteFile(outPath, []byte(result), 0644); err != nil {
+		if err := os.WriteFile(outPath, []byte(result), 0600); err != nil { //nolint:gosec // output files are non-sensitive documentation
 			return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
 		}
 		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", outPath)

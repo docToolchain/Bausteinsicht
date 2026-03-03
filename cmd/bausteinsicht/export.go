@@ -93,7 +93,7 @@ func runExport(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Ensure output directory exists.
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
+	if err := os.MkdirAll(outputDir, 0750); err != nil {
 		return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
 	}
 

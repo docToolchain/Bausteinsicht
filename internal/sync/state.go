@@ -42,7 +42,7 @@ type RelationshipState struct {
 // LoadState reads a SyncState from the given path.
 // If the file does not exist, an empty SyncState is returned (first-sync scenario).
 func LoadState(path string) (*SyncState, error) {
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) // #nosec G304 -- path derived from model location
 	if err != nil {
 		if os.IsNotExist(err) {
 			return &SyncState{
@@ -106,7 +106,7 @@ func SaveState(path string, state *SyncState) error {
 
 // ComputeHash reads the file at path and returns a "sha256:<hex>" fingerprint.
 func ComputeHash(path string) (string, error) {
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) // #nosec G304 -- path derived from model location
 	if err != nil {
 		return "", fmt.Errorf("ComputeHash %q: %w", path, err)
 	}

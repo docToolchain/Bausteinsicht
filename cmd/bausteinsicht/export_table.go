@@ -80,10 +80,10 @@ func runExportTable(cmd *cobra.Command, _ []string) error {
 	}
 
 	outPath := filepath.Join(outputDir, filename)
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
+	if err := os.MkdirAll(outputDir, 0750); err != nil {
 		return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
 	}
-	if err := os.WriteFile(outPath, []byte(result), 0644); err != nil {
+	if err := os.WriteFile(outPath, []byte(result), 0600); err != nil { //nolint:gosec // output files are non-sensitive documentation
 		return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
 	}
 

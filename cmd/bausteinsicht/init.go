@@ -43,12 +43,12 @@ func runInit(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Write sample model.
-	if err := os.WriteFile(defaultModelFile, templates.SampleModel, 0644); err != nil {
+	if err := os.WriteFile(defaultModelFile, templates.SampleModel, 0600); err != nil {
 		return exitWithCode(fmt.Errorf("writing %s: %w", defaultModelFile, err), 2)
 	}
 
 	// Write template.
-	if err := os.WriteFile(defaultTemplFile, templates.DefaultTemplate, 0644); err != nil {
+	if err := os.WriteFile(defaultTemplFile, templates.DefaultTemplate, 0600); err != nil {
 		return exitWithCode(fmt.Errorf("writing %s: %w", defaultTemplFile, err), 2)
 	}
 

@@ -28,3 +28,9 @@ Thumbs.db
 # Temporary files
 *.tmp
 my-architecture/
+
+# Claude Code
+.claude/
+
+# draw.io backup files
+.$*.bkp
