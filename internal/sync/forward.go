@@ -128,6 +128,11 @@ func applyForwardPerView(
 		// the ChangeSet (#231).
 		populateNewPage(page, viewID, scopeID, templates, flat, elemSet, result)
 
+		// Populate connectors for relationships whose endpoints are both
+		// on the page but whose connector doesn't exist yet. This handles
+		// relationships involving newly populated elements (#231).
+		populateConnectors(page, viewID, m, elemSet, templates, result)
+
 		// Reconciliation: remove elements on the page that are no longer
 		// in the resolved view (e.g., after exclude list changes). #102
 		reconcileViewPage(page, elemSet, flat, scopeID, viewID, result)
@@ -164,6 +169,59 @@ func populateNewPage(
 			continue // Already created by applyChangesToPage.
 		}
 		applyElementAdded(id, viewID, scopeID, page, templates, flat, &pl, result)
+	}
+}
+
+// populateConnectors creates connectors for all model relationships whose
+// (possibly lifted) endpoints are both on the page but no connector exists yet.
+// This ensures relationships involving newly populated elements are rendered (#231).
+func populateConnectors(
+	page *drawio.Page,
+	viewID string,
+	m *model.BausteinsichtModel,
+	elemSet map[string]bool,
+	templates *drawio.TemplateSet,
+	result *ForwardResult,
+) {
+	liftedSeen := make(map[string]bool)
+	for i, rel := range m.Relationships {
+		from := liftEndpoint(rel.From, elemSet)
+		to := liftEndpoint(rel.To, elemSet)
+		if from == "" || to == "" {
+			continue
+		}
+		// Skip self-referencing lifted relationships.
+		if from == to && (from != rel.From || to != rel.To) {
+			continue
+		}
+
+		isLifted := from != rel.From || to != rel.To
+		pairKey := from + "->" + to
+		if isLifted {
+			if liftedSeen[pairKey] {
+				continue
+			}
+			liftedSeen[pairKey] = true
+		} else {
+			liftedSeen[pairKey] = true
+		}
+
+		srcRef := scopedCellID(viewID, from)
+		tgtRef := scopedCellID(viewID, to)
+		if page.FindConnector(srcRef, tgtRef, i) != nil {
+			continue // Already exists.
+		}
+		style := templates.GetConnectorStyle()
+		data := drawio.ConnectorData{
+			From:      from,
+			To:        to,
+			Label:     rel.Label,
+			SourceRef: srcRef,
+			TargetRef: tgtRef,
+			Index:     i,
+		}
+		page.CreateConnector(data, style)
+		result.ConnectorsCreated++
 	}
 }
 

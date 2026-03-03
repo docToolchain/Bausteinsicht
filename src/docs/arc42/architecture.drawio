@@ -155,6 +155,12 @@
         <mxCell id="rel-containers--drawio_app-containers--bausteinsicht.drawio-4" edge="1" parent="1" source="containers--drawio_app" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=10;" target="containers--bausteinsicht.drawio" value="modifies .drawio file">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
+        <mxCell id="rel-containers--bausteinsicht.cli-containers--bausteinsicht.model-5" value="loads/saves JSONC" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=10;" edge="1" source="containers--bausteinsicht.cli" target="containers--bausteinsicht.model" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="rel-containers--bausteinsicht.sync-containers--bausteinsicht.drawio-15" value="creates/updates elements" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=10;" edge="1" source="containers--bausteinsicht.sync" target="containers--bausteinsicht.drawio" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
       </root>
     </mxGraphModel>
   </diagram>
@@ -235,6 +241,12 @@
             <mxGeometry x="40" y="670" width="200" height="120" as="geometry"/>
           </mxCell>
         </object>
+        <mxCell id="rel-drawio-components--bausteinsicht.sync-drawio-components--bausteinsicht.drawio.element-15" value="creates/updates elements" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=10;" edge="1" source="drawio-components--bausteinsicht.sync" target="drawio-components--bausteinsicht.drawio.element" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="rel-drawio-components--bausteinsicht.sync-drawio-components--bausteinsicht.drawio.connector-16" value="creates/updates connectors" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=10;" edge="1" source="drawio-components--bausteinsicht.sync" target="drawio-components--bausteinsicht.drawio.connector" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
       </root>
     </mxGraphModel>
   </diagram>
@@ -321,6 +333,12 @@
             <mxGeometry x="40" y="1210" width="200" height="120" as="geometry"/>
           </mxCell>
         </object>
+        <mxCell id="rel-model-components--bausteinsicht.cli-model-components--bausteinsicht.sync-7" value="triggers sync" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=10;" edge="1" source="model-components--bausteinsicht.cli" target="model-components--bausteinsicht.sync" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="rel-model-components--bausteinsicht.sync-model-components--bausteinsicht.model.patch-17" value="comment-preserving updates" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=10;" edge="1" source="model-components--bausteinsicht.sync" target="model-components--bausteinsicht.model.patch" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
       </root>
     </mxGraphModel>
   </diagram>
@@ -423,6 +441,15 @@
             <mxGeometry x="280" y="970" width="200" height="120" as="geometry"/>
           </mxCell>
         </object>
+        <mxCell id="rel-sync-components--bausteinsicht.cli-sync-components--bausteinsicht.model-5" value="loads/saves JSONC" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=10;" edge="1" source="sync-components--bausteinsicht.cli" target="sync-components--bausteinsicht.model" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="rel-sync-components--bausteinsicht.sync.forward-sync-components--bausteinsicht.drawio-15" value="creates/updates elements" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=10;" edge="1" source="sync-components--bausteinsicht.sync.forward" target="sync-components--bausteinsicht.drawio" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="rel-sync-components--bausteinsicht.sync.reverse-sync-components--bausteinsicht.model-17" value="comment-preserving updates" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=10;" edge="1" source="sync-components--bausteinsicht.sync.reverse" target="sync-components--bausteinsicht.model" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
       </root>
     </mxGraphModel>
   </diagram>

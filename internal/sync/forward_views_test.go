@@ -1022,3 +1022,77 @@ func TestApplyForward_NewlyIncludedElementOnExistingPage(t *testing.T) {
 		t.Error("expected 'system.svc_b' on detail page (newly included, not in ChangeSet) — see #231")
 	}
 }
+
+// TestApplyForward_NewlyIncludedElementGetsConnectors verifies that when
+// an element is populated on an existing page (not via ChangeSet), its
+// relationships are also rendered as connectors. This extends #231 to
+// cover the connector case.
+func TestApplyForward_NewlyIncludedElementGetsConnectors(t *testing.T) {
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"parent": {Kind: "system", Title: "Parent", Children: map[string]model.Element{
+				"child_a": {Kind: "component", Title: "Child A"},
+				"child_b": {Kind: "component", Title: "Child B"},
+			}},
+			"ext": {Kind: "container", Title: "External"},
+		},
+		Relationships: []model.Relationship{
+			{From: "ext", To: "parent.child_a", Label: "calls A"},
+			{From: "ext", To: "parent.child_b", Label: "calls B"},
+			{From: "parent.child_a", To: "parent.child_b", Label: "delegates"},
+		},
+		Views: map[string]model.View{
+			"detail": {
+				Title:   "Detail View",
+				Scope:   "parent",
+				Include: []string{"parent.*", "ext"},
+			},
+		},
+	}
+
+	doc := drawio.NewDocument()
+	doc.AddPage("view-detail", "Detail View")
+	ts := minimalTemplates(t)
+
+	// Only child_a is in the ChangeSet. child_b and ext are already in
+	// sync state but newly included in this view — no ChangeSet entries.
+	cs := &ChangeSet{
+		ModelElementChanges: []ElementChange{
+			{ID: "parent.child_a", Type: Added},
+		},
+		ModelRelationshipChanges: []RelationshipChange{
+			{From: "ext", To: "parent.child_a", Index: 0, Type: Added, NewValue: "calls A"},
+		},
+	}
+
+	ApplyForward(cs, doc, ts, m)
+
+	page := doc.GetPage("view-detail")
+	if page == nil {
+		t.Fatal("detail page not found")
+	}
+
+	// All three elements should be on the page.
+	if page.FindElement("parent.child_a") == nil {
+		t.Fatal("expected child_a on page")
+	}
+	if page.FindElement("parent.child_b") == nil {
+		t.Fatal("expected child_b on page (populated, not in ChangeSet)")
+	}
+	if page.FindElement("ext") == nil {
+		t.Fatal("expected ext on page (populated, not in ChangeSet)")
+	}
+
+	// Connector from ChangeSet should exist.
+	if page.FindConnector("detail--ext", "detail--parent.child_a", 0) == nil {
+		t.Error("expected connector ext→child_a (from ChangeSet)")
+	}
+
+	// Connectors NOT in ChangeSet should also be created for populated elements.
+	if page.FindConnector("detail--ext", "detail--parent.child_b", 1) == nil {
+		t.Error("expected connector ext→child_b (populated, not in ChangeSet) — see #231")
+	}
+	if page.FindConnector("detail--parent.child_a", "detail--parent.child_b", 2) == nil {
+		t.Error("expected connector child_a→child_b (populated, not in ChangeSet) — see #231")
+	}
+}
