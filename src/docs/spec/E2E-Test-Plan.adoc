@@ -1,0 +1,403 @@
+= E2E Test Plan — Bausteinsicht CLI
+:toc:
+:toc-title: Contents
+:sectnums:
+
+== Purpose
+
+Reusable, comprehensive end-to-end test plan for all Bausteinsicht CLI workflows.
+Run periodically (at least before each release) to catch regressions and edge-case bugs that unit tests miss.
+
+Test reports are stored as: `src/docs/e2e-test-report-YYYY-MM-DD.adoc`
+
+== Before You Start
+
+=== Pre-Requisites
+
+. Build the CLI: `make build`
+. Verify draw.io CLI is available: `drawio-export --version` (devcontainer) or `drawio --version`
+. Ensure `xmllint` is available for XML well-formedness checks
+
+=== Updating This Test Plan
+
+IMPORTANT: Before executing the tests, check whether new commands, flags, or features have been added since the last update of this document.
+
+. Run `./bausteinsicht --help` and compare all listed commands against Section 3–15 of this document.
+. For each command, run `./bausteinsicht <command> --help` and compare all flags against the test sections.
+. If a new command or flag exists that has NO corresponding test section or test case:
+  .. Add a new section or extend an existing section with test cases for the missing functionality.
+  .. Commit the updated test plan BEFORE executing the tests.
+. If a command or flag has been removed, mark the corresponding test cases as `OBSOLETE` (do not delete — keep for history).
+
+=== How to Execute
+
+. Work through each section below in order.
+. For each test, use a fresh temporary directory: `dir=$(mktemp -d) && cd "$dir"`
+. Mark results: `PASS`, `FAIL` (with issue number), `SKIP` (with reason)
+. File a GitHub issue for each new failure immediately after discovering it.
+. Record results in a new test report file: `src/docs/e2e-test-report-YYYY-MM-DD.adoc`
+
+=== Result Template
+
+Copy this table into the test report:
+
+[source,asciidoc]
+----
+[cols="1,1,1,1,1"]
+|===
+| Section | Tests | Pass | Fail | Skip
+
+| 1. Basic Workflow | 6 | | |
+| 2. Validate | 25 | | |
+| 3. Forward Sync | 23 | | |
+| 4. Reverse Sync + Conflicts | 22 | | |
+| 5. Views / Wildcards / Scope / Lifting | 28 | | |
+| 6. CLI Add Commands | 30 | | |
+| 7. Watch Mode | 8 | | |
+| 8. Export | 12 | | |
+| 9. Draw.io File Integrity | 5 | | |
+| 10. Security / Injection Testing | 9 | | |
+| 11. CLI Flag Interactions | 9 | | |
+| 12. Sync State Edge Cases | 6 | | |
+| 13. Model File Edge Cases | 7 | | |
+| 14. Template Handling | 6 | | |
+| 15. Error Output Formatting | 8 | | |
+| **Total** | **204** | | |
+|===
+----
+
+== 1. Basic Workflow (6 tests)
+
+[cols="1,4,5,5"]
+|===
+| # | Test | Steps | Expected
+
+| 1.1 | Init in fresh dir | `bausteinsicht init` | 4 files created (architecture.jsonc, template.drawio, architecture.drawio, .bausteinsicht-sync)
+| 1.2 | Double init | Run `init` twice in same dir | Error: file already exists
+| 1.3 | Init in read-only dir | `chmod 555 dir && init` | Permission denied error
+| 1.4 | Validate after init | `bausteinsicht validate` | "Model is valid."
+| 1.5 | Sync after init | `bausteinsicht sync` | "Already in sync. No changes."
+| 1.6 | Init `--format json` | `bausteinsicht init --format json` | Valid JSON with `"success": true`
+|===
+
+== 2. Validate (25 tests)
+
+[cols="1,4,5,5"]
+|===
+| # | Test | Input | Expected
+
+| 2.1 | Empty JSON `{}` | `echo '{}' > model.jsonc` | Warning or error (no spec/model)
+| 2.2 | Spec without model | Only `specification` key | Valid
+| 2.3 | Model without spec | Only `model` key | Error: unknown kind
+| 2.4 | Unknown element kind | kind "microservice" not in spec | Error
+| 2.5 | Rel where `from` doesn't exist | `"from": "nonexistent"` | Error
+| 2.6 | Rel where `to` doesn't exist | `"to": "ghost"` | Error
+| 2.7 | Empty relationships `[]` | | Valid
+| 2.8 | Empty views `{}` | | Valid
+| 2.9 | `--format json` for errors | | `{"valid":false,"errors":[...]}`
+| 2.10 | `--format json` for valid model | | `{"valid":true,"errors":[]}`
+| 2.11 | Non-existent model file | `--model /nonexistent` | File not found error
+| 2.12 | Model path is directory | `--model /tmp` | "is a directory" error
+| 2.13 | View scope referencing non-existent element | | Error
+| 2.14 | View include referencing non-existent element | `"include": ["bogus"]` | Warning or error (not silently ignored)
+| 2.15 | View exclude referencing non-existent element | `"exclude": ["bogus"]` | Warning or error
+| 2.16 | Duplicate IDs at different nesting levels | `api` top-level + `parent.api` | Valid (different paths)
+| 2.17 | Unknown relationship kind | `"kind": "foobar"` not in spec | Error
+| 2.18 | Empty string element ID `""` | `"": {...}` | Error
+| 2.19 | Whitespace-only element ID `" "` | `" ": {...}` | Error
+| 2.20 | `null` root JSON | File is just `null` | Error
+| 2.21 | `--format xml` (invalid format) | | Error: unknown format
+| 2.22 | `--format JSON` (uppercase) | | JSON output (case-insensitive) or clear error
+| 2.23 | Malformed JSON | | Clear parse error
+| 2.24 | 500 elements stress test | | <1s, valid
+| 2.25 | Deep nesting (6 levels) | | Valid
+|===
+
+== 3. Forward Sync (23 tests)
+
+[cols="1,4,5,5"]
+|===
+| # | Test | Steps | Expected
+
+| 3.1 | Add element, sync | Add to model + view include, sync | Element in drawio with correct style
+| 3.2 | Add 2 elements simultaneously | | Both appear
+| 3.3 | Long ID (120 chars) | | Accepted, synced
+| 3.4 | Remove ALL elements, sync | | All pages cleaned
+| 3.5 | Add element back after removal | | Fresh creation
+| 3.6 | Add relationship, sync | | Connector rendered
+| 3.7 | Remove source element of relationship | | Element + connector removed
+| 3.8 | Long relationship label (500 chars) | | No truncation
+| 3.9 | Multiple rels between same pair | A->B "uses" + A->B "sends" | Both connectors rendered
+| 3.10 | Bidirectional relationships | A->B + B->A | Both render
+| 3.11 | Self-referencing relationship | A->A | Connector created
+| 3.12 | 3 levels of nesting, sync | system->container->component | All levels correct
+| 3.13 | Delete middle nesting level | | Re-parenting works
+| 3.14 | Move element between parents | | Old removed, new created
+| 3.15 | Sync 5x without changes | | All "Already in sync"
+| 3.16 | Incremental add/remove across syncs | | Correct state
+| 3.17 | No duplicates after 5 cycles | | Exactly 1 instance
+| 3.18 | Delete drawio file, then sync | | Recreate or clear error
+| 3.19 | Corrupt drawio file, then sync | Random text in drawio | Error, model untouched
+| 3.20 | Delete sync state, then sync | | No duplicates
+| 3.21 | Element in all 3 views | | Appears on all pages
+| 3.22 | Remove element from one view | | Only removed from that page
+| 3.23 | 10 add+sync cycles: XML well-formedness | xmllint after each | Valid XML
+|===
+
+== 4. Reverse Sync + Conflicts (22 tests)
+
+[cols="1,4,5,5"]
+|===
+| # | Test | Steps | Expected
+
+| 4.1 | Change label in drawio, sync | Edit `<object>` label attribute | Model title updated
+| 4.2 | Change description (tooltip) | | Model description updated
+| 4.3 | Change technology | | Model technology updated
+| 4.4 | HTML entities in label | `&amp;` `&lt;` `&gt;` | Properly decoded in model
+| 4.5 | Bold HTML tags in label | `<b>text</b>` | Tags stripped
+| 4.6 | Line breaks in label | `<br>` | Handled gracefully
+| 4.7 | Empty string label | Set `label=""` | Warning or reject (not silent)
+| 4.8 | Conflict: same field both sides | | Model wins + warning
+| 4.9 | Different fields changed | Title in model, desc in drawio | Both applied
+| 4.10 | Multiple fields in drawio only | | All updated in model
+| 4.11 | Delete element from drawio | | Removed from model + rels
+| 4.12 | Delete connector from drawio | | Relationship removed
+| 4.13 | Delete element with relationships | | Element + all rels removed
+| 4.14 | Change connector label | | Label updated in model
+| 4.15 | Change connector source/target | | Old rel removed, new created
+| 4.16 | `//` comments preserved | | Count before = count after
+| 4.17 | `/* */` block comments preserved | | Preserved after sync
+| 4.18 | Trailing commas preserved | | Maintained
+| 4.19 | 3 rapid consecutive syncs | | Idempotent after first
+| 4.20 | Multiple elements changed simultaneously | | All updated
+| 4.21 | No double WARNING prefix | | Conflict message starts with "Conflict detected" (not "WARNING: WARNING:")
+| 4.22 | View references cleaned on element delete | | Removed from include/exclude
+|===
+
+== 5. Views / Wildcards / Scope / Lifting (28 tests)
+
+[cols="1,4,5,5"]
+|===
+| # | Test | Include/Exclude | Expected
+
+| 5.1 | Exact match | `["webshop"]` | Only webshop
+| 5.2 | Single wildcard | `["webshop.*"]` | Direct children
+| 5.3 | Double wildcard | `["webshop.**"]` | All descendants
+| 5.4 | Bare `*` | `["*"]` | All top-level
+| 5.5 | Bare `**` | `["**"]` | Everything
+| 5.6 | Nested wildcard | `["webshop.frontend.*"]` | cart + catalog
+| 5.7 | Explicit list | `["a", "b"]` | Exactly those two
+| 5.8 | Mixed wildcard + explicit | `["webshop.*", "external"]` | Combined
+| 5.9 | Exclude single element | Include `*`, exclude one | Element removed
+| 5.10 | Exclude nested wildcard | Include `**`, exclude `prefix.*` | Correct
+| 5.11 | Exclude descendants | Include `prefix.**`, exclude `prefix.child.**` | Children excluded, not parent
+| 5.12 | Scope with valid element | `"scope": "webshop"` | Boundary box
+| 5.13 | Scope with non-existent element | | Warning, graceful
+| 5.14 | Scope with empty include | | Only boundary
+| 5.15 | Direct + lifted relationships | | Direct has priority
+| 5.16 | Lifted to parent | | Label preserved
+| 5.17 | Direct deep relationship | | Correct connector
+| 5.18 | Transitive chain | | No transitive lifting
+| 5.19 | Two views with overlapping elements | | Both pages have element
+| 5.20 | Remove view from model, sync | | Page removed from drawio
+| 5.21 | Rename view key | | Old page removed, new added
+| 5.22 | Empty include `[]` | | Empty page
+| 5.23 | Nonexistent element in include | | Empty page
+| 5.24 | Include = exclude (cancel out) | | Empty page
+| 5.25 | Duplicate entries in include | `["x", "x"]` | Deduplicated
+| 5.26 | Trailing dot `"webshop."` | | No match, empty page
+| 5.27 | Just dots `"..."` | | No match, empty page
+| 5.28 | 3 views, add element to all | | Element on all 3 pages
+|===
+
+== 6. CLI Add Commands (30 tests)
+
+[cols="1,4,5,5"]
+|===
+| # | Test | Command | Expected
+
+| 6.1 | Basic add element | `add element --id test --kind system --title "Test"` | Success
+| 6.2 | Duplicate ID | Same ID twice | Error
+| 6.3 | Empty ID `""` | | Rejected
+| 6.4 | ID with space `"a b"` | | Rejected
+| 6.5 | Dotted ID `"a.b"` at top level | | Rejected
+| 6.6 | Empty title `""` | | Rejected
+| 6.7 | Unknown kind | | Error with valid kinds listed
+| 6.8 | Valid parent | `--parent onlineshop` | Success
+| 6.9 | Invalid parent | `--parent nonexistent` | Error
+| 6.10 | Numeric-starting ID `123` | | Rejected
+| 6.11 | camelCase / UPPER / single-char IDs | | Accepted
+| 6.12 | No flags at all | `add element` | Missing required flags error
+| 6.13 | All optional flags | `--description "..." --technology "..."` | All stored in model
+| 6.14 | `--format json` for element | | Valid JSON with id, kind, title, technology, description
+| 6.15 | Basic add relationship | `add relationship --from a --to b --label "x"` | Success
+| 6.16 | Self-referencing relationship | `--from a --to a` | Accepted
+| 6.17 | Non-existent from/to | | Error
+| 6.18 | Empty label | `--label ""` | Accepted
+| 6.19 | Very long label (1000 chars) | | Accepted
+| 6.20 | Special chars in label | `& < > " '` | Escaped correctly
+| 6.21 | Duplicate relationship | Same from+to twice | Rejected with error
+| 6.22 | `--format json` for relationship | | Valid JSON
+| 6.23 | Dot notation nested elements | `--from parent.child` | Works
+| 6.24 | Unknown relationship kind | | Rejected
+| 6.25 | `//` comments preserved after add | Count before/after | Same
+| 6.26 | `/* */` block comments preserved | | Preserved
+| 6.27 | Trailing commas preserved | | Maintained
+| 6.28 | Mixed comments after add | | All preserved
+| 6.29 | Two sequential adds | | Both elements + comments intact
+| 6.30 | Add relationship preserves comments | | No comment loss
+|===
+
+== 7. Watch Mode (8 tests)
+
+[cols="1,4,5,5"]
+|===
+| # | Test | Steps | Expected
+
+| 7.1 | Detects model changes | Start watch, modify model, wait 3s | Sync triggered
+| 7.2 | Detects drawio changes | Start watch, modify drawio XML, wait 3s | Reverse sync triggered
+| 7.3 | Debounce (5 rapid saves) | 5 writes within 500ms | Single sync
+| 7.4 | Recovery from invalid model | Write invalid JSON, wait, restore valid | Error then recovery
+| 7.5 | `--model` flag | `watch --model architecture.jsonc` | Works same as default
+| 7.6 | Non-existent model | `watch --model nonexistent.jsonc` | Immediate error
+| 7.7 | Clean exit on SIGINT | `kill -INT` | "Stopped watching." (exit 0)
+| 7.8 | File delete + recreate | Delete model, recreate, modify | Watch continues detecting changes
+|===
+
+== 8. Export (12 tests)
+
+[cols="1,4,5,5"]
+|===
+| # | Test | Steps | Expected
+
+| 8.1 | Export all views as PNG | `bausteinsicht export --image-format png` | One PNG per view page
+| 8.2 | Export all views as SVG | `bausteinsicht export --image-format svg` | One SVG per view page
+| 8.3 | Export single view | `export --view context` | Only one file for context view
+| 8.4 | Export non-existent view | `export --view nonexistent` | Error: view not found
+| 8.5 | Export to custom output dir | `export --output ./images/` | Files created in `./images/`
+| 8.6 | Export to non-existent dir | `export --output /nonexistent/path/` | Dir created or clear error
+| 8.7 | Export `--format json` | `export --format json` | JSON output listing exported files
+| 8.8 | Export with `--embed-diagram` | `export --embed-diagram --image-format png` | PNG contains embedded draw.io XML
+| 8.9 | Export without draw.io CLI | `export --drawio-path /nonexistent` | Clear error: draw.io CLI not found
+| 8.10 | Export after init (no custom elements) | Init, export | Exports default diagram
+| 8.11 | Export after multiple syncs | Add elements, sync 3x, export | Exported image matches current state
+| 8.12 | Output filename convention | Export all views | Files named `{base}-{viewID}.{ext}` (e.g., `architecture-context.png`)
+|===
+
+== 9. Draw.io File Integrity (5 tests)
+
+[cols="1,4,5,5"]
+|===
+| # | Test | Steps | Expected
+
+| 9.1 | XML well-formedness after 10 cycles | Add element + sync x10, xmllint each | Valid XML every time
+| 9.2 | No orphaned connectors | Add rels, remove middle element, sync | No dangling edges
+| 9.3 | Style consistency | 5 elements same kind | Identical styles
+| 9.4 | Page structure (base cells) | After 10 cycles | Exactly one mxCell 0 and 1 per page
+| 9.5 | mxGraphModel attributes | After 10 cycles | dx, dy, grid, etc. preserved
+|===
+
+== 10. Security / Injection Testing (9 tests)
+
+[cols="1,4,5,5"]
+|===
+| # | Test | Input | Expected
+
+| 10.1 | XML injection via title | `<script>alert('xss')</script>` | Escaped, XML well-formed
+| 10.2 | XML injection via description | `"><evil attr="injected` | No attribute injection
+| 10.3 | XML injection via rel label | `</mxCell><mxCell evil="true"/>` | No injected elements
+| 10.4 | CDATA injection | `]]>...</description><evil>` | XML integrity maintained
+| 10.5 | Unicode null bytes in title | `\x00` in title | Handled gracefully
+| 10.6 | Very long string (100K chars) | | No crash
+| 10.7 | Path traversal via `--parent` | `../../etc/passwd` | "not found" error
+| 10.8 | Shell injection via element ID | `$(whoami)`, `` `whoami` `` | Rejected by ID regex
+| 10.9 | JSON injection in model | `", "evil": "true` in title | Literal string value
+|===
+
+== 11. CLI Flag Interactions (9 tests)
+
+[cols="1,4,5,5"]
+|===
+| # | Test | Command | Expected
+
+| 11.1 | `--verbose` with validate | `validate --verbose` | More detail than non-verbose
+| 11.2 | `--verbose` with sync | `sync --verbose` | More detail
+| 11.3 | `--verbose` with export | `export --verbose` | More detail
+| 11.4 | `--model` pointing to .drawio | `validate --model x.drawio` | Clear parse error
+| 11.5 | `--template` pointing to .jsonc | `sync --template x.jsonc` | Error (not silent fallback)
+| 11.6 | `--format json` + `--verbose` | | Valid JSON (verbose doesn't break JSON structure)
+| 11.7 | Both model+template non-existent | | Clear error
+| 11.8 | `--help` on all subcommands | init, sync, validate, watch, add element, add relationship, export | Help text, exit 0
+| 11.9 | Unknown flag `--bogus` | `sync --bogus` | Error: unknown flag
+|===
+
+== 12. Sync State Edge Cases (6 tests)
+
+[cols="1,4,5,5"]
+|===
+| # | Test | Setup | Expected
+
+| 12.1 | Corrupt sync state | `{{{invalid` | Clear parse error
+| 12.2 | Extra/stale entries | Fake elements in sync state | Cleaned up gracefully
+| 12.3 | Missing entries | Remove some from sync state | No duplicates created
+| 12.4 | Empty sync state `{}` | | No duplicates, rebuilds state
+| 12.5 | Empty file (0 bytes) | | Clear error
+| 12.6 | JSON array instead of object | `[]` | Clear type error
+|===
+
+== 13. Model File Edge Cases (7 tests)
+
+[cols="1,4,5,5"]
+|===
+| # | Test | Input | Expected
+
+| 13.1 | UTF-8 BOM | `\xEF\xBB\xBF` prefix | Stripped or clear error mentioning BOM
+| 13.2 | Windows line endings `\r\n` | | Works
+| 13.3 | Mixed line endings | | Works
+| 13.4 | Tab indentation | | Works
+| 13.5 | No trailing newline | | Works
+| 13.6 | Minified (single-line) JSON | | Works
+| 13.7 | 100 elements performance | | <1s for validate + sync
+|===
+
+== 14. Template Handling (6 tests)
+
+[cols="1,4,5,5"]
+|===
+| # | Test | Steps | Expected
+
+| 14.1 | Custom template via `--template` | `sync --template custom.drawio` | Styles from custom template used
+| 14.2 | Template without required styles | Empty template | Clear error or default styles
+| 14.3 | Template is not valid draw.io XML | Random text | Clear parse error
+| 14.4 | Template path doesn't exist | `--template /nonexistent.drawio` | File not found error
+| 14.5 | Init creates template.drawio | `init` | template.drawio contains valid draw.io XML with element styles
+| 14.6 | Init blocked by existing template | Pre-create template.drawio, then `init` | Error: file already exists
+|===
+
+== 15. Error Output Formatting (8 tests)
+
+[cols="1,4,5,5"]
+|===
+| # | Test | Command | Expected
+
+| 15.1 | Error as JSON (validate) | `validate --model /nonexistent --format json` 2>&1 | `{"error":"...","code":N}` on stderr
+| 15.2 | Error as JSON (sync) | `sync --model /nonexistent --format json` 2>&1 | `{"error":"...","code":N}` on stderr
+| 15.3 | Error as JSON (add element) | `add element --format json --kind invalid ...` 2>&1 | `{"error":"...","code":N}` on stderr
+| 15.4 | Error as JSON (export) | `export --format json --drawio-path /nonexistent` 2>&1 | `{"error":"...","code":N}` on stderr
+| 15.5 | Error as text (default) | `validate --model /nonexistent` 2>&1 | Plain text error on stderr
+| 15.6 | Error exit codes | Various error commands | exit code 1 for user errors, 2 for system errors
+| 15.7 | Success JSON output consistency | `init --format json`, `sync --format json`, etc. | All valid JSON, parseable by `jq`
+| 15.8 | No mixed stdout/stderr | Error command with `--format json` | JSON error on stderr only, no text on stdout
+|===
+
+== Test History
+
+Record each test execution here:
+
+[cols="1,1,1,1,2"]
+|===
+| Date | Round | Tests | Bugs Found | Report
+
+| 2026-03-01 | 1+2 | 73 | 18 (#107-#124) | `e2e-test-report-2026-03-01.adoc`
+| 2026-03-02 | 3 | 221 | 12 (#140-#151) | `e2e-test-report-2026-03-02.adoc`
+|===

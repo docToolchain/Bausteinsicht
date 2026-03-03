@@ -1,0 +1,416 @@
+= E2E Test Report — 2026-03-02 (Round 5)
+:toc:
+:toc-title: Contents
+
+== Summary
+
+Fifth comprehensive E2E test pass after all 35 bugs from rounds 1–4 were fixed and merged.
+Testing performed on devcontainer (Linux 5.15.167.4-microsoft-standard-WSL2) using the built CLI binary.
+Focus: full coverage of all 204 tests from E2E-Test-Plan.adoc, intensive edge-case hunting.
+
+[cols="1,1,1,1,1"]
+|===
+| Section | Tests | Pass | Fail | Skip
+
+| 1. Basic Workflow | 6 | 6 | 0 | 0
+| 2. Validate | 25 | 23 | 2 | 0
+| 3. Forward Sync | 23 | 22 | 1 | 0
+| 4. Reverse Sync + Conflicts | 22 | 22 | 0 | 0
+| 5. Views / Wildcards / Scope / Lifting | 28 | 26 | 2 | 0
+| 6. CLI Add Commands | 30 | 30 | 0 | 0
+| 7. Watch Mode | 8 | 8 | 0 | 0
+| 8. Export | 12 | 12 | 0 | 0
+| 9. Draw.io File Integrity | 5 | 5 | 0 | 0
+| 10. Security / Injection Testing | 9 | 9 | 0 | 0
+| 11. CLI Flag Interactions | 9 | 9 | 0 | 0
+| 12. Sync State Edge Cases | 6 | 6 | 0 | 0
+| 13. Model File Edge Cases | 7 | 7 | 0 | 0
+| 14. Template Handling | 6 | 5 | 1 | 0
+| 15. Error Output Formatting | 8 | 8 | 0 | 0
+| **Total** | **204** | **198** | **6** | **0**
+|===
+
+== Previous Issues Status
+
+All 35 bugs from rounds 1–4 (#107–#124, #140–#151, #165–#169) have been fixed and merged.
+Verified: 0 regressions — all previously fixed bugs remain fixed.
+
+== New Issues Filed
+
+=== Medium Severity
+
+[cols="1,3,1"]
+|===
+| Issue | Description | Test Area
+
+| #175 | Removing all views corrupts drawio file beyond recovery — `<mxfile>` left without `<diagram>` elements, subsequent syncs fail permanently | Forward Sync
+|===
+
+=== Low Severity
+
+[cols="1,3,1"]
+|===
+| Issue | Description | Test Area
+
+| #176 | `sync` silently accepts invalid include/exclude patterns (trailing dot, just dots) while `validate` correctly rejects them — inconsistency can cause unexpected element removal | Views
+| #177 | `validate` accepts empty `{}` and spec-only models as valid — no warning about missing model elements | Validation
+| #178 | `sync` silently accepts invalid XML template file via `--template` flag — no error or warning about unparseable template | Template
+|===
+
+== Detailed Test Results
+
+=== 1. Basic Workflow / Init
+
+[cols="3,1,3"]
+|===
+| Test | Result | Notes
+
+| 1.1: `bausteinsicht init` in fresh dir | PASS | Creates architecture.jsonc, template.drawio, architecture.drawio, .bausteinsicht-sync
+| 1.2: Double init in same dir | PASS | Error: file already exists (exit 2)
+| 1.3: Init in read-only dir | PASS | Permission denied (exit 2)
+| 1.4: Validate after init | PASS | "Model is valid."
+| 1.5: Sync after init | PASS | "Already in sync. No changes."
+| 1.6: Init `--format json` | PASS | Valid JSON output
+|===
+
+=== 2. Validate Edge Cases
+
+[cols="3,1,3"]
+|===
+| Test | Result | Notes
+
+| 2.1: Empty JSON `{}` | **FAIL** | Accepted as valid (#177)
+| 2.2: Spec without model section | **FAIL** | Accepted as valid (#177)
+| 2.3: Model without specification | PASS | Reports unknown kind errors
+| 2.4: Unknown element kind | PASS | Clear error message with path
+| 2.5: Rel where `from` doesn't exist | PASS | Clear error
+| 2.6: Rel where `to` doesn't exist | PASS | Clear error
+| 2.7: Empty relationships array | PASS | Valid
+| 2.8: Empty views `{}` | PASS | Valid
+| 2.9: `--format json` for errors | PASS | Valid JSON: `{"valid":false,"errors":[...]}`
+| 2.10: `--format json` for valid model | PASS | `{"valid":true,"errors":[]}`
+| 2.11: Non-existent model file | PASS | Clear file not found error (exit 2)
+| 2.12: Model path is directory | PASS | "is a directory" error (exit 2)
+| 2.13: View scope referencing non-existent element | PASS | Clear error
+| 2.14: View include referencing non-existent element | PASS | Error reported
+| 2.15: View exclude referencing non-existent element | PASS | Error reported
+| 2.16: Duplicate IDs at different nesting levels | PASS | Different qualified paths
+| 2.17: Unknown relationship kind | PASS | Clear error
+| 2.18: Empty string element ID `""` | PASS | Rejected
+| 2.19: Whitespace-only element ID `" "` | PASS | Rejected
+| 2.20: `null` root JSON | PASS | Rejected (exit 2)
+| 2.21: `--format xml` (invalid format) | PASS | Rejected (exit 1)
+| 2.22: `--format JSON` (uppercase) | PASS | Case-insensitive, produces valid JSON
+| 2.23: Malformed JSON | PASS | Clear parse error (exit 2)
+| 2.24: 500 elements stress test | PASS | Validates in 5ms
+| 2.25: Deep nesting (6 levels) | PASS | Valid
+|===
+
+=== 3. Forward Sync
+
+[cols="3,1,3"]
+|===
+| Test | Result | Notes
+
+| 3.1: Add single element, sync | PASS | Element appears with correct style
+| 3.2: Add 2 elements simultaneously | PASS | Both appear
+| 3.3: Long ID (120+ chars) | PASS | Accepted and synced
+| 3.4: Remove ALL elements, sync | **FAIL** | Drawio becomes permanently invalid (#175)
+| 3.5: Add element back after removal | PASS | Fresh creation
+| 3.6: Add relationship, sync | PASS | Connector rendered
+| 3.7: Remove source element of relationship | PASS | Element + connector removed
+| 3.8: Long relationship label (500 chars) | PASS | No truncation
+| 3.9: Multiple rels between same pair | PASS | Both connectors rendered (fix #142 holds)
+| 3.10: Bidirectional relationships | PASS | Both render
+| 3.11: Self-referencing relationship | PASS | Connector created (fix #111 holds)
+| 3.12: 3 levels of nesting | PASS | All levels correct
+| 3.13: Delete middle nesting level | PASS | Re-parenting works
+| 3.14: Move element between parents | PASS | Old removed, new created
+| 3.15: Sync 5x without changes (idempotency) | PASS | All "Already in sync"
+| 3.16: Incremental add/remove across syncs | PASS | Correct state tracking
+| 3.17: No duplicates after 5 cycles | PASS | Exactly 1 instance per element
+| 3.18: Delete drawio file, then sync | PASS | File recreated (fix #149 holds)
+| 3.19: Corrupt drawio file, then sync | PASS | Error, model untouched (fix #140 holds)
+| 3.20: Delete sync state, then sync | PASS | No duplicates (fix #141 holds)
+| 3.21: Element in all 3 views | PASS | Appears on all pages
+| 3.22: Remove element from one view | PASS | Only removed from that page
+| 3.23: 10 add+sync cycles XML well-formedness | PASS | Valid XML every cycle
+|===
+
+=== 4. Reverse Sync + Conflicts
+
+[cols="3,1,3"]
+|===
+| Test | Result | Notes
+
+| 4.1: Change label in drawio | PASS | Model title updated
+| 4.2: Change description (tooltip) | PASS | Model description updated
+| 4.3: Change technology via label [brackets] | PASS | Model technology updated
+| 4.4: HTML entities in label | PASS | Properly decoded (& < > work)
+| 4.5: Bold HTML tags stripped | PASS | Tags correctly removed
+| 4.6: Line breaks in label | PASS | Handled gracefully
+| 4.7: Empty string label | PASS | Warning issued, original title preserved
+| 4.8: Conflict: same field both sides | PASS | Model wins + clear warning with field details
+| 4.9: Different fields changed | PASS | Both applied independently
+| 4.10: Multiple fields changed in drawio | PASS | All updated in model
+| 4.11: Delete element from drawio | PASS | Removed from model + relationships
+| 4.12: Delete connector from drawio | PASS | Relationship removed from model
+| 4.13: Delete element with relationships | PASS | Element + all rels removed
+| 4.14: Change connector label | PASS | Label updated in model
+| 4.15: Change connector source/target | PASS | Old rel removed, new created
+| 4.16: `//` comments preserved | PASS | All comments intact
+| 4.17: `/* */` block comments preserved | PASS | Block comments intact (fix #121 holds)
+| 4.18: Trailing commas preserved | PASS | Maintained
+| 4.19: 3 rapid consecutive syncs | PASS | Idempotent after first
+| 4.20: Multiple elements changed simultaneously | PASS | All updated
+| 4.21: No double WARNING prefix | PASS | Single prefix (fix #116 holds)
+| 4.22: View references cleaned on element delete | PASS | Removed from include/exclude (fix #114 holds)
+|===
+
+=== 5. Views / Wildcards / Scope / Lifting
+
+[cols="3,1,3"]
+|===
+| Test | Result | Notes
+
+| 5.1: Exact match `["webshop"]` | PASS | Only webshop
+| 5.2: Single wildcard `["webshop.*"]` | PASS | Direct children
+| 5.3: Double wildcard `["webshop.**"]` | PASS | All descendants
+| 5.4: Bare `*` | PASS | All top-level
+| 5.5: Bare `**` | PASS | Everything
+| 5.6: Nested wildcard `["webshop.frontend.*"]` | PASS | Correct matching
+| 5.7: Explicit list `["a", "b"]` | PASS | Exactly those two
+| 5.8: Mixed wildcard + explicit | PASS | Combined correctly
+| 5.9: Exclude single element | PASS | Element removed from view
+| 5.10: Exclude nested wildcard | PASS | Correct filtering
+| 5.11: Exclude descendants | PASS | Children excluded, not parent
+| 5.12: Scope with valid element | PASS | Boundary box created
+| 5.13: Scope with non-existent element | PASS | Warning, graceful handling
+| 5.14: Scope with empty include | PASS | Only boundary element
+| 5.15: Direct + lifted relationships | PASS | Direct has priority
+| 5.16: Lifted to parent | PASS | Label preserved
+| 5.17: Direct deep relationship | PASS | Correct connector
+| 5.18: Transitive chain | PASS | No transitive lifting (correct)
+| 5.19: Two views with overlapping elements | PASS | Both pages have element
+| 5.20: Remove view from model, sync | PASS | Page removed (fix #143 holds)
+| 5.21: Rename view key | PASS | Old page removed, new added
+| 5.22: Empty include `[]` | PASS | Empty page created
+| 5.23: Nonexistent element in include | PASS | Empty page
+| 5.24: Include = exclude (cancel out) | PASS | Empty page
+| 5.25: Trailing dot `"webshop."` | **FAIL** | Sync accepts without warning, validate rejects (#176)
+| 5.26: Just dots `"..."` | **FAIL** | Sync accepts without warning, validate rejects (#176)
+| 5.27: Duplicate entries in include | PASS | Deduplicated
+| 5.28: 3 views, add element to all | PASS | Element on all 3 pages
+|===
+
+=== 6. CLI Add Commands
+
+[cols="3,1,3"]
+|===
+| Test | Result | Notes
+
+| 6.1: Basic add element | PASS | Success
+| 6.2: Duplicate ID | PASS | Rejected with error
+| 6.3: Empty ID `""` | PASS | Rejected by ID regex
+| 6.4: ID with space | PASS | Rejected
+| 6.5: Dotted ID `"a.b"` | PASS | Rejected
+| 6.6: Empty title `""` | PASS | Rejected
+| 6.7: Unknown kind | PASS | Error with valid kinds listed
+| 6.8: Valid parent | PASS | Success with dot-notation path
+| 6.9: Invalid parent | PASS | Element not found error
+| 6.10: Numeric-starting ID | PASS | Rejected
+| 6.11: camelCase / UPPER / single-char / hyphen / underscore IDs | PASS | All accepted
+| 6.12: No flags at all | PASS | Missing required flags error
+| 6.13: All optional flags (description, technology) | PASS | All stored correctly
+| 6.14: `--format json` for element | PASS | Valid JSON output
+| 6.15: Basic add relationship | PASS | Success
+| 6.16: Self-referencing relationship | PASS | Accepted
+| 6.17: Non-existent from/to | PASS | Clear error
+| 6.18: Empty label | PASS | Accepted
+| 6.19: Very long label (1000 chars) | PASS | Accepted
+| 6.20: Special chars in label (& < > " ') | PASS | Correctly escaped
+| 6.21: Duplicate relationship (same from+to+kind) | PASS | Rejected
+| 6.22: `--format json` for relationship | PASS | Valid JSON
+| 6.23: Dot notation for nested elements | PASS | Works correctly
+| 6.24: Unknown relationship kind | PASS | Rejected with error
+| 6.25: `//` comments preserved after add | PASS | Same count before/after
+| 6.26: `/* */` block comments preserved | PASS | Preserved
+| 6.27: Trailing commas preserved | PASS | Maintained
+| 6.28: Mixed comments after add | PASS | All preserved
+| 6.29: Two sequential adds | PASS | Both elements + comments intact
+| 6.30: Add relationship preserves comments | PASS | No comment loss
+|===
+
+=== 7. Watch Mode
+
+[cols="3,1,3"]
+|===
+| Test | Result | Notes
+
+| 7.1: Detects model changes | PASS | Sync triggered within debounce window
+| 7.2: Detects drawio changes | PASS | Reverse sync triggered, model updated
+| 7.3: Debounce (5 rapid saves) | PASS | Single sync fired
+| 7.4: Recovery from invalid model | PASS | Error reported, no crash, recovery on fix
+| 7.5: `--model` flag | PASS | Watches correct file
+| 7.6: Non-existent model | PASS | Immediate error (exit 2)
+| 7.7: Clean exit on SIGINT | PASS | "Stopped watching." (exit 0)
+| 7.8: File delete + recreate | PASS | Watch continues detecting changes
+|===
+
+=== 8. Export
+
+[cols="3,1,3"]
+|===
+| Test | Result | Notes
+
+| 8.1: Export all views as PNG | PASS | One PNG per view page
+| 8.2: Export all views as SVG | PASS | One SVG per view page
+| 8.3: Export single view | PASS | Only one file for context view
+| 8.4: Export non-existent view | PASS | Error: view not found
+| 8.5: Export to custom output dir | PASS | Files created in custom directory
+| 8.6: Export to non-existent dir | PASS | Directory auto-created
+| 8.7: Export `--format json` | PASS | JSON output listing exported files
+| 8.8: Export with `--embed-diagram` | PASS | PNG/SVG contains embedded draw.io XML
+| 8.9: Invalid image format (`gif`) | PASS | Rejected with error
+| 8.10: Export after init | PASS | Exports default diagram
+| 8.11: Export after multiple syncs | PASS | Exported image matches current state
+| 8.12: Output filename convention | PASS | Files named `architecture-{viewID}.{ext}`
+|===
+
+=== 9. Draw.io File Integrity
+
+[cols="3,1,3"]
+|===
+| Test | Result | Notes
+
+| 9.1: XML well-formedness after 10 cycles | PASS | Valid XML every cycle
+| 9.2: No orphaned connectors after element removal | PASS | Clean removal
+| 9.3: Style consistency (5 elements same kind) | PASS | Identical styles
+| 9.4: Page structure (base cells) after 10 cycles | PASS | Exactly one mxCell 0 and 1 per page
+| 9.5: mxGraphModel attributes preserved | PASS | All attributes intact
+|===
+
+=== 10. Security / Injection Testing
+
+[cols="3,1,3"]
+|===
+| Test | Result | Notes
+
+| 10.1: XML injection via title (`<script>`) | PASS | Properly escaped
+| 10.2: XML injection via description (attribute injection) | PASS | XML well-formed, no injected attributes
+| 10.3: XML injection via relationship label | PASS | No injected elements
+| 10.4: CDATA injection | PASS | XML integrity maintained
+| 10.5: Unicode null bytes in title | PASS | Stripped by shell, no damage
+| 10.6: Very long strings (100K chars) | PASS | No crash, handles fine
+| 10.7: Path traversal via `--parent` flag | PASS | "not found" error
+| 10.8: Shell injection via element ID (`$(whoami)`) | PASS | Rejected by ID regex
+| 10.9: JSON injection in model title | PASS | Literal string, no injection
+|===
+
+=== 11. CLI Flag Interactions
+
+[cols="3,1,3"]
+|===
+| Test | Result | Notes
+
+| 11.1: `--verbose` with validate | PASS | More detail than non-verbose (fix #144 holds)
+| 11.2: `--verbose` with sync | PASS | More detail than non-verbose
+| 11.3: `--verbose` with export | PASS | More detail than non-verbose
+| 11.4: `--model` pointing to .drawio file | PASS | Clear parse error
+| 11.5: `--template` pointing to .jsonc file | PASS | Rejected: "template file must have a .drawio extension" (fix #148 holds)
+| 11.6: `--format json` + `--verbose` | PASS | Valid JSON output
+| 11.7: Both model+template non-existent | PASS | Clear error (model error first)
+| 11.8: `--help` on all 7 subcommands | PASS | All show help, exit 0
+| 11.9: Unknown flag `--bogus` | PASS | Error: unknown flag
+|===
+
+=== 12. Sync State Edge Cases
+
+[cols="3,1,3"]
+|===
+| Test | Result | Notes
+
+| 12.1: Corrupt sync state (invalid JSON) | PASS | Clear parse error (exit 2)
+| 12.2: Extra/stale entries in sync state | PASS | Handled gracefully
+| 12.3: Missing entries from sync state | PASS | No duplicates created
+| 12.4: Empty sync state `{}` | PASS | Recovers with warnings about new elements
+| 12.5: Empty file (0 bytes) | PASS | Recovers (fix #169 holds)
+| 12.6: JSON array instead of object | PASS | Clear unmarshal error (exit 2)
+|===
+
+=== 13. Model File Edge Cases
+
+[cols="3,1,3"]
+|===
+| Test | Result | Notes
+
+| 13.1: UTF-8 BOM | PASS | Stripped correctly (fix #147 holds)
+| 13.2: Windows line endings `\r\n` | PASS | Handled correctly
+| 13.3: Mixed line endings | PASS | Handled correctly
+| 13.4: Tab indentation | PASS | Works fine
+| 13.5: No trailing newline | PASS | Works fine
+| 13.6: Minified (single-line) JSON | PASS | Works fine
+| 13.7: 100 elements performance | PASS | Sync in 6ms
+|===
+
+=== 14. Template Handling
+
+[cols="3,1,3"]
+|===
+| Test | Result | Notes
+
+| 14.1: Custom template via `--template` | PASS | Styles from custom template used
+| 14.2: Template without required styles | PASS | Falls back to default styles
+| 14.3: Template is not valid draw.io XML | **FAIL** | Silently accepted (#178)
+| 14.4: Template path doesn't exist | PASS | File not found error (exit 2)
+| 14.5: Init creates valid template.drawio | PASS | Valid draw.io XML with element styles
+| 14.6: Init blocked by existing files | PASS | Error: file already exists
+|===
+
+=== 15. Error Output Formatting
+
+[cols="3,1,3"]
+|===
+| Test | Result | Notes
+
+| 15.1: Error as JSON (validate) | PASS | `{"error":"...","code":N}` on stderr
+| 15.2: Error as JSON (sync) | PASS | JSON error wrapper on stderr
+| 15.3: Error as JSON (add element) | PASS | JSON error wrapper on stderr
+| 15.4: Error as JSON (export) | PASS | JSON error wrapper on stderr
+| 15.5: Error as text (default) | PASS | Plain text on stderr
+| 15.6: Error exit codes | PASS | 1=user error, 2=system error
+| 15.7: Success JSON output consistency | PASS | All commands produce valid JSON
+| 15.8: No mixed stdout/stderr | PASS | JSON error only on stderr, no text on stdout
+|===
+
+== Root Cause Patterns
+
+=== 1. Missing Drawio Structure Recovery (#175)
+
+The `LoadDocument` validation (added to fix #140) correctly rejects drawio files without `<diagram>` elements. However, the forward sync can create such files when all views are removed. The fix should either preserve at least one empty diagram or allow `sync` to recreate the drawio structure.
+
+=== 2. Validation-Sync Inconsistency (#176)
+
+The `validate` and `sync` commands apply different levels of validation to view patterns. `validate` checks all include/exclude entries against the element tree, but `sync` resolves patterns silently (non-matching patterns produce empty sets). This gap means `sync` can silently change behavior based on typos in patterns.
+
+== Comparison with Previous Rounds
+
+[cols="1,1,1,1,1,1"]
+|===
+| Metric | Round 1+2 | Round 3 | Round 4 | Round 5 | Trend
+
+| Total tests | 73 | 221 | 147 | 204 | Full coverage
+| Bugs found | 18 | 12 | 5 | 4 | Significant decrease
+| Critical bugs | 3 | 1 | 1 | 0 | No critical bugs
+| Medium bugs | — | — | 2 | 1 | Decreasing
+| Security issues | untested | 0/9 | 0/8 | 0/9 | Clean
+| Previous bugs regressed | — | 0/18 | 0/30 | 0/35 | All fixes hold
+| Pass rate | — | — | — | 97.1% | High stability
+|===
+
+== Recommendations
+
+1. **Priority 1 (Medium):** Fix #175 (drawio file corrupted when all views removed) — add drawio structure recovery
+2. **Priority 2 (Low):** Fix #176 (sync/validate pattern inconsistency) — add pattern validation to sync
+3. **Priority 3 (Low):** Fix #177 (empty model accepted as valid) — add warning for empty models
+4. **Priority 4 (Low):** Fix #178 (invalid template silently accepted) — validate template XML
