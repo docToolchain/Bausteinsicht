@@ -1,7 +1,7 @@
 {
-  "timestamp": "2026-03-02T23:27:56Z",
-  "model_hash": "sha256:60e8d647296c411a166fd5212e31ba69e90f9d25ae798088be6404b17c6250ed",
-  "drawio_hash": "sha256:58f3104a1f9bf62d4f03ba490adbe26bac47b7580b51a66f1ff47cc71e77dd19",
+  "timestamp": "2026-03-03T10:45:22Z",
+  "model_hash": "sha256:3e88692f8a71b7c8002e6f4cbdb6c006cb605a3d33ede10eaa48c45ed68d4e79",
+  "drawio_hash": "sha256:cb0ca73c62f956e2225c3639f92345b742d97762163d2e987468d51bcfe1ea4e",
   "elements": {
     "bausteinsicht": {
       "title": "Bausteinsicht",

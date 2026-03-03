@@ -401,7 +401,7 @@
       "scope": "bausteinsicht.drawio",
       "include": [
         "bausteinsicht.drawio.*",
-        "bausteinsicht.sync.forward",
+        "bausteinsicht.sync",
         "bausteinsicht.export",
         "drawio_app"
       ],
@@ -413,7 +413,7 @@
       "include": [
         "bausteinsicht.model.*",
         "bausteinsicht.cli",
-        "bausteinsicht.sync.reverse",
+        "bausteinsicht.sync",
         "ide"
       ],
       "description": "Internal components of the JSONC model management package with external callers"
@@ -423,9 +423,8 @@
       "scope": "bausteinsicht.sync",
       "include": [
         "bausteinsicht.sync.*",
-        "bausteinsicht.model.patch",
-        "bausteinsicht.drawio.element",
-        "bausteinsicht.drawio.connector",
+        "bausteinsicht.model",
+        "bausteinsicht.drawio",
         "bausteinsicht.cli",
         "bausteinsicht.watcher"
       ],
