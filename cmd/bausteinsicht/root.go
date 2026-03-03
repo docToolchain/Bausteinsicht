@@ -45,6 +45,7 @@ func NewRootCmd() *cobra.Command {
 	rootCmd.AddCommand(newAddCmd())
 	rootCmd.AddCommand(newWatchCmd())
 	rootCmd.AddCommand(newExportCmd())
+	rootCmd.AddCommand(newExportTableCmd())
 
 	return rootCmd
 }
