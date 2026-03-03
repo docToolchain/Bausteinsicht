@@ -3,6 +3,8 @@ package drawio
 import (
 	"strings"
 	"testing"
+
+	"github.com/beevik/etree"
 )
 
 func newInternalTestPage(t *testing.T) *Page {
@@ -247,6 +249,322 @@ func TestCreateElementDefaultParent(t *testing.T) {
 	if got := cell.SelectAttrValue("parent", ""); got != "1" {
 		t.Errorf("default parent: got %q, want %q", got, "1")
 	}
+}
+
+// --- Sub-cell tests ---
+
+func testSubCellTemplates() *SubCellTemplates {
+	return &SubCellTemplates{
+		Title: &SubCellStyle{
+			Style:  "text;html=1;fontSize=14;fontStyle=1;fontColor=#ffffff;fillColor=none;strokeColor=none;align=center;verticalAlign=middle;movable=0;resizable=0;deletable=0;editable=0;",
+			X:      0, Y: 20, Width: 240, Height: 30,
+		},
+		Tech: &SubCellStyle{
+			Style:  "text;html=1;fontSize=11;fontStyle=2;fontColor=#CCCCCC;fillColor=none;strokeColor=none;align=center;verticalAlign=middle;movable=0;resizable=0;deletable=0;editable=0;",
+			X:      0, Y: 55, Width: 240, Height: 20,
+		},
+		Desc: &SubCellStyle{
+			Style:  "text;html=1;fontSize=10;fontColor=#BBBBBB;fillColor=none;strokeColor=none;align=center;verticalAlign=middle;movable=0;resizable=0;deletable=0;editable=0;",
+			X:      0, Y: 80, Width: 240, Height: 40,
+		},
+	}
+}
+
+func TestCreateElementWithSubCells(t *testing.T) {
+	page := newInternalTestPage(t)
+	data := ElementData{
+		ID:          "webshop.api",
+		Kind:        "container",
+		Title:       "API Gateway",
+		Technology:  "Spring Boot",
+		Description: "Handles all API requests",
+		ParentID:    "1",
+		X:           200,
+		Y:           150,
+		Width:       240,
+		Height:      150,
+		SubCells:    testSubCellTemplates(),
+	}
+	err := page.CreateElement(data, "rounded=1;container=1;")
+	if err != nil {
+		t.Fatalf("CreateElement error: %v", err)
+	}
+
+	obj := page.FindElement("webshop.api")
+	if obj == nil {
+		t.Fatal("expected to find created element, got nil")
+	}
+
+	// Label should be empty when using sub-cells.
+	if got := obj.SelectAttrValue("label", ""); got != "" {
+		t.Errorf("label: got %q, want empty", got)
+	}
+
+	// Check child text cells exist.
+	root := page.Root()
+	titleCell := findCellByID(root, "webshop.api-title")
+	if titleCell == nil {
+		t.Fatal("expected title sub-cell, got nil")
+	}
+	if got := titleCell.SelectAttrValue("value", ""); got != "API Gateway" {
+		t.Errorf("title value: got %q, want %q", got, "API Gateway")
+	}
+	if got := titleCell.SelectAttrValue("parent", ""); got != "webshop.api" {
+		t.Errorf("title parent: got %q, want %q", got, "webshop.api")
+	}
+
+	techCell := findCellByID(root, "webshop.api-tech")
+	if techCell == nil {
+		t.Fatal("expected tech sub-cell, got nil")
+	}
+	if got := techCell.SelectAttrValue("value", ""); got != "[Spring Boot]" {
+		t.Errorf("tech value: got %q, want %q", got, "[Spring Boot]")
+	}
+
+	descCell := findCellByID(root, "webshop.api-desc")
+	if descCell == nil {
+		t.Fatal("expected desc sub-cell, got nil")
+	}
+	if got := descCell.SelectAttrValue("value", ""); got != "Handles all API requests" {
+		t.Errorf("desc value: got %q, want %q", got, "Handles all API requests")
+	}
+}
+
+func TestCreateElementWithSubCells_NoTechNoDesc(t *testing.T) {
+	page := newInternalTestPage(t)
+	data := ElementData{
+		ID:       "customer",
+		Kind:     "actor",
+		Title:    "Customer",
+		ParentID: "1",
+		Width:    110,
+		Height:   130,
+		SubCells: testSubCellTemplates(),
+	}
+	err := page.CreateElement(data, "shape=mxgraph.c4.person2;container=1;")
+	if err != nil {
+		t.Fatalf("CreateElement error: %v", err)
+	}
+
+	root := page.Root()
+	titleCell := findCellByID(root, "customer-title")
+	if titleCell == nil {
+		t.Fatal("expected title sub-cell")
+	}
+
+	// Tech and desc should NOT be created when empty.
+	if findCellByID(root, "customer-tech") != nil {
+		t.Error("tech sub-cell should not be created for empty technology")
+	}
+	if findCellByID(root, "customer-desc") != nil {
+		t.Error("desc sub-cell should not be created for empty description")
+	}
+}
+
+func TestUpdateElementWithSubCells(t *testing.T) {
+	page := newInternalTestPage(t)
+	data := ElementData{
+		ID:          "svc.db",
+		Kind:        "container",
+		Title:       "Old Title",
+		Technology:  "Postgres",
+		Description: "Old description",
+		ParentID:    "1",
+		Width:       240,
+		Height:      150,
+		SubCells:    testSubCellTemplates(),
+	}
+	if err := page.CreateElement(data, "rounded=1;container=1;"); err != nil {
+		t.Fatalf("CreateElement: %v", err)
+	}
+
+	updated := ElementData{
+		Title:       "New Title",
+		Technology:  "MySQL",
+		Description: "New description",
+	}
+	page.UpdateElement("svc.db", updated)
+
+	root := page.Root()
+	titleCell := findCellByID(root, "svc.db-title")
+	if titleCell == nil {
+		t.Fatal("title sub-cell not found after update")
+	}
+	if got := titleCell.SelectAttrValue("value", ""); got != "New Title" {
+		t.Errorf("title value: got %q, want %q", got, "New Title")
+	}
+
+	techCell := findCellByID(root, "svc.db-tech")
+	if techCell == nil {
+		t.Fatal("tech sub-cell not found after update")
+	}
+	if got := techCell.SelectAttrValue("value", ""); got != "[MySQL]" {
+		t.Errorf("tech value: got %q, want %q", got, "[MySQL]")
+	}
+
+	descCell := findCellByID(root, "svc.db-desc")
+	if descCell == nil {
+		t.Fatal("desc sub-cell not found after update")
+	}
+	if got := descCell.SelectAttrValue("value", ""); got != "New description" {
+		t.Errorf("desc value: got %q, want %q", got, "New description")
+	}
+}
+
+func TestUpdateElementWithSubCells_RemoveTech(t *testing.T) {
+	page := newInternalTestPage(t)
+	data := ElementData{
+		ID:         "svc",
+		Kind:       "container",
+		Title:      "Service",
+		Technology: "Go",
+		ParentID:   "1",
+		Width:      240,
+		Height:     150,
+		SubCells:   testSubCellTemplates(),
+	}
+	if err := page.CreateElement(data, "rounded=1;container=1;"); err != nil {
+		t.Fatalf("CreateElement: %v", err)
+	}
+
+	// Update with empty technology — should remove tech sub-cell.
+	page.UpdateElement("svc", ElementData{Title: "Service", Technology: ""})
+
+	root := page.Root()
+	if findCellByID(root, "svc-tech") != nil {
+		t.Error("tech sub-cell should have been removed when technology is empty")
+	}
+}
+
+func TestDeleteElementRemovesSubCells(t *testing.T) {
+	page := newInternalTestPage(t)
+	data := ElementData{
+		ID:          "del.me",
+		Kind:        "container",
+		Title:       "Delete Me",
+		Technology:  "Go",
+		Description: "To be deleted",
+		ParentID:    "1",
+		Width:       240,
+		Height:      150,
+		SubCells:    testSubCellTemplates(),
+	}
+	if err := page.CreateElement(data, "rounded=1;container=1;"); err != nil {
+		t.Fatalf("CreateElement: %v", err)
+	}
+
+	page.DeleteElement("del.me")
+
+	root := page.Root()
+	if findCellByID(root, "del.me-title") != nil {
+		t.Error("title sub-cell should have been removed on delete")
+	}
+	if findCellByID(root, "del.me-tech") != nil {
+		t.Error("tech sub-cell should have been removed on delete")
+	}
+	if findCellByID(root, "del.me-desc") != nil {
+		t.Error("desc sub-cell should have been removed on delete")
+	}
+}
+
+func TestReadElementFields_SubCells(t *testing.T) {
+	page := newInternalTestPage(t)
+	data := ElementData{
+		ID:          "api",
+		Kind:        "container",
+		Title:       "API Gateway",
+		Technology:  "Spring Boot",
+		Description: "REST API",
+		ParentID:    "1",
+		Width:       240,
+		Height:      150,
+		SubCells:    testSubCellTemplates(),
+	}
+	if err := page.CreateElement(data, "rounded=1;container=1;"); err != nil {
+		t.Fatalf("CreateElement: %v", err)
+	}
+
+	obj := page.FindElement("api")
+	if obj == nil {
+		t.Fatal("element not found")
+	}
+
+	title, tech, desc := page.ReadElementFields(obj)
+	if title != "API Gateway" {
+		t.Errorf("title: got %q, want %q", title, "API Gateway")
+	}
+	if tech != "Spring Boot" {
+		t.Errorf("technology: got %q, want %q", tech, "Spring Boot")
+	}
+	if desc != "REST API" {
+		t.Errorf("description: got %q, want %q", desc, "REST API")
+	}
+}
+
+func TestReadElementFields_HTMLFallback(t *testing.T) {
+	page := newInternalTestPage(t)
+	// Create element without sub-cells (legacy HTML label).
+	data := ElementData{
+		ID:         "legacy",
+		Kind:       "system",
+		Title:      "Legacy System",
+		Technology: "COBOL",
+		ParentID:   "1",
+	}
+	if err := page.CreateElement(data, "rounded=1;"); err != nil {
+		t.Fatalf("CreateElement: %v", err)
+	}
+
+	obj := page.FindElement("legacy")
+	if obj == nil {
+		t.Fatal("element not found")
+	}
+
+	title, tech, desc := page.ReadElementFields(obj)
+	if title != "Legacy System" {
+		t.Errorf("title: got %q, want %q", title, "Legacy System")
+	}
+	if tech != "COBOL" {
+		t.Errorf("technology: got %q, want %q", tech, "COBOL")
+	}
+	if desc != "" {
+		t.Errorf("description: got %q, want empty", desc)
+	}
+}
+
+func TestFindAllElements_ExcludesSubCells(t *testing.T) {
+	page := newInternalTestPage(t)
+	data := ElementData{
+		ID:          "elem",
+		Kind:        "container",
+		Title:       "Element",
+		Technology:  "Go",
+		Description: "Desc",
+		ParentID:    "1",
+		Width:       240,
+		Height:      150,
+		SubCells:    testSubCellTemplates(),
+	}
+	if err := page.CreateElement(data, "rounded=1;container=1;"); err != nil {
+		t.Fatalf("CreateElement: %v", err)
+	}
+
+	elems := page.FindAllElements()
+	if len(elems) != 1 {
+		t.Errorf("FindAllElements: got %d elements, want 1 (sub-cells should not be returned)", len(elems))
+	}
+}
+
+func findCellByID(root *etree.Element, id string) *etree.Element {
+	if root == nil {
+		return nil
+	}
+	for _, cell := range root.SelectElements("mxCell") {
+		if cell.SelectAttrValue("id", "") == id {
+			return cell
+		}
+	}
+	return nil
 }
 
 func TestContainerChildParent(t *testing.T) {

@@ -4,19 +4,28 @@ import (
 	"strings"
 )
 
+// Label color constants for technology and description lines.
+// These are light enough to be readable on dark C4 backgrounds (#08427B,
+// #1168BD, #438DD5) while still providing contrast on the lighter
+// component background (#85BBF0).
+const (
+	techColor = "#CCCCCC"
+	descColor = "#BBBBBB"
+)
+
 // GenerateLabel creates an HTML label for draw.io elements.
-// Format: <b>Title</b><br><font color="#666666">[Technology]</font><br><font color="#999999">Description</font>
-// Technology is wrapped in square brackets per C4 convention.
+// Format: <b>Title</b><br><font color="..."><i>[Technology]</i></font><br><font color="..." style="font-size:11px">Description</font>
+// Technology is wrapped in square brackets per C4 convention and rendered in italic.
 // Empty technology or description lines are omitted.
 // The returned string is unescaped HTML; etree handles XML attribute escaping.
 func GenerateLabel(title, technology, description string) string {
 	var b strings.Builder
 	b.WriteString("<b>" + escapeHTML(title) + "</b>")
 	if technology != "" {
-		b.WriteString("<br><font color=\"#666666\">[" + escapeHTML(technology) + "]</font>")
+		b.WriteString("<br><font color=\"" + techColor + "\"><i>[" + escapeHTML(technology) + "]</i></font>")
 	}
 	if description != "" {
-		b.WriteString("<br><font color=\"#999999\">" + escapeHTML(description) + "</font>")
+		b.WriteString("<br><font color=\"" + descColor + "\" style=\"font-size:11px\">" + escapeHTML(description) + "</font>")
 	}
 	return b.String()
 }
@@ -56,15 +65,15 @@ func ParseLabel(html string) (title, technology, description string) {
 	switch len(segments) {
 	case 1:
 		seg := segments[0]
-		if seg.color == "#999999" {
+		if seg.color == descColor || seg.color == "#999999" {
 			// Description only (no technology)
-			return cleanTitle, "", unescapeHTML(seg.text)
+			return cleanTitle, "", unescapeHTML(stripTags(seg.text))
 		}
 		// Technology (with or without brackets)
-		return cleanTitle, unescapeHTML(trimBrackets(seg.text)), ""
+		return cleanTitle, unescapeHTML(trimBrackets(stripTags(seg.text))), ""
 	case 2:
-		tech := unescapeHTML(trimBrackets(segments[0].text))
-		desc := unescapeHTML(segments[1].text)
+		tech := unescapeHTML(trimBrackets(stripTags(segments[0].text)))
+		desc := unescapeHTML(stripTags(segments[1].text))
 		return cleanTitle, tech, desc
 	default:
 		return cleanTitle, "", ""

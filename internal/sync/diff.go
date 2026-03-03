@@ -196,6 +196,8 @@ func DetectChanges(m *model.BausteinsichtModel, doc *drawio.Document, lastState 
 }
 
 // extractDrawioElements gathers element data from all pages in the document.
+// It reads from child text sub-cells first, falling back to HTML label parsing
+// for backward compatibility with older draw.io files.
 func extractDrawioElements(doc *drawio.Document) map[string]drawioElemSnapshot {
 	result := make(map[string]drawioElemSnapshot)
 	for _, page := range doc.Pages() {
@@ -204,8 +206,9 @@ func extractDrawioElements(doc *drawio.Document) map[string]drawioElemSnapshot {
 			if id == "" {
 				continue
 			}
-			label := obj.SelectAttrValue("label", "")
-			title, technology, labelDesc := drawio.ParseLabel(label)
+			// ReadElementFields checks for child text sub-cells first,
+			// then falls back to ParseLabel for backward compat.
+			title, technology, labelDesc := page.ReadElementFields(obj)
 			// Fall back to XML attribute if label doesn't contain technology (#186).
 			if technology == "" {
 				technology = obj.SelectAttrValue("technology", "")
@@ -253,11 +256,15 @@ func detectUnmanagedDrawioElements(cs *ChangeSet, doc *drawio.Document) {
 			if cell == nil || cell.SelectAttrValue("vertex", "") != "1" {
 				continue
 			}
-			label := obj.SelectAttrValue("label", "")
-			if label == "" {
-				continue
+			// Try sub-cell reading first, then HTML label.
+			title, _, _ := page.ReadElementFields(obj)
+			if title == "" {
+				label := obj.SelectAttrValue("label", "")
+				if label == "" {
+					continue
+				}
+				title, _, _ = drawio.ParseLabel(label)
 			}
-			title, _, _ := drawio.ParseLabel(label)
 			id := sanitizeID(title)
 			if id == "" {
 				continue

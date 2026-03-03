@@ -22,6 +22,9 @@
 
 | 2026-03-01 (tooling)
 | Added Makefile with `gosec`, `staticcheck`, `nilaway`, `govulncheck`, `go vet` (PR #78). First automated scan identified 2 new findings: SEC-011 (unhandled error), SEC-012 (potential nil panics). Updated dependency status table.
+
+| 2026-03-03 (sub-cells)
+| Updated SEC-008 assessment: `ParseLabel`/`stripTags` is now a backward-compatible fallback only, reducing its attack surface. New sub-cell architecture (#232) uses plain-text `value` attributes on child `<mxCell>` elements, avoiding HTML parsing for new elements.
 |===
 
 === Scope
@@ -229,7 +232,7 @@ A deeply nested model (50,000+ levels) would exhaust the goroutine stack and pan
 **Recommendation:**
 Add a `maxDepth` parameter (e.g., 100 levels) and return an error if exceeded.
 
-==== SEC-008: stripTags Incorrect Parsing (Low)
+==== SEC-008: stripTags Incorrect Parsing (Low — reduced)
 
 **Affected file:** `internal/drawio/label.go:141-155`
 
@@ -240,8 +243,11 @@ the parser exits the "inTag" state prematurely, leaking attribute content into t
 
 This only affects the fallback path in `ParseLabel` (when the label does not start with `<b>`).
 
+**Update (2026-03-03):** With the sub-cell architecture (#232), new elements use plain-text `value` attributes on child `<mxCell>` elements instead of HTML labels. `ParseLabel` is now only invoked as a backward-compatible fallback for older draw.io files that lack sub-cells. This significantly reduces the attack surface of `stripTags` — it will only be hit when reading legacy elements.
+
 **Recommendation:**
 Either use a proper HTML tokenizer or add attribute-aware parsing for the `>` inside quotes case.
+Lower priority now that `ParseLabel` is a fallback path only.
 
 ==== SEC-009: Outdated Go Toolchain (Medium) — FIXED
 
@@ -315,7 +321,7 @@ The following attack vectors were explicitly tested and confirmed **not exploita
 | Entity expansion does not occur with `RawToken`.
 
 | HTML Injection (forward sync)
-| User-controlled model strings pass through `escapeHTML()` before XML attribute storage. Round-trip is safe.
+| User-controlled model strings pass through `escapeHTML()` before XML attribute storage. Sub-cell text values are stored as plain-text `value` attributes (no HTML rendering). Round-trip is safe.
 
 | JSON Deserialization Attack
 | Go's `encoding/json` is not susceptible to unsafe deserialization. No `interface{}` unmarshaling of untrusted data.

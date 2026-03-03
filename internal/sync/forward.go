@@ -308,6 +308,7 @@ func createScopeBoundary(
 		Y:           elementGap,
 		Width:       width,
 		Height:      height,
+		// Boundaries don't use sub-cells — they use the swimlane header for the label.
 	}
 
 	if err := page.CreateElement(data, style); err != nil {
@@ -527,6 +528,7 @@ func applyElementAdded(
 		Y:           pl.nextY,
 		Width:       width,
 		Height:      height,
+		SubCells:    subCellsFromTemplate(ts),
 	}
 
 	// Parent children of the scope element to the boundary cell.
@@ -541,6 +543,19 @@ func applyElementAdded(
 
 	pl.nextX += width + elementGap
 	result.ElementsCreated++
+}
+
+// subCellsFromTemplate creates SubCellTemplates from a TemplateStyle.
+// Returns nil if the template has no sub-cell definitions.
+func subCellsFromTemplate(ts drawio.TemplateStyle) *drawio.SubCellTemplates {
+	if ts.TitleStyle == nil {
+		return nil
+	}
+	return &drawio.SubCellTemplates{
+		Title: ts.TitleStyle,
+		Tech:  ts.TechStyle,
+		Desc:  ts.DescStyle,
+	}
 }
 
 // applyElementModified updates the changed field of an existing element.
@@ -579,8 +594,8 @@ func applyElementModified(
 	if ch.Field != "" {
 		obj := page.FindElement(ch.ID)
 		if obj != nil {
-			label := obj.SelectAttrValue("label", "")
-			curTitle, curTech, curDesc := drawio.ParseLabel(label)
+			// Use ReadElementFields which handles both sub-cells and HTML labels.
+			curTitle, curTech, curDesc := page.ReadElementFields(obj)
 			curTooltip := obj.SelectAttrValue("tooltip", "")
 			if curDesc == "" {
 				curDesc = curTooltip

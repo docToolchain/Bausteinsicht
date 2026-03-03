@@ -1,3 +1,9 @@
+:jbake-title: E2E Test Report 2026-03-02 Round 6
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: Test Reports
+:jbake-order: 5
+
 = E2E Test Report — 2026-03-02 (Round 6)
 :toc:
 :toc-title: Contents

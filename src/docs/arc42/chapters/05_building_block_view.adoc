@@ -12,39 +12,11 @@ ifndef::imagesdir[:imagesdir: ../../images]
 
 === Level 1: Overall System
 
-[plantuml, building-blocks-level1, png]
-....
-@startuml
-!include <C4/C4_Container>
+.System Context (generated from architecture model via draw.io export)
+image::arc42/architecture-context.png[System Context,width=80%]
 
-Person(user, "User", "Architect, Developer, or LLM Agent")
-
-System_Boundary(bs, "Bausteinsicht") {
-  Container(cmd, "cmd", "Cobra", "CLI entry points, argument parsing, output formatting")
-  Container(model, "model", "Go", "JSON model read/write, validation, ID resolution")
-  Container(drawio, "drawio", "Go", "mxGraph XML read/write, templates, labels")
-  Container(sync, "sync", "Go", "Bidirectional sync engine with three-way merge")
-  Container(watcher_c, "watcher", "Go", "File system watcher with debounce")
-}
-
-ContainerDb(jsonc, "*.jsonc", "JSONC", "Architecture model files")
-ContainerDb(drawiofile, "*.drawio", "mxGraph XML", "draw.io diagram files")
-ContainerDb(syncstate, ".bausteinsicht-sync", "JSON", "Sync state file")
-ContainerDb(template, "template.drawio", "mxGraph XML", "Style templates")
-
-Rel(user, cmd, "CLI commands")
-Rel(cmd, sync, "Delegates")
-Rel(cmd, model, "Delegates")
-Rel(cmd, watcher_c, "Delegates")
-Rel(sync, model, "Reads/writes model")
-Rel(sync, drawio, "Reads/writes XML")
-Rel(watcher_c, sync, "Triggers sync")
-Rel(model, jsonc, "Reads/writes")
-Rel(drawio, drawiofile, "Reads/writes")
-Rel(drawio, template, "Reads")
-Rel(sync, syncstate, "Reads/writes")
-@enduml
-....
+.Container View (generated from architecture model via draw.io export)
+image::arc42/architecture-containers.png[Container View,width=80%]
 
 ==== Motivation
 
@@ -63,7 +35,7 @@ The system decomposes into four internal packages plus a thin CLI layer. The key
 | Reads, writes, and validates the JSONC architecture model. Provides Go structs (`BausteinsichtModel`, `Element`, `Relationship`, `View`). Handles ID resolution with dot notation and wildcard matching for view includes.
 
 | `drawio`
-| Reads, writes, and manipulates draw.io XML (mxGraph format). Creates elements as `<object>` with `<mxCell>`, manages connectors, applies template styles, parses/generates HTML labels.
+| Reads, writes, and manipulates draw.io XML (mxGraph format). Creates elements as `<object>` with `<mxCell>` and child text sub-cells, manages connectors, applies template styles. Reads element fields from sub-cells with HTML label fallback for backward compatibility.
 
 | `sync`
 | Orchestrates bidirectional synchronization. Compares model and draw.io state against last-sync state. Detects additions, modifications, deletions, and conflicts. Applies changes in both directions.
@@ -108,28 +80,8 @@ The system decomposes into four internal packages plus a thin CLI layer. The key
 
 The sync engine is the most complex package. It decomposes into five sub-components.
 
-[plantuml, building-blocks-level2-sync, png]
-....
-@startuml
-!include <C4/C4_Component>
-
-Container_Boundary(sync, "sync") {
-  Component(engine, "engine", "Go", "Main orchestrator: diff, resolve, apply")
-  Component(diff, "diff", "Go", "Three-way change detection")
-  Component(forward, "forward", "Go", "Applies model changes to draw.io")
-  Component(reverse, "reverse", "Go", "Applies draw.io changes to model")
-  Component(state, "state", "Go", "Sync state file I/O and hashing")
-  Component(conflict, "conflict", "Go", "Conflict detection and resolution")
-}
-
-Rel(engine, diff, "Detect changes")
-Rel(engine, forward, "Apply model changes")
-Rel(engine, reverse, "Apply drawio changes")
-Rel(engine, state, "Read/write state")
-Rel(engine, conflict, "Resolve conflicts")
-Rel(diff, conflict, "Report conflicts")
-@enduml
-....
+.Sync Engine Components (generated from architecture model via draw.io export)
+image::arc42/architecture-sync-components.png[Sync Engine Components,width=80%]
 
 ==== Building Blocks
 
@@ -144,7 +96,7 @@ Rel(diff, conflict, "Report conflicts")
 | Compares current model and draw.io state against the last-sync state. Produces lists of added, modified, and deleted elements/relationships for each side. Identifies conflicts (same field changed on both sides).
 
 | `forward`
-| Applies model changes to the draw.io document. Creates new elements from templates (placed side-by-side below existing content). Updates labels, tooltips, technology. Removes deleted elements and orphaned connectors.
+| Applies model changes to the draw.io document. Creates new elements from templates with child text sub-cells (placed side-by-side below existing content). Updates sub-cell values for title, technology, and description. Removes deleted elements (including sub-cells) and orphaned connectors.
 
 | `reverse`
 | Applies draw.io changes to the model. Detects new elements (no `bausteinsicht_id`), renames, description changes. Auto-generates IDs for new elements. Warns about deletions.
@@ -161,25 +113,8 @@ Rel(diff, conflict, "Report conflicts")
 
 The draw.io package handles all mxGraph XML concerns.
 
-[plantuml, building-blocks-level2-drawio, png]
-....
-@startuml
-!include <C4/C4_Component>
-
-Container_Boundary(drawio, "drawio") {
-  Component(document, "document", "Go", "mxfile/diagram XML parsing and page management")
-  Component(element, "element", "Go", "Element CRUD as <object> + <mxCell>")
-  Component(connector, "connector", "Go", "Connector CRUD with edge routing")
-  Component(template_c, "template", "Go", "Template loading by bausteinsicht_template attribute")
-  Component(label, "label", "Go", "HTML label generation and parsing")
-}
-
-Rel(document, element, "Manages")
-Rel(document, connector, "Manages")
-Rel(element, label, "Generates/parses")
-Rel(element, template_c, "Applies style")
-@enduml
-....
+.draw.io Package Components (generated from architecture model via draw.io export)
+image::arc42/architecture-drawio-components.png[draw.io Package Components,width=80%]
 
 ==== Building Blocks
 
@@ -191,38 +126,23 @@ Rel(element, template_c, "Applies style")
 | Top-level draw.io file handling. Parses `<mxfile>` with multiple `<diagram>` pages. Provides access to pages by ID. Manages base cells (`id="0"`, `id="1"`).
 
 | `element`
-| CRUD operations for architecture elements as `<object>` + `<mxCell>` pairs. Sets `bausteinsicht_id`, `bausteinsicht_kind`, `technology`, `tooltip`, `link`. Handles container elements (swimlane style with child `parent` attribute).
+| CRUD operations for architecture elements as `<object>` + `<mxCell>` pairs with child text sub-cells for title, technology, and description. Sets `bausteinsicht_id`, `bausteinsicht_kind`, `technology`, `tooltip`, `link`. Creates sub-cells from template styles. Reads element fields from sub-cells first, with HTML label fallback. Handles container elements (swimlane style with child `parent` attribute).
 
 | `connector`
 | CRUD operations for relationship connectors. Creates `<mxCell>` with `edge="1"`, `source`, `target`. Uses ID convention `rel-<from>-<to>`. Always sets `parent="1"` (layer, not container).
 
 | `template`
-| Reads template draw.io files. Extracts styles by `bausteinsicht_template` attribute. Returns style string and default dimensions for each element kind.
+| Reads template draw.io files. Extracts styles by `bausteinsicht_template` attribute. Parses child `<mxCell>` elements (with `-title`, `-tech`, `-desc` ID suffixes) to extract sub-cell styles and geometry. Returns style string, default dimensions, and sub-cell templates for each element kind.
 
 | `label`
-| Generates HTML labels: `<b>Title</b><br><font color="#666666">Technology</font>`. Parses HTML labels back to extract title and technology during reverse sync. Handles XML entity escaping.
+| Backward-compatible HTML label parsing. Parses `<b>Title</b><br><font>Technology</font>` labels from older draw.io files. Used as fallback when elements lack child text sub-cells. Handles XML entity escaping.
 |===
 
 
 === Level 2: Model Package
 
-[plantuml, building-blocks-level2-model, png]
-....
-@startuml
-!include <C4/C4_Component>
-
-Container_Boundary(model, "model") {
-  Component(types, "types", "Go", "BausteinsichtModel, Element, Relationship, View structs")
-  Component(loader, "loader", "Go", "JSONC read/write with comment stripping")
-  Component(resolve, "resolve", "Go", "Dot-notation ID resolution and wildcard matching")
-  Component(validate, "validate", "Go", "Model validation rules")
-}
-
-Rel(loader, types, "Populates")
-Rel(resolve, types, "Traverses")
-Rel(validate, types, "Checks")
-@enduml
-....
+.Model Package Components (generated from architecture model via draw.io export)
+image::arc42/architecture-model-components.png[Model Package Components,width=80%]
 
 ==== Building Blocks
 

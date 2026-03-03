@@ -9,11 +9,24 @@ import (
 	"github.com/beevik/etree"
 )
 
+// SubCellStyle holds style and geometry for a text sub-cell within an element.
+type SubCellStyle struct {
+	Style         string  // mxCell style string
+	X, Y          float64 // position relative to parent
+	Width, Height float64 // dimensions
+}
+
 // TemplateStyle holds the visual style and default dimensions for a draw.io element.
 type TemplateStyle struct {
 	Style  string  // mxCell style string
 	Width  float64 // default width from mxGeometry
 	Height float64 // default height from mxGeometry
+
+	// Sub-cell styles for grouped text labels (title, technology, description).
+	// Nil means no sub-cells defined (legacy template).
+	TitleStyle *SubCellStyle
+	TechStyle  *SubCellStyle
+	DescStyle  *SubCellStyle
 }
 
 // TemplateSet holds all styles parsed from a draw.io template file.
@@ -50,6 +63,10 @@ func LoadTemplateFromBytes(data []byte) (*TemplateSet, error) {
 		boundaries: make(map[string]TemplateStyle),
 	}
 
+	// Build maps for looking up child cells.
+	templateIDs := make(map[string]string) // template object id → kind
+	groupToKind := make(map[string]string) // group cell id → kind (when template is inside a group)
+
 	// Find all <object> elements with bausteinsicht_template attribute.
 	for _, obj := range tree.FindElements("//object[@bausteinsicht_template]") {
 		kind := obj.SelectAttrValue("bausteinsicht_template", "")
@@ -65,7 +82,67 @@ func LoadTemplateFromBytes(data []byte) (*TemplateSet, error) {
 		style := cell.SelectAttrValue("style", "")
 		width, height := parseGeometry(cell)
 
+		objID := obj.SelectAttrValue("id", "")
+		if objID != "" {
+			templateIDs[objID] = kind
+		}
+
+		// If the template mxCell's parent is not "1", it's inside a group.
+		// Map the group ID so sub-cells with that group parent are found too.
+		cellParent := cell.SelectAttrValue("parent", "1")
+		if cellParent != "1" && cellParent != "0" && cellParent != "" {
+			groupToKind[cellParent] = kind
+		}
+
 		ts.categorize(kind, TemplateStyle{Style: style, Width: width, Height: height})
+	}
+
+	// Parse child mxCells that are sub-cells of template elements.
+	// Sub-cells may be children of the template object ID directly,
+	// or children of a group cell that contains the template object.
+	for _, cell := range tree.FindElements("//mxCell[@parent]") {
+		parentID := cell.SelectAttrValue("parent", "")
+		kind, ok := templateIDs[parentID]
+		if !ok {
+			kind, ok = groupToKind[parentID]
+		}
+		if !ok {
+			continue
+		}
+		cellID := cell.SelectAttrValue("id", "")
+		if cellID == "" {
+			continue
+		}
+		sub := parseSubCellStyle(cell)
+		if sub == nil {
+			continue
+		}
+
+		// Determine role from cell ID suffix or value heuristic.
+		role := ""
+		switch {
+		case strings.HasSuffix(cellID, "-title"):
+			role = "title"
+		case strings.HasSuffix(cellID, "-tech"):
+			role = "tech"
+		case strings.HasSuffix(cellID, "-desc"):
+			role = "desc"
+		default:
+			// Fallback: detect role by value attribute when ID doesn't follow convention
+			// (e.g., draw.io-generated IDs from manual template editing).
+			val := strings.TrimSpace(cell.SelectAttrValue("value", ""))
+			switch {
+			case strings.EqualFold(val, "title") || strings.HasSuffix(val, " Name"):
+				role = "title"
+			case strings.EqualFold(val, "[technology]"):
+				role = "tech"
+			case strings.EqualFold(val, "description"):
+				role = "desc"
+			}
+		}
+		if role != "" {
+			ts.setSubCell(kind, role, sub)
+		}
 	}
 
 	// Find relationship connector: bare <mxCell bausteinsicht_template="relationship">.
@@ -100,6 +177,47 @@ func (t *TemplateSet) categorize(kind string, style TemplateStyle) {
 	} else {
 		t.elements[kind] = style
 	}
+}
+
+// setSubCell assigns a parsed sub-cell style to the appropriate field on a TemplateStyle.
+func (t *TemplateSet) setSubCell(kind, role string, sub *SubCellStyle) {
+	// Look up in both maps.
+	if ts, ok := t.elements[kind]; ok {
+		setSubCellOnStyle(&ts, role, sub)
+		t.elements[kind] = ts
+	}
+	if ts, ok := t.boundaries[kind]; ok {
+		setSubCellOnStyle(&ts, role, sub)
+		t.boundaries[kind] = ts
+	}
+}
+
+func setSubCellOnStyle(ts *TemplateStyle, role string, sub *SubCellStyle) {
+	switch role {
+	case "title":
+		ts.TitleStyle = sub
+	case "tech":
+		ts.TechStyle = sub
+	case "desc":
+		ts.DescStyle = sub
+	}
+}
+
+// parseSubCellStyle parses style and geometry from a child mxCell element.
+func parseSubCellStyle(cell *etree.Element) *SubCellStyle {
+	style := cell.SelectAttrValue("style", "")
+	if style == "" {
+		return nil
+	}
+	geo := cell.FindElement("mxGeometry")
+	if geo == nil {
+		return nil
+	}
+	x, _ := strconv.ParseFloat(geo.SelectAttrValue("x", "0"), 64)
+	y, _ := strconv.ParseFloat(geo.SelectAttrValue("y", "0"), 64)
+	w, _ := strconv.ParseFloat(geo.SelectAttrValue("width", "0"), 64)
+	h, _ := strconv.ParseFloat(geo.SelectAttrValue("height", "0"), 64)
+	return &SubCellStyle{Style: style, X: x, Y: y, Width: w, Height: h}
 }
 
 // parseGeometry extracts width and height from an mxCell's nested mxGeometry element.

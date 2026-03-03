@@ -23,7 +23,8 @@ During forward sync, when Bausteinsicht needs to create a new element on the dia
 1. It looks up the element's `kind` (e.g., `"container"`)
 2. It searches the template file for an `<object>` with `bausteinsicht_template="container"`
 3. It copies the **style**, **width**, and **height** from the template shape
-4. It applies these to the new element on the diagram
+4. It copies **sub-cell styles** (title, technology, description) from the template's child `<mxCell>` elements
+5. It creates the new element with `label=""` and `container=1`, plus child text sub-cells for title, technology, and description
 
 If no matching template is found, a default rectangle (160×70) is used and a warning is displayed.
 
@@ -49,20 +50,38 @@ The template file (`template.drawio` by default) is created by `bausteinsicht in
 
 Templates are identified by the `bausteinsicht_template` attribute:
 
-**Element templates** use an `<object>` wrapper:
+**Element templates** use an `<object>` wrapper with child sub-cell `<mxCell>` elements:
 [source,xml]
 ----
-<object label="Container Name"
+<object label=""
+        id="template-container"
         bausteinsicht_template="container">  <!--1-->
-  <mxCell style="rounded=1;fillColor=#438DD5;..." <!--2-->
+  <mxCell style="rounded=1;fillColor=#438DD5;...;container=1;" <!--2-->
           vertex="1" parent="1">
-    <mxGeometry width="200" height="120" />   <!--3-->
+    <mxGeometry width="240" height="150" />   <!--3-->
   </mxCell>
 </object>
+<!-- Sub-cell style templates (parent references template object ID) -->
+<mxCell id="template-container-title" value="Title"  <!--4-->
+        style="text;html=1;fontSize=14;fontStyle=1;fontColor=#ffffff;..."
+        vertex="1" parent="template-container">
+  <mxGeometry x="0" y="20" width="240" height="30" as="geometry" />
+</mxCell>
+<mxCell id="template-container-tech" value="[Technology]"
+        style="text;html=1;fontSize=11;fontStyle=2;fontColor=#CCCCCC;..."
+        vertex="1" parent="template-container">
+  <mxGeometry x="0" y="55" width="240" height="20" as="geometry" />
+</mxCell>
+<mxCell id="template-container-desc" value="Description"
+        style="text;html=1;fontSize=10;fontColor=#BBBBBB;..."
+        vertex="1" parent="template-container">
+  <mxGeometry x="0" y="80" width="240" height="40" as="geometry" />
+</mxCell>
 ----
 <1> The `bausteinsicht_template` attribute must match the element kind name from your model's `specification.elements`
-<2> The `style` string is copied to new elements
+<2> The `style` string is copied to new elements. Must include `container=1;` for sub-cell grouping.
 <3> The `width` and `height` are used as default dimensions
+<4> Sub-cell templates define the font style, size, color, and vertical position for title, technology, and description text. ID suffixes (`-title`, `-tech`, `-desc`) identify the role.
 
 **Boundary templates** follow the same pattern but with a `_boundary` suffix:
 [source,xml]
@@ -110,6 +129,17 @@ To change an existing element's appearance:
 3. Save the file
 
 IMPORTANT: Do **not** remove or rename the `bausteinsicht_template` attribute. Bausteinsicht reads this attribute to match templates to element kinds. If you edit the XML directly, keep `bausteinsicht_template="<kind>"` intact.
+
+==== Step 2b: Edit Sub-Cell Text Styles
+
+Each element template contains child text cells for title, technology, and description. To customize their typography:
+
+1. In draw.io, double-click into the template element to select a child text cell
+2. Use the Format panel to change font size, color, style (bold/italic), or alignment
+3. Drag the child cell to adjust its vertical position within the parent
+4. Save the file
+
+Sub-cell IDs follow the pattern `<template-id>-title`, `<template-id>-tech`, `<template-id>-desc`. When editing XML directly, keep these suffixes intact.
 
 ==== Step 3: Edit the Connector Style
 
@@ -172,14 +202,30 @@ Open `template.drawio` in draw.io and create a new shape:
 Alternatively, edit the XML directly. Add inside `<root>`:
 [source,xml]
 ----
-<object label="Database"
+<object label=""
         id="template-database"
         bausteinsicht_template="database">
-  <mxCell style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#60A917;fontColor=#ffffff;strokeColor=#4B8412;size=12;fontSize=11;align=center;verticalAlign=middle;"
+  <mxCell style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#60A917;fontColor=#ffffff;strokeColor=#4B8412;size=12;fontSize=11;align=center;verticalAlign=middle;container=1;"
           vertex="1" parent="1">
     <mxGeometry x="0" y="0" width="120" height="100" as="geometry" />
   </mxCell>
 </object>
+<!-- Sub-cell templates for the new kind -->
+<mxCell id="template-database-title" value="Title"
+        style="text;html=1;fontSize=14;fontStyle=1;fontColor=#ffffff;fillColor=none;strokeColor=none;align=center;verticalAlign=middle;movable=0;resizable=0;deletable=0;editable=0;"
+        vertex="1" parent="template-database">
+  <mxGeometry x="0" y="15" width="120" height="25" as="geometry" />
+</mxCell>
+<mxCell id="template-database-tech" value="[Technology]"
+        style="text;html=1;fontSize=10;fontStyle=2;fontColor=#CCCCCC;fillColor=none;strokeColor=none;align=center;verticalAlign=middle;movable=0;resizable=0;deletable=0;editable=0;"
+        vertex="1" parent="template-database">
+  <mxGeometry x="0" y="45" width="120" height="20" as="geometry" />
+</mxCell>
+<mxCell id="template-database-desc" value="Description"
+        style="text;html=1;fontSize=9;fontColor=#BBBBBB;fillColor=none;strokeColor=none;align=center;verticalAlign=middle;movable=0;resizable=0;deletable=0;editable=0;"
+        vertex="1" parent="template-database">
+  <mxGeometry x="0" y="65" width="120" height="30" as="geometry" />
+</mxCell>
 ----
 
 ==== Step 3: Add a Boundary Template (Optional)
@@ -228,7 +274,9 @@ The boundary template is used when this element is the `scope` of a view and ren
 | `style` string | Yes | The full mxCell style (colors, shape, borders, fonts, etc.)
 | `width` | Yes | Default width for new elements
 | `height` | Yes | Default height for new elements
-| `label` | No | Labels come from the model (title, technology, description)
+| Sub-cell styles | Yes | Font size, color, weight, and vertical position for title, technology, and description text cells
+| Sub-cell geometry | Yes | Y-position and height; width is scaled to the parent element width
+| `label` | No | Parent label is set to empty; text comes from sub-cell `value` attributes
 | Position (x, y) | No | New elements are placed by the layout algorithm
 | `id` | No | IDs are generated from the model element ID
 |===

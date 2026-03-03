@@ -16,7 +16,7 @@ func TestGenerateLabel(t *testing.T) {
 			name:       "standard label with title and technology",
 			title:      "REST API",
 			technology: "Spring Boot",
-			want:       `<b>REST API</b><br><font color="#666666">[Spring Boot]</font>`,
+			want:       `<b>REST API</b><br><font color="#CCCCCC"><i>[Spring Boot]</i></font>`,
 		},
 		{
 			name:       "title only, no technology",
@@ -34,7 +34,7 @@ func TestGenerateLabel(t *testing.T) {
 			name:       "special characters in technology",
 			title:      "API",
 			technology: `Go & <fast>`,
-			want:       `<b>API</b><br><font color="#666666">[Go &amp; &lt;fast&gt;]</font>`,
+			want:       `<b>API</b><br><font color="#CCCCCC"><i>[Go &amp; &lt;fast&gt;]</i></font>`,
 		},
 		{
 			name:       "empty title and technology",
@@ -46,20 +46,20 @@ func TestGenerateLabel(t *testing.T) {
 			name:       "empty title with technology",
 			title:      "",
 			technology: "Java",
-			want:       `<b></b><br><font color="#666666">[Java]</font>`,
+			want:       `<b></b><br><font color="#CCCCCC"><i>[Java]</i></font>`,
 		},
 		{
 			name:        "title, technology and description",
 			title:       "REST API",
 			technology:  "Spring Boot",
 			description: "Handles business logic",
-			want:        `<b>REST API</b><br><font color="#666666">[Spring Boot]</font><br><font color="#999999">Handles business logic</font>`,
+			want:        `<b>REST API</b><br><font color="#CCCCCC"><i>[Spring Boot]</i></font><br><font color="#BBBBBB" style="font-size:11px">Handles business logic</font>`,
 		},
 		{
 			name:        "title and description, no technology",
 			title:       "Customer",
 			description: "End user of the system",
-			want:        `<b>Customer</b><br><font color="#999999">End user of the system</font>`,
+			want:        `<b>Customer</b><br><font color="#BBBBBB" style="font-size:11px">End user of the system</font>`,
 		},
 	}
 
@@ -116,7 +116,7 @@ func TestParseLabel(t *testing.T) {
 	}{
 		{
 			name:      "standard label with title and technology",
-			html:      `<b>REST API</b><br><font color="#666666">[Spring Boot]</font>`,
+			html:      `<b>REST API</b><br><font color="#CCCCCC"><i>[Spring Boot]</i></font>`,
 			wantTitle: "REST API",
 			wantTech:  "Spring Boot",
 		},
@@ -146,7 +146,7 @@ func TestParseLabel(t *testing.T) {
 		},
 		{
 			name:      "escaped chars in technology",
-			html:      `<b>API</b><br><font color="#666666">[Go &amp; &lt;fast&gt;]</font>`,
+			html:      `<b>API</b><br><font color="#CCCCCC"><i>[Go &amp; &lt;fast&gt;]</i></font>`,
 			wantTitle: "API",
 			wantTech:  "Go & <fast>",
 		},
@@ -157,14 +157,27 @@ func TestParseLabel(t *testing.T) {
 			wantTech:  "",
 		},
 		{
-			name:      "label with title, tech and description",
+			name:      "new format with italic tech and styled description",
+			html:      `<b>REST API</b><br><font color="#CCCCCC"><i>[Spring Boot]</i></font><br><font color="#BBBBBB" style="font-size:11px">Handles requests</font>`,
+			wantTitle: "REST API",
+			wantTech:  "Spring Boot",
+			wantDesc:  "Handles requests",
+		},
+		{
+			name:      "new format description only",
+			html:      `<b>Customer</b><br><font color="#BBBBBB" style="font-size:11px">End user</font>`,
+			wantTitle: "Customer",
+			wantDesc:  "End user",
+		},
+		{
+			name:      "legacy label with old colors (backward compat)",
 			html:      `<b>REST API</b><br><font color="#666666">[Spring Boot]</font><br><font color="#999999">Handles requests</font>`,
 			wantTitle: "REST API",
 			wantTech:  "Spring Boot",
 			wantDesc:  "Handles requests",
 		},
 		{
-			name:      "label with title and description only",
+			name:      "legacy description-only with old color",
 			html:      `<b>Customer</b><br><font color="#999999">End user</font>`,
 			wantTitle: "Customer",
 			wantDesc:  "End user",

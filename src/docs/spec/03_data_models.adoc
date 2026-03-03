@@ -321,22 +321,40 @@ These are **never modified** by Bausteinsicht.
 
 Every Bausteinsicht element is wrapped in an `<object>` element to carry custom metadata.
 The nested `<mxCell>` has no `id` — the `<object>` owns the ID.
+The parent `<mxCell>` uses `container=1` so that child text sub-cells are grouped inside it.
 
 [source,xml]
 ----
-<object label="&lt;b&gt;REST API&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;[Spring Boot]&lt;/font&gt;&lt;br&gt;&lt;font color=&quot;#999999&quot;&gt;Handles all HTTP requests&lt;/font&gt;"
+<object label=""
         id="containers--webshop.api"
         bausteinsicht_id="webshop.api"
         bausteinsicht_kind="container"
         technology="Spring Boot"
         tooltip="Handles all HTTP requests">
   <mxCell style="rounded=1;whiteSpace=wrap;html=1;
-                 fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;"
+                 fillColor=#438DD5;strokeColor=#3C7FC0;fontSize=13;container=1;"
           vertex="1"
           parent="1">
-    <mxGeometry x="200" y="150" width="160" height="70" as="geometry" />
+    <mxGeometry x="200" y="150" width="240" height="150" as="geometry" />
   </mxCell>
 </object>
+
+<!-- Text sub-cells: separate mxCell children for title, technology, description -->
+<mxCell id="containers--webshop.api-title" value="REST API"
+        style="text;html=1;fontSize=14;fontStyle=1;fontColor=#ffffff;fillColor=none;strokeColor=none;align=center;verticalAlign=middle;movable=0;resizable=0;deletable=0;editable=0;"
+        vertex="1" parent="containers--webshop.api">
+  <mxGeometry x="0" y="20" width="240" height="30" as="geometry" />
+</mxCell>
+<mxCell id="containers--webshop.api-tech" value="[Spring Boot]"
+        style="text;html=1;fontSize=11;fontStyle=2;fontColor=#CCCCCC;fillColor=none;strokeColor=none;align=center;verticalAlign=middle;movable=0;resizable=0;deletable=0;editable=0;"
+        vertex="1" parent="containers--webshop.api">
+  <mxGeometry x="0" y="55" width="240" height="20" as="geometry" />
+</mxCell>
+<mxCell id="containers--webshop.api-desc" value="Handles all HTTP requests"
+        style="text;html=1;fontSize=10;fontColor=#BBBBBB;fillColor=none;strokeColor=none;align=center;verticalAlign=middle;movable=0;resizable=0;deletable=0;editable=0;"
+        vertex="1" parent="containers--webshop.api">
+  <mxGeometry x="0" y="80" width="240" height="40" as="geometry" />
+</mxCell>
 ----
 
 Custom properties on `<object>`:
@@ -346,7 +364,7 @@ Custom properties on `<object>`:
 | Property | Purpose
 
 | `label`
-| Display text (HTML-escaped, replaces `value` on mxCell)
+| Empty string (`""`) for elements using sub-cells. Legacy elements may still have an HTML label (backward compatible).
 
 | `id`
 | Cell ID — page-scoped for file-wide uniqueness: `<viewID>--<elementID>` (e.g., `context--customer`). When an element appears on multiple view pages, each instance has a distinct cell ID.
@@ -367,33 +385,44 @@ Custom properties on `<object>`:
 | Drill-down navigation link (see Navigation section)
 |===
 
-==== HTML Labels
+==== Text Sub-Cells (Grouped Labels)
 
-Labels use HTML formatting with `html=1` in the style. HTML is XML-entity-escaped in the `label` attribute.
+Each element's display text is decomposed into independent child `<mxCell>` elements, giving full control over font size, color, weight, and vertical positioning. The parent element has `label=""` and `container=1`.
 
-The label format has up to three lines:
+Three child cell types exist, identified by their ID suffix:
+
+[cols="1,1,3"]
+|===
+| Sub-Cell | ID Suffix | Style
+
+| **Title**
+| `-title`
+| Bold, larger font (14px), element's font color
+
+| **Technology**
+| `-tech`
+| Italic, smaller font (11px), `[bracketed]`, lighter color
+
+| **Description**
+| `-desc`
+| Smallest font (10px), lighter color
+|===
+
+Child cells use `movable=0;resizable=0;deletable=0;editable=0;` to prevent accidental manipulation in draw.io.
+
+Technology and description sub-cells are only created when the corresponding field is non-empty. Actor elements have only a title sub-cell.
+
+==== HTML Labels (Backward Compatible)
+
+Legacy draw.io files may still use HTML-formatted `label` attributes instead of sub-cells. Bausteinsicht reads both formats: it checks for child text sub-cells first, and falls back to parsing the HTML label if none are found.
+
+The legacy label format has up to three lines:
 
 . **Title** — bold (`<b>Title</b>`)
-. **Technology** — grey `#666666`, wrapped in square brackets (`<font color="#666666">[Technology]</font>`)
-. **Description** — lighter grey `#999999` (`<font color="#999999">Description</font>`)
+. **Technology** — grey, wrapped in square brackets, italic
+. **Description** — lighter grey, smaller font
 
-Lines are separated by `<br>`. Empty technology or description lines are omitted.
-
-[cols="1,1"]
-|===
-| Displayed | Stored as
-
-| **REST API** +
-[Spring Boot] (grey) +
-Handles all HTTP requests (lighter grey)
-| `&lt;b&gt;REST API&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;[Spring Boot]&lt;/font&gt;&lt;br&gt;&lt;font color=&quot;#999999&quot;&gt;Handles all HTTP requests&lt;/font&gt;`
-
-| **Customer** +
-End user (lighter grey, no technology)
-| `&lt;b&gt;Customer&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#999999&quot;&gt;End user&lt;/font&gt;`
-|===
-
-Entity escaping rules:
+Entity escaping rules for HTML labels:
 
 [cols="1,1"]
 |===
@@ -426,18 +455,24 @@ Child coordinates are **relative** to the container's top-left corner (below the
 </object>
 
 <!-- Child element — parent references the container -->
-<object label="&lt;b&gt;REST API&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;[Spring Boot]&lt;/font&gt;&lt;br&gt;&lt;font color=&quot;#999999&quot;&gt;Handles all HTTP requests&lt;/font&gt;"
+<object label=""
         id="containers--webshop.api"
         bausteinsicht_id="webshop.api"
         bausteinsicht_kind="container"
         technology="Spring Boot">
   <mxCell style="rounded=1;whiteSpace=wrap;html=1;
-                 fillColor=#dae8fc;strokeColor=#6c8ebf;"
+                 fillColor=#438DD5;strokeColor=#3C7FC0;container=1;"
           vertex="1"
           parent="webshop">
-    <mxGeometry x="30" y="60" width="160" height="70" as="geometry" />
+    <mxGeometry x="30" y="60" width="240" height="150" as="geometry" />
   </mxCell>
 </object>
+<!-- Sub-cells for the child element (parent = child's cell ID) -->
+<mxCell id="containers--webshop.api-title" value="REST API"
+        style="text;html=1;fontSize=14;fontStyle=1;..." vertex="1"
+        parent="containers--webshop.api">
+  <mxGeometry x="0" y="20" width="240" height="30" as="geometry" />
+</mxCell>
 ----
 
 ==== Connectors (Relationships)

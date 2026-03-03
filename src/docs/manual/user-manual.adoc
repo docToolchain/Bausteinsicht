@@ -79,7 +79,7 @@ The typical workflow alternates between editing the model and arranging diagrams
 ==== Reverse Sync (Diagram → Model)
 
 1. Open `architecture.drawio` in draw.io
-2. Edit element labels, descriptions, or technology directly in draw.io
+2. Edit element text — each element contains child text cells for title, technology, and description that can be edited independently
 3. Save the `.drawio` file
 4. Run `bausteinsicht sync`
 5. Check `architecture.jsonc` — your changes are reflected
@@ -300,8 +300,9 @@ Existing elements keep their current style. Only newly created elements pick up 
 
 From each template element, Bausteinsicht extracts:
 
-* **style** — the full mxCell style string
+* **style** — the full mxCell style string (must include `container=1;`)
 * **width** and **height** — default dimensions from mxGeometry
+* **sub-cell styles** — font size, color, weight, and vertical position for title, technology, and description text cells (from child `<mxCell>` elements with `-title`, `-tech`, `-desc` ID suffixes)
 
 === Validation
 

@@ -142,6 +142,13 @@ microsite.with {
     // set a title to '-' in order to remove this menu entry.
     menu = [:]
 
+    // Kroki.io for rendering PlantUML and Mermaid diagrams server-side
+    asciidoctorAttributes = [
+        'diagram-server-url=https://kroki.io/',
+        'diagram-server-type=kroki_io',
+        'kroki-server-url=https://kroki.io/',
+    ]
+
 //tag::additionalConverters[]
 /**
 

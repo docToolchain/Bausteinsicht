@@ -120,6 +120,46 @@ func TestLoadTemplateFromBytes_ValidXMLButNotDrawio(t *testing.T) {
 	}
 }
 
+func TestGetStyle_SubCellStyles(t *testing.T) {
+	ts, err := drawio.LoadTemplate(defaultTemplatePath)
+	if err != nil {
+		t.Fatalf("LoadTemplate: %v", err)
+	}
+
+	// All non-actor element kinds should have sub-cell styles.
+	for _, kind := range []string{"system", "container", "component", "external_system"} {
+		style, ok := ts.GetStyle(kind)
+		if !ok {
+			t.Errorf("GetStyle(%q): expected true", kind)
+			continue
+		}
+		if style.TitleStyle == nil {
+			t.Errorf("GetStyle(%q): expected non-nil TitleStyle", kind)
+		}
+		if style.TechStyle == nil {
+			t.Errorf("GetStyle(%q): expected non-nil TechStyle", kind)
+		}
+		if style.DescStyle == nil {
+			t.Errorf("GetStyle(%q): expected non-nil DescStyle", kind)
+		}
+	}
+
+	// Actor should have title and desc sub-cells (no tech).
+	actorStyle, ok := ts.GetStyle("actor")
+	if !ok {
+		t.Fatal("GetStyle(actor): expected true")
+	}
+	if actorStyle.TitleStyle == nil {
+		t.Error("actor: expected non-nil TitleStyle")
+	}
+	if actorStyle.TechStyle != nil {
+		t.Error("actor: expected nil TechStyle")
+	}
+	if actorStyle.DescStyle == nil {
+		t.Error("actor: expected non-nil DescStyle")
+	}
+}
+
 func TestLoadTemplateFromBytes(t *testing.T) {
 	data, err := os.ReadFile(defaultTemplatePath)
 	if err != nil {
