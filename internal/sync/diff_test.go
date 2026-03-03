@@ -468,6 +468,121 @@ func TestDetectChanges_LiftedConnectorIgnored(t *testing.T) {
 	}
 }
 
+// TestDetectChanges_LiftedConnectorNotDeletedFromModel verifies that when a
+// relationship exists in the model with deep endpoints (e.g., cli → model.loader)
+// but the draw.io connector uses lifted endpoints (cli → model), the reverse
+// sync does NOT treat the original relationship as deleted (#223).
+func TestDetectChanges_LiftedConnectorNotDeletedFromModel(t *testing.T) {
+	// Model has a deep relationship: cli → model.loader (index 5)
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"cli": {Kind: "container", Title: "CLI"},
+			"model": {Kind: "container", Title: "Model", Children: map[string]model.Element{
+				"loader": {Kind: "component", Title: "Loader"},
+			}},
+		},
+		Relationships: []model.Relationship{
+			{From: "cli", To: "model.loader", Label: "loads JSONC", Kind: "uses"},
+		},
+		Views: map[string]model.View{
+			"containers": {
+				Title:   "Container View",
+				Scope:   "",
+				Include: []string{"cli", "model"},
+			},
+		},
+	}
+
+	// Sync state records the original relationship.
+	state := emptyState()
+	state.Elements["cli"] = ElementState{Title: "CLI", Kind: "container"}
+	state.Elements["model"] = ElementState{Title: "Model", Kind: "container"}
+	state.Elements["model.loader"] = ElementState{Title: "Loader", Kind: "component"}
+	state.Relationships = []RelationshipState{
+		{From: "cli", To: "model.loader", Index: 0, Label: "loads JSONC", Kind: "uses"},
+	}
+
+	// Draw.io has the connector with LIFTED endpoints (cli → model)
+	// because the containers view doesn't include model.loader.
+	doc := drawio.NewDocument()
+	page := doc.AddPage("view-containers", "Container View")
+	_ = page.CreateElement(drawio.ElementData{
+		ID: "cli", CellID: "containers--cli", Kind: "container", Title: "CLI",
+	}, "")
+	_ = page.CreateElement(drawio.ElementData{
+		ID: "model", CellID: "containers--model", Kind: "container", Title: "Model",
+	}, "")
+	page.CreateConnector(drawio.ConnectorData{
+		From: "cli", To: "model",
+		Label:     "loads JSONC",
+		SourceRef: "containers--cli",
+		TargetRef: "containers--model",
+		Index:     0,
+	}, "")
+
+	cs := DetectChanges(m, doc, state, nil)
+
+	// The original relationship (cli → model.loader) must NOT be marked as
+	// deleted from draw.io. The lifted connector (cli → model) represents it.
+	for _, ch := range cs.DrawioRelationshipChanges {
+		if ch.From == "cli" && ch.To == "model.loader" && ch.Type == Deleted {
+			t.Errorf("CRITICAL: relationship cli→model.loader should not be deleted when a lifted connector cli→model exists (#223), got: %+v",
+				cs.DrawioRelationshipChanges)
+		}
+	}
+}
+
+// TestDetectChanges_RealDeletionStillWorksWithLiftedCheck ensures that a genuine
+// user deletion (connector removed from draw.io, no lifted version exists) is
+// still detected after the #223 fix.
+func TestDetectChanges_RealDeletionStillWorksWithLiftedCheck(t *testing.T) {
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"cli":   {Kind: "container", Title: "CLI"},
+			"model": {Kind: "container", Title: "Model"},
+		},
+		Relationships: []model.Relationship{
+			{From: "cli", To: "model", Label: "uses", Kind: "uses"},
+		},
+		Views: map[string]model.View{
+			"containers": {
+				Title:   "Container View",
+				Include: []string{"cli", "model"},
+			},
+		},
+	}
+
+	state := emptyState()
+	state.Elements["cli"] = ElementState{Title: "CLI", Kind: "container"}
+	state.Elements["model"] = ElementState{Title: "Model", Kind: "container"}
+	state.Relationships = []RelationshipState{
+		{From: "cli", To: "model", Index: 0, Label: "uses", Kind: "uses"},
+	}
+
+	// Draw.io has the elements but the user deleted the connector.
+	doc := drawio.NewDocument()
+	page := doc.AddPage("view-containers", "Container View")
+	_ = page.CreateElement(drawio.ElementData{
+		ID: "cli", CellID: "containers--cli", Kind: "container", Title: "CLI",
+	}, "")
+	_ = page.CreateElement(drawio.ElementData{
+		ID: "model", CellID: "containers--model", Kind: "container", Title: "Model",
+	}, "")
+	// No connector — user deleted it.
+
+	cs := DetectChanges(m, doc, state, nil)
+
+	found := false
+	for _, ch := range cs.DrawioRelationshipChanges {
+		if ch.From == "cli" && ch.To == "model" && ch.Type == Deleted {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected real user deletion cli→model to be detected, but it was not")
+	}
+}
+
 func TestDetectChanges_TooltipChangeDetected(t *testing.T) {
 	// Sync state has element with description "Old Desc"
 	state := stateWithElem("app", "App", "Old Desc", "Go")
