@@ -46,6 +46,14 @@ See link:01_use_cases.adoc[Use Cases] for the functional overview of all CLI com
 | Export diagram views to PNG or SVG using the draw.io CLI
 | Implemented
 
+| `bausteinsicht export-table`
+| Export element attributes as AsciiDoc or Markdown table per view
+| Implemented
+
+| `bausteinsicht export-diagram`
+| Export views as PlantUML C4 or Mermaid C4 text diagrams
+| Implemented
+
 | `bausteinsicht --version`
 | Display version number
 | Implemented
@@ -488,6 +496,149 @@ $ bausteinsicht export --format json --embed-diagram
 {
   "files": ["./context.png"],
   "errors": [],
+  "success": true
+}
+----
+
+==== `bausteinsicht export-table`
+
+Exports element attributes as an AsciiDoc or Markdown table per view or as a combined table across all views.
+
+**Flags:**
+
+[cols="2,3,1,1"]
+|===
+| Flag | Description | Required | Default
+
+| `--view`
+| Export only a specific view by its key. When omitted, all views are exported.
+| No
+| (all views)
+
+| `--table-format`
+| Table output format: `adoc` (AsciiDoc) or `md` (Markdown).
+| No
+| `adoc`
+
+| `--output`
+| Output directory for exported files.
+| No
+| `.` (current directory)
+
+| `--combined`
+| Export a single combined table with elements from all views, deduplicated.
+| No
+| `false`
+|===
+
+**Behavior:**
+
+* Loads the model and resolves view elements.
+* For each view, generates a table with columns: ID, Kind, Title, Technology, Description.
+* Elements are sorted alphabetically by ID within each table.
+* Output files are named `<view-key>.adoc` or `<view-key>.md` (e.g., `context.adoc`).
+* With `--combined`, produces a single file `combined.adoc` (or `.md`) containing all elements across views, deduplicated by ID.
+* Creates the output directory if it does not exist.
+
+**JSON output structure:**
+[source,json]
+----
+{
+  "files": ["./context.adoc", "./container.adoc"],
+  "success": true
+}
+----
+
+**Exit codes:**
+
+* `0` -- all tables exported successfully
+* `1` -- one or more exports failed (partial failure)
+* `2` -- model file not found, invalid format, or no views to export
+
+**Example:**
+[source,bash]
+----
+$ bausteinsicht export-table
+Exported: ./context.adoc
+Exported: ./container.adoc
+
+$ bausteinsicht export-table --table-format md --output docs/tables --view context
+Exported: docs/tables/context.md
+
+$ bausteinsicht export-table --combined --output docs/tables
+Exported: docs/tables/combined.adoc
+
+$ bausteinsicht export-table --format json
+{
+  "files": ["./context.adoc"],
+  "success": true
+}
+----
+
+==== `bausteinsicht export-diagram`
+
+Exports views as PlantUML C4 or Mermaid C4 text diagrams.
+
+**Flags:**
+
+[cols="2,3,1,1"]
+|===
+| Flag | Description | Required | Default
+
+| `--view`
+| Export only a specific view by its key. When omitted, all views are exported.
+| No
+| (all views)
+
+| `--diagram-format`
+| Diagram output format: `plantuml` or `mermaid`.
+| No
+| `plantuml`
+
+| `--output`
+| Output directory for exported files.
+| No
+| `.` (current directory)
+|===
+
+**Behavior:**
+
+* Loads the model and resolves view elements and relationships.
+* Auto-detects the C4 level (Context, Container, or Component) from the view content.
+* Generates C4 diagram source using the appropriate macros (`Person`, `System`, `System_Ext`, `Container`, `Component`, `System_Boundary`, `Container_Boundary`).
+* Relationships are filtered to those visible in the view. Endpoints are lifted to visible ancestor elements when the original endpoints are not included in the view.
+* PlantUML output uses the local stdlib include syntax (`!include <C4/C4_Context>`, etc.).
+* Output files are named `<view-key>.puml` (PlantUML) or `<view-key>.mmd` (Mermaid).
+* Creates the output directory if it does not exist.
+
+**JSON output structure:**
+[source,json]
+----
+{
+  "files": ["./context.puml", "./container.puml"],
+  "success": true
+}
+----
+
+**Exit codes:**
+
+* `0` -- all diagrams exported successfully
+* `1` -- one or more exports failed (partial failure)
+* `2` -- model file not found, invalid format, or no views to export
+
+**Example:**
+[source,bash]
+----
+$ bausteinsicht export-diagram
+Exported: ./context.puml
+Exported: ./container.puml
+
+$ bausteinsicht export-diagram --diagram-format mermaid --output docs/diagrams --view context
+Exported: docs/diagrams/context.mmd
+
+$ bausteinsicht export-diagram --format json
+{
+  "files": ["./context.puml"],
   "success": true
 }
 ----

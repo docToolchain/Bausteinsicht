@@ -16,7 +16,8 @@ const (
 	Mermaid
 )
 
-const c4PlantUMLBase = "https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master"
+// C4-PlantUML is part of the PlantUML stdlib since v2.x, so we use
+// the <C4/...> include syntax which resolves locally without network access.
 
 // FormatView renders a view as a C4 diagram in the given format.
 func FormatView(m *model.BausteinsichtModel, viewKey string, f Format) (string, error) {
@@ -65,6 +66,7 @@ type elemEntry struct {
 }
 
 func detectLevel(resolved []string, flat map[string]*model.Element, scope string) string {
+	hasContainer := false
 	for _, id := range resolved {
 		elem := flat[id]
 		if elem == nil {
@@ -74,10 +76,10 @@ func detectLevel(resolved []string, flat map[string]*model.Element, scope string
 			return "Component"
 		}
 		if elem.Kind == "container" {
-			return "Container"
+			hasContainer = true
 		}
 	}
-	if scope != "" {
+	if hasContainer || scope != "" {
 		return "Container"
 	}
 	return "Context"
@@ -166,7 +168,7 @@ func escapeQuotes(s string) string {
 
 func writePlantUML(b *strings.Builder, view model.View, level string, inside, outside []elemEntry, rels []relEntry, flat map[string]*model.Element) {
 	b.WriteString("@startuml\n")
-	fmt.Fprintf(b, "!include %s/C4_%s.puml\n\n", c4PlantUMLBase, level)
+	fmt.Fprintf(b, "!include <C4/C4_%s>\n\n", level)
 
 	// External elements (outside scope boundary).
 	for _, e := range outside {

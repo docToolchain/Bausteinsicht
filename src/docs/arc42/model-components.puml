@@ -1,0 +1,24 @@
+@startuml
+!include <C4/C4_Component>
+
+Container(bausteinsicht_cli, "CLI", "Go / Cobra", "Command-line interface providing validate, sync, export, and watch commands")
+Component(bausteinsicht_sync_reverse, "Reverse Sync", "Go", "Applies draw.io changes back to the JSONC model (drawio → model)")
+System_Ext(ide, "IDE", "IDE with JSON Schema support for JSONC editing with autocompletion")
+Container_Boundary(bausteinsicht_model, "Model") {
+  Component(bausteinsicht_model_loader, "Loader", "Go", "JSONC read/write with comment stripping and trailing comma handling")
+  Component(bausteinsicht_model_patch, "Patch", "Go", "Comment-preserving JSONC mutations for reverse sync")
+  Component(bausteinsicht_model_resolve, "Resolve", "Go", "Dot-notation element resolution and wildcard pattern matching")
+  Component(bausteinsicht_model_types, "Types", "Go", "Core struct definitions for elements, relationships, views, and specification")
+  Component(bausteinsicht_model_validate, "Validate", "Go", "Model validation rules for elements, relationships, and views")
+}
+
+Rel(ide, bausteinsicht_model, "JSON Schema validation")
+Rel(bausteinsicht_cli, bausteinsicht_model_loader, "loads/saves JSONC")
+Rel(bausteinsicht_cli, bausteinsicht_model_validate, "validates model")
+Rel(bausteinsicht_sync_reverse, bausteinsicht_model_patch, "comment-preserving updates")
+Rel(bausteinsicht_model_loader, bausteinsicht_model_resolve, "resolves element IDs")
+Rel(bausteinsicht_model_loader, bausteinsicht_model_types, "populates structs")
+Rel(bausteinsicht_model_validate, bausteinsicht_model_types, "reads model structs")
+Rel(bausteinsicht_model_validate, bausteinsicht_model_resolve, "resolves patterns")
+Rel(bausteinsicht_model_patch, bausteinsicht_model_types, "reads model structs")
+@enduml

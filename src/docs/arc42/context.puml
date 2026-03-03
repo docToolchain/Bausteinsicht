@@ -1,0 +1,14 @@
+@startuml
+!include <C4/C4_Context>
+
+System(bausteinsicht, "Bausteinsicht", "Architecture-as-code tool with draw.io as visual frontend and bidirectional synchronization")
+Person(developer, "Developer", "Developer using the Bausteinsicht CLI to manage architecture models")
+System_Ext(drawio_app, "draw.io App", "draw.io desktop or web application for visual diagram editing")
+System_Ext(ide, "IDE", "IDE with JSON Schema support for JSONC editing with autocompletion")
+
+Rel(developer, bausteinsicht, "runs commands")
+Rel(developer, ide, "edits JSONC")
+Rel(developer, drawio_app, "edits diagrams")
+Rel(ide, bausteinsicht, "JSON Schema validation")
+Rel(drawio_app, bausteinsicht, "modifies .drawio file")
+@enduml

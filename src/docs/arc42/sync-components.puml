@@ -1,0 +1,29 @@
+@startuml
+!include <C4/C4_Component>
+
+Container(bausteinsicht_cli, "CLI", "Go / Cobra", "Command-line interface providing validate, sync, export, and watch commands")
+Component(bausteinsicht_drawio_connector, "Connector", "Go", "Connector/relationship CRUD for edges between elements")
+Component(bausteinsicht_drawio_element, "Element", "Go", "Element CRUD operations on mxGraphModel objects and mxCells")
+Component(bausteinsicht_model_patch, "Patch", "Go", "Comment-preserving JSONC mutations for reverse sync")
+Container(bausteinsicht_watcher, "Watcher", "Go / fsnotify", "File system monitoring for automatic sync on model or diagram changes")
+Container_Boundary(bausteinsicht_sync, "Sync Engine") {
+  Component(bausteinsicht_sync_conflict, "Conflict", "Go", "Conflict detection and resolution when both model and diagram changed")
+  Component(bausteinsicht_sync_diff, "Diff", "Go", "Three-way change detection comparing model, diagram, and last-sync state")
+  Component(bausteinsicht_sync_engine, "Engine", "Go", "Main sync orchestrator coordinating diff, forward, reverse, and conflict resolution")
+  Component(bausteinsicht_sync_forward, "Forward Sync", "Go", "Applies model changes to draw.io diagrams (model → drawio)")
+  Component(bausteinsicht_sync_reverse, "Reverse Sync", "Go", "Applies draw.io changes back to the JSONC model (drawio → model)")
+  Component(bausteinsicht_sync_state, "State", "Go", "Sync state persistence using SHA256 hashes for change detection")
+}
+
+Rel(bausteinsicht_cli, bausteinsicht_sync_engine, "triggers sync")
+Rel(bausteinsicht_cli, bausteinsicht_watcher, "starts watch mode")
+Rel(bausteinsicht_sync_engine, bausteinsicht_sync_diff, "detects changes")
+Rel(bausteinsicht_sync_engine, bausteinsicht_sync_forward, "model to drawio")
+Rel(bausteinsicht_sync_engine, bausteinsicht_sync_reverse, "drawio to model")
+Rel(bausteinsicht_sync_engine, bausteinsicht_sync_state, "loads/saves state")
+Rel(bausteinsicht_sync_engine, bausteinsicht_sync_conflict, "resolves conflicts")
+Rel(bausteinsicht_sync_forward, bausteinsicht_drawio_element, "creates/updates elements")
+Rel(bausteinsicht_sync_forward, bausteinsicht_drawio_connector, "creates/updates connectors")
+Rel(bausteinsicht_sync_reverse, bausteinsicht_model_patch, "comment-preserving updates")
+Rel(bausteinsicht_watcher, bausteinsicht_sync_engine, "triggers on file change")
+@enduml

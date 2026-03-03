@@ -224,9 +224,33 @@
       "kind": "uses"
     },
     {
+      "from": "drawio_app",
+      "to": "bausteinsicht.drawio.document",
+      "label": "modifies .drawio file",
+      "kind": "uses"
+    },
+    {
       "from": "bausteinsicht.cli",
       "to": "bausteinsicht.model.loader",
       "label": "loads/saves JSONC",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.cli",
+      "to": "bausteinsicht.model.validate",
+      "label": "validates model",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.cli",
+      "to": "bausteinsicht.sync.engine",
+      "label": "triggers sync",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.cli",
+      "to": "bausteinsicht.watcher",
+      "label": "starts watch mode",
       "kind": "uses"
     },
     {
@@ -243,8 +267,14 @@
     },
     {
       "from": "bausteinsicht.sync.engine",
+      "to": "bausteinsicht.sync.forward",
+      "label": "model to drawio",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.sync.engine",
       "to": "bausteinsicht.sync.reverse",
-      "label": "drawio → model",
+      "label": "drawio to model",
       "kind": "uses"
     },
     {
@@ -266,9 +296,39 @@
       "kind": "uses"
     },
     {
+      "from": "bausteinsicht.sync.forward",
+      "to": "bausteinsicht.drawio.connector",
+      "label": "creates/updates connectors",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.sync.reverse",
+      "to": "bausteinsicht.model.patch",
+      "label": "comment-preserving updates",
+      "kind": "uses"
+    },
+    {
       "from": "bausteinsicht.drawio.element",
       "to": "bausteinsicht.drawio.label",
       "label": "generates labels",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.drawio.element",
+      "to": "bausteinsicht.drawio.template",
+      "label": "looks up styles",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.drawio.element",
+      "to": "bausteinsicht.drawio.document",
+      "label": "modifies pages",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.drawio.connector",
+      "to": "bausteinsicht.drawio.document",
+      "label": "modifies pages",
       "kind": "uses"
     },
     {
@@ -278,59 +338,40 @@
       "kind": "uses"
     },
     {
-      "from": "bausteinsicht.drawio.element",
-      "to": "bausteinsicht.drawio.label",
-      "label": "generates labels"
+      "from": "bausteinsicht.model.loader",
+      "to": "bausteinsicht.model.types",
+      "label": "populates structs",
+      "kind": "uses"
     },
     {
-      "from": "bausteinsicht.export",
-      "to": "bausteinsicht.drawio",
-      "label": "reads diagram pages"
+      "from": "bausteinsicht.model.validate",
+      "to": "bausteinsicht.model.types",
+      "label": "reads model structs",
+      "kind": "uses"
     },
     {
-      "from": "bausteinsicht.sync.engine",
-      "to": "bausteinsicht.sync.reverse",
-      "label": "drawio → model"
+      "from": "bausteinsicht.model.validate",
+      "to": "bausteinsicht.model.resolve",
+      "label": "resolves patterns",
+      "kind": "uses"
     },
     {
-      "from": "bausteinsicht.sync.forward",
-      "to": "bausteinsicht.drawio.element",
-      "label": "creates/updates elements"
-    },
-    {
-      "from": "bausteinsicht.cli",
-      "to": "bausteinsicht.export",
-      "label": "triggers export"
-    },
-    {
-      "from": "bausteinsicht.sync.engine",
-      "to": "bausteinsicht.sync.conflict",
-      "label": "resolves conflicts"
+      "from": "bausteinsicht.model.patch",
+      "to": "bausteinsicht.model.types",
+      "label": "reads model structs",
+      "kind": "uses"
     },
     {
       "from": "bausteinsicht.watcher",
-      "to": "bausteinsicht.sync",
-      "label": "triggers on file change"
+      "to": "bausteinsicht.sync.engine",
+      "label": "triggers on file change",
+      "kind": "uses"
     },
     {
-      "from": "bausteinsicht.sync.engine",
-      "to": "bausteinsicht.sync.forward",
-      "label": "model → drawio"
-    },
-    {
-      "from": "bausteinsicht.sync.engine",
-      "to": "bausteinsicht.sync.state",
-      "label": "loads/saves state"
-    },
-    {
-      "from": "bausteinsicht.sync.engine",
-      "to": "bausteinsicht.sync.diff",
-      "label": "detects changes"
-    },
-    {
-      "from": "bausteinsicht.cli",
-      "to": "bausteinsicht.watcher",
-      "label": "starts watch mode"
+      "from": "bausteinsicht.export",
+      "to": "bausteinsicht.drawio.document",
+      "label": "reads diagram pages",
+      "kind": "uses"
     }
   ],
   "views": {
@@ -359,17 +400,23 @@
       "title": "draw.io Package Components",
       "scope": "bausteinsicht.drawio",
       "include": [
-        "bausteinsicht.drawio.*"
+        "bausteinsicht.drawio.*",
+        "bausteinsicht.sync.forward",
+        "bausteinsicht.export",
+        "drawio_app"
       ],
-      "description": "Internal components of the draw.io XML handling package"
+      "description": "Internal components of the draw.io XML handling package with external callers"
     },
     "model-components": {
       "title": "Model Package Components",
       "scope": "bausteinsicht.model",
       "include": [
-        "bausteinsicht.model.*"
+        "bausteinsicht.model.*",
+        "bausteinsicht.cli",
+        "bausteinsicht.sync.reverse",
+        "ide"
       ],
-      "description": "Internal components of the JSONC model management package"
+      "description": "Internal components of the JSONC model management package with external callers"
     },
     "sync-components": {
       "title": "Sync Engine Components",
@@ -378,7 +425,9 @@
         "bausteinsicht.sync.*",
         "bausteinsicht.model.patch",
         "bausteinsicht.drawio.element",
-        "bausteinsicht.drawio.connector"
+        "bausteinsicht.drawio.connector",
+        "bausteinsicht.cli",
+        "bausteinsicht.watcher"
       ],
       "description": "Internal components of the bidirectional sync engine and its key dependencies"
     }

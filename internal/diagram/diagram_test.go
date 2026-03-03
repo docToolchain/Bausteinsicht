@@ -61,8 +61,8 @@ func TestPlantUML_ContextView(t *testing.T) {
 	if !strings.Contains(result, "@enduml") {
 		t.Error("expected @enduml")
 	}
-	if !strings.Contains(result, "C4_Context.puml") {
-		t.Error("expected C4_Context.puml include")
+	if !strings.Contains(result, "<C4/C4_Context>") {
+		t.Error("expected <C4/C4_Context> stdlib include")
 	}
 	if !strings.Contains(result, "Person(") {
 		t.Error("expected Person() macro for actor")
@@ -85,8 +85,8 @@ func TestPlantUML_ContainerView(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if !strings.Contains(result, "C4_Container.puml") {
-		t.Error("expected C4_Container.puml include for container view")
+	if !strings.Contains(result, "<C4/C4_Container>") {
+		t.Error("expected <C4/C4_Container> stdlib include for container view")
 	}
 	if !strings.Contains(result, "System_Boundary(") {
 		t.Error("expected System_Boundary for scope element")
