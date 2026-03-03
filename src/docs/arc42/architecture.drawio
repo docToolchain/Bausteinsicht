@@ -5,7 +5,7 @@
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
         <object label="" bausteinsicht_id="bausteinsicht" bausteinsicht_kind="system" tooltip="Architecture-as-code tool with draw.io as visual frontend and bidirectional synchronization" link="data:page/id,view-containers" id="context--bausteinsicht">
-          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1168BD;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;movable=0;resizable=0;rotatable=0;deletable=0;editable=0;locked=1;connectable=0;" vertex="1">
+          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1168BD;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;movable=0;resizable=0;rotatable=0;deletable=0;editable=0;locked=1;connectable=0;" vertex="1">
             <mxGeometry height="120" width="180" x="366" y="440" as="geometry" />
           </mxCell>
         </object>
@@ -16,7 +16,7 @@
           <mxGeometry height="70" width="180" y="50" as="geometry" />
         </mxCell>
         <object label="" bausteinsicht_id="drawio_app" bausteinsicht_kind="external_system" tooltip="draw.io desktop or web application for visual diagram editing" id="context--drawio_app">
-          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#999999;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;" vertex="1">
+          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#999999;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1">
             <mxGeometry height="120" width="180" x="40" y="440" as="geometry" />
           </mxCell>
         </object>
@@ -27,7 +27,7 @@
           <mxGeometry height="70" width="180" y="50" as="geometry" />
         </mxCell>
         <object label="" bausteinsicht_id="ide" bausteinsicht_kind="external_system" tooltip="IDE with JSON Schema support for JSONC editing with autocompletion" id="context--ide">
-          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#999999;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;dashed=1;strokeColor=#FF0000;" vertex="1">
+          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#999999;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1">
             <mxGeometry height="120" width="180" x="710" y="440" as="geometry" />
           </mxCell>
         </object>
@@ -38,7 +38,7 @@
           <mxGeometry height="70" width="180" y="50" as="geometry" />
         </mxCell>
         <object label="" bausteinsicht_id="developer" bausteinsicht_kind="actor" tooltip="Developer using the Bausteinsicht CLI to manage architecture models" id="context--developer">
-          <mxCell parent="1" style="shape=mxgraph.c4.person2;whiteSpace=wrap;html=1;align=center;verticalAlign=top;verticalLabelPosition=bottom;fillColor=#08427B;fontColor=#ffffff;fontSize=13;spacing=2;container=1;strokeColor=#FF0000;dashed=1;" vertex="1">
+          <mxCell parent="1" style="shape=mxgraph.c4.person2;whiteSpace=wrap;html=1;align=center;verticalAlign=top;verticalLabelPosition=bottom;fillColor=#08427B;fontColor=#ffffff;fontSize=13;spacing=2;container=1;" vertex="1">
             <mxGeometry height="130" width="110" x="401" y="250" as="geometry" />
           </mxCell>
         </object>
@@ -77,7 +77,7 @@
           </mxCell>
         </object>
         <object label="" bausteinsicht_id="bausteinsicht.cli" bausteinsicht_kind="container" technology="Go / Cobra" tooltip="Command-line interface providing validate, sync, export, and watch commands" id="containers--bausteinsicht.cli">
-          <mxCell parent="containers--bausteinsicht" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;" vertex="1">
+          <mxCell parent="containers--bausteinsicht" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1">
             <mxGeometry height="120" width="180" x="230" y="104" as="geometry" />
           </mxCell>
         </object>
@@ -91,7 +91,7 @@
           <mxGeometry height="70" width="180" y="50" as="geometry" />
         </mxCell>
         <object label="" bausteinsicht_id="bausteinsicht.watcher" bausteinsicht_kind="container" technology="Go / fsnotify" tooltip="File system monitoring for automatic sync on model or diagram changes" id="containers--bausteinsicht.watcher">
-          <mxCell parent="containers--bausteinsicht" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;" vertex="1">
+          <mxCell parent="containers--bausteinsicht" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1">
             <mxGeometry height="120" width="180" x="450" y="170" as="geometry" />
           </mxCell>
         </object>
@@ -105,7 +105,7 @@
           <mxGeometry height="70" width="180" y="50" as="geometry" />
         </mxCell>
         <object label="" bausteinsicht_id="bausteinsicht.export" bausteinsicht_kind="container" technology="Go" tooltip="Diagram export to PNG and SVG formats via draw.io CLI" id="containers--bausteinsicht.export">
-          <mxCell parent="containers--bausteinsicht" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;" vertex="1">
+          <mxCell parent="containers--bausteinsicht" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1">
             <mxGeometry height="120" width="180" x="230" y="360" as="geometry" />
           </mxCell>
         </object>
@@ -119,7 +119,7 @@
           <mxGeometry height="70" width="180" y="50" as="geometry" />
         </mxCell>
         <object label="" bausteinsicht_id="bausteinsicht.drawio" bausteinsicht_kind="container" technology="Go / etree" tooltip="draw.io XML document handling — elements, connectors, templates, and labels" link="data:page/id,view-drawio-components" id="containers--bausteinsicht.drawio">
-          <mxCell parent="containers--bausteinsicht" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;" vertex="1">
+          <mxCell parent="containers--bausteinsicht" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1">
             <mxGeometry height="120" width="180" x="20" y="240" as="geometry" />
           </mxCell>
         </object>
@@ -133,7 +133,7 @@
           <mxGeometry height="70" width="180" y="50" as="geometry" />
         </mxCell>
         <object label="" bausteinsicht_id="bausteinsicht.sync" bausteinsicht_kind="container" technology="Go" tooltip="Bidirectional synchronization engine between JSONC model and draw.io diagrams" link="data:page/id,view-sync-components" id="containers--bausteinsicht.sync">
-          <mxCell parent="containers--bausteinsicht" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;" vertex="1">
+          <mxCell parent="containers--bausteinsicht" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1">
             <mxGeometry height="120" width="180" x="430" y="500" as="geometry" />
           </mxCell>
         </object>
@@ -147,7 +147,7 @@
           <mxGeometry height="70" width="180" y="50" as="geometry" />
         </mxCell>
         <object label="" bausteinsicht_id="bausteinsicht.model" bausteinsicht_kind="container" technology="Go" tooltip="JSONC architecture model management — loading, validation, and mutation" link="data:page/id,view-model-components" id="containers--bausteinsicht.model">
-          <mxCell parent="containers--bausteinsicht" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;" vertex="1">
+          <mxCell parent="containers--bausteinsicht" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1">
             <mxGeometry height="120" width="180" x="670" y="330" as="geometry" />
           </mxCell>
         </object>
@@ -161,7 +161,7 @@
           <mxGeometry height="70" width="180" y="50" as="geometry" />
         </mxCell>
         <object label="" bausteinsicht_id="drawio_app" bausteinsicht_kind="external_system" tooltip="draw.io desktop or web application for visual diagram editing" id="containers--drawio_app">
-          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#999999;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;movable=1;resizable=1;rotatable=1;deletable=1;editable=1;locked=0;connectable=1;" vertex="1">
+          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#999999;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;movable=1;resizable=1;rotatable=1;deletable=1;editable=1;locked=0;connectable=1;" vertex="1">
             <mxGeometry height="120" width="180" x="-50" y="390" as="geometry" />
           </mxCell>
         </object>
@@ -172,7 +172,7 @@
           <mxGeometry height="70" width="180" y="50" as="geometry" />
         </mxCell>
         <object label="" bausteinsicht_id="ide" bausteinsicht_kind="external_system" tooltip="IDE with JSON Schema support for JSONC editing with autocompletion" id="containers--ide">
-          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#999999;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;movable=1;resizable=1;rotatable=1;deletable=1;editable=1;locked=0;connectable=1;" vertex="1">
+          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#999999;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;movable=1;resizable=1;rotatable=1;deletable=1;editable=1;locked=0;connectable=1;" vertex="1">
             <mxGeometry height="120" width="180" x="1230" y="560" as="geometry" />
           </mxCell>
         </object>
@@ -183,7 +183,7 @@
           <mxGeometry height="70" width="180" y="50" as="geometry" />
         </mxCell>
         <object label="" bausteinsicht_id="developer" bausteinsicht_kind="actor" tooltip="Developer using the Bausteinsicht CLI to manage architecture models" id="containers--developer">
-          <mxCell parent="1" style="shape=mxgraph.c4.person2;whiteSpace=wrap;html=1;align=center;verticalAlign=top;verticalLabelPosition=bottom;fillColor=#08427B;fontColor=#ffffff;fontSize=13;spacing=2;container=1;strokeColor=#FF0000;dashed=1;" vertex="1">
+          <mxCell parent="1" style="shape=mxgraph.c4.person2;whiteSpace=wrap;html=1;align=center;verticalAlign=top;verticalLabelPosition=bottom;fillColor=#08427B;fontColor=#ffffff;fontSize=13;spacing=2;container=1;" vertex="1">
             <mxGeometry height="130" width="110" x="495" y="10" as="geometry" />
           </mxCell>
         </object>
@@ -265,7 +265,7 @@
           </mxCell>
         </object>
         <object label="" bausteinsicht_id="bausteinsicht.drawio.element" bausteinsicht_kind="component" technology="Go" tooltip="Element CRUD operations on mxGraphModel objects and mxCells" id="drawio-components--bausteinsicht.drawio.element">
-          <mxCell parent="drawio-components--bausteinsicht.drawio" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#85BBF0;fontColor=#000000;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;" vertex="1">
+          <mxCell parent="drawio-components--bausteinsicht.drawio" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#85BBF0;fontColor=#000000;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1">
             <mxGeometry height="120" width="180" x="420" y="140" as="geometry" />
           </mxCell>
         </object>
@@ -279,7 +279,7 @@
           <mxGeometry height="70" width="180" y="50" as="geometry" />
         </mxCell>
         <object label="" bausteinsicht_id="bausteinsicht.drawio.document" bausteinsicht_kind="component" technology="Go" tooltip="XML parsing, page management, and file I/O for .drawio files" id="drawio-components--bausteinsicht.drawio.document">
-          <mxCell parent="drawio-components--bausteinsicht.drawio" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#85BBF0;fontColor=#000000;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;" vertex="1">
+          <mxCell parent="drawio-components--bausteinsicht.drawio" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#85BBF0;fontColor=#000000;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1">
             <mxGeometry height="120" width="180" x="110" y="140" as="geometry" />
           </mxCell>
         </object>
@@ -293,7 +293,7 @@
           <mxGeometry height="70" width="180" y="50" as="geometry" />
         </mxCell>
         <object label="" bausteinsicht_id="bausteinsicht.drawio.label" bausteinsicht_kind="component" technology="Go" tooltip="HTML label generation and parsing for element display text" id="drawio-components--bausteinsicht.drawio.label">
-          <mxCell parent="drawio-components--bausteinsicht.drawio" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#85BBF0;fontColor=#000000;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;" vertex="1">
+          <mxCell parent="drawio-components--bausteinsicht.drawio" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#85BBF0;fontColor=#000000;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1">
             <mxGeometry height="120" width="180" x="620" y="380" as="geometry" />
           </mxCell>
         </object>
@@ -307,7 +307,7 @@
           <mxGeometry height="70" width="180" y="50" as="geometry" />
         </mxCell>
         <object label="" bausteinsicht_id="bausteinsicht.drawio.connector" bausteinsicht_kind="component" technology="Go" tooltip="Connector/relationship CRUD for edges between elements" id="drawio-components--bausteinsicht.drawio.connector">
-          <mxCell parent="drawio-components--bausteinsicht.drawio" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#85BBF0;fontColor=#000000;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;" vertex="1">
+          <mxCell parent="drawio-components--bausteinsicht.drawio" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#85BBF0;fontColor=#000000;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1">
             <mxGeometry height="120" width="180" x="110" y="360" as="geometry" />
           </mxCell>
         </object>
@@ -321,7 +321,7 @@
           <mxGeometry height="70" width="180" y="50" as="geometry" />
         </mxCell>
         <object label="" bausteinsicht_id="bausteinsicht.drawio.template" bausteinsicht_kind="component" technology="Go" tooltip="Template loading and style lookup from .drawio template files" id="drawio-components--bausteinsicht.drawio.template">
-          <mxCell parent="drawio-components--bausteinsicht.drawio" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#85BBF0;fontColor=#000000;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;" vertex="1">
+          <mxCell parent="drawio-components--bausteinsicht.drawio" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#85BBF0;fontColor=#000000;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1">
             <mxGeometry height="120" width="180" x="730" y="240" as="geometry" />
           </mxCell>
         </object>
@@ -335,7 +335,7 @@
           <mxGeometry height="70" width="180" y="50" as="geometry" />
         </mxCell>
         <object label="" bausteinsicht_id="drawio_app" bausteinsicht_kind="external_system" tooltip="draw.io desktop or web application for visual diagram editing" id="drawio-components--drawio_app">
-          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#999999;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;dashed=1;strokeColor=#FF0000;movable=1;resizable=1;rotatable=1;deletable=1;editable=1;locked=0;connectable=1;" vertex="1">
+          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#999999;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;movable=1;resizable=1;rotatable=1;deletable=1;editable=1;locked=0;connectable=1;" vertex="1">
             <mxGeometry height="120" width="180" x="20" y="670" as="geometry" />
           </mxCell>
         </object>
@@ -346,7 +346,7 @@
           <mxGeometry height="70" width="180" y="50" as="geometry" />
         </mxCell>
         <object label="" bausteinsicht_id="bausteinsicht.export" bausteinsicht_kind="container" technology="Go" tooltip="Diagram export to PNG and SVG formats via draw.io CLI" id="drawio-components--bausteinsicht.export">
-          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;dashed=1;strokeColor=#FF0000;" vertex="1">
+          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1">
             <mxGeometry height="120" width="180" x="340" y="360" as="geometry" />
           </mxCell>
         </object>
@@ -360,7 +360,7 @@
           <mxGeometry height="70" width="180" y="50" as="geometry" />
         </mxCell>
         <object label="" bausteinsicht_id="bausteinsicht.sync" bausteinsicht_kind="container" technology="Go" tooltip="Bidirectional synchronization engine between JSONC model and draw.io diagrams" link="data:page/id,view-sync-components" id="drawio-components--bausteinsicht.sync">
-          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;" vertex="1">
+          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1">
             <mxGeometry height="120" width="180" x="650" y="1100" as="geometry" />
           </mxCell>
         </object>
@@ -420,7 +420,7 @@
           </mxCell>
         </object>
         <object label="" bausteinsicht_id="bausteinsicht.model.loader" bausteinsicht_kind="component" technology="Go" tooltip="JSONC read/write with comment stripping and trailing comma handling" id="model-components--bausteinsicht.model.loader">
-          <mxCell parent="model-components--bausteinsicht.model" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#85BBF0;fontColor=#000000;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;" vertex="1">
+          <mxCell parent="model-components--bausteinsicht.model" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#85BBF0;fontColor=#000000;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1">
             <mxGeometry height="120" width="180" x="370" y="90" as="geometry" />
           </mxCell>
         </object>
@@ -434,7 +434,7 @@
           <mxGeometry height="70" width="180" y="50" as="geometry" />
         </mxCell>
         <object label="" bausteinsicht_id="bausteinsicht.model.resolve" bausteinsicht_kind="component" technology="Go" tooltip="Dot-notation element resolution and wildcard pattern matching" id="model-components--bausteinsicht.model.resolve">
-          <mxCell parent="model-components--bausteinsicht.model" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#85BBF0;fontColor=#000000;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;" vertex="1">
+          <mxCell parent="model-components--bausteinsicht.model" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#85BBF0;fontColor=#000000;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1">
             <mxGeometry height="120" width="180" x="700" y="330" as="geometry" />
           </mxCell>
         </object>
@@ -448,7 +448,7 @@
           <mxGeometry height="70" width="180" y="50" as="geometry" />
         </mxCell>
         <object label="" bausteinsicht_id="bausteinsicht.model.validate" bausteinsicht_kind="component" technology="Go" tooltip="Model validation rules for elements, relationships, and views" id="model-components--bausteinsicht.model.validate">
-          <mxCell parent="model-components--bausteinsicht.model" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#85BBF0;fontColor=#000000;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;" vertex="1">
+          <mxCell parent="model-components--bausteinsicht.model" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#85BBF0;fontColor=#000000;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1">
             <mxGeometry height="120" width="180" x="580" y="160" as="geometry" />
           </mxCell>
         </object>
@@ -462,7 +462,7 @@
           <mxGeometry height="70" width="180" y="50" as="geometry" />
         </mxCell>
         <object label="" bausteinsicht_id="bausteinsicht.model.types" bausteinsicht_kind="component" technology="Go" tooltip="Core struct definitions for elements, relationships, views, and specification" id="model-components--bausteinsicht.model.types">
-          <mxCell parent="model-components--bausteinsicht.model" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#85BBF0;fontColor=#000000;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;" vertex="1">
+          <mxCell parent="model-components--bausteinsicht.model" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#85BBF0;fontColor=#000000;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1">
             <mxGeometry height="120" width="180" x="200" y="320" as="geometry" />
           </mxCell>
         </object>
@@ -476,7 +476,7 @@
           <mxGeometry height="70" width="180" y="50" as="geometry" />
         </mxCell>
         <object label="" bausteinsicht_id="bausteinsicht.model.patch" bausteinsicht_kind="component" technology="Go" tooltip="Comment-preserving JSONC mutations for reverse sync" id="model-components--bausteinsicht.model.patch">
-          <mxCell parent="model-components--bausteinsicht.model" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#85BBF0;fontColor=#000000;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;" vertex="1">
+          <mxCell parent="model-components--bausteinsicht.model" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#85BBF0;fontColor=#000000;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1">
             <mxGeometry height="120" width="180" x="60" y="90" as="geometry" />
           </mxCell>
         </object>
@@ -490,7 +490,7 @@
           <mxGeometry height="70" width="180" y="50" as="geometry" />
         </mxCell>
         <object label="" bausteinsicht_id="bausteinsicht.cli" bausteinsicht_kind="container" technology="Go / Cobra" tooltip="Command-line interface providing validate, sync, export, and watch commands" id="model-components--bausteinsicht.cli">
-          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;" vertex="1">
+          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1">
             <mxGeometry height="120" width="180" x="650" y="330" as="geometry" />
           </mxCell>
         </object>
@@ -504,7 +504,7 @@
           <mxGeometry height="70" width="180" y="50" as="geometry" />
         </mxCell>
         <object label="" bausteinsicht_id="bausteinsicht.sync" bausteinsicht_kind="container" technology="Go" tooltip="Bidirectional synchronization engine between JSONC model and draw.io diagrams" link="data:page/id,view-sync-components" id="model-components--bausteinsicht.sync">
-          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;" vertex="1">
+          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1">
             <mxGeometry height="120" width="180" x="260" y="330" as="geometry" />
           </mxCell>
         </object>
@@ -518,7 +518,7 @@
           <mxGeometry height="70" width="180" y="50" as="geometry" />
         </mxCell>
         <object label="" bausteinsicht_id="ide" bausteinsicht_kind="external_system" tooltip="IDE with JSON Schema support for JSONC editing with autocompletion" id="model-components--ide">
-          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#999999;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;dashed=1;strokeColor=#FF0000;movable=1;resizable=1;rotatable=1;deletable=1;editable=1;locked=0;connectable=1;" vertex="1">
+          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#999999;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;movable=1;resizable=1;rotatable=1;deletable=1;editable=1;locked=0;connectable=1;" vertex="1">
             <mxGeometry height="120" width="180" x="1340" y="760" as="geometry" />
           </mxCell>
         </object>
@@ -589,7 +589,7 @@
           </mxCell>
         </object>
         <object label="" bausteinsicht_id="bausteinsicht.sync.engine" bausteinsicht_kind="component" technology="Go" tooltip="Main sync orchestrator coordinating diff, forward, reverse, and conflict resolution" id="sync-components--bausteinsicht.sync.engine">
-          <mxCell parent="sync-components--bausteinsicht.sync" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#85BBF0;fontColor=#000000;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;" vertex="1">
+          <mxCell parent="sync-components--bausteinsicht.sync" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#85BBF0;fontColor=#000000;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1">
             <mxGeometry height="120" width="180" x="220" y="90" as="geometry" />
           </mxCell>
         </object>
@@ -603,7 +603,7 @@
           <mxGeometry height="70" width="180" y="50" as="geometry" />
         </mxCell>
         <object label="" bausteinsicht_id="bausteinsicht.sync.conflict" bausteinsicht_kind="component" technology="Go" tooltip="Conflict detection and resolution when both model and diagram changed" id="sync-components--bausteinsicht.sync.conflict">
-          <mxCell parent="sync-components--bausteinsicht.sync" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#85BBF0;fontColor=#000000;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;" vertex="1">
+          <mxCell parent="sync-components--bausteinsicht.sync" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#85BBF0;fontColor=#000000;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1">
             <mxGeometry height="120" width="180" x="520" y="360" as="geometry" />
           </mxCell>
         </object>
@@ -617,7 +617,7 @@
           <mxGeometry height="70" width="180" y="50" as="geometry" />
         </mxCell>
         <object label="" bausteinsicht_id="bausteinsicht.sync.forward" bausteinsicht_kind="component" technology="Go" tooltip="Applies model changes to draw.io diagrams (model → drawio)" id="sync-components--bausteinsicht.sync.forward">
-          <mxCell parent="sync-components--bausteinsicht.sync" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#85BBF0;fontColor=#000000;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;" vertex="1">
+          <mxCell parent="sync-components--bausteinsicht.sync" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#85BBF0;fontColor=#000000;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1">
             <mxGeometry height="120" width="180" x="20" y="230" as="geometry" />
           </mxCell>
         </object>
@@ -631,7 +631,7 @@
           <mxGeometry height="70" width="180" y="50" as="geometry" />
         </mxCell>
         <object label="" bausteinsicht_id="bausteinsicht.sync.diff" bausteinsicht_kind="component" technology="Go" tooltip="Three-way change detection comparing model, diagram, and last-sync state" id="sync-components--bausteinsicht.sync.diff">
-          <mxCell parent="sync-components--bausteinsicht.sync" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#85BBF0;fontColor=#000000;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;" vertex="1">
+          <mxCell parent="sync-components--bausteinsicht.sync" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#85BBF0;fontColor=#000000;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1">
             <mxGeometry height="120" width="180" x="220" y="260" as="geometry" />
           </mxCell>
         </object>
@@ -645,7 +645,7 @@
           <mxGeometry height="70" width="180" y="50" as="geometry" />
         </mxCell>
         <object label="" bausteinsicht_id="bausteinsicht.sync.state" bausteinsicht_kind="component" technology="Go" tooltip="Sync state persistence using SHA256 hashes for change detection" id="sync-components--bausteinsicht.sync.state">
-          <mxCell parent="sync-components--bausteinsicht.sync" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#85BBF0;fontColor=#000000;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;" vertex="1">
+          <mxCell parent="sync-components--bausteinsicht.sync" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#85BBF0;fontColor=#000000;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1">
             <mxGeometry height="120" width="180" x="420" y="210" as="geometry" />
           </mxCell>
         </object>
@@ -659,7 +659,7 @@
           <mxGeometry height="70" width="180" y="50" as="geometry" />
         </mxCell>
         <object label="" bausteinsicht_id="bausteinsicht.sync.reverse" bausteinsicht_kind="component" technology="Go" tooltip="Applies draw.io changes back to the JSONC model (drawio → model)" id="sync-components--bausteinsicht.sync.reverse">
-          <mxCell parent="sync-components--bausteinsicht.sync" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#85BBF0;fontColor=#000000;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;" vertex="1">
+          <mxCell parent="sync-components--bausteinsicht.sync" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#85BBF0;fontColor=#000000;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1">
             <mxGeometry height="120" width="180" x="620" y="210" as="geometry" />
           </mxCell>
         </object>
@@ -673,7 +673,7 @@
           <mxGeometry height="70" width="180" y="50" as="geometry" />
         </mxCell>
         <object label="" bausteinsicht_id="bausteinsicht.cli" bausteinsicht_kind="container" technology="Go / Cobra" tooltip="Command-line interface providing validate, sync, export, and watch commands" id="sync-components--bausteinsicht.cli">
-          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;dashed=1;strokeColor=#FF0000;" vertex="1">
+          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1">
             <mxGeometry height="120" width="180" x="640" y="320" as="geometry" />
           </mxCell>
         </object>
@@ -687,7 +687,7 @@
           <mxGeometry height="70" width="180" y="50" as="geometry" />
         </mxCell>
         <object label="" bausteinsicht_id="bausteinsicht.watcher" bausteinsicht_kind="container" technology="Go / fsnotify" tooltip="File system monitoring for automatic sync on model or diagram changes" id="sync-components--bausteinsicht.watcher">
-          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;" vertex="1">
+          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1">
             <mxGeometry height="120" width="180" x="310" y="320" as="geometry" />
           </mxCell>
         </object>
@@ -701,7 +701,7 @@
           <mxGeometry height="70" width="180" y="50" as="geometry" />
         </mxCell>
         <object label="" bausteinsicht_id="bausteinsicht.drawio" bausteinsicht_kind="container" technology="Go / etree" tooltip="draw.io XML document handling — elements, connectors, templates, and labels" link="data:page/id,view-drawio-components" id="sync-components--bausteinsicht.drawio">
-          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;" vertex="1">
+          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1">
             <mxGeometry height="120" width="180" x="-10" y="610" as="geometry" />
           </mxCell>
         </object>
@@ -715,7 +715,7 @@
           <mxGeometry height="70" width="180" y="50" as="geometry" />
         </mxCell>
         <object label="" bausteinsicht_id="bausteinsicht.model" bausteinsicht_kind="container" technology="Go" tooltip="JSONC architecture model management — loading, validation, and mutation" link="data:page/id,view-model-components" id="sync-components--bausteinsicht.model">
-          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;" vertex="1">
+          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1">
             <mxGeometry height="120" width="180" x="1230" y="740" as="geometry" />
           </mxCell>
         </object>
