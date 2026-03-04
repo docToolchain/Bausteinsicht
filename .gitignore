@@ -29,8 +29,12 @@ Thumbs.db
 *.tmp
 my-architecture/
 
-# Claude Code
-.claude/
+# Claude Code (track project settings, ignore user-specific files)
+.claude/settings.local.json
+.claude/projects/
+.claude/worktrees/
+.claude/plans/
+.claude/todo.md
 
 # draw.io backup files
 .$*.bkp
