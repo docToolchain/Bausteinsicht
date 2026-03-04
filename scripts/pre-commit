@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# Pre-commit hook for Bausteinsicht
+# Install: make install-hooks
+set -euo pipefail
+
+echo "==> Running pre-commit checks..."
+
+# 1. gofmt — check formatting (fast)
+echo "  gofmt..."
+UNFORMATTED=$(gofmt -l . 2>&1 | grep -v vendor/ || true)
+if [ -n "$UNFORMATTED" ]; then
+    echo "ERROR: Files not formatted with gofmt:"
+    echo "$UNFORMATTED"
+    echo "Run: gofmt -w ."
+    exit 1
+fi
+
+# 2. go vet — static analysis (fast)
+echo "  go vet..."
+go vet ./...
+
+# 3. golangci-lint — meta-linter (if available)
+if command -v golangci-lint &>/dev/null; then
+    echo "  golangci-lint..."
+    golangci-lint run ./...
+fi
+
+# 4. gitleaks — secret scanning on staged changes (if available)
+if command -v gitleaks &>/dev/null; then
+    echo "  gitleaks..."
+    gitleaks detect --source . --no-git --no-banner
+fi
+
+echo "==> All pre-commit checks passed."

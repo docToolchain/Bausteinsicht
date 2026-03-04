@@ -1,4 +1,4 @@
-.PHONY: build test test-race vet staticcheck gosec nilaway govulncheck gitleaks golangci-lint check clean install-tools
+.PHONY: build test test-race vet staticcheck gosec nilaway govulncheck gitleaks golangci-lint check clean install-tools install-hooks
 
 # Ensure GOPATH/bin is in PATH for installed tools
 export PATH := $(PATH):$(shell go env GOPATH)/bin
@@ -54,6 +54,12 @@ install-tools:
 	go install golang.org/x/vuln/cmd/govulncheck@latest
 	@echo "Install golangci-lint via: https://golangci-lint.run/welcome/install/"
 	@echo "Install gitleaks via: https://github.com/gitleaks/gitleaks#installing"
+
+# Install git pre-commit hook
+install-hooks:
+	cp scripts/pre-commit .git/hooks/pre-commit
+	chmod +x .git/hooks/pre-commit
+	@echo "Pre-commit hook installed."
 
 clean:
 	rm -f bausteinsicht
