@@ -1,0 +1,55 @@
+[cols="2,1,1,3"]
+|===
+| Element | Kind | Technology | Description
+
+| CLI
+| container
+| Go / Cobra
+| Command-line interface providing validate, sync, export, and watch commands
+
+| draw.io
+| container
+| Go / etree
+| draw.io XML document handling — elements, connectors, templates, and labels
+
+| Model
+| container
+| Go
+| JSONC architecture model management — loading, validation, and mutation
+
+| Conflict
+| component
+| Go
+| Conflict detection and resolution when both model and diagram changed
+
+| Diff
+| component
+| Go
+| Three-way change detection comparing model, diagram, and last-sync state
+
+| Engine
+| component
+| Go
+| Main sync orchestrator coordinating diff, forward, reverse, and conflict resolution
+
+| Forward Sync
+| component
+| Go
+| Applies model changes to draw.io diagrams (model → drawio)
+
+| Reverse Sync
+| component
+| Go
+| Applies draw.io changes back to the JSONC model (drawio → model)
+
+| State
+| component
+| Go
+| Sync state persistence using SHA256 hashes for change detection
+
+| Watcher
+| container
+| Go / fsnotify
+| File system monitoring for automatic sync on model or diagram changes
+
+|===

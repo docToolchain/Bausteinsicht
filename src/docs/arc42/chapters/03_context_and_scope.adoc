@@ -15,33 +15,10 @@ ifndef::imagesdir[:imagesdir: ../../images]
 
 Bausteinsicht sits between the architecture model (JSON files) and draw.io diagrams, synchronizing both bidirectionally.
 
-[plantuml, business-context, png]
-....
-@startuml
-!include <C4/C4_Context>
+.System Context (generated from architecture model)
+image::arc42/architecture-context.png[System Context,width=80%]
 
-Person(architect, "Software Architect", "Edits architecture model and diagrams")
-Person(dev, "Developer", "Reads architecture diagrams")
-Person(llm, "LLM Agent", "Modifies model via CLI commands")
-
-System(bs, "Bausteinsicht", "Architecture-as-code tool with bidirectional draw.io sync")
-
-System_Ext(model, "Architecture Model", "JSONC files on filesystem")
-System_Ext(drawio, "draw.io Diagrams", ".drawio XML files")
-System_Ext(templates, "Templates", ".drawio template files")
-
-Rel(architect, drawio, "Edits visually")
-Rel(architect, model, "Edits DSL")
-Rel(dev, drawio, "Reads diagrams")
-Rel(llm, bs, "CLI commands")
-
-Rel(bs, model, "Reads / writes")
-Rel(bs, drawio, "Generates / reads")
-Rel(bs, templates, "Reads styling")
-
-BiRel(model, drawio, "Bidirectional sync via Bausteinsicht")
-@enduml
-....
+include::context-elements.adoc[]
 
 [cols="1,2,2"]
 |===

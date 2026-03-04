@@ -12,10 +12,7 @@ ifndef::imagesdir[:imagesdir: ../../images]
 
 === Level 1: Overall System
 
-.System Context (generated from architecture model via draw.io export)
-image::arc42/architecture-context.png[System Context,width=80%]
-
-.Container View (generated from architecture model via draw.io export)
+.Container View (generated from architecture model)
 image::arc42/architecture-containers.png[Container View,width=80%]
 
 ==== Motivation
@@ -24,25 +21,7 @@ The system decomposes into four internal packages plus a thin CLI layer. The key
 
 ==== Building Blocks
 
-[cols="1,3"]
-|===
-| Building Block | Responsibility
-
-| `cmd`
-| CLI entry points using Cobra. Parses arguments, calls internal packages, formats output. No business logic.
-
-| `model`
-| Reads, writes, and validates the JSONC architecture model. Provides Go structs (`BausteinsichtModel`, `Element`, `Relationship`, `View`). Handles ID resolution with dot notation and wildcard matching for view includes.
-
-| `drawio`
-| Reads, writes, and manipulates draw.io XML (mxGraph format). Creates elements as `<object>` with `<mxCell>` and child text sub-cells, manages connectors, applies template styles. Reads element fields from sub-cells with HTML label fallback for backward compatibility.
-
-| `sync`
-| Orchestrates bidirectional synchronization. Compares model and draw.io state against last-sync state. Detects additions, modifications, deletions, and conflicts. Applies changes in both directions.
-
-| `watcher`
-| Watches model and draw.io files for changes using `fsnotify`. Debounces rapid changes. Triggers sync engine on file modification.
-|===
+include::containers-elements.adoc[]
 
 ==== Important Interfaces
 
@@ -85,28 +64,7 @@ image::arc42/architecture-sync-components.png[Sync Engine Components,width=80%]
 
 ==== Building Blocks
 
-[cols="1,3"]
-|===
-| Building Block | Responsibility
-
-| `engine`
-| Main orchestrator. Calls diff, resolves conflicts, then applies forward and reverse changes in sequence. Returns a comprehensive result.
-
-| `diff`
-| Compares current model and draw.io state against the last-sync state. Produces lists of added, modified, and deleted elements/relationships for each side. Identifies conflicts (same field changed on both sides).
-
-| `forward`
-| Applies model changes to the draw.io document. Creates new elements from templates with child text sub-cells (placed side-by-side below existing content). Updates sub-cell values for title, technology, and description. Removes deleted elements (including sub-cells) and orphaned connectors.
-
-| `reverse`
-| Applies draw.io changes to the model. Detects new elements (no `bausteinsicht_id`), renames, description changes. Auto-generates IDs for new elements. Warns about deletions.
-
-| `state`
-| Manages the `.bausteinsicht-sync` file. Serializes/deserializes element states, relationship states, and file hashes. Provides comparison helpers.
-
-| `conflict`
-| Detects and resolves conflicts. In v1: model wins, warning is displayed. Designed for future extension (interactive resolution, merge strategies).
-|===
+include::sync-components-elements.adoc[]
 
 
 === Level 2: DrawIO Package
@@ -118,25 +76,7 @@ image::arc42/architecture-drawio-components.png[draw.io Package Components,width
 
 ==== Building Blocks
 
-[cols="1,3"]
-|===
-| Building Block | Responsibility
-
-| `document`
-| Top-level draw.io file handling. Parses `<mxfile>` with multiple `<diagram>` pages. Provides access to pages by ID. Manages base cells (`id="0"`, `id="1"`).
-
-| `element`
-| CRUD operations for architecture elements as `<object>` + `<mxCell>` pairs with child text sub-cells for title, technology, and description. Sets `bausteinsicht_id`, `bausteinsicht_kind`, `technology`, `tooltip`, `link`. Creates sub-cells from template styles. Reads element fields from sub-cells first, with HTML label fallback. Handles container elements (swimlane style with child `parent` attribute).
-
-| `connector`
-| CRUD operations for relationship connectors. Creates `<mxCell>` with `edge="1"`, `source`, `target`. Uses ID convention `rel-<from>-<to>`. Always sets `parent="1"` (layer, not container).
-
-| `template`
-| Reads template draw.io files. Extracts styles by `bausteinsicht_template` attribute. Parses child `<mxCell>` elements (with `-title`, `-tech`, `-desc` ID suffixes) to extract sub-cell styles and geometry. Returns style string, default dimensions, and sub-cell templates for each element kind.
-
-| `label`
-| Backward-compatible HTML label parsing. Parses `<b>Title</b><br><font>Technology</font>` labels from older draw.io files. Used as fallback when elements lack child text sub-cells. Handles XML entity escaping.
-|===
+include::drawio-components-elements.adoc[]
 
 
 === Level 2: Model Package
@@ -146,22 +86,7 @@ image::arc42/architecture-model-components.png[Model Package Components,width=80
 
 ==== Building Blocks
 
-[cols="1,3"]
-|===
-| Building Block | Responsibility
-
-| `types`
-| Go struct definitions: `BausteinsichtModel`, `Specification`, `Element`, `Relationship`, `View`, `ElementKind`, `RelationshipKind`. JSON struct tags for serialization.
-
-| `loader`
-| Reads JSONC files (strips comments, parses JSON). Writes model back to JSONC. Auto-detects model file in current directory.
-
-| `resolve`
-| ID resolution using dot notation (`webshop.api.auth`). Traverses the element hierarchy. Wildcard matching for view `include` patterns (`webshop.*`). Flattens nested elements into a map keyed by full ID path.
-
-| `validate`
-| Validates the model: required fields, kind references exist in specification, relationship endpoints reference existing elements, view includes resolve to at least one element.
-|===
+include::model-components-elements.adoc[]
 
 
 === Go Package Layout

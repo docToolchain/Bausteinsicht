@@ -1,0 +1,25 @@
+[cols="2,1,1,3"]
+|===
+| Element | Kind | Technology | Description
+
+| Bausteinsicht
+| system
+| 
+| Architecture-as-code tool with draw.io as visual frontend and bidirectional synchronization
+
+| Developer
+| actor
+| 
+| Developer using the Bausteinsicht CLI to manage architecture models
+
+| draw.io App
+| external_system
+| 
+| draw.io desktop or web application for visual diagram editing
+
+| IDE
+| external_system
+| 
+| IDE with JSON Schema support for JSONC editing with autocompletion
+
+|===
