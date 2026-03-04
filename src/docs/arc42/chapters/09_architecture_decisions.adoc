@@ -28,4 +28,9 @@ All ADRs are located in `src/docs/arc42/ADRs/`.
 | Choice of Implementation Language
 | Proposed
 | Go chosen over Python and Kotlin/JVM. Single-binary distribution, LLM-friendly code generation, compile-time type safety, and dedicated mxGraph library support.
+
+| link:../ADRs/ADR-003-Risk-Classification.adoc[ADR-003]
+| Risk Classification
+| Accepted
+| Tier 2 (Extended Assurance) — determined by Code Type = 2 (Business Logic). Existing toolchain covers most mitigations. Guides AI-assisted development quality requirements.
 |===
