@@ -130,9 +130,9 @@ func TestMatchPattern_Wildcard(t *testing.T) {
 	flat := FlattenElements(m)
 
 	tests := []struct {
-		pattern  string
-		wantIDs  []string
-		notWant  []string
+		pattern string
+		wantIDs []string
+		notWant []string
 	}{
 		{
 			pattern: "onlineshop.*",

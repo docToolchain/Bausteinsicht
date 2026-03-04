@@ -30,7 +30,7 @@ type ElementChange struct {
 type RelationshipChange struct {
 	From     string
 	To       string
-	Index    int    // relationship array index for disambiguation
+	Index    int // relationship array index for disambiguation
 	Type     ChangeType
 	Field    string // "label", "" for add/delete
 	OldValue string
@@ -219,10 +219,10 @@ func extractDrawioElements(doc *drawio.Document) map[string]drawioElemSnapshot {
 				description = labelDesc
 			}
 			// Skip duplicate bausteinsicht_id — keep first occurrence (#213).
-		if _, exists := result[id]; exists {
-			continue
-		}
-		result[id] = drawioElemSnapshot{
+			if _, exists := result[id]; exists {
+				continue
+			}
+			result[id] = drawioElemSnapshot{
 				title:       title,
 				technology:  technology,
 				description: description,

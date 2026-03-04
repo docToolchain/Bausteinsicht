@@ -59,7 +59,7 @@ func TestSaveLoadState_RoundTrip(t *testing.T) {
 		ModelHash:  "sha256:abc123",
 		DrawioHash: "sha256:def456",
 		Elements: map[string]ElementState{
-			"webshop": {Title: "Webshop", Kind: "system"},
+			"webshop":     {Title: "Webshop", Kind: "system"},
 			"webshop.api": {Title: "API", Technology: "Go", Kind: "service"},
 		},
 		Relationships: []RelationshipState{

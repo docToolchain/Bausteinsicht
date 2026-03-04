@@ -256,16 +256,16 @@ func TestCreateElementDefaultParent(t *testing.T) {
 func testSubCellTemplates() *SubCellTemplates {
 	return &SubCellTemplates{
 		Title: &SubCellStyle{
-			Style:  "text;html=1;fontSize=14;fontStyle=1;fontColor=#ffffff;fillColor=none;strokeColor=none;align=center;verticalAlign=middle;movable=0;resizable=0;deletable=0;editable=0;",
-			X:      0, Y: 20, Width: 240, Height: 30,
+			Style: "text;html=1;fontSize=14;fontStyle=1;fontColor=#ffffff;fillColor=none;strokeColor=none;align=center;verticalAlign=middle;movable=0;resizable=0;deletable=0;editable=0;",
+			X:     0, Y: 20, Width: 240, Height: 30,
 		},
 		Tech: &SubCellStyle{
-			Style:  "text;html=1;fontSize=11;fontStyle=2;fontColor=#CCCCCC;fillColor=none;strokeColor=none;align=center;verticalAlign=middle;movable=0;resizable=0;deletable=0;editable=0;",
-			X:      0, Y: 55, Width: 240, Height: 20,
+			Style: "text;html=1;fontSize=11;fontStyle=2;fontColor=#CCCCCC;fillColor=none;strokeColor=none;align=center;verticalAlign=middle;movable=0;resizable=0;deletable=0;editable=0;",
+			X:     0, Y: 55, Width: 240, Height: 20,
 		},
 		Desc: &SubCellStyle{
-			Style:  "text;html=1;fontSize=10;fontColor=#BBBBBB;fillColor=none;strokeColor=none;align=center;verticalAlign=middle;movable=0;resizable=0;deletable=0;editable=0;",
-			X:      0, Y: 80, Width: 240, Height: 40,
+			Style: "text;html=1;fontSize=10;fontColor=#BBBBBB;fillColor=none;strokeColor=none;align=center;verticalAlign=middle;movable=0;resizable=0;deletable=0;editable=0;",
+			X:     0, Y: 80, Width: 240, Height: 40,
 		},
 	}
 }

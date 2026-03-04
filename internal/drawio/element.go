@@ -9,17 +9,17 @@ import (
 
 // ElementData holds the data needed to create or update an element.
 type ElementData struct {
-	ID          string  // bausteinsicht_id (e.g., "webshop.api")
-	CellID      string  // draw.io cell ID (file-wide unique); defaults to ID if empty
-	Kind        string  // bausteinsicht_kind (e.g., "container")
-	Title       string  // display title
-	Technology  string  // technology string
-	Description string  // tooltip text
-	Link        string  // drill-down link (e.g., "data:page/id,view-containers")
-	ParentID    string  // parent cell ID ("1" for top-level, container ID for children)
-	X, Y        float64 // position
-	Width       float64 // element width
-	Height      float64 // element height
+	ID          string            // bausteinsicht_id (e.g., "webshop.api")
+	CellID      string            // draw.io cell ID (file-wide unique); defaults to ID if empty
+	Kind        string            // bausteinsicht_kind (e.g., "container")
+	Title       string            // display title
+	Technology  string            // technology string
+	Description string            // tooltip text
+	Link        string            // drill-down link (e.g., "data:page/id,view-containers")
+	ParentID    string            // parent cell ID ("1" for top-level, container ID for children)
+	X, Y        float64           // position
+	Width       float64           // element width
+	Height      float64           // element height
 	SubCells    *SubCellTemplates // sub-cell templates; nil for legacy HTML labels
 }
 

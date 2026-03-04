@@ -15,11 +15,11 @@ import (
 
 // SyncState stores the state after each successful sync.
 type SyncState struct {
-	Timestamp     string                       `json:"timestamp"`
-	ModelHash     string                       `json:"model_hash"`
-	DrawioHash    string                       `json:"drawio_hash"`
-	Elements      map[string]ElementState      `json:"elements"`
-	Relationships []RelationshipState          `json:"relationships"`
+	Timestamp     string                  `json:"timestamp"`
+	ModelHash     string                  `json:"model_hash"`
+	DrawioHash    string                  `json:"drawio_hash"`
+	Elements      map[string]ElementState `json:"elements"`
+	Relationships []RelationshipState     `json:"relationships"`
 }
 
 // ElementState captures an element's synced values.

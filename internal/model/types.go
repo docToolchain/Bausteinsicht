@@ -26,13 +26,13 @@ type RelationshipKind struct {
 }
 
 type Element struct {
-	Kind        string            `json:"kind"`
-	Title       string            `json:"title"`
-	Description string            `json:"description,omitempty"`
-	Technology  string            `json:"technology,omitempty"`
-	Tags        []string          `json:"tags,omitempty"`
+	Kind        string             `json:"kind"`
+	Title       string             `json:"title"`
+	Description string             `json:"description,omitempty"`
+	Technology  string             `json:"technology,omitempty"`
+	Tags        []string           `json:"tags,omitempty"`
 	Children    map[string]Element `json:"children,omitempty"`
-	Metadata    map[string]string `json:"metadata,omitempty"`
+	Metadata    map[string]string  `json:"metadata,omitempty"`
 }
 
 type Relationship struct {

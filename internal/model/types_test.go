@@ -9,7 +9,6 @@ import (
 	"testing"
 )
 
-
 func stripComments(jsonc string) string {
 	// Remove single-line comments (// ...) but not // inside strings
 	// Match either a string literal (keep) or a comment (remove)
@@ -27,11 +26,11 @@ func TestJSONRoundTrip(t *testing.T) {
 		Schema: "https://example.com/schema.json",
 		Specification: Specification{
 			Elements: map[string]ElementKind{
-				"actor": {Notation: "Actor", Description: "A person"},
+				"actor":  {Notation: "Actor", Description: "A person"},
 				"system": {Notation: "Software System", Container: true},
 			},
 			Relationships: map[string]RelationshipKind{
-				"uses": {Notation: "uses"},
+				"uses":  {Notation: "uses"},
 				"async": {Notation: "async", Dashed: true},
 			},
 		},

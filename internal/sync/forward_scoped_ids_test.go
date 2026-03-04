@@ -19,7 +19,7 @@ func TestApplyForward_ScopedIDs(t *testing.T) {
 	m := &model.BausteinsichtModel{
 		Model: map[string]model.Element{
 			"customer": {Kind: "container", Title: "Customer"},
-			"shop":     {Kind: "container", Title: "Shop", Children: map[string]model.Element{
+			"shop": {Kind: "container", Title: "Shop", Children: map[string]model.Element{
 				"api": {Kind: "container", Title: "API"},
 			}},
 		},

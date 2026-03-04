@@ -14,10 +14,10 @@ import (
 )
 
 const (
-	defaultModelFile   = "architecture.jsonc"
-	defaultDrawioFile  = "architecture.drawio"
-	defaultTemplFile   = "template.drawio"
-	defaultSyncState   = ".bausteinsicht-sync"
+	defaultModelFile  = "architecture.jsonc"
+	defaultDrawioFile = "architecture.drawio"
+	defaultTemplFile  = "template.drawio"
+	defaultSyncState  = ".bausteinsicht-sync"
 )
 
 func newInitCmd() *cobra.Command {

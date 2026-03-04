@@ -108,11 +108,11 @@ func TestGenerateActorLabel(t *testing.T) {
 
 func TestParseLabel(t *testing.T) {
 	tests := []struct {
-		name        string
-		html        string
-		wantTitle   string
-		wantTech    string
-		wantDesc    string
+		name      string
+		html      string
+		wantTitle string
+		wantTech  string
+		wantDesc  string
 	}{
 		{
 			name:      "standard label with title and technology",
