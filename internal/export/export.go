@@ -11,11 +11,12 @@ import (
 
 // ExportOptions configures a single page export operation.
 type ExportOptions struct {
-	Format       string // "png" or "svg"
-	PageIndex    int    // 1-based page index
-	OutputPath   string // full path to output file
-	EmbedDiagram bool   // embed draw.io XML source in output
-	InputFile    string // path to the .drawio file
+	Format       string  // "png" or "svg"
+	PageIndex    int     // 1-based page index
+	OutputPath   string  // full path to output file
+	EmbedDiagram bool    // embed draw.io XML source in output
+	InputFile    string  // path to the .drawio file
+	Scale        float64 // export scale factor (0 = default, e.g. 2.0 for retina)
 }
 
 // DetectDrawioBinary finds the draw.io CLI binary. It checks for
@@ -40,6 +41,9 @@ func BuildExportArgs(opts ExportOptions) []string {
 	}
 	if opts.EmbedDiagram {
 		args = append(args, "--embed-diagram")
+	}
+	if opts.Scale > 0 {
+		args = append(args, "--scale", fmt.Sprintf("%g", opts.Scale))
 	}
 	args = append(args, opts.InputFile)
 	return args

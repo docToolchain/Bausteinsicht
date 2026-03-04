@@ -23,6 +23,7 @@ func newExportCmd() *cobra.Command {
 	cmd.Flags().String("view", "", "Export only this view (by key)")
 	cmd.Flags().String("output", ".", "Output directory")
 	cmd.Flags().Bool("embed-diagram", false, "Embed draw.io XML source in output")
+	cmd.Flags().Float64("scale", 2.0, "Export scale factor (e.g. 2.0 for retina, 3.0 for print)")
 	return cmd
 }
 
@@ -40,6 +41,7 @@ func runExport(cmd *cobra.Command, _ []string) error {
 	viewFilter, _ := cmd.Flags().GetString("view")
 	outputDir, _ := cmd.Flags().GetString("output")
 	embedDiagram, _ := cmd.Flags().GetBool("embed-diagram")
+	scale, _ := cmd.Flags().GetFloat64("scale")
 
 	// Validate image format.
 	if imageFormat != "png" && imageFormat != "svg" {
@@ -139,6 +141,7 @@ func runExport(cmd *cobra.Command, _ []string) error {
 			OutputPath:   outFile,
 			EmbedDiagram: embedDiagram,
 			InputFile:    drawioPath,
+			Scale:        scale,
 		})
 		if err != nil {
 			exportErrors = append(exportErrors, fmt.Sprintf("view %q: %v", ex.key, err))
