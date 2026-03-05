@@ -16,12 +16,13 @@ const (
 	Markdown
 )
 
-type row struct {
-	ID          string
-	Title       string
-	Kind        string
-	Technology  string
-	Description string
+// Row represents a single element row in the table export.
+type Row struct {
+	ID          string `json:"id"`
+	Title       string `json:"title"`
+	Kind        string `json:"kind"`
+	Technology  string `json:"technology,omitempty"`
+	Description string `json:"description,omitempty"`
 }
 
 // FormatView renders a single view's elements as a table.
@@ -67,7 +68,7 @@ func FormatAllViews(m *model.BausteinsichtModel, f Format) (string, error) {
 // FormatCombined renders all elements across all views (deduplicated) as a single table.
 func FormatCombined(m *model.BausteinsichtModel, f Format) (string, error) {
 	seen := make(map[string]bool)
-	var rows []row
+	var rows []Row
 
 	flat := model.FlattenElements(m)
 	keys := sortedViewKeys(m)
@@ -91,7 +92,7 @@ func FormatCombined(m *model.BausteinsichtModel, f Format) (string, error) {
 			if elem == nil {
 				continue
 			}
-			rows = append(rows, row{
+			rows = append(rows, Row{
 				ID:          id,
 				Title:       elem.Title,
 				Kind:        elem.Kind,
@@ -109,7 +110,7 @@ func FormatCombined(m *model.BausteinsichtModel, f Format) (string, error) {
 	return b.String(), nil
 }
 
-func resolveRows(m *model.BausteinsichtModel, view *model.View) ([]row, error) {
+func resolveRows(m *model.BausteinsichtModel, view *model.View) ([]Row, error) {
 	resolved, err := model.ResolveView(m, view)
 	if err != nil {
 		return nil, err
@@ -118,13 +119,13 @@ func resolveRows(m *model.BausteinsichtModel, view *model.View) ([]row, error) {
 	flat := model.FlattenElements(m)
 	sort.Strings(resolved)
 
-	var rows []row
+	var rows []Row
 	for _, id := range resolved {
 		elem := flat[id]
 		if elem == nil {
 			continue
 		}
-		rows = append(rows, row{
+		rows = append(rows, Row{
 			ID:          id,
 			Title:       elem.Title,
 			Kind:        elem.Kind,
@@ -144,7 +145,7 @@ func writeTitle(b *strings.Builder, title string, f Format) {
 	}
 }
 
-func writeTable(b *strings.Builder, rows []row, f Format) {
+func writeTable(b *strings.Builder, rows []Row, f Format) {
 	switch f {
 	case AsciiDoc:
 		writeAsciiDocTable(b, rows)
@@ -153,7 +154,7 @@ func writeTable(b *strings.Builder, rows []row, f Format) {
 	}
 }
 
-func writeAsciiDocTable(b *strings.Builder, rows []row) {
+func writeAsciiDocTable(b *strings.Builder, rows []Row) {
 	b.WriteString("[cols=\"2,1,1,3\"]\n|===\n")
 	b.WriteString("| Element | Kind | Technology | Description\n\n")
 	for _, r := range rows {
@@ -162,12 +163,80 @@ func writeAsciiDocTable(b *strings.Builder, rows []row) {
 	b.WriteString("|===\n")
 }
 
-func writeMarkdownTable(b *strings.Builder, rows []row) {
+func writeMarkdownTable(b *strings.Builder, rows []Row) {
 	b.WriteString("| Element | Kind | Technology | Description |\n")
 	b.WriteString("|---------|------|------------|-------------|\n")
 	for _, r := range rows {
 		fmt.Fprintf(b, "| %s | %s | %s | %s |\n", r.Title, r.Kind, r.Technology, r.Description)
 	}
+}
+
+// CollectRows returns the row data for JSON export.
+// If viewKey is set, only that view's rows are returned.
+// If combined is true, all views are merged (deduplicated).
+// Otherwise, all views' rows are returned.
+func CollectRows(m *model.BausteinsichtModel, viewKey string, combined bool) ([]Row, error) {
+	switch {
+	case combined:
+		return collectCombinedRows(m)
+	case viewKey != "":
+		view, ok := m.Views[viewKey]
+		if !ok {
+			return nil, fmt.Errorf("view %q not found", viewKey)
+		}
+		return resolveRows(m, &view)
+	default:
+		return collectAllRows(m)
+	}
+}
+
+func collectCombinedRows(m *model.BausteinsichtModel) ([]Row, error) {
+	seen := make(map[string]bool)
+	var rows []Row
+	flat := model.FlattenElements(m)
+	for _, key := range sortedViewKeys(m) {
+		view, ok := m.Views[key]
+		if !ok {
+			continue
+		}
+		v := view
+		resolved, err := model.ResolveView(m, &v)
+		if err != nil {
+			continue
+		}
+		for _, id := range resolved {
+			if seen[id] {
+				continue
+			}
+			seen[id] = true
+			elem := flat[id]
+			if elem == nil {
+				continue
+			}
+			rows = append(rows, Row{
+				ID: id, Title: elem.Title, Kind: elem.Kind,
+				Technology: elem.Technology, Description: elem.Description,
+			})
+		}
+	}
+	sort.Slice(rows, func(i, j int) bool { return rows[i].ID < rows[j].ID })
+	return rows, nil
+}
+
+func collectAllRows(m *model.BausteinsichtModel) ([]Row, error) {
+	var rows []Row
+	for _, key := range sortedViewKeys(m) {
+		view, ok := m.Views[key]
+		if !ok {
+			continue
+		}
+		viewRows, err := resolveRows(m, &view)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, viewRows...)
+	}
+	return rows, nil
 }
 
 func sortedViewKeys(m *model.BausteinsichtModel) []string {

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -28,6 +29,7 @@ func newExportTableCmd() *cobra.Command {
 
 func runExportTable(cmd *cobra.Command, _ []string) error {
 	modelPath, _ := cmd.Flags().GetString("model")
+	format, _ := cmd.Flags().GetString("format")
 	viewKey, _ := cmd.Flags().GetString("view")
 	tableFormat, _ := cmd.Flags().GetString("table-format")
 	outputDir, _ := cmd.Flags().GetString("output")
@@ -44,6 +46,11 @@ func runExportTable(cmd *cobra.Command, _ []string) error {
 	m, err := model.Load(modelPath)
 	if err != nil {
 		return exitWithCode(fmt.Errorf("loading model: %w", err), 2)
+	}
+
+	// When --format json is set, output structured JSON instead of a table. (#239)
+	if format == "json" {
+		return exportTableJSON(cmd, m, viewKey, combined)
 	}
 
 	var f table.Format
@@ -88,5 +95,19 @@ func runExportTable(cmd *cobra.Command, _ []string) error {
 	}
 
 	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", outPath)
+	return nil
+}
+
+// exportTableJSON outputs the table data as JSON. (#239)
+func exportTableJSON(cmd *cobra.Command, m *model.BausteinsichtModel, viewKey string, combined bool) error {
+	rows, err := table.CollectRows(m, viewKey, combined)
+	if err != nil {
+		return exitWithCode(err, 1)
+	}
+	data, err := json.MarshalIndent(rows, "", "  ")
+	if err != nil {
+		return exitWithCode(fmt.Errorf("marshaling JSON: %w", err), 2)
+	}
+	fmt.Fprintln(cmd.OutOrStdout(), string(data))
 	return nil
 }
