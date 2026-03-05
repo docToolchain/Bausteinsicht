@@ -1,9 +1,11 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"github.com/docToolchain/Bauteinsicht/internal/diagram"
 	"github.com/docToolchain/Bauteinsicht/internal/model"
@@ -69,6 +71,33 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 		views = m.Views
 	}
 
+	format, _ := cmd.Flags().GetString("format")
+
+	// When --format json, output structured JSON with diagram source. (#241)
+	if format == "json" {
+		type diagramEntry struct {
+			View   string `json:"view"`
+			Format string `json:"format"`
+			Source string `json:"source"`
+		}
+		var entries []diagramEntry
+		keys := sortedKeys(views)
+		for _, key := range keys {
+			result, fmtErr := diagram.FormatView(m, key, f)
+			if fmtErr != nil {
+				return exitWithCode(fmtErr, 1)
+			}
+			entries = append(entries, diagramEntry{
+				View:   key,
+				Format: diagramFormat,
+				Source: result,
+			})
+		}
+		data, _ := json.MarshalIndent(entries, "", "  ")
+		fmt.Fprintln(cmd.OutOrStdout(), string(data))
+		return nil
+	}
+
 	for key := range views {
 		result, fmtErr := diagram.FormatView(m, key, f)
 		if fmtErr != nil {
@@ -91,4 +120,13 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 	}
 
 	return nil
+}
+
+func sortedKeys(views map[string]model.View) []string {
+	keys := make([]string, 0, len(views))
+	for k := range views {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }
