@@ -243,6 +243,69 @@ func TestLoad_ModelWithBOM(t *testing.T) {
 	}
 }
 
+func TestSave_PreservesPreambleComments(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "model.jsonc")
+
+	// Write a model file with preamble comments before the root `{`
+	preamble := "// Architecture model for Acme Corp\n// Author: Jane Doe\n"
+	original, err := Load("testdata/minimal-model.jsonc")
+	if err != nil {
+		t.Fatalf("failed to load: %v", err)
+	}
+	// First save without preamble
+	if err := Save(path, original); err != nil {
+		t.Fatalf("failed to save: %v", err)
+	}
+	// Manually prepend preamble to simulate a user-edited file
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("failed to read: %v", err)
+	}
+	if err := os.WriteFile(path, append([]byte(preamble), data...), 0644); err != nil {
+		t.Fatalf("failed to write with preamble: %v", err)
+	}
+
+	// Save again — preamble should be preserved
+	if err := Save(path, original); err != nil {
+		t.Fatalf("second save failed: %v", err)
+	}
+
+	result, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("failed to read result: %v", err)
+	}
+	if string(result[:len(preamble)]) != preamble {
+		t.Errorf("preamble lost after save.\nExpected prefix:\n%s\nGot:\n%s", preamble, string(result[:80]))
+	}
+}
+
+func TestSave_NoPreambleWhenFileStartsWithBrace(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "model.jsonc")
+
+	original, err := Load("testdata/minimal-model.jsonc")
+	if err != nil {
+		t.Fatalf("failed to load: %v", err)
+	}
+	if err := Save(path, original); err != nil {
+		t.Fatalf("failed to save: %v", err)
+	}
+
+	// Save again — file starts with `{`, no preamble should be added
+	if err := Save(path, original); err != nil {
+		t.Fatalf("second save failed: %v", err)
+	}
+
+	result, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("failed to read result: %v", err)
+	}
+	if result[0] != '{' {
+		t.Errorf("expected file to start with '{', got '%c'", result[0])
+	}
+}
+
 func TestLoad_NullJSONRoot(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "null-model.jsonc")

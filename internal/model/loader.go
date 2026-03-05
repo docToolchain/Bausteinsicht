@@ -32,12 +32,22 @@ func Load(path string) (*BausteinsichtModel, error) {
 }
 
 // Save marshals the model and atomically writes it to path.
+// Preserves any preamble (comments/whitespace before the root `{`) from the
+// existing file so that users' header comments are not lost (#242).
 // Uses os.CreateTemp for a randomized temp file name to prevent TOCTOU attacks.
 func Save(path string, model *BausteinsichtModel) error {
 	data, err := json.MarshalIndent(model, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshaling model: %w", err)
 	}
+
+	// Preserve preamble from the existing file (comments before root `{`).
+	if existing, readErr := os.ReadFile(path); readErr == nil { // #nosec G304
+		if preamble := extractPreamble(existing); len(preamble) > 0 {
+			data = append(preamble, data...)
+		}
+	}
+
 	dir := filepath.Dir(path)
 	tmp, err := os.CreateTemp(dir, ".model-tmp-*")
 	if err != nil {
@@ -148,3 +158,18 @@ func StripJSONC(data []byte) []byte {
 
 // trailingCommaRe matches a comma optionally followed by whitespace before } or ]
 var trailingCommaRe = regexp.MustCompile(`,(\s*[}\]])`)
+
+// extractPreamble returns everything before the first `{` in the file.
+// This captures comment lines and blank lines that precede the root object.
+// Returns nil if there is no preamble or the file starts with `{`.
+func extractPreamble(data []byte) []byte {
+	for i, b := range data {
+		if b == '{' {
+			if i == 0 {
+				return nil
+			}
+			return data[:i]
+		}
+	}
+	return nil
+}
