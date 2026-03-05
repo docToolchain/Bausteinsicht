@@ -199,13 +199,14 @@ func runSync(cmd *cobra.Command, _ []string) error {
 }
 
 type syncSummary struct {
-	ForwardAdded   int `json:"forward_added"`
-	ForwardUpdated int `json:"forward_updated"`
-	ForwardDeleted int `json:"forward_deleted"`
-	ReverseAdded   int `json:"reverse_added"`
-	ReverseUpdated int `json:"reverse_updated"`
-	ReverseDeleted int `json:"reverse_deleted"`
-	Conflicts      int `json:"conflicts"`
+	ForwardAdded    int `json:"forward_added"`
+	ForwardUpdated  int `json:"forward_updated"`
+	ForwardDeleted  int `json:"forward_deleted"`
+	ReverseAdded    int `json:"reverse_added"`
+	ReverseUpdated  int `json:"reverse_updated"`
+	ReverseDeleted  int `json:"reverse_deleted"`
+	MetadataUpdated int `json:"metadata_updated"`
+	Conflicts       int `json:"conflicts"`
 }
 
 func buildSyncSummary(result *bsync.SyncResult) syncSummary {
@@ -219,6 +220,7 @@ func buildSyncSummary(result *bsync.SyncResult) syncSummary {
 		s.ForwardAdded += result.Forward.ConnectorsCreated
 		s.ForwardUpdated += result.Forward.ConnectorsUpdated
 		s.ForwardDeleted += result.Forward.ConnectorsDeleted
+		s.MetadataUpdated = result.Forward.MetadataUpdated
 	}
 	if result.Reverse != nil {
 		s.ReverseAdded = result.Reverse.ElementsCreated
@@ -268,13 +270,16 @@ func isEmptyMxfileError(err error) bool {
 func printSyncSummary(s syncSummary) {
 	total := s.ForwardAdded + s.ForwardUpdated + s.ForwardDeleted +
 		s.ReverseAdded + s.ReverseUpdated + s.ReverseDeleted
-	if total == 0 && s.Conflicts == 0 {
+	if total == 0 && s.Conflicts == 0 && s.MetadataUpdated == 0 {
 		fmt.Println("Already in sync. No changes.")
 		return
 	}
 	if s.ForwardAdded+s.ForwardUpdated+s.ForwardDeleted > 0 {
 		fmt.Printf("Forward (model → draw.io): %d added, %d updated, %d deleted\n",
 			s.ForwardAdded, s.ForwardUpdated, s.ForwardDeleted)
+	}
+	if s.MetadataUpdated > 0 && total == 0 {
+		fmt.Printf("Metadata/legend updated on %d view page(s).\n", s.MetadataUpdated/2)
 	}
 	if s.ReverseAdded+s.ReverseUpdated+s.ReverseDeleted > 0 {
 		fmt.Printf("Reverse (draw.io → model): %d added, %d updated, %d deleted\n",

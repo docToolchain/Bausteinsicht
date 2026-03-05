@@ -30,6 +30,7 @@ type ForwardResult struct {
 	ConnectorsCreated int
 	ConnectorsUpdated int
 	ConnectorsDeleted int
+	MetadataUpdated   int // metadata and legend boxes created/updated
 	Warnings          []string
 }
 
@@ -165,9 +166,11 @@ func applyForwardPerView(
 
 		if metadataEnabled && opts != nil {
 			createMetadata(page, viewID, view, m.Config, opts.ModelPath, opts.SyncTime)
+			result.MetadataUpdated++
 		}
 		if legendEnabled {
 			createLegend(page, viewID, m.Specification, templates, elemSet, flat)
+			result.MetadataUpdated++
 		}
 	}
 }
