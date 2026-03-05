@@ -6,6 +6,10 @@ FROM mcr.microsoft.com/devcontainers/go:1.24
 # Avoid interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
 
+# JRuby (used by asciidoctor-diagram in docToolchain) needs the system CA bundle
+# to connect to kroki.io for server-side diagram rendering
+ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+
 # ──────────────────────────────────────────────
 # System packages (draw.io headless dependencies)
 # ──────────────────────────────────────────────
