@@ -1,0 +1,181 @@
+:jbake-title: ADR-004: Sequence Diagram Export
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: Development
+:jbake-order: 5
+
+= ADR-004: Sequence Diagram Export from Architecture Model
+
+== Status
+
+Rejected
+
+== Context
+
+Bausteinsicht defines a structural architecture model in JSONC with elements, relationships, and views.
+The question arose whether sequence diagrams could be derived from this model, either automatically or with minimal additional modeling (link:https://github.com/docToolchain/Bausteinsicht/issues/226[GitHub Issue #226]).
+
+Sequence diagrams require:
+
+* **Ordered interactions** — message sequence is the core information
+* **Participants** — a subset of elements in a specific scenario
+* **Call semantics** — synchronous, asynchronous, return messages
+* **Control flow** — loops, alternatives, optional fragments
+
+The Bausteinsicht model provides **static relationships** (`from → to` with a label) — these have no inherent ordering.
+
+=== Evaluated Approaches
+
+==== Approach A: Derive sequence diagrams from static relationships
+
+Generate PlantUML/Mermaid sequence diagrams using the existing model relationships.
+
+* Participants can be derived from view elements
+* Messages can be derived from relationships
+* **Ordering cannot be derived** — this is the fundamental gap
+* Result: an unordered skeleton, not a meaningful sequence diagram
+
+==== Approach B: Add dynamic views to the JSONC model
+
+Extend the model with a `"dynamicViews"` section (following Structurizr's approach):
+
+[source,jsonc]
+----
+{
+  "dynamicViews": {
+    "orderFlow": {
+      "title": "Customer Places Order",
+      "scope": "onlineshop",
+      "steps": [
+        { "from": "customer", "to": "onlineshop.frontend", "label": "Places order" },
+        { "from": "onlineshop.frontend", "to": "onlineshop.api", "label": "POST /orders" },
+        { "from": "onlineshop.api", "to": "onlineshop.db", "label": "INSERT order" }
+      ]
+    }
+  }
+}
+----
+
+* Steps reference existing model elements — validated against the model
+* Export to PlantUML or Mermaid for rendering
+* Structurizr and LikeC4 both implement this pattern
+* **Significant model complexity increase** for a supplementary diagram type
+
+==== Approach C: LLM-based generation via Skill
+
+Teach an AI agent (via Claude Code / Kiro Skill) to generate sequence diagrams from the model *and* the source code.
+
+* The source code contains the actual call order, sync/async semantics, error paths
+* The model contributes element names and abstraction levels
+* **Problem**: if the LLM reads the code anyway, the model adds little value — only display names and the mapping of packages to architectural components
+
+==== Approach D: Out of scope — use PlantUML/Mermaid directly
+
+Users write sequence diagrams manually using the same element names from the model.
+No Bausteinsicht feature needed.
+
+== Weighted Pugh Matrix
+
+Rating scale: -1 = worse than reference, 0 = same as reference, +1 = better than reference
+
+Reference option: *D (Out of scope)*
+
+[cols="4,1,1,1,1,1"]
+|===
+| Criterion | Weight | A: Auto-derive | B: Dynamic Views | C: LLM Skill | D: Out of scope (Ref)
+
+| *Usefulness of output*
+| 5
+| -1
+| +1
+| +1
+| 0
+
+| *Model complexity*
+| 4
+| 0
+| -1
+| 0
+| 0
+
+| *Implementation effort*
+| 4
+| 0
+| -1
+| 0
+| 0
+
+| *Alignment with core value (structural arch)*
+| 3
+| 0
+| -1
+| 0
+| 0
+
+| *Maintenance burden on users*
+| 3
+| 0
+| -1
+| 0
+| 0
+
+| *LLM friendliness*
+| 2
+| 0
+| 0
+| +1
+| 0
+
+|===
+
+=== Weighted Results
+
+[cols="3,1,1,1,1"]
+|===
+| Criterion | A: Auto-derive | B: Dynamic Views | C: LLM Skill | D: Out of scope (Ref)
+
+| Usefulness of output (×5)            | -5  | +5  | +5  | 0
+| Model complexity (×4)                | 0   | -4  | 0   | 0
+| Implementation effort (×4)           | 0   | -4  | 0   | 0
+| Alignment with core value (×3)       | 0   | -3  | 0   | 0
+| Maintenance burden on users (×3)     | 0   | -3  | 0   | 0
+| LLM friendliness (×2)               | 0   | 0   | +2  | 0
+| *Total*                              | *-5* | *-9* | *+7* | *0*
+|===
+
+== Decision
+
+**Rejected for Bausteinsicht core — recommend LLM-based approach (Option C) as a Skill.**
+
+Bausteinsicht will not implement sequence diagram export as a built-in feature. The rationale:
+
+. *The ordering problem is fundamental.* Static relationships have no sequence — auto-derived diagrams (Option A) are near-useless. The model would need an entirely new section to capture behavioral information (Option B), which contradicts Bausteinsicht's focus on structural architecture.
+
+. *Dynamic views add significant complexity for marginal value.* Structurizr and LikeC4 implement this, but they are full-stack architecture platforms. For Bausteinsicht — a focused structural tool with draw.io sync — the cost/benefit ratio is unfavorable.
+
+. *LLMs can generate sequence diagrams from code directly.* An AI agent with access to the source code can produce better sequence diagrams than any model-only approach, because the code contains the actual call chain, error handling, and control flow. The model adds only display names and abstraction mapping — a small benefit.
+
+. *The C4 model recommends restraint.* Simon Brown explicitly states that dynamic diagrams "should be used sparingly" and are supplementary to the four structural levels.
+
+A community-contributed **Skill** (Agent Skills standard) that combines model context with code analysis for sequence diagram generation remains a viable path — but outside Bausteinsicht's core scope.
+
+== Consequences
+
+=== Positive
+
+* Model schema stays simple and focused on structural architecture
+* No additional maintenance burden for users (no `dynamicViews` to keep in sync)
+* draw.io synchronization scope remains manageable
+* Users can write PlantUML/Mermaid sequence diagrams using model element names today
+
+=== Negative
+
+* Bausteinsicht cannot generate behavioral diagrams
+* Users must use separate tools for sequence diagrams
+* No single source of truth for both structural and behavioral views
+
+=== Mitigations
+
+* Document recommended PlantUML/Mermaid patterns using Bausteinsicht element names
+* A future Skill (link:https://github.com/docToolchain/Bausteinsicht/issues/234[Issue #234]) could combine model + code analysis for LLM-assisted sequence diagram generation
+* If demand arises, this decision can be revisited for v2+
