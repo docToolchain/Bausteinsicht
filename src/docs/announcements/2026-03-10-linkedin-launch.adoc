@@ -1,0 +1,56 @@
+:jbake-title: LinkedIn Launch Announcement
+:jbake-type: page_toc
+:jbake-status: draft
+:jbake-menu: Development
+:jbake-order: 99
+
+= LinkedIn Launch Announcement — Week of 2026-03-10
+:toc:
+
+== Status
+
+* [ ] Repository review by Ralf
+* [ ] Publish on LinkedIn
+
+== Draft Post
+
+----
+Introducing Bausteinsicht — Architecture as Code with draw.io
+
+After years of building docToolchain, I kept running into the same problem: architecture diagrams that drift from reality the moment someone opens a diagramming tool.
+
+Bausteinsicht solves this with a different approach:
+
+Define your architecture in a simple JSON model. Get draw.io diagrams automatically — and keep them in sync, bidirectionally.
+
+How it works:
+- You describe elements, relationships, and views in JSONC (JSON with comments + schema validation)
+- The CLI generates fully styled draw.io diagrams with zoom-based drill-down navigation
+- Edit in draw.io? Changes sync back to the model. Edit the model? Diagrams update.
+- Watch mode detects changes in real-time
+
+What makes it different:
+- No vendor lock-in — draw.io files are open XML, your model is plain JSON
+- IDE-first — JSON Schema gives you autocompletion and validation in any editor
+- LLM-friendly — AI agents can read and modify architecture via CLI commands
+- Flexible hierarchy — not limited to 4 C4 levels; define your own notation
+
+Built in Go, zero npm dependencies, runs as a single CLI binary.
+
+We just completed a thorough testing round (215 E2E tests) and fixed all reported bugs. The repo includes arc42 documentation, ADRs, a security review, and a devcontainer for instant onboarding.
+
+Try it: https://github.com/docToolchain/Bausteinsicht
+
+I'd love to hear from anyone working on architecture-as-code, model-driven documentation, or diagram automation.
+
+#SoftwareArchitecture #ArchitectureAsCode #DrawIO #OpenSource #DocToolchain #DeveloperTools
+----
+
+== Changelog
+
+[cols="1,3"]
+|===
+| Date | Change
+
+| 2026-03-05 | Initial draft created
+|===
