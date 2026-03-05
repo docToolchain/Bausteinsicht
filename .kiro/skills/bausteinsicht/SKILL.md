@@ -1,1 +1,1 @@
-../../.claude/skills/bausteinsicht/SKILL.md
+../../../.claude/skills/bausteinsicht/SKILL.md

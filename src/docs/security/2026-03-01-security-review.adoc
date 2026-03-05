@@ -25,6 +25,9 @@
 
 | 2026-03-03 (sub-cells)
 | Updated SEC-008 assessment: `ParseLabel`/`stripTags` is now a backward-compatible fallback only, reducing its attack surface. New sub-cell architecture (#232) uses plain-text `value` attributes on child `<mxCell>` elements, avoiding HTML parsing for new elements.
+
+| 2026-03-05 (nilaway + review)
+| Fixed SEC-012 (nil panics from `GetPage()`) via `requirePage` test helpers and `strings.Cut` refactor (#235). Full code review + security review of metadata feature, nilaway fixes, Kroki config, Dockerfile. Added SEC-013 (`sanitizeID` permissiveness) and SEC-014 (Dockerfile script downloads without checksums). HTML escaping in new `metadata.go` confirmed correct.
 |===
 
 === Scope
@@ -113,6 +116,16 @@ The primary risk scenario is a **malicious or crafted model/drawio file** shared
 | SEC-012
 | Low
 | Potential nil panics from unchecked `GetPage()` return values
+| Fixed (#235)
+
+| SEC-013
+| Low
+| `sanitizeID` in `diff.go` does not strip dots/slashes from titles, potentially creating IDs that interfere with dot-notation hierarchy
+| Open
+
+| SEC-014
+| Medium
+| Dockerfile downloads and pipes install scripts (golangci-lint, Claude Code, human CLI) without checksum verification
 | Open
 |===
 
