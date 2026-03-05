@@ -37,11 +37,11 @@ What makes it different:
 
 Built in Go, zero npm dependencies, runs as a single CLI binary.
 
-We just completed a thorough testing round (215 E2E tests) and fixed all reported bugs. The repo includes arc42 documentation, ADRs, a security review, and a devcontainer for instant onboarding.
+We just completed a thorough testing round (215 E2E tests) and fixed all reported bugs. The project includes arc42 documentation, ADRs, a security review, and a devcontainer for instant onboarding.
 
-Try it: https://github.com/docToolchain/Bausteinsicht
+Open-source release is coming soon — stay tuned!
 
-I'd love to hear from anyone working on architecture-as-code, model-driven documentation, or diagram automation.
+If you're working on architecture-as-code, model-driven documentation, or diagram automation, I'd love to connect.
 
 #SoftwareArchitecture #ArchitectureAsCode #DrawIO #OpenSource #DocToolchain #DeveloperTools
 ----
@@ -53,4 +53,5 @@ I'd love to hear from anyone working on architecture-as-code, model-driven docum
 | Date | Change
 
 | 2026-03-05 | Initial draft created
+| 2026-03-05 | Changed to teaser/stay-tuned format (no repo link yet)
 |===
