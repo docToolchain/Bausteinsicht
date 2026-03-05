@@ -15,6 +15,68 @@ ifndef::imagesdir[:imagesdir: ../../images]
 
 Bausteinsicht sits between the architecture model (JSON files) and draw.io diagrams, synchronizing both bidirectionally.
 
+==== Architecture Maintenance Process
+
+The following activity diagram shows how Bausteinsicht fits into the daily architecture workflow. The architect chooses between editing the text model or the visual diagram — Bausteinsicht synchronizes both directions.
+
+[plantuml, business-context-process, png]
+....
+@startuml
+skinparam shadowing false
+skinparam ActivityBackgroundColor #f0f0f0
+skinparam ActivityBorderColor #333333
+
+|Architect|
+start
+:Define or update\narchitecture model\n(JSONC in IDE);
+note right
+  IDE provides autocompletion
+  and validation via JSON Schema
+end note
+
+|Bausteinsicht|
+:bausteinsicht sync;
+
+fork
+  :Forward sync\nmodel → draw.io;
+fork again
+  :Reverse sync\ndraw.io → model;
+end fork
+
+|Architect|
+:Review diagrams\nin draw.io;
+
+if (Visual edits needed?) then (yes)
+  :Edit diagram\nin draw.io;
+  |Bausteinsicht|
+  :bausteinsicht sync;
+  note right
+    Reverse sync picks up
+    visual changes back
+    into the JSONC model
+  end note
+  |Architect|
+else (no)
+endif
+
+:Commit model + diagram\nto Git;
+
+|Developer|
+:Open draw.io diagrams\nfor reference;
+
+|LLM Agent|
+:bausteinsicht add element\n--format json;
+|Bausteinsicht|
+:bausteinsicht sync;
+|LLM Agent|
+:Verify result via CLI;
+
+stop
+@enduml
+....
+
+==== System Context
+
 .System Context (generated from architecture model)
 image::arc42/architecture-context.png[System Context,width=80%]
 

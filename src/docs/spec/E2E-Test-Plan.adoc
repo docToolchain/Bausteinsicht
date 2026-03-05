@@ -1,3 +1,9 @@
+:jbake-title: E2E Test Plan
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: Development
+:jbake-order: 6
+
 = E2E Test Plan — Bausteinsicht CLI
 :toc:
 :toc-title: Contents

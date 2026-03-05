@@ -52,7 +52,7 @@ activate state
 state --> cmd : SyncState
 deactivate state
 
-cmd -> engine : Run(model, document, state, templates)
+cmd -> engine : Run(model, document, state, templates, opts)
 activate engine
 
 engine -> diff : DetectChanges(model, document, state)
@@ -64,8 +64,9 @@ alt conflicts detected
   engine -> engine : Resolve conflicts\n(model wins, log warnings)
 end
 
-engine -> fwd : Apply(modelChanges, document, templates)
+engine -> fwd : Apply(modelChanges, document, templates, opts)
 activate fwd
+note right of fwd : Creates/updates metadata\nand legend boxes per view
 fwd --> engine : forward result
 deactivate fwd
 
@@ -93,6 +94,7 @@ deactivate cmd
 * Forward sync runs before reverse sync in the same cycle
 * The state file is only written after both directions complete successfully
 * If any step fails, no files are written (atomic operation)
+* Forward sync adds metadata (title, source, author, timestamp) and a legend to each view page
 
 === Watch Mode
 
@@ -116,7 +118,7 @@ activate w
 
 loop on file change
   w -> w : Debounce (300ms)
-  w -> engine : Run(model, document, state, templates)
+  w -> engine : Run(model, document, state, templates, opts)
   activate engine
   engine --> w : SyncResult
   deactivate engine
@@ -158,7 +160,7 @@ else no files
   cmd -> cmd : Generate sample model\n(specification + example elements)
   cmd -> loader : Save(model.jsonc, sampleModel)
   cmd -> cmd : Copy default template\nto project directory
-  cmd -> engine : Run(model, document=empty,\nstate=empty, templates)
+  cmd -> engine : Run(model, document=empty,\nstate=empty, templates, opts)
   cmd --> User : Project initialized.\nOpen arch.drawio in draw.io.
 end
 

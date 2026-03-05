@@ -1,8 +1,8 @@
 :jbake-title: ADR-001: DSL Format
 :jbake-type: page_toc
 :jbake-status: published
-:jbake-menu: ADR
-:jbake-order: 1
+:jbake-menu: Development
+:jbake-order: 2
 
 = ADR-001: Choice of DSL Format for Bausteinsicht
 

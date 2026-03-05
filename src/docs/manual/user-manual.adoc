@@ -1,7 +1,7 @@
 :jbake-title: User Manual
 :jbake-type: page_toc
 :jbake-status: published
-:jbake-menu: Manual
+:jbake-menu: Development
 :jbake-order: 1
 
 ifndef::imagesdir[:imagesdir: ../../images]

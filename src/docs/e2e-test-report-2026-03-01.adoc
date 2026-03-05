@@ -1,8 +1,8 @@
 :jbake-title: E2E Test Report 2026-03-01
 :jbake-type: page_toc
 :jbake-status: published
-:jbake-menu: Test Reports
-:jbake-order: 1
+:jbake-menu: Development
+:jbake-order: 10
 
 = E2E Test Report — 2026-03-01 (Update 2)
 :toc:

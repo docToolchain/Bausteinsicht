@@ -1,8 +1,8 @@
 :jbake-title: ADR-003: Risk Classification
 :jbake-type: page_toc
 :jbake-status: published
-:jbake-menu: ADR
-:jbake-order: 3
+:jbake-menu: Development
+:jbake-order: 4
 
 = ADR-003: Risk Classification
 
