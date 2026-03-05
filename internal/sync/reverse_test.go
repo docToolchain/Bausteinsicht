@@ -355,7 +355,7 @@ func TestDetectChanges_NewElementFromDrawio(t *testing.T) {
 	// Create a drawio doc with the existing element plus a new unmanaged shape.
 	doc := drawio.NewDocument()
 	doc.AddPage("view-context", "System Context")
-	page := doc.GetPage("view-context")
+	page := requirePage(t, doc, "view-context")
 	if err := page.CreateElement(drawio.ElementData{
 		ID: "existing", CellID: "context--existing",
 		Kind: "system", Title: "Existing",

@@ -624,7 +624,7 @@ func TestRun_MultipleRelsSamePair(t *testing.T) {
 	}
 
 	// Verify both connectors exist on the page.
-	page := doc.Pages()[0]
+	page := requireFirstPage(t, doc)
 	conns := page.FindAllConnectors()
 	if len(conns) != 2 {
 		t.Fatalf("round 1: expected 2 connectors on page, got %d", len(conns))
@@ -894,7 +894,7 @@ func TestRun_NewViewPageGetsPopulated(t *testing.T) {
 	}
 
 	// Verify "b" is actually on v2 page.
-	v2Page := doc.GetPage("view-v2")
+	v2Page := requirePage(t, doc, "view-v2")
 	if v2Page == nil {
 		t.Fatal("v2 page not found")
 	}

@@ -71,7 +71,7 @@ func TestApplyForward_ElementOnCorrectViewPage(t *testing.T) {
 	ApplyForward(cs, doc, ts, m)
 
 	// Context view should have customer and webshop.
-	contextPage := doc.GetPage("view-context")
+	contextPage := requirePage(t, doc, "view-context")
 	if contextPage == nil {
 		t.Fatal("context page not found")
 	}
@@ -91,7 +91,7 @@ func TestApplyForward_ElementOnCorrectViewPage(t *testing.T) {
 	}
 
 	// Container view should have customer, api, db (from includes: customer + webshop.*).
-	containerPage := doc.GetPage("view-containers")
+	containerPage := requirePage(t, doc, "view-containers")
 	if containerPage == nil {
 		t.Fatal("container page not found")
 	}
@@ -129,7 +129,7 @@ func TestApplyForward_RelationshipOnlyOnPageWithBothEndpoints(t *testing.T) {
 	ApplyForward(cs, doc, ts, m)
 
 	// Context page: customer→webshop connector should exist (using scoped cell IDs).
-	contextPage := doc.GetPage("view-context")
+	contextPage := requirePage(t, doc, "view-context")
 	if contextPage.FindConnector("context--customer", "context--webshop", 0) == nil {
 		t.Error("expected connector customer→webshop on context page")
 	}
@@ -140,7 +140,7 @@ func TestApplyForward_RelationshipOnlyOnPageWithBothEndpoints(t *testing.T) {
 	}
 
 	// Container page: api→db connector should exist (using scoped cell IDs).
-	containerPage := doc.GetPage("view-containers")
+	containerPage := requirePage(t, doc, "view-containers")
 	if containerPage.FindConnector("containers--webshop.api", "containers--webshop.db", 1) == nil {
 		t.Error("expected connector api→db on container page")
 	}
@@ -197,7 +197,7 @@ func TestApplyForward_RelationshipLifting(t *testing.T) {
 	ApplyForward(cs, doc, ts, m)
 
 	// Context page: customer → webshop.frontend should be lifted to customer → webshop
-	contextPage := doc.GetPage("view-context")
+	contextPage := requirePage(t, doc, "view-context")
 	if contextPage == nil {
 		t.Fatal("context page not found")
 	}
@@ -222,7 +222,7 @@ func TestApplyForward_RelationshipLifting(t *testing.T) {
 	}
 
 	// Container page: customer → webshop.frontend should NOT be lifted (frontend is on the page)
-	containerPage := doc.GetPage("view-containers")
+	containerPage := requirePage(t, doc, "view-containers")
 	if containerPage == nil {
 		t.Fatal("container page not found")
 	}
@@ -276,7 +276,7 @@ func TestApplyForward_RelationshipLiftingDedup(t *testing.T) {
 
 	ApplyForward(cs, doc, ts, m)
 
-	contextPage := doc.GetPage("view-context")
+	contextPage := requirePage(t, doc, "view-context")
 	conns := contextPage.FindAllConnectors()
 
 	// Both relationships lift to a→b, but only one connector should be created.
@@ -326,7 +326,7 @@ func TestApplyForward_DirectRelSuppressesLifted(t *testing.T) {
 
 	ApplyForward(cs, doc, ts, m)
 
-	page := doc.GetPage("view-overview")
+	page := requirePage(t, doc, "view-overview")
 	conns := page.FindAllConnectors()
 
 	if len(conns) != 1 {
@@ -375,7 +375,7 @@ func TestApplyForward_ScopeBoundingBox(t *testing.T) {
 
 	ApplyForward(cs, doc, ts, m)
 
-	page := doc.GetPage("view-containers")
+	page := requirePage(t, doc, "view-containers")
 	if page == nil {
 		t.Fatal("container page not found")
 	}
@@ -446,7 +446,7 @@ func TestApplyForward_DeletedElementRemovedFromViewPages(t *testing.T) {
 	ApplyForward(csAdd, doc, ts, m)
 
 	// Verify db exists on container page before deletion.
-	containerPage := doc.GetPage("view-containers")
+	containerPage := requirePage(t, doc, "view-containers")
 	if containerPage.FindElement("webshop.db") == nil {
 		t.Fatal("precondition: webshop.db should exist on container page before deletion")
 	}
@@ -508,7 +508,7 @@ func TestApplyForward_DeletedRelationshipRemovedFromViewPages(t *testing.T) {
 	ApplyForward(csAdd, doc, ts, m)
 
 	// Verify connector exists before deletion.
-	containerPage := doc.GetPage("view-containers")
+	containerPage := requirePage(t, doc, "view-containers")
 	if containerPage.FindConnector("containers--webshop.api", "containers--webshop.db", 1) == nil {
 		t.Fatal("precondition: api→db connector should exist on container page")
 	}
@@ -555,7 +555,7 @@ func TestApplyForward_ScopeBoundaryUpdatedOnModify(t *testing.T) {
 	ApplyForward(csAdd, doc, ts, m)
 
 	// Verify boundary exists with original title.
-	containerPage := doc.GetPage("view-containers")
+	containerPage := requirePage(t, doc, "view-containers")
 	boundary := containerPage.FindElement("webshop")
 	if boundary == nil {
 		t.Fatal("precondition: scope boundary for webshop should exist on containers page")
@@ -624,7 +624,7 @@ func TestExcludeRemovesElementFromPage(t *testing.T) {
 	ApplyForward(csAdd, doc, ts, m)
 
 	// Verify preconditions: webshop.db is on the container page with a connector.
-	containerPage := doc.GetPage("view-containers")
+	containerPage := requirePage(t, doc, "view-containers")
 	if containerPage == nil {
 		t.Fatal("precondition: container page not found")
 	}
@@ -701,7 +701,7 @@ func TestApplyForward_DeleteElementRemovesConnectors(t *testing.T) {
 	ApplyForward(csAdd, doc, ts, m)
 
 	// Verify preconditions on the container page.
-	containerPage := doc.GetPage("view-containers")
+	containerPage := requirePage(t, doc, "view-containers")
 	if containerPage.FindElement("webshop.db") == nil {
 		t.Fatal("precondition: webshop.db should exist on container page")
 	}
@@ -742,7 +742,7 @@ func TestApplyForward_DeleteElementRemovesConnectors(t *testing.T) {
 	}
 
 	// The customer→webshop connector on the context page should be unaffected.
-	contextPage := doc.GetPage("view-context")
+	contextPage := requirePage(t, doc, "view-context")
 	if contextPage.FindConnector("context--customer", "context--webshop", 0) == nil {
 		t.Error("customer→webshop connector on context page should be unaffected")
 	}
@@ -775,7 +775,7 @@ func TestApplyForward_NoViewsFallback(t *testing.T) {
 		t.Fatalf("expected 1 element created, got %d", result.ElementsCreated)
 	}
 
-	page := doc.Pages()[0]
+	page := requireFirstPage(t, doc)
 	if page.FindElement("api") == nil {
 		t.Error("expected 'api' on first page when no views defined")
 	}
@@ -822,7 +822,7 @@ func TestApplyForward_DrillDownNavigationLinks(t *testing.T) {
 	ApplyForward(cs, doc, ts, m)
 
 	// "shop" on context page should have a link to the containers view.
-	contextPage := doc.GetPage("view-context")
+	contextPage := requirePage(t, doc, "view-context")
 	shopElem := contextPage.FindElement("shop")
 	if shopElem == nil {
 		t.Fatal("shop element not found on context page")
@@ -881,7 +881,7 @@ func TestApplyForward_BackNavigationButton(t *testing.T) {
 	ApplyForward(cs, doc, ts, m)
 
 	// The containers page should have a back-navigation button.
-	containerPage := doc.GetPage("view-containers")
+	containerPage := requirePage(t, doc, "view-containers")
 	root := containerPage.Root()
 	var navFound bool
 	for _, obj := range root.SelectElements("object") {
@@ -936,7 +936,7 @@ func TestApplyForward_ConnectorToScopeElement(t *testing.T) {
 
 	ApplyForward(cs, doc, ts, m)
 
-	page := doc.GetPage("view-detail")
+	page := requirePage(t, doc, "view-detail")
 	if page == nil {
 		t.Fatal("detail page not found")
 	}
@@ -1007,7 +1007,7 @@ func TestApplyForward_NewlyIncludedElementOnExistingPage(t *testing.T) {
 	// set but NOT in the ChangeSet. The forward sync must still create it.
 	ApplyForward(cs, doc, ts, m)
 
-	page := doc.GetPage("view-detail")
+	page := requirePage(t, doc, "view-detail")
 	if page == nil {
 		t.Fatal("detail page not found")
 	}
@@ -1067,7 +1067,7 @@ func TestApplyForward_NewlyIncludedElementGetsConnectors(t *testing.T) {
 
 	ApplyForward(cs, doc, ts, m)
 
-	page := doc.GetPage("view-detail")
+	page := requirePage(t, doc, "view-detail")
 	if page == nil {
 		t.Fatal("detail page not found")
 	}

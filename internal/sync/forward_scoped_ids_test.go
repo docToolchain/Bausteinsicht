@@ -46,8 +46,8 @@ func TestApplyForward_ScopedIDs(t *testing.T) {
 
 	ApplyForward(cs, doc, ts, m)
 
-	contextPage := doc.GetPage("view-context")
-	containerPage := doc.GetPage("view-containers")
+	contextPage := requirePage(t, doc, "view-context")
+	containerPage := requirePage(t, doc, "view-containers")
 
 	// Both pages should have customer (found by bausteinsicht_id).
 	if contextPage.FindElement("customer") == nil {
@@ -112,7 +112,7 @@ func TestApplyForward_ScopedConnectorRefs(t *testing.T) {
 
 	ApplyForward(cs, doc, ts, m)
 
-	page := doc.GetPage("view-containers")
+	page := requirePage(t, doc, "view-containers")
 
 	// Connector should reference page-scoped cell IDs.
 	elemA := page.FindElement("a")

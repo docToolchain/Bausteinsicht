@@ -116,7 +116,7 @@ func TestApplyForward_ElementKindChanged(t *testing.T) {
 		t.Fatalf("expected 1 element updated, got %d", result.ElementsUpdated)
 	}
 
-	page := doc.Pages()[0]
+	page := requireFirstPage(t, doc)
 	obj := page.FindElement("api")
 	if obj == nil {
 		t.Fatal("element 'api' not found")
@@ -157,7 +157,7 @@ func TestApplyForward_NewElement(t *testing.T) {
 		t.Fatalf("expected 1 element created, got %d", result.ElementsCreated)
 	}
 
-	page := doc.Pages()[0]
+	page := requireFirstPage(t, doc)
 	obj := page.FindElement("api")
 	if obj == nil {
 		t.Fatal("element 'api' not found in document")
@@ -178,7 +178,7 @@ func TestApplyForward_NewElementVisualMarker(t *testing.T) {
 	}
 	ApplyForward(cs, doc, ts, m)
 
-	page := doc.Pages()[0]
+	page := requireFirstPage(t, doc)
 	obj := page.FindElement("api")
 	if obj == nil {
 		t.Fatal("element 'api' not found")
@@ -214,7 +214,7 @@ func TestApplyForward_UpdatedTitle(t *testing.T) {
 		t.Fatalf("expected 1 element updated, got %d", result.ElementsUpdated)
 	}
 
-	page := doc.Pages()[0]
+	page := requireFirstPage(t, doc)
 	obj := page.FindElement("api")
 	if obj == nil {
 		t.Fatal("element 'api' not found")
@@ -243,7 +243,7 @@ func TestApplyForward_DeletedElement(t *testing.T) {
 		t.Fatalf("expected 1 element deleted, got %d", result.ElementsDeleted)
 	}
 
-	page := doc.Pages()[0]
+	page := requireFirstPage(t, doc)
 	if page.FindElement("api") != nil {
 		t.Fatal("element 'api' should have been removed")
 	}
@@ -267,7 +267,7 @@ func TestApplyForward_NewRelationship(t *testing.T) {
 		t.Fatalf("expected 1 connector created, got %d", result.ConnectorsCreated)
 	}
 
-	page := doc.Pages()[0]
+	page := requireFirstPage(t, doc)
 	if page.FindConnector("frontend", "backend", 0) == nil {
 		t.Fatal("connector 'frontend→backend' not found")
 	}
@@ -298,7 +298,7 @@ func TestApplyForward_MultipleNewElementsNoOverlap(t *testing.T) {
 		t.Fatalf("expected 2 elements created, got %d", result.ElementsCreated)
 	}
 
-	page := doc.Pages()[0]
+	page := requireFirstPage(t, doc)
 	xA := elementX(page, "a")
 	xB := elementX(page, "b")
 	if xA == xB {
@@ -577,7 +577,7 @@ func TestApplyForward_NoDuplicateElements(t *testing.T) {
 	result := ApplyForward(cs, doc, ts, m)
 
 	// Should NOT create a duplicate — skip existing element.
-	page := doc.Pages()[0]
+	page := requireFirstPage(t, doc)
 	count := 0
 	for _, el := range page.Root().SelectElements("object") {
 		if el.SelectAttrValue("bausteinsicht_id", "") == "api" {
@@ -628,7 +628,7 @@ func TestApplyForward_MultipleRelationshipsSamePair(t *testing.T) {
 		t.Fatalf("expected 2 connectors created, got %d", result.ConnectorsCreated)
 	}
 
-	page := doc.Pages()[0]
+	page := requireFirstPage(t, doc)
 	conns := page.FindAllConnectors()
 	if len(conns) != 2 {
 		t.Fatalf("expected 2 connectors on page, got %d", len(conns))

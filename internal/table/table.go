@@ -50,7 +50,10 @@ func FormatAllViews(m *model.BausteinsichtModel, f Format) (string, error) {
 		if i > 0 {
 			b.WriteString("\n")
 		}
-		view := m.Views[key]
+		view, ok := m.Views[key]
+		if !ok {
+			continue
+		}
 		rows, err := resolveRows(m, &view)
 		if err != nil {
 			return "", err
@@ -70,7 +73,10 @@ func FormatCombined(m *model.BausteinsichtModel, f Format) (string, error) {
 	keys := sortedViewKeys(m)
 
 	for _, key := range keys {
-		view := m.Views[key]
+		view, ok := m.Views[key]
+		if !ok {
+			continue
+		}
 		v := view
 		resolved, err := model.ResolveView(m, &v)
 		if err != nil {

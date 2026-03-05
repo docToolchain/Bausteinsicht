@@ -206,25 +206,25 @@ func validateElementID(id string) error {
 
 // lookupElement resolves a dot-notation path to an Element within the model.
 func lookupElement(m *BausteinsichtModel, path string) (Element, error) {
-	parts := strings.SplitN(path, ".", 2)
-	elem, ok := m.Model[parts[0]]
+	head, rest, hasDot := strings.Cut(path, ".")
+	elem, ok := m.Model[head]
 	if !ok {
-		return Element{}, fmt.Errorf("element %q not found", parts[0])
+		return Element{}, fmt.Errorf("element %q not found", head)
 	}
-	if len(parts) == 1 {
+	if !hasDot {
 		return elem, nil
 	}
-	return lookupChild(elem, parts[1])
+	return lookupChild(elem, rest)
 }
 
 func lookupChild(parent Element, path string) (Element, error) {
-	parts := strings.SplitN(path, ".", 2)
-	child, ok := parent.Children[parts[0]]
+	head, rest, hasDot := strings.Cut(path, ".")
+	child, ok := parent.Children[head]
 	if !ok {
-		return Element{}, fmt.Errorf("element %q not found", parts[0])
+		return Element{}, fmt.Errorf("element %q not found", head)
 	}
-	if len(parts) == 1 {
+	if !hasDot {
 		return child, nil
 	}
-	return lookupChild(child, parts[1])
+	return lookupChild(child, rest)
 }

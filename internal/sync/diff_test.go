@@ -1036,7 +1036,7 @@ func TestDetectChanges_TechnologyFromXMLAttribute(t *testing.T) {
 
 	doc := drawio.NewDocument()
 	doc.AddPage("1", "Page 1")
-	page := doc.GetPage("1")
+	page := requirePage(t, doc, "1")
 	if err := page.CreateElement(drawio.ElementData{
 		ID:     "customer",
 		CellID: "customer",
@@ -1079,7 +1079,7 @@ func TestDetectChanges_TechnologyFromXMLAttribute(t *testing.T) {
 func TestExtractDrawioRelationships_IgnoresNavBackConnectors(t *testing.T) {
 	doc := drawio.NewDocument()
 	doc.AddPage("view-ctx", "Context")
-	page := doc.GetPage("view-ctx")
+	page := requirePage(t, doc, "view-ctx")
 
 	// Create a managed element.
 	if err := page.CreateElement(drawio.ElementData{
@@ -1133,7 +1133,7 @@ func TestDetectChanges_NewRelationshipFromDrawioHasLabel(t *testing.T) {
 	// Create drawio doc with a connector from a to b.
 	doc := drawio.NewDocument()
 	doc.AddPage("view-ctx", "Context")
-	page := doc.GetPage("view-ctx")
+	page := requirePage(t, doc, "view-ctx")
 	for _, id := range []string{"a", "b"} {
 		if err := page.CreateElement(drawio.ElementData{
 			ID: id, CellID: "ctx--" + id,
