@@ -246,9 +246,11 @@ func detectUnmanagedDrawioElements(cs *ChangeSet, doc *drawio.Document) {
 			if obj.SelectAttrValue("bausteinsicht_id", "") != "" {
 				continue // managed element, already handled
 			}
-			// Skip navigation buttons created by forward sync.
+			// Skip non-model elements created by forward sync.
 			objID := obj.SelectAttrValue("id", "")
-			if strings.HasPrefix(objID, "nav-back-") {
+			if strings.HasPrefix(objID, "nav-back-") ||
+				strings.HasPrefix(objID, metadataPrefix) ||
+				strings.HasPrefix(objID, legendPrefix) {
 				continue
 			}
 			// Check that it wraps a vertex cell (not a connector).

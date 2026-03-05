@@ -16,6 +16,12 @@ const (
 	defaultHeight    = 60.0
 )
 
+// ForwardOptions holds optional parameters for forward sync.
+type ForwardOptions struct {
+	ModelPath string // path to the model file, shown in metadata box
+	SyncTime  string // timestamp string, shown in metadata box
+}
+
 // ForwardResult summarises the changes applied to a draw.io document.
 type ForwardResult struct {
 	ElementsCreated   int
@@ -31,21 +37,28 @@ type ForwardResult struct {
 // to doc, using templates for styles and m for element data.
 // When the model defines views, elements and relationships are placed on their
 // corresponding view pages. Without views, falls back to the first page.
+// opts is optional — pass nil to skip metadata/legend generation.
 func ApplyForward(
 	cs *ChangeSet,
 	doc *drawio.Document,
 	templates *drawio.TemplateSet,
 	m *model.BausteinsichtModel,
+	opts ...ForwardOptions,
 ) *ForwardResult {
 	result := &ForwardResult{}
 	flat := model.FlattenElements(m)
+
+	var fwdOpts ForwardOptions
+	if len(opts) > 0 {
+		fwdOpts = opts[0]
+	}
 
 	if len(m.Views) == 0 {
 		applyForwardToPage(cs, doc, templates, flat, nil, result)
 		return result
 	}
 
-	applyForwardPerView(cs, doc, templates, flat, m, result)
+	applyForwardPerView(cs, doc, templates, flat, m, &fwdOpts, result)
 	return result
 }
 
@@ -78,6 +91,7 @@ func applyForwardPerView(
 	templates *drawio.TemplateSet,
 	flat map[string]*model.Element,
 	m *model.BausteinsichtModel,
+	opts *ForwardOptions,
 	result *ForwardResult,
 ) {
 	// Build drill-down link map: elementID → "data:page/id,view-<viewID>"
@@ -143,6 +157,17 @@ func applyForwardPerView(
 		// Create back-navigation button on detail views (views with scope). (#198)
 		if scopeID != "" {
 			createBackNavButton(page, viewID, scopeID, m)
+		}
+
+		// Create metadata and legend boxes on each view page. (#233)
+		metadataEnabled := m.Config.Metadata == nil || *m.Config.Metadata
+		legendEnabled := m.Config.Legend == nil || *m.Config.Legend
+
+		if metadataEnabled && opts != nil {
+			createMetadata(page, viewID, view, m.Config, opts.ModelPath, opts.SyncTime)
+		}
+		if legendEnabled {
+			createLegend(page, viewID, m.Specification, templates, elemSet, flat)
 		}
 	}
 }

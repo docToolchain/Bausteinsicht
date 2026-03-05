@@ -170,6 +170,15 @@ func (t *TemplateSet) GetConnectorStyle() string {
 	return t.connector
 }
 
+// GetAllStyles returns a copy of all element styles keyed by kind.
+func (t *TemplateSet) GetAllStyles() map[string]TemplateStyle {
+	out := make(map[string]TemplateStyle, len(t.elements))
+	for k, v := range t.elements {
+		out[k] = v
+	}
+	return out
+}
+
 // categorize places the style into the appropriate map based on its kind.
 func (t *TemplateSet) categorize(kind string, style TemplateStyle) {
 	if strings.HasSuffix(kind, "_boundary") {

@@ -1,8 +1,17 @@
 package model
 
+// Config holds top-level configuration for diagram generation.
+type Config struct {
+	Metadata *bool  `json:"metadata,omitempty"`
+	Legend   *bool  `json:"legend,omitempty"`
+	Author string `json:"author,omitempty"`
+	Repo   string `json:"repo,omitempty"`
+}
+
 // BausteinsichtModel is the top-level model file
 type BausteinsichtModel struct {
 	Schema        string             `json:"$schema,omitempty"`
+	Config        Config             `json:"config,omitempty"`
 	Specification Specification      `json:"specification"`
 	Model         map[string]Element `json:"model"`
 	Relationships []Relationship     `json:"relationships"`

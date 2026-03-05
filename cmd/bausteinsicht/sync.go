@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/docToolchain/Bauteinsicht/internal/drawio"
 	"github.com/docToolchain/Bauteinsicht/internal/model"
@@ -133,7 +134,11 @@ func runSync(cmd *cobra.Command, _ []string) error {
 	bsync.RemoveOrphanedViewPages(doc, m)
 
 	// Run sync.
-	result := bsync.Run(m, doc, state, tmpl, newPageIDs)
+	fwdOpts := bsync.ForwardOptions{
+		ModelPath: modelPath,
+		SyncTime:  time.Now().Format("2006-01-02 15:04"),
+	}
+	result := bsync.Run(m, doc, state, tmpl, newPageIDs, fwdOpts)
 
 	// Save updated model: use PatchSave to preserve JSONC comments and key
 	// ordering when possible, fall back to full Save for structural changes.

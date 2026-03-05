@@ -34,6 +34,7 @@ func Run(
 	lastState *SyncState,
 	templates *drawio.TemplateSet,
 	newPageIDs map[string]bool,
+	opts ...ForwardOptions,
 ) *SyncResult {
 	result := &SyncResult{}
 
@@ -57,7 +58,7 @@ func Run(
 	result.Changes = changes
 
 	// Step 4: Forward sync (model → draw.io).
-	result.Forward = ApplyForward(changes, doc, templates, m)
+	result.Forward = ApplyForward(changes, doc, templates, m, opts...)
 
 	// Step 5: Reverse sync (draw.io → model).
 	result.Reverse = ApplyReverse(changes, m)
