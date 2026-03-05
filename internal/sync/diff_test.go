@@ -1345,3 +1345,110 @@ func TestDetectChanges_DuplicateBausteinsichtIDKeepsFirst(t *testing.T) {
 		}
 	}
 }
+
+// --- Cross-view consistency (#236) ---
+
+func TestDetectChanges_CrossViewStaleTitle(t *testing.T) {
+	// Scenario: reverse sync updated the title in one view (and the model/state),
+	// but a second view still shows the old title. The next sync must emit a
+	// forward change to bring the stale view up to date.
+	//
+	// After reverse sync:
+	//   model  = "New Title"
+	//   state  = "New Title"
+	//   View A = "New Title"  (was edited here)
+	//   View B = "Old Title"  (stale)
+
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"svc": {Kind: "system", Title: "New Title"},
+		},
+		Views: map[string]model.View{
+			"context":    {Title: "Context"},
+			"containers": {Title: "Containers"},
+		},
+		Relationships: []model.Relationship{},
+		Specification: model.Specification{
+			Elements: map[string]model.ElementKind{
+				"system": {},
+			},
+		},
+	}
+
+	state := emptyState()
+	state.Elements["svc"] = ElementState{Title: "New Title", Kind: "system"}
+
+	// Build a two-page document: page 1 has the updated title, page 2 is stale.
+	doc := drawio.NewDocument()
+	page1 := doc.AddPage("view-context", "Context View")
+	_ = page1.CreateElement(drawio.ElementData{
+		ID: "svc", CellID: "context--svc", Kind: "system", Title: "New Title",
+	}, "")
+	page2 := doc.AddPage("view-containers", "Containers View")
+	_ = page2.CreateElement(drawio.ElementData{
+		ID: "svc", CellID: "containers--svc", Kind: "system", Title: "Old Title",
+	}, "")
+
+	cs := DetectChanges(m, doc, state, nil)
+
+	// Expect a forward change to update the stale title.
+	found := false
+	for _, ch := range cs.ModelElementChanges {
+		if ch.ID == "svc" && ch.Type == Modified && ch.Field == "title" &&
+			ch.OldValue == "Old Title" && ch.NewValue == "New Title" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected forward change to fix stale cross-view title, got model changes: %+v",
+			cs.ModelElementChanges)
+	}
+
+	// Should NOT produce a drawio-side change (no conflict — model is authoritative).
+	for _, ch := range cs.DrawioElementChanges {
+		if ch.ID == "svc" && ch.Type == Modified && ch.Field == "title" {
+			t.Errorf("unexpected drawio-side title change: %+v", ch)
+		}
+	}
+}
+
+func TestDetectChanges_CrossViewConsistentNoSpuriousChange(t *testing.T) {
+	// When all views have the same title as the model, no cross-view change
+	// should be emitted.
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"svc": {Kind: "system", Title: "Service"},
+		},
+		Views: map[string]model.View{
+			"context":    {Title: "Context"},
+			"containers": {Title: "Containers"},
+		},
+		Relationships: []model.Relationship{},
+		Specification: model.Specification{
+			Elements: map[string]model.ElementKind{
+				"system": {},
+			},
+		},
+	}
+
+	state := emptyState()
+	state.Elements["svc"] = ElementState{Title: "Service", Kind: "system"}
+
+	doc := drawio.NewDocument()
+	page1 := doc.AddPage("view-context", "Context View")
+	_ = page1.CreateElement(drawio.ElementData{
+		ID: "svc", CellID: "context--svc", Kind: "system", Title: "Service",
+	}, "")
+	page2 := doc.AddPage("view-containers", "Containers View")
+	_ = page2.CreateElement(drawio.ElementData{
+		ID: "svc", CellID: "containers--svc", Kind: "system", Title: "Service",
+	}, "")
+
+	cs := DetectChanges(m, doc, state, nil)
+
+	for _, ch := range cs.ModelElementChanges {
+		if ch.ID == "svc" && ch.Type == Modified {
+			t.Errorf("no cross-view change expected when all views are consistent, got: %+v", ch)
+		}
+	}
+}

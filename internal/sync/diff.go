@@ -185,6 +185,7 @@ func DetectChanges(m *model.BausteinsichtModel, doc *drawio.Document, lastState 
 	visibleElems := computeVisibleElements(m)
 	newPageOnly := computeNewPageOnlyElements(m, newPageIDs)
 	detectElementChanges(cs, flatModel, drawioElems, lastState, visibleElems, newPageOnly)
+	detectCrossViewInconsistencies(cs, doc, flatModel, lastState)
 	detectUnmanagedDrawioElements(cs, doc)
 
 	modelRels := buildModelRelMap(m)
@@ -524,6 +525,97 @@ func unionElementIDs(
 		all[id] = struct{}{}
 	}
 	return all
+}
+
+// detectCrossViewInconsistencies scans ALL pages in the draw.io document
+// and emits forward changes when an element on any page shows a stale value
+// that doesn't match the model, even though model and state agree.
+// This handles the case where reverse sync updated one view but other views
+// still show the old value (#236).
+func detectCrossViewInconsistencies(
+	cs *ChangeSet,
+	doc *drawio.Document,
+	flatModel map[string]*model.Element,
+	lastState *SyncState,
+) {
+	// Track which element+field combos we've already emitted to avoid duplicates.
+	type fieldKey struct {
+		id, field string
+	}
+	emitted := make(map[fieldKey]bool)
+	// Skip fields that detectElementChanges already emitted as model changes.
+	for _, ch := range cs.ModelElementChanges {
+		if ch.Field != "" {
+			emitted[fieldKey{ch.ID, ch.Field}] = true
+		}
+	}
+	// Skip fields that have a legitimate draw.io-side change — those are user
+	// edits that should be reverse-synced, not overwritten by forward sync.
+	for _, ch := range cs.DrawioElementChanges {
+		if ch.Field != "" {
+			emitted[fieldKey{ch.ID, ch.Field}] = true
+		}
+	}
+
+	for _, page := range doc.Pages() {
+		for _, obj := range page.FindAllElements() {
+			id := obj.SelectAttrValue("bausteinsicht_id", "")
+			if id == "" {
+				continue
+			}
+			me, inModel := flatModel[id]
+			if !inModel {
+				continue
+			}
+			lastElem, inLast := lastState.Elements[id]
+			if !inLast {
+				continue
+			}
+
+			title, technology, labelDesc := page.ReadElementFields(obj)
+			if technology == "" {
+				technology = obj.SelectAttrValue("technology", "")
+			}
+			tooltipDesc := obj.SelectAttrValue("tooltip", "")
+			description := tooltipDesc
+			if description == "" {
+				description = labelDesc
+			}
+
+			// If model and state agree but this page shows a stale value,
+			// emit a forward change so all views are brought up to date.
+			if me.Title == lastElem.Title && title != me.Title {
+				fk := fieldKey{id, "title"}
+				if !emitted[fk] {
+					emitted[fk] = true
+					cs.ModelElementChanges = append(cs.ModelElementChanges, ElementChange{
+						ID: id, Type: Modified, Field: "title",
+						OldValue: title, NewValue: me.Title,
+					})
+				}
+			}
+			if me.Description == lastElem.Description && description != me.Description {
+				fk := fieldKey{id, "description"}
+				if !emitted[fk] {
+					emitted[fk] = true
+					cs.ModelElementChanges = append(cs.ModelElementChanges, ElementChange{
+						ID: id, Type: Modified, Field: "description",
+						OldValue: description, NewValue: me.Description,
+					})
+				}
+			}
+			if me.Technology == lastElem.Technology && technology != me.Technology {
+				fk := fieldKey{id, "technology"}
+				if !emitted[fk] {
+					emitted[fk] = true
+					cs.ModelElementChanges = append(cs.ModelElementChanges, ElementChange{
+						ID: id, Type: Modified, Field: "technology",
+						OldValue: technology, NewValue: me.Technology,
+					})
+				}
+			}
+		}
+	}
 }
 
 // appendIfChanged adds a Modified ElementChange if newValue differs from lastValue.
