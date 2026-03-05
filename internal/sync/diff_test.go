@@ -1452,3 +1452,74 @@ func TestDetectChanges_CrossViewConsistentNoSpuriousChange(t *testing.T) {
 		}
 	}
 }
+
+// --- View include expansion (#240) ---
+
+func TestDetectChanges_ViewIncludeExpansionNotTreatedAsDeleted(t *testing.T) {
+	// Scenario: element "svc" is in model and state (previously synced) but not
+	// in draw.io because it was not included in any view. The user adds it to a
+	// view's include list. The element should NOT be treated as "deleted from
+	// draw.io" — forward sync will create it on the view page.
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"svc": {Kind: "system", Title: "Service"},
+		},
+		Views: map[string]model.View{
+			"context": {Title: "Context", Include: []string{"svc"}},
+		},
+		Relationships: []model.Relationship{},
+		Specification: model.Specification{
+			Elements: map[string]model.ElementKind{
+				"system": {},
+			},
+		},
+	}
+
+	state := emptyState()
+	state.Elements["svc"] = ElementState{Title: "Service", Kind: "system"}
+	// "svc" was NOT on any draw.io page during the last sync (view didn't include it).
+	state.RenderedElements = map[string]bool{}
+
+	// draw.io has NO "svc" element (it was filtered before).
+	doc := drawio.NewDocument()
+	doc.AddPage("view-context", "Context View")
+
+	cs := DetectChanges(m, doc, state, nil)
+
+	// Should NOT have a draw.io-side deletion.
+	for _, ch := range cs.DrawioElementChanges {
+		if ch.ID == "svc" && ch.Type == Deleted {
+			t.Errorf("element newly included in view should not be treated as deleted from draw.io: %+v", ch)
+		}
+	}
+}
+
+func TestDetectChanges_ActualDrawioDeletionStillDetected(t *testing.T) {
+	// Scenario: element "svc" was visible in draw.io, user deleted it manually.
+	// Model still has it with unchanged data, state still has it, draw.io does NOT.
+	// This should be treated as a draw.io deletion because RenderedElements
+	// confirms the element was previously on a page.
+	//
+	// The difference from #240: here RenderedElements includes "svc" (it was
+	// on a draw.io page during the last sync).
+	m := simpleModel("svc", "Service", "", "")
+
+	state := stateWithElem("svc", "Service", "", "")
+	// "svc" WAS on a draw.io page during the last sync.
+	state.RenderedElements = map[string]bool{"svc": true}
+
+	doc := emptyDoc() // no "svc" element — user deleted it
+
+	cs := DetectChanges(m, doc, state, nil)
+
+	// Draw.io-side deletion should be detected because element was rendered.
+	foundDeletion := false
+	for _, ch := range cs.DrawioElementChanges {
+		if ch.ID == "svc" && ch.Type == Deleted {
+			foundDeletion = true
+		}
+	}
+	if !foundDeletion {
+		t.Error("expected draw.io-side deletion when element was previously rendered")
+	}
+}

@@ -486,6 +486,16 @@ func detectElementChanges(
 				if newPageOnly != nil && newPageOnly[id] {
 					continue
 				}
+				// Skip elements that were never rendered to a draw.io page.
+				// When RenderedElements is available (state from v2+), an element
+				// absent from draw.io but not in RenderedElements was never on any
+				// page — it was filtered by views. Forward sync will create it now
+				// that views include it. (#240)
+				// When RenderedElements is nil (old state files), fall back to
+				// treating all elements as rendered (preserving old behavior).
+				if lastState.RenderedElements != nil && !lastState.RenderedElements[id] {
+					continue
+				}
 				cs.DrawioElementChanges = append(cs.DrawioElementChanges, ElementChange{ID: id, Type: Deleted})
 			}
 		case inDrawio && inLast:

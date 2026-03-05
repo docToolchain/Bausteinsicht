@@ -563,12 +563,14 @@ func TestRun_UserDeletionInDrawioStillWorksWithViews(t *testing.T) {
 	}, "")
 
 	// State from previous sync includes both elements.
+	// Both were rendered to draw.io pages during the last sync.
 	state := &SyncState{
 		Elements: map[string]ElementState{
 			"customer": {Title: "Customer", Kind: "container"},
 			"webshop":  {Title: "Webshop", Kind: "container"},
 		},
-		Relationships: []RelationshipState{},
+		Relationships:    []RelationshipState{},
+		RenderedElements: map[string]bool{"customer": true, "webshop": true},
 	}
 
 	// User manually deletes "customer" from draw.io.

@@ -15,11 +15,12 @@ import (
 
 // SyncState stores the state after each successful sync.
 type SyncState struct {
-	Timestamp     string                  `json:"timestamp"`
-	ModelHash     string                  `json:"model_hash"`
-	DrawioHash    string                  `json:"drawio_hash"`
-	Elements      map[string]ElementState `json:"elements"`
-	Relationships []RelationshipState     `json:"relationships"`
+	Timestamp        string                  `json:"timestamp"`
+	ModelHash        string                  `json:"model_hash"`
+	DrawioHash       string                  `json:"drawio_hash"`
+	Elements         map[string]ElementState `json:"elements"`
+	Relationships    []RelationshipState     `json:"relationships"`
+	RenderedElements map[string]bool         `json:"rendered_elements,omitempty"`
 }
 
 // ElementState captures an element's synced values.
@@ -115,8 +116,7 @@ func ComputeHash(path string) (string, error) {
 }
 
 // BuildState creates a SyncState snapshot from the current model and draw.io document.
-// doc is accepted but not inspected (draw.io element data comes from the model for now).
-func BuildState(m *model.BausteinsichtModel, _ *drawio.Document, modelPath, drawioPath string) (*SyncState, error) {
+func BuildState(m *model.BausteinsichtModel, doc *drawio.Document, modelPath, drawioPath string) (*SyncState, error) {
 	modelHash, err := ComputeHash(modelPath)
 	if err != nil {
 		return nil, fmt.Errorf("BuildState model hash: %w", err)
@@ -149,11 +149,27 @@ func BuildState(m *model.BausteinsichtModel, _ *drawio.Document, modelPath, draw
 		})
 	}
 
+	// Record which elements are actually present on draw.io pages.
+	// This allows deletion detection to distinguish "user deleted from draw.io"
+	// from "element was never rendered because views didn't include it" (#240).
+	rendered := make(map[string]bool)
+	if doc != nil {
+		for _, page := range doc.Pages() {
+			for _, obj := range page.FindAllElements() {
+				id := obj.SelectAttrValue("bausteinsicht_id", "")
+				if id != "" {
+					rendered[id] = true
+				}
+			}
+		}
+	}
+
 	return &SyncState{
-		Timestamp:     time.Now().UTC().Format(time.RFC3339),
-		ModelHash:     modelHash,
-		DrawioHash:    drawioHash,
-		Elements:      elements,
-		Relationships: rels,
+		Timestamp:        time.Now().UTC().Format(time.RFC3339),
+		ModelHash:        modelHash,
+		DrawioHash:       drawioHash,
+		Elements:         elements,
+		Relationships:    rels,
+		RenderedElements: rendered,
 	}, nil
 }
