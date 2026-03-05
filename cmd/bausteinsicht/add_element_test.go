@@ -443,6 +443,74 @@ func TestAddElementPreservesComments(t *testing.T) {
 	}
 }
 
+// TestAddElementFormattingTopLevel verifies that added elements produce well-formatted JSONC.
+// Regression test for #237.
+func TestAddElementFormattingTopLevel(t *testing.T) {
+	dir := t.TempDir()
+	modelPath := writeSampleModel(t, dir)
+
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"add", "element",
+		"--model", modelPath,
+		"--id", "payments",
+		"--kind", "system",
+		"--title", "Payment Service",
+	})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := string(data)
+
+	// Should not contain formatting artifacts like "},\n  ," or "}}"
+	if strings.Contains(content, "\n  ,") {
+		t.Error("found stray comma on its own line")
+	}
+	if strings.Contains(content, "}}") {
+		t.Error("found collapsed closing braces '}}' — missing newline")
+	}
+}
+
+// TestAddElementFormattingNested verifies that nested elements are correctly indented.
+// Regression test for #237.
+func TestAddElementFormattingNested(t *testing.T) {
+	dir := t.TempDir()
+	modelPath := writeSampleModel(t, dir)
+
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"add", "element",
+		"--model", modelPath,
+		"--id", "db",
+		"--kind", "container",
+		"--title", "Database",
+		"--parent", "webshop",
+	})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := string(data)
+
+	// The nested "db" entry should be at the same indentation as "api" (8 spaces).
+	if !strings.Contains(content, "        \"db\": {") {
+		t.Error("nested element 'db' not at correct indentation (expected 8 spaces)")
+	}
+	// Fields inside "db" should be at 10 spaces.
+	if !strings.Contains(content, "          \"kind\": \"container\"") {
+		t.Error("nested element fields not at correct indentation (expected 10 spaces)")
+	}
+}
+
 // TestAddElementInvalidIDs verifies that IDs with dots, spaces, or special
 // characters are rejected. Regression test for #123.
 func TestAddElementInvalidIDs(t *testing.T) {

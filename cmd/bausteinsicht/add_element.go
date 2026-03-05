@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"strings"
 
 	"github.com/docToolchain/Bauteinsicht/internal/model"
 	"github.com/spf13/cobra"
@@ -239,7 +240,13 @@ func splitDotPath(path string) []string {
 // saveAddedElement saves a newly added element using comment-preserving
 // insertion. Falls back to model.Save if patching fails. (#122)
 func saveAddedElement(modelPath string, m *model.BausteinsichtModel, fullID, parent, id string, elem model.Element) error {
-	elemJSON := marshalElementJSON(elem)
+	// Compute indent depth: "model" is depth 1, each dot-path segment adds 2
+	// (one for the parent element, one for "children").
+	depth := 2 // "model" → "X" is at depth 2
+	if parent != "" {
+		depth += len(splitDotPath(parent)) * 2 // each parent level adds element + children
+	}
+	elemJSON := marshalElementJSON(elem, depth)
 
 	// Build the object path for insertion.
 	var objectPath []string
@@ -262,8 +269,13 @@ func saveAddedElement(modelPath string, m *model.BausteinsichtModel, fullID, par
 	return nil
 }
 
-// marshalElementJSON builds a compact JSON object for an element.
-func marshalElementJSON(elem model.Element) string {
+// marshalElementJSON builds a formatted JSON object for an element.
+// depth is the nesting depth of the entry key (e.g., 2 for "model.X",
+// 4 for "model.X.children.Y"). Each level adds 2 spaces.
+func marshalElementJSON(elem model.Element, depth int) string {
+	fieldIndent := strings.Repeat(" ", (depth+1)*2)
+	closeIndent := strings.Repeat(" ", depth*2)
+
 	parts := []string{fmt.Sprintf(`"kind": %q`, elem.Kind)}
 	parts = append(parts, fmt.Sprintf(`"title": %q`, elem.Title))
 	if elem.Technology != "" {
@@ -275,13 +287,13 @@ func marshalElementJSON(elem model.Element) string {
 
 	result := "{\n"
 	for i, p := range parts {
-		result += "      " + p
+		result += fieldIndent + p
 		if i < len(parts)-1 {
 			result += ","
 		}
 		result += "\n"
 	}
-	result += "    }"
+	result += closeIndent + "}"
 	return result
 }
 

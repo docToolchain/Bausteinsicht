@@ -330,11 +330,28 @@ func InsertObjectEntry(data []byte, objectPath []string, key, valueJSON string) 
 	// Build the insertion text.
 	var insertion string
 	if hasEntries {
-		insertion = fmt.Sprintf(",\n%s  %q: %s", indent, key, valueJSON)
-	} else {
-		insertion = fmt.Sprintf("\n%s  %q: %s\n%s", indent, key, valueJSON, indent)
+		// Find the last non-whitespace/comment byte before closeBrace to
+		// append a comma after the previous entry (not before the new one).
+		lastContent := closeBrace - 1
+		for lastContent > start && (data[lastContent] == ' ' || data[lastContent] == '\t' || data[lastContent] == '\n' || data[lastContent] == '\r') {
+			lastContent--
+		}
+		// Insert comma after last entry, then newline + new entry.
+		comma := ""
+		if lastContent > start && data[lastContent] != ',' {
+			comma = ","
+		}
+		insertion = fmt.Sprintf("%s\n%s  %q: %s\n%s", comma, indent, key, valueJSON, indent)
+		// Replace from after last content to closing brace (inclusive) with:
+		// comma + \n + indent + new entry + \n + indent + }
+		result := make([]byte, 0, len(data)+len(insertion))
+		result = append(result, data[:lastContent+1]...)
+		result = append(result, []byte(insertion)...)
+		result = append(result, data[closeBrace:]...)
+		return result, nil
 	}
 
+	insertion = fmt.Sprintf("\n%s  %q: %s\n%s", indent, key, valueJSON, indent)
 	result := make([]byte, 0, len(data)+len(insertion))
 	result = append(result, data[:closeBrace]...)
 	result = append(result, []byte(insertion)...)
@@ -372,11 +389,25 @@ func AppendArrayEntry(data []byte, arrayPath []string, valueJSON string) ([]byte
 
 	var insertion string
 	if hasEntries {
-		insertion = fmt.Sprintf(",\n%s  %s", indent, valueJSON)
-	} else {
-		insertion = fmt.Sprintf("\n%s  %s\n%s", indent, valueJSON, indent)
+		// Find the last non-whitespace byte before closeBracket to
+		// append comma after the previous entry.
+		lastContent := closeBracket - 1
+		for lastContent > start && (data[lastContent] == ' ' || data[lastContent] == '\t' || data[lastContent] == '\n' || data[lastContent] == '\r') {
+			lastContent--
+		}
+		comma := ""
+		if lastContent > start && data[lastContent] != ',' {
+			comma = ","
+		}
+		insertion = fmt.Sprintf("%s\n%s  %s\n%s", comma, indent, valueJSON, indent)
+		result := make([]byte, 0, len(data)+len(insertion))
+		result = append(result, data[:lastContent+1]...)
+		result = append(result, []byte(insertion)...)
+		result = append(result, data[closeBracket:]...)
+		return result, nil
 	}
 
+	insertion = fmt.Sprintf("\n%s  %s\n%s", indent, valueJSON, indent)
 	result := make([]byte, 0, len(data)+len(insertion))
 	result = append(result, data[:closeBracket]...)
 	result = append(result, []byte(insertion)...)
