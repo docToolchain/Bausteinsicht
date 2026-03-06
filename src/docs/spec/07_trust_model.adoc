@@ -1,0 +1,49 @@
+= Trust Model
+
+== Overview
+
+Bausteinsicht is a local CLI tool that transforms architecture model files (JSONC) into draw.io diagrams.
+It operates entirely on the local filesystem with the permissions of the invoking user.
+
+== Trust Boundaries
+
+=== Fully Trusted: CLI Flags
+
+CLI flags (`--model`, `--template`, `--output`) are provided directly by the user.
+Like other file-processing CLIs (`cat`, `jq`, `sed`), Bausteinsicht accepts arbitrary file paths by design.
+There is no path restriction — the user has full filesystem access.
+
+=== Semi-Trusted: Model and Template Files
+
+Model (`.jsonc`) and template (`.drawio`) files may come from shared Git repositories or external sources.
+While they are parsed and validated, they are not sandboxed:
+
+* **Model files** are parsed as JSONC. Malformed input produces validation errors, not security issues.
+  The model cannot trigger code execution.
+* **Template files** are parsed as XML (draw.io format). Only known attributes and elements are read.
+  Arbitrary XML content is ignored.
+* **draw.io files** (output) are written using the `etree` XML library. User-controlled strings (titles, descriptions)
+  are XML-escaped during serialization.
+
+=== Untrusted: Agent / CI Environments
+
+When Bausteinsicht runs inside an AI agent loop or CI pipeline, the caller should apply standard sandboxing:
+
+* Run in a container or restricted directory
+* Use read-only mounts for input files where possible
+* Limit filesystem access to the project directory
+
+There is no built-in `--restrict-to-dir` flag.
+The trust model assumes the user (or their agent framework) controls filesystem boundaries.
+
+== Non-Threats
+
+* **No network access** — Bausteinsicht makes no HTTP calls, DNS lookups, or socket connections.
+* **No code execution** — The model format (JSONC) and template format (draw.io XML) cannot trigger
+  arbitrary code execution.
+* **No credential handling** — Bausteinsicht does not read, store, or transmit credentials.
+
+== Related Documents
+
+* link:../security/2026-03-01-security-review.adoc[Security Review]
+* link:../../CLAUDE.md[Project Conventions — Security Report]
