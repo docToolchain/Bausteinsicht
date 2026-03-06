@@ -2,6 +2,7 @@ package drawio_test
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/docToolchain/Bauteinsicht/internal/drawio"
@@ -157,6 +158,39 @@ func TestGetStyle_SubCellStyles(t *testing.T) {
 	}
 	if actorStyle.DescStyle == nil {
 		t.Error("actor: expected non-nil DescStyle")
+	}
+}
+
+func TestLoadTemplateFromBytes_NoVersionAttr(t *testing.T) {
+	data := []byte(`<mxfile><diagram id="t" name="T"><mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/></root></mxGraphModel></diagram></mxfile>`)
+	ts, err := drawio.LoadTemplateFromBytes(data)
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if ts.Version != 1 {
+		t.Errorf("expected version 1 for missing attr, got %d", ts.Version)
+	}
+}
+
+func TestLoadTemplateFromBytes_Version1(t *testing.T) {
+	data := []byte(`<mxfile bausteinsicht_template_version="1"><diagram id="t" name="T"><mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/></root></mxGraphModel></diagram></mxfile>`)
+	ts, err := drawio.LoadTemplateFromBytes(data)
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if ts.Version != 1 {
+		t.Errorf("expected version 1, got %d", ts.Version)
+	}
+}
+
+func TestLoadTemplateFromBytes_UnsupportedVersion(t *testing.T) {
+	data := []byte(`<mxfile bausteinsicht_template_version="99"><diagram id="t" name="T"><mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/></root></mxGraphModel></diagram></mxfile>`)
+	_, err := drawio.LoadTemplateFromBytes(data)
+	if err == nil {
+		t.Fatal("expected error for unsupported version, got nil")
+	}
+	if !strings.Contains(err.Error(), "not supported") {
+		t.Errorf("expected 'not supported' in error, got: %v", err)
 	}
 }
 
