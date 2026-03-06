@@ -245,6 +245,11 @@ Nested elements are referenced using dot notation: `"webshop.api.auth"`.
 | string
 | no
 | View description
+
+| `layout`
+| string
+| no
+| Auto-layout mode for new pages: `"layered"` (default), `"grid"`, or `"none"`. Layered groups elements by kind tier; grid places alphabetically in a grid; none uses a horizontal row.
 |===
 
 [[Wildcard Patterns]]

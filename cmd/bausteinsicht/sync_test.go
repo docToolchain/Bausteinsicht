@@ -303,7 +303,7 @@ func TestSyncConcurrentModelAndDrawioChanges(t *testing.T) {
 		t.Fatal(err)
 	}
 	ms := strings.Replace(string(modelData),
-		`"description": "End user who browses and purchases products in the online shop"`,
+		`"description": "End user who browses products and places orders"`,
 		`"description": "Premium customer with VIP access"`, 1)
 	if ms == string(modelData) {
 		t.Skip("could not find customer description to modify")

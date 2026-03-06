@@ -2,8 +2,13 @@ package model
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 )
+
+// MaxElementDepth is the maximum nesting depth for elements.
+// This prevents stack overflow from deeply nested or circular model definitions.
+const MaxElementDepth = 50
 
 // Resolve traverses the model hierarchy using dot notation (e.g., "webshop.api.auth").
 func Resolve(m *BausteinsichtModel, id string) (*Element, error) {
@@ -30,22 +35,31 @@ func Resolve(m *BausteinsichtModel, id string) (*Element, error) {
 }
 
 // flattenInto recursively adds elements to the map with their full dot-notation path.
-func flattenInto(children map[string]Element, prefix string, result map[string]*Element) {
+func flattenInto(children map[string]Element, prefix string, depth int, result map[string]*Element) error {
+	if depth > MaxElementDepth {
+		return fmt.Errorf("element nesting exceeds maximum depth of %d at %q", MaxElementDepth, strings.TrimSuffix(prefix, "."))
+	}
 	for key, elem := range children {
 		fullID := prefix + key
 		e := elem
 		result[fullID] = &e
 		if elem.Children != nil {
-			flattenInto(elem.Children, fullID+".", result)
+			if err := flattenInto(elem.Children, fullID+".", depth+1, result); err != nil {
+				return err
+			}
 		}
 	}
+	return nil
 }
 
 // FlattenElements returns all elements keyed by full dot-notation ID path.
-func FlattenElements(m *BausteinsichtModel) map[string]*Element {
+// Returns an error if the element hierarchy exceeds MaxElementDepth.
+func FlattenElements(m *BausteinsichtModel) (map[string]*Element, error) {
 	result := make(map[string]*Element)
-	flattenInto(m.Model, "", result)
-	return result
+	if err := flattenInto(m.Model, "", 1, result); err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 // MatchPattern matches elements in the flat map against a pattern.
@@ -113,7 +127,10 @@ func ResolveView(m *BausteinsichtModel, view *View) ([]string, error) {
 		return []string{}, nil
 	}
 
-	flatMap := FlattenElements(m)
+	flatMap, err := FlattenElements(m)
+	if err != nil {
+		return nil, err
+	}
 
 	included := make(map[string]bool)
 	for _, pattern := range view.Include {
@@ -132,5 +149,6 @@ func ResolveView(m *BausteinsichtModel, view *View) ([]string, error) {
 	for id := range included {
 		result = append(result, id)
 	}
+	sort.Strings(result)
 	return result, nil
 }

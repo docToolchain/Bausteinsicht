@@ -67,13 +67,21 @@ func validateElements(m *BausteinsichtModel) []ValidationError {
 		if err := validateElementID(id); err != nil {
 			errs = append(errs, ValidationError{Path: "model." + id, Message: err.Error()})
 		}
-		errs = append(errs, validateElement(m, "model."+id, elem)...)
+		errs = append(errs, validateElement(m, "model."+id, elem, 1)...)
 	}
 	return errs
 }
 
-func validateElement(m *BausteinsichtModel, path string, elem Element) []ValidationError {
+func validateElement(m *BausteinsichtModel, path string, elem Element, depth int) []ValidationError {
 	var errs []ValidationError
+
+	if depth > MaxElementDepth {
+		errs = append(errs, ValidationError{
+			Path:    path,
+			Message: fmt.Sprintf("element nesting exceeds maximum depth of %d", MaxElementDepth),
+		})
+		return errs
+	}
 
 	if elem.Kind == "" {
 		errs = append(errs, ValidationError{Path: path, Message: "missing required field \"kind\""})
@@ -100,7 +108,7 @@ func validateElement(m *BausteinsichtModel, path string, elem Element) []Validat
 		if err := validateElementID(childID); err != nil {
 			errs = append(errs, ValidationError{Path: path + "." + childID, Message: err.Error()})
 		}
-		errs = append(errs, validateElement(m, path+"."+childID, child)...)
+		errs = append(errs, validateElement(m, path+"."+childID, child, depth+1)...)
 	}
 
 	return errs
@@ -155,12 +163,26 @@ func validateRelationships(m *BausteinsichtModel) []ValidationError {
 	return errs
 }
 
+// validLayouts is the set of allowed values for View.Layout.
+var validLayouts = map[string]bool{
+	"":        true,
+	"layered": true,
+	"grid":    true,
+	"none":    true,
+}
+
 func validateViews(m *BausteinsichtModel) []ValidationError {
 	var errs []ValidationError
 	for id, view := range m.Views {
 		path := "views." + id
 		if view.Title == "" {
 			errs = append(errs, ValidationError{Path: path, Message: "missing required field \"title\""})
+		}
+		if !validLayouts[view.Layout] {
+			errs = append(errs, ValidationError{
+				Path:    path,
+				Message: fmt.Sprintf("invalid layout %q (must be \"layered\", \"grid\", \"none\", or empty)", view.Layout),
+			})
 		}
 		if view.Scope != "" {
 			if _, err := lookupElement(m, view.Scope); err != nil {

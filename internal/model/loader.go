@@ -1,6 +1,7 @@
 package model
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -28,7 +29,63 @@ func Load(path string) (*BausteinsichtModel, error) {
 	if err := json.Unmarshal(clean, &m); err != nil {
 		return nil, fmt.Errorf("parsing %s: %w", path, err)
 	}
+
+	m.ElementOrder = extractElementOrder(clean)
+
 	return &m, nil
+}
+
+// extractElementOrder walks the JSON with a streaming decoder to capture the
+// definition order of keys in specification.elements. Go maps don't preserve
+// insertion order, so we need this to determine layer assignment for layout.
+func extractElementOrder(data []byte) []string {
+	// Parse into a raw structure to navigate to specification.elements,
+	// then re-decode that object with a streaming decoder to get key order.
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return nil
+	}
+	specRaw, ok := raw["specification"]
+	if !ok {
+		return nil
+	}
+	var spec map[string]json.RawMessage
+	if err := json.Unmarshal(specRaw, &spec); err != nil {
+		return nil
+	}
+	elemsRaw, ok := spec["elements"]
+	if !ok {
+		return nil
+	}
+
+	// Stream-decode the elements object to capture key order.
+	dec := json.NewDecoder(bytes.NewReader(elemsRaw))
+	tok, err := dec.Token() // consume opening '{'
+	if err != nil {
+		return nil
+	}
+	if d, ok := tok.(json.Delim); !ok || d != '{' {
+		return nil
+	}
+
+	var order []string
+	for dec.More() {
+		tok, err := dec.Token()
+		if err != nil {
+			break
+		}
+		key, ok := tok.(string)
+		if !ok {
+			continue
+		}
+		order = append(order, key)
+		// Skip the value (the element kind object).
+		var discard json.RawMessage
+		if err := dec.Decode(&discard); err != nil {
+			break
+		}
+	}
+	return order
 }
 
 // Save marshals the model and atomically writes it to path.

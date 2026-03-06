@@ -404,6 +404,36 @@ func TestValidateWithWarnings_ValidModel_NoWarnings(t *testing.T) {
 	}
 }
 
+func TestValidate_ViewInvalidLayout(t *testing.T) {
+	m := buildValidModel()
+	m.Views["overview"] = View{
+		Title:   "Overview",
+		Include: []string{"*"},
+		Layout:  "invalid",
+	}
+	errs := Validate(m)
+	if !containsMessage(errs, "invalid layout") {
+		t.Errorf("expected layout validation error, got: %v", errs)
+	}
+}
+
+func TestValidate_ViewValidLayouts(t *testing.T) {
+	for _, layout := range []string{"", "layered", "grid", "none"} {
+		t.Run(layout, func(t *testing.T) {
+			m := buildValidModel()
+			m.Views["overview"] = View{
+				Title:   "Overview",
+				Include: []string{"*"},
+				Layout:  layout,
+			}
+			errs := Validate(m)
+			if containsMessage(errs, "invalid layout") {
+				t.Errorf("layout %q should be valid, got error: %v", layout, errs)
+			}
+		})
+	}
+}
+
 // containsPath checks whether any error has the given path.
 func containsPath(errs []ValidationError, path string) bool {
 	for _, e := range errs {

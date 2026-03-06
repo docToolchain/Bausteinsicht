@@ -18,12 +18,14 @@ import (
 )
 
 func newSyncCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "sync",
 		Short: "Synchronize model and draw.io diagram",
 		Long:  "Runs one bidirectional sync cycle between the architecture model and the draw.io diagram.",
 		RunE:  runSync,
 	}
+	cmd.Flags().Bool("relayout", false, "Re-apply auto-layout to all view pages (resets element positions)")
+	return cmd
 }
 
 func runSync(cmd *cobra.Command, _ []string) error {
@@ -31,6 +33,7 @@ func runSync(cmd *cobra.Command, _ []string) error {
 	modelPath, _ := cmd.Flags().GetString("model")
 	templatePath, _ := cmd.Flags().GetString("template")
 	verbose, _ := cmd.Flags().GetBool("verbose")
+	relayout, _ := cmd.Flags().GetBool("relayout")
 
 	// Auto-detect model file.
 	if modelPath == "" {
@@ -112,7 +115,7 @@ func runSync(cmd *cobra.Command, _ []string) error {
 
 	// Verbose output goes to stderr so it doesn't interfere with JSON on stdout.
 	if verbose && format != "json" {
-		flat := model.FlattenElements(m)
+		flat, _ := model.FlattenElements(m)
 		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Syncing model: %s\n", modelPath)
 		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "  %d elements, %d relationships, %d views\n",
 			len(flat), len(m.Relationships), len(m.Views))
@@ -137,6 +140,7 @@ func runSync(cmd *cobra.Command, _ []string) error {
 	fwdOpts := bsync.ForwardOptions{
 		ModelPath: modelPath,
 		SyncTime:  time.Now().Format("2006-01-02 15:04"),
+		Relayout:  relayout,
 	}
 	result := bsync.Run(m, doc, state, tmpl, newPageIDs, fwdOpts)
 

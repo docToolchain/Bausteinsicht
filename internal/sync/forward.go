@@ -1,6 +1,7 @@
 package sync
 
 import (
+	"sort"
 	"strconv"
 	"strings"
 
@@ -20,6 +21,7 @@ const (
 type ForwardOptions struct {
 	ModelPath string // path to the model file, shown in metadata box
 	SyncTime  string // timestamp string, shown in metadata box
+	Relayout  bool   // when true, clear and re-layout all view pages
 }
 
 // ForwardResult summarises the changes applied to a draw.io document.
@@ -47,7 +49,7 @@ func ApplyForward(
 	opts ...ForwardOptions,
 ) *ForwardResult {
 	result := &ForwardResult{}
-	flat := model.FlattenElements(m)
+	flat, _ := model.FlattenElements(m)
 
 	var fwdOpts ForwardOptions
 	if len(opts) > 0 {
@@ -127,6 +129,13 @@ func applyForwardPerView(
 		}
 
 		scopeID := view.Scope
+
+		// --relayout: clear all managed elements from the page so
+		// populateNewPage treats it as a fresh page.
+		if opts != nil && opts.Relayout {
+			clearPageElements(page)
+		}
+
 		if scopeID != "" {
 			createScopeBoundary(scopeID, viewID, page, templates, flat, result)
 			// Include scope element in the filter so connectors targeting the
@@ -141,7 +150,7 @@ func applyForwardPerView(
 		// #188, #189). For existing pages this handles elements newly
 		// included via view include/exclude changes that don't appear in
 		// the ChangeSet (#231).
-		populateNewPage(page, viewID, scopeID, templates, flat, elemSet, result)
+		populateNewPage(page, viewID, scopeID, templates, flat, elemSet, m, result)
 
 		// Populate connectors for relationships whose endpoints are both
 		// on the page but whose connector doesn't exist yet. This handles
@@ -186,17 +195,60 @@ func populateNewPage(
 	templates *drawio.TemplateSet,
 	flat map[string]*model.Element,
 	elemSet map[string]bool,
+	m *model.BausteinsichtModel,
 	result *ForwardResult,
 ) {
-	pl := computePlacement(page)
+	// Collect elements that need placement.
+	var toPlace []string
 	for id := range elemSet {
 		if id == scopeID {
-			continue // Scope boundary handled separately.
+			continue
 		}
 		if page.FindElement(id) != nil {
-			continue // Already created by applyChangesToPage.
+			continue
 		}
-		applyElementAdded(id, viewID, scopeID, page, templates, flat, &pl, result)
+		toPlace = append(toPlace, id)
+	}
+	if len(toPlace) == 0 {
+		return
+	}
+
+	// Determine if this is a fresh page (no existing bausteinsicht elements).
+	existingElems := page.FindAllElements()
+	isFreshPage := len(existingElems) == 0
+
+	// Look up the view's layout mode.
+	layoutMode := ""
+	for vID, v := range m.Views {
+		if "view-"+vID == page.ID() {
+			layoutMode = v.Layout
+			break
+		}
+	}
+
+	if isFreshPage {
+		// Use layout engine for fresh pages.
+		lr := computeLayout(toPlace, flat, templates, m.ElementOrder, scopeID, layoutMode)
+
+		// Resize the scope boundary if the layout engine computed dimensions.
+		if scopeID != "" && lr.BoundaryWidth > 0 && lr.BoundaryHeight > 0 {
+			resizeScopeBoundary(page, scopeID, lr.BoundaryWidth, lr.BoundaryHeight)
+		}
+
+		sort.Strings(toPlace)
+		for _, id := range toPlace {
+			pos, ok := lr.Positions[id]
+			if !ok {
+				continue
+			}
+			placeSingleElement(id, viewID, scopeID, page, templates, flat, pos.X, pos.Y, result)
+		}
+	} else {
+		// Incremental: fall back to cursor-based placement.
+		pl := computePlacement(page)
+		for _, id := range toPlace {
+			applyElementAdded(id, viewID, scopeID, page, templates, flat, &pl, result)
+		}
 	}
 }
 
@@ -571,6 +623,113 @@ func applyElementAdded(
 
 	pl.nextX += width + elementGap
 	result.ElementsCreated++
+}
+
+// placeSingleElement creates a new element at specific coordinates (used by layout engine).
+func placeSingleElement(
+	id string,
+	viewID string,
+	scopeID string,
+	page *drawio.Page,
+	templates *drawio.TemplateSet,
+	flat map[string]*model.Element,
+	x, y float64,
+	result *ForwardResult,
+) {
+	if page.FindElement(id) != nil {
+		return
+	}
+
+	elem, ok := flat[id]
+	if !ok {
+		result.Warnings = append(result.Warnings, "element not found in model: "+id)
+		return
+	}
+
+	ts, ok := templates.GetStyle(elem.Kind)
+	if !ok {
+		ts = drawio.TemplateStyle{Width: defaultWidth, Height: defaultHeight}
+		result.Warnings = append(result.Warnings, "no template style for kind: "+elem.Kind)
+	}
+
+	style := mergeStyles(ts.Style, newElementMarker)
+
+	width := ts.Width
+	if width == 0 {
+		width = defaultWidth
+	}
+	height := ts.Height
+	if height == 0 {
+		height = defaultHeight
+	}
+
+	data := drawio.ElementData{
+		ID:          id,
+		CellID:      scopedCellID(viewID, id),
+		Kind:        elem.Kind,
+		Title:       elem.Title,
+		Technology:  elem.Technology,
+		Description: elem.Description,
+		X:           x,
+		Y:           y,
+		Width:       width,
+		Height:      height,
+		SubCells:    subCellsFromTemplate(ts),
+	}
+
+	if scopeID != "" && isChildOf(id, scopeID) {
+		data.ParentID = scopedCellID(viewID, scopeID)
+	}
+
+	if err := page.CreateElement(data, style); err != nil {
+		result.Warnings = append(result.Warnings, "failed to create element "+id+": "+err.Error())
+		return
+	}
+
+	result.ElementsCreated++
+}
+
+// resizeScopeBoundary updates the geometry of an existing scope boundary element.
+func resizeScopeBoundary(page *drawio.Page, scopeID string, width, height float64) {
+	obj := page.FindElement(scopeID)
+	if obj == nil {
+		return
+	}
+	cell := obj.FindElement("mxCell")
+	if cell == nil {
+		return
+	}
+	geo := cell.FindElement("mxGeometry")
+	if geo == nil {
+		return
+	}
+	geo.CreateAttr("width", strconv.FormatFloat(width, 'f', -1, 64))
+	geo.CreateAttr("height", strconv.FormatFloat(height, 'f', -1, 64))
+}
+
+// clearPageElements removes all managed bausteinsicht elements and connectors
+// from a page. Used by --relayout to allow the layout engine to reposition
+// everything from scratch.
+func clearPageElements(page *drawio.Page) {
+	root := page.Root()
+	if root == nil {
+		return
+	}
+	// Collect elements to remove (cannot modify tree while iterating).
+	var toRemove []*etree.Element
+	for _, obj := range root.SelectElements("object") {
+		if obj.SelectAttrValue("bausteinsicht_id", "") != "" {
+			toRemove = append(toRemove, obj)
+		}
+	}
+	for _, cell := range root.SelectElements("mxCell") {
+		if strings.HasPrefix(cell.SelectAttrValue("id", ""), "rel-") {
+			toRemove = append(toRemove, cell)
+		}
+	}
+	for _, el := range toRemove {
+		root.RemoveChild(el)
+	}
 }
 
 // subCellsFromTemplate creates SubCellTemplates from a TemplateStyle.

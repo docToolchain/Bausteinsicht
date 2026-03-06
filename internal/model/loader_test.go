@@ -306,6 +306,23 @@ func TestSave_NoPreambleWhenFileStartsWithBrace(t *testing.T) {
 	}
 }
 
+func TestLoad_ElementOrder(t *testing.T) {
+	m, err := Load("testdata/valid-model.jsonc")
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	// valid-model.jsonc defines "system" before "container"
+	want := []string{"system", "container"}
+	if len(m.ElementOrder) != len(want) {
+		t.Fatalf("expected ElementOrder %v, got %v", want, m.ElementOrder)
+	}
+	for i, w := range want {
+		if m.ElementOrder[i] != w {
+			t.Errorf("ElementOrder[%d] = %q, want %q", i, m.ElementOrder[i], w)
+		}
+	}
+}
+
 func TestLoad_NullJSONRoot(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "null-model.jsonc")

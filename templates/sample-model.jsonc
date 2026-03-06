@@ -1,26 +1,32 @@
 {
   "$schema": "https://raw.githubusercontent.com/docToolchain/Bauteinsicht/main/schema/bausteinsicht.schema.json",
 
-  // Define the kinds of elements and relationships used in this model
+  // Specification: define the element kinds and relationship types used in this model.
+  // The order of element kinds determines the layer order in auto-layout
+  // (first = top row, last = bottom row).
   "specification": {
     "elements": {
       "actor": {
         "notation": "Actor",
-        "description": "A person or external system that interacts with the system"
+        "description": "A person or role that interacts with the system"
       },
       "system": {
         "notation": "Software System",
         "description": "A top-level software system",
         "container": true
       },
+      "external": {
+        "notation": "External System",
+        "description": "A third-party system outside your control"
+      },
       "container": {
         "notation": "Container",
-        "description": "A deployable unit within a system",
+        "description": "A deployable unit (application, service, data store)",
         "container": true
       },
       "component": {
         "notation": "Component",
-        "description": "A logical grouping within a container",
+        "description": "A logical module within a container",
         "container": true
       }
     },
@@ -28,122 +34,172 @@
       "uses": {
         "notation": "uses"
       },
-      "includes": {
-        "notation": "includes",
+      "async": {
+        "notation": "publishes/subscribes",
         "dashed": true
       }
     }
   },
 
-  // The architecture model: elements and their hierarchy
+  // Architecture model: elements and their hierarchy
   "model": {
-    // External actor
+    // Actors
     "customer": {
       "kind": "actor",
       "title": "Customer",
-      "description": "End user who browses and purchases products in the online shop"
+      "description": "End user who browses products and places orders"
+    },
+    "backoffice-user": {
+      "kind": "actor",
+      "title": "Back-Office User",
+      "description": "Internal staff managing inventory and processing orders"
     },
 
-    // Top-level system with nested containers
+    // The main system
     "onlineshop": {
       "kind": "system",
       "title": "Online Shop",
       "description": "E-commerce platform for selling products online",
       "children": {
-        // Web frontend container
         "frontend": {
           "kind": "container",
           "title": "Web Frontend",
           "technology": "React",
-          "description": "Browser-based UI for browsing and ordering products"
+          "description": "Single-page application for browsing and ordering"
         },
-        // REST API container with components
         "api": {
           "kind": "container",
           "title": "REST API",
           "technology": "Go",
-          "description": "Backend service that handles business logic and data access",
+          "description": "Backend service handling business logic",
           "children": {
             "catalog": {
               "kind": "component",
               "title": "Product Catalog",
               "technology": "Go",
-              "description": "Manages product listings and search"
+              "description": "Manages product listings, search and categories"
             },
             "orders": {
               "kind": "component",
-              "title": "Order Management",
+              "title": "Order Processing",
               "technology": "Go",
-              "description": "Processes and tracks customer orders"
+              "description": "Handles order lifecycle from cart to fulfillment"
+            },
+            "notifications": {
+              "kind": "component",
+              "title": "Notification Service",
+              "technology": "Go",
+              "description": "Sends order confirmations and shipping updates"
             }
           }
         },
-        // Database container
         "db": {
           "kind": "container",
           "title": "Database",
           "technology": "PostgreSQL",
-          "description": "Persistent storage for products, orders and customers"
+          "description": "Stores products, orders and customer data"
+        },
+        "cache": {
+          "kind": "container",
+          "title": "Cache",
+          "technology": "Redis",
+          "description": "Caches product catalog for fast read access"
         }
       }
+    },
+
+    // External systems
+    "payment-provider": {
+      "kind": "external",
+      "title": "Payment Provider",
+      "technology": "Stripe API",
+      "description": "Processes credit card and bank transfer payments"
+    },
+    "email-service": {
+      "kind": "external",
+      "title": "E-Mail Service",
+      "technology": "SMTP",
+      "description": "Delivers transactional emails to customers"
     }
   },
 
-  // Relationships between elements (dot notation for nested elements)
+  // Relationships between elements (use dot notation for nested elements)
   "relationships": [
     {
       "from": "customer",
       "to": "onlineshop.frontend",
-      "label": "uses",
-      "kind": "uses",
-      "description": "Browses products and places orders via browser"
+      "label": "browses & orders",
+      "kind": "uses"
+    },
+    {
+      "from": "backoffice-user",
+      "to": "onlineshop.api",
+      "label": "manages inventory",
+      "kind": "uses"
     },
     {
       "from": "onlineshop.frontend",
       "to": "onlineshop.api",
-      "label": "calls",
-      "kind": "uses",
-      "description": "Sends REST API requests over HTTPS"
+      "label": "REST/JSON",
+      "kind": "uses"
     },
     {
       "from": "onlineshop.api",
       "to": "onlineshop.db",
       "label": "reads/writes",
-      "kind": "uses",
-      "description": "Persists and retrieves data"
+      "kind": "uses"
+    },
+    {
+      "from": "onlineshop.api.catalog",
+      "to": "onlineshop.cache",
+      "label": "reads",
+      "kind": "uses"
     },
     {
       "from": "onlineshop.api.catalog",
       "to": "onlineshop.db",
-      "label": "queries",
+      "label": "queries products",
       "kind": "uses"
     },
     {
       "from": "onlineshop.api.orders",
       "to": "onlineshop.db",
-      "label": "reads/writes",
+      "label": "persists orders",
       "kind": "uses"
+    },
+    {
+      "from": "onlineshop.api.orders",
+      "to": "payment-provider",
+      "label": "charges payment",
+      "kind": "uses"
+    },
+    {
+      "from": "onlineshop.api.notifications",
+      "to": "email-service",
+      "label": "sends emails",
+      "kind": "async"
     }
   ],
 
-  // View definitions: what to show on each diagram page
+  // Views: each view becomes a page in the draw.io diagram
   "views": {
     "context": {
       "title": "System Context",
-      "include": ["customer", "onlineshop"],
-      "description": "High-level view showing the Online Shop and its users"
+      "include": ["customer", "backoffice-user", "onlineshop", "payment-provider", "email-service"],
+      "description": "High-level view showing the Online Shop, its users and external dependencies",
+      "layout": "layered"
     },
     "containers": {
       "title": "Container View",
       "scope": "onlineshop",
-      "include": ["customer", "onlineshop.*"],
-      "description": "Internal structure of the Online Shop system"
+      "include": ["customer", "backoffice-user", "onlineshop.*", "payment-provider", "email-service"],
+      "description": "Internal structure of the Online Shop: containers and their interactions"
     },
     "components": {
       "title": "API Components",
       "scope": "onlineshop.api",
-      "include": ["onlineshop.api.*", "onlineshop.db"],
-      "description": "Components inside the REST API container"
+      "include": ["onlineshop.api.*", "onlineshop.db", "onlineshop.cache", "payment-provider", "email-service"],
+      "description": "Components inside the REST API and their external dependencies"
     }
   }
 }

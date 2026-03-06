@@ -204,7 +204,9 @@ $ bausteinsicht validate --format json
 
 Runs one bidirectional synchronization cycle between the architecture model and the draw.io diagram.
 
-**Flags:** No command-specific flags. Uses global flags only.
+**Flags:**
+
+* `--relayout` -- Re-apply auto-layout to all view pages, resetting element positions to the layout engine's computed positions. Without this flag, existing element positions are preserved.
 
 **Behavior:**
 

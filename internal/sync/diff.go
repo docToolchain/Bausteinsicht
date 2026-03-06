@@ -2,6 +2,7 @@ package sync
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/docToolchain/Bauteinsicht/internal/drawio"
@@ -180,7 +181,7 @@ func computeNewPageOnlyElements(m *model.BausteinsichtModel, newPageIDs map[stri
 func DetectChanges(m *model.BausteinsichtModel, doc *drawio.Document, lastState *SyncState, newPageIDs map[string]bool) *ChangeSet {
 	cs := &ChangeSet{}
 
-	flatModel := model.FlattenElements(m)
+	flatModel, _ := model.FlattenElements(m)
 	drawioElems := extractDrawioElements(doc)
 	visibleElems := computeVisibleElements(m)
 	newPageOnly := computeNewPageOnlyElements(m, newPageIDs)
@@ -452,9 +453,14 @@ func detectElementChanges(
 	visibleElems map[string]bool,
 	newPageOnly map[string]bool,
 ) {
-	allIDs := unionElementIDs(flatModel, drawioElems, lastState)
+	allIDsMap := unionElementIDs(flatModel, drawioElems, lastState)
+	allIDs := make([]string, 0, len(allIDsMap))
+	for id := range allIDsMap {
+		allIDs = append(allIDs, id)
+	}
+	sort.Strings(allIDs)
 
-	for id := range allIDs {
+	for _, id := range allIDs {
 		me, inModel := flatModel[id]
 		de, inDrawio := drawioElems[id]
 		lastElem, inLast := lastState.Elements[id]

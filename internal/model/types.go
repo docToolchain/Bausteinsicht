@@ -16,6 +16,10 @@ type BausteinsichtModel struct {
 	Model         map[string]Element `json:"model"`
 	Relationships []Relationship     `json:"relationships"`
 	Views         map[string]View    `json:"views"`
+
+	// ElementOrder stores the definition order of element kinds from
+	// specification.elements. Used by the layout engine for layer assignment.
+	ElementOrder []string `json:"-"`
 }
 
 type Specification struct {
@@ -58,4 +62,5 @@ type View struct {
 	Include     []string `json:"include,omitempty"`
 	Exclude     []string `json:"exclude,omitempty"`
 	Description string   `json:"description,omitempty"`
+	Layout      string   `json:"layout,omitempty"`
 }
