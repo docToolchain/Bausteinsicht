@@ -1,0 +1,612 @@
+= Bausteinsicht Software Review (LASR)
+:author: Architecture Review Board
+:revdate: 2026-03-06
+:toc: left
+:toclevels: 3
+:sectnums:
+
+== Review Context
+
+This document records the results of a Lightweight Approach for Software Reviews (LASR) of Bausteinsicht v1, conducted on 2026-03-06.
+
+=== Method
+
+LASR is a lean, structured review method developed by Stefan Toth and Stefan Zörner.
+It combines the goal orientation of ATAM with the effective risk search of pre-mortem analysis.
+The method produces a visual gap profile (spider chart) that highlights potential weaknesses at a glance.
+
+=== LASR Steps
+
+1. **Lean Mission Statement** — condense the system's vision
+2. **Evaluation Scale** — identify top quality goals with target values (0–100)
+3. **Risk-Based Review** — identify risks using risk cards, map to quality goals, assess current state
+4. **Target-Oriented Discussion** — deep-dive only into areas with high uncertainty
+
+=== Companion Document
+
+This review complements the link:2026-03-06-architecture-review.adoc[ATAM Architecture Review] conducted on the same date.
+Where ATAM provides comprehensive analysis of sensitivity points and tradeoffs, LASR provides a quick visual gap profile.
+
+
+== Step 1: Lean Mission Statement
+
+****
+**Bausteinsicht** is an architecture-as-code CLI tool that uses JSONC models with JSON Schema validation and draw.io as a visual frontend.
+It provides bidirectional synchronization between the text-based model and the diagram, enabling developers and architects to maintain architecture documentation that is both machine-readable (for LLMs and CI/CD) and visually appealing (for stakeholders).
+The tool ships as a single Go binary with zero runtime dependencies.
+****
+
+
+== Step 2: Evaluation Scale — Quality Goals
+
+The top 5 quality goals are derived from the link:chapters/10_quality_requirements.adoc[quality requirements] and the project's business goals.
+Each goal is assigned a **target value** (where we want to be for v1) on a 0–100 scale.
+
+[cols="1,3,1"]
+|===
+| ID | Quality Goal | Target
+
+| QG-1
+| **Learnability** — New user productive within 30 minutes
+| 85
+
+| QG-2
+| **IDE Support** — Autocompletion and validation without plugins
+| 90
+
+| QG-3
+| **LLM Friendliness** — AI agents can read/write models via CLI
+| 85
+
+| QG-4
+| **Sync Reliability** — No silent data loss in bidirectional sync
+| 95
+
+| QG-5
+| **Installability** — Download to first command in under 1 minute
+| 95
+|===
+
+
+== Step 3: Risk-Based Review
+
+Risks are identified using the LASR risk card categories and mapped to the quality goals they affect.
+The **current value** reflects the assessed state after risk identification.
+
+=== Risk Card Category: Legacy / Existing Code
+
+[cols="1,3,1"]
+|===
+| Risk | Description | Affects
+
+| LC-1
+| JSONC PatchSave is a byte-level patcher with inherent fragility. Unusual formatting or new field types can trigger fallback to full rewrite, losing comments.
+| QG-4
+
+| LC-2
+| Sync state file (`.bausteinsicht-sync`) has no integrity check. Corruption causes full re-sync, potentially duplicating elements.
+| QG-4
+|===
+
+=== Risk Card Category: Platforms / Runtime
+
+[cols="1,3,1"]
+|===
+| Risk | Description | Affects
+
+| PL-1
+| draw.io XML format is not formally versioned. Breaking changes in draw.io could break the sync engine.
+| QG-4
+
+| PL-2
+| draw.io desktop app required for visual editing — not all users have it installed; web version has different behavior.
+| QG-1
+|===
+
+=== Risk Card Category: Third-Party Systems
+
+[cols="1,3,1"]
+|===
+| Risk | Description | Affects
+
+| TP-1
+| JSON Schema must be registered on SchemaStore for zero-config IDE support. Registration is a dependency on an external service.
+| QG-2
+
+| TP-2
+| Only 5 direct Go dependencies, all clean. No npm supply chain risk. **Low risk.**
+| —
+|===
+
+=== Risk Card Category: Build / Deployment
+
+[cols="1,3,1"]
+|===
+| Risk | Description | Affects
+
+| BD-1
+| Cross-compilation produces binaries for all platforms from single machine. Well-tested. **Low risk.**
+| —
+|===
+
+=== Risk Card Category: Methodology / Process
+
+[cols="1,3,1"]
+|===
+| Risk | Description | Affects
+
+| MP-1
+| `bausteinsicht init` generates a default template and sample model, but users who skip `init` and start from scratch must understand the template mechanism. Documentation of the init workflow is critical.
+| QG-1
+
+| MP-2
+| CLI-only interface — no real-time feedback while editing. Users must run `validate` manually. Discoverability depends on documentation.
+| QG-1, QG-3
+
+| MP-3
+| No auto-layout on first sync. Elements appear in a flat row; users must arrange manually in draw.io. LLM-generated diagrams look poor.
+| QG-1, QG-3
+|===
+
+=== Risk Card Category: Security
+
+[cols="1,3,1"]
+|===
+| Risk | Description | Affects
+
+| SC-1
+| Path traversal via `--model`/`--template` flags when invoked by automated agents with untrusted input.
+| QG-3
+
+| SC-2
+| No XXE, no command injection, no deserialization attacks. Safe JSON/XML processing. **Non-risk.**
+| —
+|===
+
+=== Risk Card Category: Testing / Quality Assurance
+
+[cols="1,3,1"]
+|===
+| Risk | Description | Affects
+
+| QA-1
+| 26 of 215 E2E tests are skipped (mostly environment-related). Reduces confidence in some edge cases.
+| QG-4
+
+| QA-2
+| 1 known failure: preamble comments before root `{` lost during reverse sync. Low severity but affects comment preservation promise.
+| QG-4, QG-1
+|===
+
+=== Risk Card Category: Organization / People
+
+[cols="1,3,1"]
+|===
+| Risk | Description | Affects
+
+| OP-1
+| Small maintainer base. Bus factor risk for sync engine knowledge.
+| QG-4
+|===
+
+=== Current Assessment
+
+Based on the identified risks, the current values are assessed:
+
+[cols="1,3,1,1,1"]
+|===
+| ID | Quality Goal | Target | Current | Gap
+
+| QG-1
+| Learnability
+| 85
+| 75
+| -10
+
+| QG-2
+| IDE Support
+| 90
+| 85
+| -5
+
+| QG-3
+| LLM Friendliness
+| 85
+| 75
+| -10
+
+| QG-4
+| Sync Reliability
+| 95
+| 80
+| -15
+
+| QG-5
+| Installability
+| 95
+| 95
+| 0
+|===
+
+**Gap rationale:**
+
+* **QG-1 (–10):** `bausteinsicht init` provides a good starting point with default template and sample model. Remaining gap from no auto-layout (MP-3) and CLI-only discoverability (MP-2).
+* **QG-2 (–5):** Schema coverage is good. Small gap from SchemaStore registration dependency (TP-1) and potential schema lag behind new features.
+* **QG-3 (–10):** JSON + CLI is excellent for LLMs. Gap from poor auto-layout (MP-3), path traversal in agent scenarios (SC-1), and no `--format json` on all commands yet.
+* **QG-4 (–15):** Three-way merge works well. Gap from PatchSave fragility (LC-1), no state file integrity check (LC-2), draw.io format dependency (PL-1), skipped tests (QA-1), and known comment loss (QA-2).
+* **QG-5 (0):** Single Go binary, zero dependencies. Fully achieved.
+
+
+== Gap Profile (Spider Chart)
+
+The spider chart visualizes the target (green) vs. current (blue) quality profile.
+
+[vega]
+....
+{
+  "$schema": "https://vega.github.io/schema/vega/v5.json",
+  "description": "LASR Gap Profile — Bausteinsicht v1",
+  "width": 420,
+  "height": 420,
+  "padding": 70,
+  "autosize": {"type": "none", "contains": "padding"},
+  "signals": [
+    {"name": "radius", "update": "width / 2"}
+  ],
+  "data": [
+    {
+      "name": "table",
+      "values": [
+        {"key": "Learnability",     "value": 85, "category": "Target"},
+        {"key": "IDE Support",      "value": 90, "category": "Target"},
+        {"key": "LLM Friendliness", "value": 85, "category": "Target"},
+        {"key": "Sync Reliability", "value": 95, "category": "Target"},
+        {"key": "Installability",   "value": 95, "category": "Target"},
+        {"key": "Learnability",     "value": 75, "category": "Current"},
+        {"key": "IDE Support",      "value": 85, "category": "Current"},
+        {"key": "LLM Friendliness", "value": 75, "category": "Current"},
+        {"key": "Sync Reliability", "value": 80, "category": "Current"},
+        {"key": "Installability",   "value": 95, "category": "Current"}
+      ]
+    },
+    {
+      "name": "keys",
+      "source": "table",
+      "transform": [
+        {"type": "aggregate", "groupby": ["key"]}
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "angular",
+      "type": "point",
+      "range": {"signal": "[-PI, PI]"},
+      "padding": 0.5,
+      "domain": {"data": "table", "field": "key"}
+    },
+    {
+      "name": "radial",
+      "type": "linear",
+      "range": {"signal": "[0, radius]"},
+      "zero": true,
+      "nice": false,
+      "domain": [0, 100]
+    },
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": ["Target", "Current"],
+      "range": ["#2ca02c", "#1f77b4"]
+    }
+  ],
+  "encode": {
+    "enter": {
+      "x": {"signal": "radius"},
+      "y": {"signal": "radius"}
+    }
+  },
+  "marks": [
+    {
+      "type": "line",
+      "name": "fifty-line",
+      "from": {"data": "keys"},
+      "encode": {
+        "enter": {
+          "interpolate": {"value": "linear-closed"},
+          "x": {"signal": "scale('radial', 50) * cos(scale('angular', datum.key))"},
+          "y": {"signal": "scale('radial', 50) * sin(scale('angular', datum.key))"},
+          "stroke": {"value": "#e0e0e0"},
+          "strokeWidth": {"value": 1},
+          "strokeDash": {"value": [4, 4]}
+        }
+      }
+    },
+    {
+      "type": "group",
+      "name": "categories",
+      "zindex": 1,
+      "from": {
+        "facet": {"data": "table", "name": "facet", "groupby": ["category"]}
+      },
+      "marks": [
+        {
+          "type": "line",
+          "name": "category-line",
+          "from": {"data": "facet"},
+          "encode": {
+            "enter": {
+              "interpolate": {"value": "linear-closed"},
+              "x": {"signal": "scale('radial', datum.value) * cos(scale('angular', datum.key))"},
+              "y": {"signal": "scale('radial', datum.value) * sin(scale('angular', datum.key))"},
+              "stroke": {"scale": "color", "field": "category"},
+              "strokeWidth": {"value": 2},
+              "fill": {"scale": "color", "field": "category"},
+              "fillOpacity": {"value": 0.15}
+            }
+          }
+        },
+        {
+          "type": "symbol",
+          "from": {"data": "facet"},
+          "encode": {
+            "enter": {
+              "x": {"signal": "scale('radial', datum.value) * cos(scale('angular', datum.key))"},
+              "y": {"signal": "scale('radial', datum.value) * sin(scale('angular', datum.key))"},
+              "fill": {"scale": "color", "field": "category"},
+              "size": {"value": 40}
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "rule",
+      "name": "radial-grid",
+      "from": {"data": "keys"},
+      "zindex": 0,
+      "encode": {
+        "enter": {
+          "x": {"value": 0},
+          "y": {"value": 0},
+          "x2": {"signal": "radius * cos(scale('angular', datum.key))"},
+          "y2": {"signal": "radius * sin(scale('angular', datum.key))"},
+          "stroke": {"value": "#ddd"},
+          "strokeWidth": {"value": 1}
+        }
+      }
+    },
+    {
+      "type": "text",
+      "name": "key-label",
+      "from": {"data": "keys"},
+      "zindex": 2,
+      "encode": {
+        "enter": {
+          "x": {"signal": "(radius + 14) * cos(scale('angular', datum.key))"},
+          "y": {"signal": "(radius + 14) * sin(scale('angular', datum.key))"},
+          "text": {"field": "key"},
+          "align": [
+            {"test": "abs(scale('angular', datum.key)) > PI / 2", "value": "right"},
+            {"value": "left"}
+          ],
+          "baseline": [
+            {"test": "scale('angular', datum.key) > 0", "value": "top"},
+            {"test": "scale('angular', datum.key) == 0", "value": "middle"},
+            {"value": "bottom"}
+          ],
+          "fill": {"value": "#333"},
+          "fontSize": {"value": 13},
+          "fontWeight": {"value": "bold"}
+        }
+      }
+    },
+    {
+      "type": "line",
+      "name": "outer-line",
+      "from": {"data": "radial-grid"},
+      "encode": {
+        "enter": {
+          "interpolate": {"value": "linear-closed"},
+          "x": {"field": "x2"},
+          "y": {"field": "y2"},
+          "stroke": {"value": "#ddd"},
+          "strokeWidth": {"value": 1}
+        }
+      }
+    }
+  ],
+  "legends": [
+    {
+      "stroke": "color",
+      "title": "Profile",
+      "orient": "bottom-right",
+      "encode": {
+        "symbols": {
+          "update": {
+            "strokeWidth": {"value": 2},
+            "size": {"value": 80}
+          }
+        }
+      }
+    }
+  ]
+}
+....
+
+
+== Step 4: Target-Oriented Discussion
+
+LASR focuses discussion only on areas with significant gaps.
+Two areas show the largest deviation: **Sync Reliability (–15)** and **Learnability (–10)**.
+
+=== Focus Area: Learnability (QG-1, Gap: –10)
+
+**Root causes:**
+
+1. *No auto-layout (MP-3)* — After first sync, elements appear in a flat row. Users need to know draw.io well enough to rearrange. First impression is poor.
+2. *CLI discoverability (MP-2)* — Command names are intuitive (`sync`, `validate`, `add-element`), but users must read docs to discover them.
+3. *Init workflow awareness (MP-1)* — `bausteinsicht init` provides a default template and sample model, but users who skip it and start from scratch face a steeper learning curve.
+
+**Discussion:**
+
+The `init` command significantly lowers the onboarding barrier — template and sample model are generated automatically.
+The remaining gap comes from no auto-layout (first impression is a flat row of elements) and CLI-only discoverability.
+Auto-layout is a larger engineering effort better suited for post-release.
+
+**Confidence:** Medium — the gap estimate depends on user testing that has not been formally conducted.
+
+=== Focus Area: Sync Reliability (QG-4, Gap: –15)
+
+**Root causes:**
+
+1. *PatchSave fragility (LC-1)* — The byte-level patcher is the most complex and least understood part of the codebase. Edge cases exist.
+2. *No state file integrity check (LC-2)* — A corrupted state file causes unpredictable sync behavior.
+3. *draw.io format dependency (PL-1)* — External risk, cannot be fully mitigated.
+4. *Skipped tests (QA-1)* — 26 skipped E2E tests reduce confidence in edge cases.
+5. *Known comment loss (QA-2)* — Preamble comments are lost during reverse sync.
+
+**Discussion:**
+
+The sync engine is architecturally sound (three-way merge, collision guards, conflict warnings).
+The gap comes from edge-case robustness, not fundamental design flaws.
+The highest-leverage fix is adding a PatchSave development checklist (link:2026-03-06-architecture-review.adoc#_group_a_before_v1_release[ATAM Recommendation A.2]) to prevent regressions.
+State file integrity (link:2026-03-06-architecture-review.adoc#_group_b_after_v1_release[ATAM Recommendation B.1]) and reducing skipped tests are post-release improvements.
+
+**Confidence:** Medium-High — the 188 passing E2E tests provide strong evidence for the core path; uncertainty is in edge cases.
+
+=== Stable Areas
+
+* **Installability (QG-5, Gap: 0)** — Fully achieved. Single Go binary with zero dependencies. No discussion needed.
+* **IDE Support (QG-2, Gap: –5)** — Small gap, well-understood. JSON Schema approach is proven and working.
+* **LLM Friendliness (QG-3, Gap: –10)** — Good foundation (JSON + CLI). Gap is mostly inherited from learnability issues (no template, no auto-layout) and the path traversal risk in agent scenarios.
+
+
+== LASR vs. ATAM Comparison
+
+Both reviews were conducted on the same system on the same date.
+This section compares the findings.
+
+=== Method Comparison
+
+[cols="1,2,2"]
+|===
+| Aspect | ATAM (this project) | LASR (this project)
+
+| Effort
+| ~4 hours (retrospective, document-based)
+| ~2 hours (structured, card-based)
+
+| Primary output
+| 5 sensitivity points, 6 tradeoffs, 8 risks, 7 non-risks, 12 recommendations
+| Spider chart with 5 quality goals, 15 risks across 8 categories
+
+| Visualization
+| Tables and text
+| Gap profile radar chart (target vs. current)
+
+| Depth
+| Deep — each risk/SP/TP with full analysis
+| Broad — quick identification, focused discussion on top gaps
+
+| Actionability
+| 12 prioritized recommendations (A/B/C groups)
+| 2 focus areas with root cause analysis
+|===
+
+=== Finding Convergence
+
+Both methods identified the same top concerns:
+
+[cols="1,2,2"]
+|===
+| Concern | ATAM Finding | LASR Finding
+
+| PatchSave fragility
+| SP-2 (MEDIUM), R-5 (MEDIUM/MEDIUM)
+| LC-1, contributes to QG-4 gap
+
+| Init workflow discoverability
+| TP-6, Recommendation A.3
+| MP-1, contributes to QG-1 gap
+
+| draw.io format dependency
+| R-3 (MEDIUM/HIGH)
+| PL-1, contributes to QG-4 gap
+
+| Path traversal in agent mode
+| R-1 (MEDIUM/MEDIUM)
+| SC-1, contributes to QG-3 gap
+
+| No auto-layout
+| TP-1
+| MP-3, contributes to QG-1 and QG-3 gaps
+
+| State file integrity
+| R-2 (LOW/HIGH)
+| LC-2, contributes to QG-4 gap
+|===
+
+=== Unique Contributions
+
+[cols="1,3"]
+|===
+| Method | Unique insight
+
+| ATAM
+| Tradeoff analysis reveals the *tension* between quality attributes (e.g., TP-4: model-wins favors LLM workflows but penalizes draw.io users). Sensitivity points identify *where small changes have outsized impact*.
+
+| LASR
+| The gap profile provides an *at-a-glance* view of overall architecture health. The pre-mortem approach surfaced organizational risks (OP-1: bus factor) that ATAM's approach-focused analysis did not emphasize.
+|===
+
+=== Recommendation
+
+Use both methods together:
+
+* **LASR** for regular health checks (e.g., quarterly) — quick, visual, identifies drift
+* **ATAM** for milestone reviews (e.g., pre-release, major redesign) — thorough, documented, decision-oriented
+
+
+== Appendix: Risk Card Tally
+
+[cols="2,1,1"]
+|===
+| Category | Risks Found | Critical
+
+| Legacy / Existing Code
+| 2
+| 1
+
+| Platforms / Runtime
+| 2
+| 1
+
+| Third-Party Systems
+| 2
+| 0
+
+| Build / Deployment
+| 1
+| 0
+
+| Methodology / Process
+| 3
+| 1
+
+| Security
+| 2
+| 0
+
+| Testing / QA
+| 2
+| 0
+
+| Organization / People
+| 1
+| 0
+
+| **Total**
+| **15**
+| **3**
+|===

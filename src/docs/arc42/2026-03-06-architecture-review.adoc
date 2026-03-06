@@ -1,0 +1,808 @@
+= Bausteinsicht Architecture Review (ATAM)
+:author: Architecture Review Board
+:revdate: 2026-03-06
+:toc: left
+:toclevels: 3
+:sectnums:
+
+== Review Context and Scope
+
+This document records the results of an Architecture Tradeoff Analysis Method (ATAM) review of Bausteinsicht v1, conducted on 2026-03-06.
+
+=== Method
+
+The ATAM is a structured method for evaluating software architectures against quality attribute requirements.
+It identifies _sensitivity points_ (architectural decisions that critically affect a single quality attribute), _tradeoff points_ (decisions that affect multiple quality attributes in tension), _risks_ (decisions that may cause problems), and _non-risks_ (decisions confirmed as safe).
+
+=== Scope
+
+This review covers the Bausteinsicht v1 architecture as documented in the arc42 template (chapters 1-11), the four Architecture Decision Records (ADR-001 through ADR-004), and the sync specification.
+It is a retrospective review performed before the v1 public release.
+
+=== Audience
+
+Maintainers, contributors, and adopters evaluating Bausteinsicht for use in their organizations.
+
+=== Input Artifacts
+
+* link:chapters/10_quality_requirements.adoc[Chapter 10 — Quality Requirements] (QS-1 through QS-6)
+* link:ADRs/ADR-001-DSL-Format.adoc[ADR-001 — DSL Format (JSONC)]
+* link:ADRs/ADR-002-Implementation-Language.adoc[ADR-002 — Implementation Language (Go)]
+* link:ADRs/ADR-003-Risk-Classification.adoc[ADR-003 — Risk Classification]
+* link:ADRs/ADR-004-Sequence-Diagram-Export.adoc[ADR-004 — Sequence Diagram Export (Rejected)]
+* link:../spec/05_sync_specification.adoc[Sync Specification]
+* link:../security/2026-03-01-security-review.adoc[Security Review 2026-03-01]
+* link:../e2e-test-report-2026-03-05.adoc[E2E Test Report 2026-03-05]
+
+
+== Business and Architecture Drivers
+
+=== Business Goals
+
+[cols="1,3"]
+|===
+| ID | Goal
+
+| BG-1
+| Provide an architecture-as-code tool that uses draw.io as visual frontend — no vendor lock-in to proprietary diagramming tools.
+
+| BG-2
+| Enable LLM agents to read, write, and manipulate architecture models via CLI and JSON — supporting AI-assisted architecture work.
+
+| BG-3
+| Minimize onboarding friction: new users productive within 30 minutes, no plugins required.
+
+| BG-4
+| Ship as a single binary with zero runtime dependencies — frictionless adoption in enterprise environments.
+|===
+
+=== Stakeholder Concerns
+
+[cols="1,2,2"]
+|===
+| Stakeholder | Concern | Addressed by
+
+| Architect (user)
+| Can I model my specific architecture without hitting artificial limits?
+| QS-6, flexible hierarchy
+
+| Developer (user)
+| Will my IDE help me write the model file correctly?
+| QS-2, JSON Schema
+
+| DevOps / LLM operator
+| Can I automate architecture updates in CI/CD?
+| QS-3, QS-5, CLI interface
+
+| Security officer
+| Does the tool introduce supply chain or runtime risks?
+| ADR-002 (Go, no npm), security review
+|===
+
+=== Utility Tree
+
+The utility tree maps quality attributes to concrete scenarios with importance (H/M/L) and difficulty (H/M/L) ratings.
+
+[cols="2,3,1,1"]
+|===
+| Quality Scenario | Description | Importance | Difficulty
+
+| QS-1: Learnability
+| New user creates 3 elements, 2 relationships, 1 view in 30 min
+| H
+| M
+
+| QS-2: IDE Support
+| Autocompletion/validation in VS Code, IntelliJ, Neovim without plugins
+| H
+| L
+
+| QS-3: LLM Friendliness
+| LLM agent adds microservice without human intervention
+| H
+| M
+
+| QS-4: Sync Reliability
+| No silent data loss; conflicts produce warnings
+| H
+| H
+
+| QS-5: Installability
+| Download to first command in under 1 minute
+| M
+| L
+
+| QS-6: Flexible Hierarchy
+| 3+ nesting levels beyond C4, no artificial limits
+| M
+| L
+|===
+
+
+== Architecture Approaches
+
+Seven architectural approaches were identified and analyzed.
+
+=== AP-1: JSONC with JSON Schema
+
+_Reference: link:ADRs/ADR-001-DSL-Format.adoc[ADR-001]_
+
+The architecture model is defined in JSONC (JSON with Comments) and validated against a JSON Schema.
+JSONC provides universal IDE support via SchemaStore, is natively readable by LLMs, and requires no custom parser.
+The schema serves as living documentation and enables autocompletion without plugins.
+
+*Addresses:* QS-1 (learnability via familiar format), QS-2 (IDE support), QS-3 (LLM friendliness), QS-6 (schema allows arbitrary nesting).
+
+=== AP-2: Go Single Binary
+
+_Reference: link:ADRs/ADR-002-Implementation-Language.adoc[ADR-002]_
+
+The tool is implemented in Go, producing a statically linked binary with no runtime dependencies.
+Go provides compile-time type safety, fast startup (<10 ms), cross-compilation from a single build machine, and a minimal supply chain (no post-install script execution).
+
+*Addresses:* QS-5 (installability), BG-4 (zero dependencies), security concerns (no npm supply chain).
+
+=== AP-3: draw.io with Template-Based Styling
+
+Element appearance in draw.io is controlled by template files that are themselves draw.io diagrams.
+The sync engine looks up element kinds in the template and copies the visual style.
+This avoids a custom style language and lets users design templates in the same tool they use for viewing.
+
+*Addresses:* QS-1 (no new style syntax to learn), BG-1 (draw.io as frontend).
+
+=== AP-4: Three-Way Merge Sync Engine
+
+Bidirectional synchronization uses a `.bausteinsicht-sync` state file containing SHA-256 hashes of the last known model and draw.io state.
+On sync, the engine compares current model, current draw.io, and last-known state to determine which side changed.
+Conflicts (same field changed on both sides) produce warnings; non-conflicting changes merge cleanly.
+
+*Addresses:* QS-4 (sync reliability), BG-1 (bidirectional flow with draw.io).
+
+=== AP-5: Pipes-and-Filters Decomposition
+
+The codebase is organized into four packages with clear data flow: `model` (JSON world) -> `sync` (three-way merge) -> `drawio` (XML world), orchestrated by a thin `CLI` layer.
+Each package operates on its own data representation, with the sync engine mediating between them.
+
+*Addresses:* maintainability, testability, separation of concerns.
+
+=== AP-6: Comment-Preserving JSONC Patcher
+
+Reverse sync (draw.io -> model) uses a byte-level JSONC patcher (`PatchSave`) rather than full JSON round-trip.
+This preserves user comments, formatting, and trailing commas in the model file.
+
+*Addresses:* QS-1 (users expect their comments to survive), QS-4 (no silent formatting loss).
+
+=== AP-7: CLI-Only Interface
+
+All functionality is exposed exclusively through CLI commands (`sync`, `validate`, `watch`, `add-element`, `add-relationship`, `export-diagram`, `export-table`).
+There is no GUI, web UI, or language server.
+
+*Addresses:* QS-3 (LLM agents invoke CLI), QS-5 (nothing to install beyond the binary), BG-2 (automation).
+
+
+== Quality Scenario Analysis
+
+Each quality scenario is analyzed against the architecture approaches, identifying sensitivity and tradeoff points.
+
+=== QS-1: Learnability (H, M)
+
+[cols="1,3"]
+|===
+| Approach | Analysis
+
+| AP-1 (JSONC)
+| JSON is universally known. JSONC comments allow inline documentation. The schema provides guardrails during editing. *Positive.*
+
+| AP-3 (Templates)
+| Templates are draw.io files — users already know the tool. No style DSL to learn. *Positive.*
+
+| AP-6 (Patcher)
+| Comments survive sync, so documentation embedded in the model is preserved. *Positive.*
+
+| AP-7 (CLI)
+| CLI has a learning curve vs. a GUI, but commands are few and well-documented. *Neutral.* See <<TP-5>>.
+|===
+
+*Sensitivity:* <<SP-3>> — Schema completeness directly impacts learnability; incomplete schemas degrade the experience.
+
+=== QS-2: IDE Support (H, L)
+
+[cols="1,3"]
+|===
+| Approach | Analysis
+
+| AP-1 (JSONC)
+| JSON Schema registered on SchemaStore enables autocompletion in all major editors. *Positive.*
+|===
+
+*Sensitivity:* <<SP-3>> — Schema must cover all valid model constructs to provide accurate suggestions.
+
+=== QS-3: LLM Friendliness (H, M)
+
+[cols="1,3"]
+|===
+| Approach | Analysis
+
+| AP-1 (JSONC)
+| JSON is the native output format of LLMs. No parsing ambiguity. *Positive.*
+
+| AP-7 (CLI)
+| CLI commands with `--format json` output enable structured LLM workflows. *Positive.*
+
+| AP-6 (Patcher)
+| LLM-generated JSON is valid even with minor formatting differences; patcher handles this. *Positive.*
+|===
+
+*Tradeoff:* <<TP-2>> — JSONC verbosity vs. custom DSL conciseness; JSON wins for LLMs but is more verbose for humans.
+
+=== QS-4: Sync Reliability (H, H)
+
+[cols="1,3"]
+|===
+| Approach | Analysis
+
+| AP-4 (Three-way merge)
+| State file enables conflict detection. Non-conflicting changes merge without data loss. *Positive.*
+
+| AP-6 (Patcher)
+| Byte-level patching preserves content outside known fields. *Positive but fragile* — see <<SP-2>>.
+
+| AP-5 (Pipes-and-filters)
+| Clear package boundaries make sync logic testable in isolation. *Positive.*
+|===
+
+*Sensitivity:* <<SP-1>> (RenderedElements), <<SP-2>> (PatchSave boundaries), <<SP-4>> (add-element coordination). +
+*Tradeoff:* <<TP-3>> (byte-level patcher vs. full round-trip), <<TP-4>> (model-wins vs. interactive merge).
+
+=== QS-5: Installability (M, L)
+
+[cols="1,3"]
+|===
+| Approach | Analysis
+
+| AP-2 (Go binary)
+| Single binary, no runtime. `go build` produces statically linked executables for all platforms. *Positive.*
+|===
+
+*No sensitivity or tradeoff points identified.* This is a solved problem with Go.
+
+=== QS-6: Flexible Hierarchy (M, L)
+
+[cols="1,3"]
+|===
+| Approach | Analysis
+
+| AP-1 (JSONC)
+| JSON naturally supports recursive nesting. Schema uses `$ref` for recursive element definitions. *Positive.*
+
+| AP-4 (Three-way merge)
+| Sync engine uses dot-notation IDs (e.g., `webshop.api.auth`) that naturally encode depth. *Positive.*
+|===
+
+*Sensitivity:* <<SP-5>> — AutoDetect first-match behavior may misclassify elements at unusual nesting levels.
+
+
+== Sensitivity Points
+
+Sensitivity points are architectural decisions where a small change significantly affects a quality attribute.
+
+[[SP-1]]
+=== SP-1: RenderedElements in Reverse Sync (HIGH)
+
+The reverse sync must determine which draw.io elements correspond to model elements.
+This mapping relies on `bausteinsicht_id` attributes embedded in the XML.
+If an element lacks this attribute (e.g., manually drawn shapes), it is treated as a new element and imported with a sanitized ID.
+
+*Impact:* Incorrect mapping causes duplicate elements or lost edits. +
+*Affected QS:* QS-4 (sync reliability). +
+*Current mitigation:* Collision guards prevent duplicate IDs; sanitization is deterministic. +
+*Residual risk:* Complex manual edits in draw.io may produce unexpected import results.
+
+[[SP-2]]
+=== SP-2: JSONC PatchSave Boundaries (MEDIUM)
+
+The `PatchSave` function performs byte-level patching of the JSONC model file, replacing only the values of known fields while preserving surrounding comments and formatting.
+This approach has inherent boundaries: it cannot handle structural changes (adding/removing entire elements) and relies on pattern matching to locate fields.
+
+*Impact:* If the patcher cannot locate a field, it falls back to full file rewrite, losing comments. +
+*Affected QS:* QS-1 (comments are part of learnability), QS-4 (formatting preservation). +
+*Current mitigation:* E2E test 4.16 confirms that preamble comments before the root `{` are lost during reverse sync (known issue, LOW severity). +
+*Residual risk:* Edge cases with unusual JSONC formatting may trigger fallback.
+
+[[SP-3]]
+=== SP-3: JSON Schema Completeness (MEDIUM)
+
+IDE autocompletion quality depends entirely on JSON Schema coverage.
+Missing or incorrect schema definitions result in no suggestions or false validation errors.
+
+*Impact:* Incomplete schema directly degrades QS-1 (learnability) and QS-2 (IDE support). +
+*Affected QS:* QS-1, QS-2. +
+*Current mitigation:* Schema is tested via validate command; E2E tests cover all model constructs. +
+*Residual risk:* Schema may lag behind new features if not updated in the same PR.
+
+[[SP-4]]
+=== SP-4: add-element / Sync State Coordination (MEDIUM)
+
+The `add-element` CLI command modifies the model file directly.
+If the sync state file is stale (not updated after the addition), the next sync may treat the new element as a conflict or may miss it.
+
+*Impact:* Stale state causes spurious conflict warnings or missed forward sync of new elements. +
+*Affected QS:* QS-4 (sync reliability), QS-3 (LLM workflows rely on add-element + sync sequences). +
+*Current mitigation:* `add-element` does not update sync state; a subsequent `sync` resolves this naturally. +
+*Residual risk:* Users who run `add-element` without `sync` may see unexpected behavior on later sync.
+
+[[SP-5]]
+=== SP-5: AutoDetect First-Match Behavior (LOW)
+
+When a template contains multiple element kinds, AutoDetect assigns the first matching kind based on nesting level.
+If the template order changes, element styling may silently change.
+
+*Impact:* Unexpected visual changes after template modification. +
+*Affected QS:* QS-1 (confusing for users who edit templates). +
+*Current mitigation:* Template handling E2E tests verify style assignment. +
+*Residual risk:* Low; templates are typically authored once and rarely reordered.
+
+
+== Tradeoff Points
+
+Tradeoff points are architectural decisions where improving one quality attribute comes at the expense of another.
+
+[[TP-1]]
+=== TP-1: Manual Layout vs. Auto-Layout
+
+*Decision:* Bausteinsicht performs no automatic layout. Elements are placed side-by-side with fixed offsets; users arrange them manually in draw.io.
+
+[cols="1,1"]
+|===
+| Favors | Penalizes
+
+| User control — architects can create exactly the layout they want
+| Initial productivity — first sync produces a flat row of elements that must be manually arranged
+
+| Consistency — layout is stable across syncs (positions preserved)
+| Automation — LLM workflows cannot produce aesthetically pleasing diagrams without manual intervention
+|===
+
+*Affected QS:* QS-1 (learnability — manual layout adds a step), QS-3 (LLM friendliness — automated diagrams look poor).
+
+[[TP-2]]
+=== TP-2: JSONC vs. Custom DSL
+
+_Reference: link:ADRs/ADR-001-DSL-Format.adoc[ADR-001]_
+
+*Decision:* JSONC with JSON Schema, not a custom DSL (like Structurizr DSL or LikeC4).
+
+[cols="1,1"]
+|===
+| Favors | Penalizes
+
+| QS-2 (IDE support) — free autocompletion via SchemaStore
+| Conciseness — JSON is more verbose than a tailored DSL
+
+| QS-3 (LLM friendliness) — JSON is native LLM output
+| Expressiveness — no custom syntax sugar for common patterns
+
+| QS-1 (learnability) — JSON is universally known
+| Readability at scale — deeply nested JSON can be hard to scan
+|===
+
+[[TP-3]]
+=== TP-3: Byte-Level Patcher vs. Full Round-Trip
+
+*Decision:* `PatchSave` patches specific fields in-place rather than parsing and re-serializing the entire JSONC file.
+
+[cols="1,1"]
+|===
+| Favors | Penalizes
+
+| Comment preservation — user comments survive sync
+| Robustness — byte-level matching is fragile against unusual formatting
+
+| Formatting stability — no reformatting surprises
+| Feature velocity — adding new patchable fields requires careful implementation
+|===
+
+*Affected QS:* QS-4 (reliability — see <<SP-2>>), QS-1 (comments preserved).
+
+[[TP-4]]
+=== TP-4: Model-Wins vs. Interactive Merge
+
+*Decision:* On true conflicts (same field changed in both model and draw.io), the model value wins and a warning is printed.
+
+[cols="1,1"]
+|===
+| Favors | Penalizes
+
+| Determinism — sync result is predictable, scriptable
+| Draw.io users — visual edits are overwritten without interactive resolution
+
+| LLM workflows — no interactive prompts to handle
+| Collaboration — teams editing draw.io and model simultaneously may lose draw.io changes
+|===
+
+*Affected QS:* QS-3 (LLM friendliness — deterministic wins), QS-4 (sync reliability — data loss path exists for draw.io edits).
+
+[[TP-5]]
+=== TP-5: CLI-Only vs. LSP / Web UI
+
+*Decision:* No language server, no web UI, no editor extension. CLI only.
+
+[cols="1,1"]
+|===
+| Favors | Penalizes
+
+| QS-5 (installability) — nothing extra to install
+| Discoverability — users must read docs to find commands
+
+| QS-3 (LLM friendliness) — CLI is the natural LLM interface
+| Real-time feedback — no inline validation while editing (must run `validate`)
+
+| Maintenance — one interface to maintain
+| IDE integration — no go-to-definition, rename, or diagnostics
+|===
+
+[[TP-6]]
+=== TP-6: Embedded Templates vs. Template Gallery
+
+*Decision:* A default template ships via `bausteinsicht init`, but templates are user-provided draw.io files referenced by path. No built-in template gallery or marketplace.
+
+[cols="1,1"]
+|===
+| Favors | Penalizes
+
+| Simplicity — no template distribution infrastructure
+| Discoverability — users who skip `init` must understand the template mechanism
+
+| Flexibility — any draw.io style is possible
+| Standardization — only one default template; no curated collection for different styles
+
+| Good onboarding — `init` generates template + sample model
+| Customization — users must edit draw.io templates to change styles
+|===
+
+*Affected QS:* QS-1 (learnability — mitigated by `init` command).
+
+
+== Risks
+
+Risks are architectural decisions or conditions that may cause problems.
+
+[[R-1]]
+=== R-1: Path Traversal via CLI Flags
+
+*Likelihood:* Medium — the tool accepts `--model` and `--template` paths without validation. +
+*Impact:* Medium — an attacker who controls CLI arguments could read or write files outside the intended directory. +
+*Reference:* SEC-001 in the link:../security/2026-03-01-security-review.adoc[security review]. +
+*Mitigation:* The tool is a local CLI invoked by the user; the user already has filesystem access. Risk is relevant only when CLI is invoked by automated agents with untrusted input. +
+*Recommendation:* *[A]* Document the trust model. Consider optional `--restrict-to-dir` flag for agent use cases.
+
+[[R-2]]
+=== R-2: Sync State File Corruption
+
+*Likelihood:* Low — the `.bausteinsicht-sync` file is a plain JSON file written atomically. +
+*Impact:* High — a corrupted state file causes the next sync to treat everything as new, potentially duplicating elements or losing conflict detection. +
+*Mitigation:* The state file is committed to version control; `git checkout` recovers it. The sync engine handles missing state files gracefully (treats as first sync). +
+*Recommendation:* *[B]* Add state file integrity check (e.g., embedded checksum) and clear error message on corruption.
+
+[[R-3]]
+=== R-3: draw.io XML Format Changes
+
+*Likelihood:* Medium — draw.io is actively developed and the XML format is not formally versioned. +
+*Impact:* High — breaking changes in draw.io's XML structure could break the sync engine's XML processing. +
+*Mitigation:* The sync engine uses `bausteinsicht_id` attributes for element identification, which are custom attributes unlikely to conflict with draw.io changes. XML processing uses `beevik/etree` for DOM-style access, not hardcoded XPath. +
+*Recommendation:* *[B]* Pin a tested draw.io version in documentation. Add integration tests against multiple draw.io versions.
+
+[[R-4]]
+=== R-4: Large Model Performance
+
+*Likelihood:* Low — current users have small models (<100 elements). +
+*Impact:* Medium — the sync engine processes all elements on every run; O(n*m) complexity for element-view matching could become noticeable at scale. +
+*Mitigation:* Go's performance characteristics make this unlikely to be a problem below ~1000 elements. +
+*Recommendation:* *[C]* Profile with a 500-element model. Add benchmarks to CI.
+
+[[R-5]]
+=== R-5: PatchSave Regression with New Field Types
+
+*Likelihood:* Medium — every new model field requires PatchSave support. +
+*Impact:* Medium — missing patcher support causes comments to be lost when the new field is modified via reverse sync. +
+*Mitigation:* Property-based tests with `rapid` cover label roundtrips. E2E tests verify comment preservation. +
+*Recommendation:* *[A]* Add a development checklist: "When adding a model field, update PatchSave and add a comment-preservation test."
+
+[[R-6]]
+=== R-6: Template Compatibility Across Versions
+
+*Likelihood:* Low — template format is not versioned. +
+*Impact:* Medium — future changes to element rendering may require template updates, breaking existing user templates. +
+*Mitigation:* Templates are simple draw.io files with convention-based element kind names. +
+*Recommendation:* *[B]* Version the template format. Document migration path for breaking changes.
+
+[[R-7]]
+=== R-7: Watch Mode Race Conditions
+
+*Likelihood:* Low — fsnotify delivers events asynchronously; rapid file saves may trigger multiple syncs. +
+*Impact:* Low — concurrent syncs on the same files could produce inconsistent results. +
+*Mitigation:* Watch mode debounces events. Data race in watcher fixed in PR #77 (SEC-003). +
+*Recommendation:* *[B]* Add mutex or single-flight guard for sync execution in watch mode.
+
+[[R-8]]
+=== R-8: Missing Recursion Depth Limit
+
+*Likelihood:* Low — requires a maliciously crafted model with extreme nesting. +
+*Impact:* Low — stack overflow on deeply recursive model processing. +
+*Mitigation:* Practical models have <10 nesting levels. Go stack grows dynamically. +
+*Recommendation:* *[C]* Add configurable depth limit (default 50) with clear error message.
+
+
+== Non-Risks
+
+Architectural decisions confirmed as safe based on the security review and testing results.
+
+[[NR-1]]
+=== NR-1: XXE / XML Bomb Attacks
+
+The XML parser (`beevik/etree`) uses `RawToken` which does not expand external entities.
+XML bomb attacks are structurally impossible.
+Confirmed in security review.
+
+[[NR-2]]
+=== NR-2: JSON Deserialization Attacks
+
+Go's `encoding/json` package does not execute code during deserialization.
+No equivalent of Python's `pickle` or Java's `ObjectInputStream` risks.
+
+[[NR-3]]
+=== NR-3: Command Injection
+
+The codebase contains no `os/exec` calls.
+All processing is in-process string and XML manipulation.
+Confirmed by `gosec` scan.
+
+[[NR-4]]
+=== NR-4: Supply Chain via npm
+
+The tool has no JavaScript or Node.js dependencies.
+Go module verification (`go mod verify`) passes.
+Only 5 direct Go dependencies, all with no known CVEs.
+
+[[NR-5]]
+=== NR-5: Regression Safety
+
+215 E2E tests (188 pass, 26 skip, 0 unexpected fail) cover all major features.
+Property-based tests validate roundtrip invariants.
+Pre-commit hooks run `gofmt`, `go vet`, `golangci-lint`, and `gitleaks`.
+
+[[NR-6]]
+=== NR-6: File I/O Safety
+
+Temporary files use `os.CreateTemp` (fixed in PR #77, SEC-002).
+File permissions are appropriate for a user-space CLI tool.
+
+[[NR-7]]
+=== NR-7: Node.js Dependency Risk
+
+Explicitly excluded by ADR-002.
+draw.io CLI is used only in the devcontainer for PNG/SVG export, not in the distributed binary.
+
+
+== Risk Summary Tables
+
+=== Risk Register
+
+[cols="1,2,1,1,1,1"]
+|===
+| ID | Risk | Likelihood | Impact | Priority | Action
+
+| R-1
+| Path traversal via CLI flags
+| Medium
+| Medium
+| A
+| Document trust model
+
+| R-2
+| Sync state file corruption
+| Low
+| High
+| B
+| Add integrity check
+
+| R-3
+| draw.io XML format changes
+| Medium
+| High
+| B
+| Pin version, add tests
+
+| R-4
+| Large model performance
+| Low
+| Medium
+| C
+| Profile, add benchmarks
+
+| R-5
+| PatchSave regression with new fields
+| Medium
+| Medium
+| A
+| Development checklist
+
+| R-6
+| Template compatibility across versions
+| Low
+| Medium
+| B
+| Version template format
+
+| R-7
+| Watch mode race conditions
+| Low
+| Low
+| B
+| Add sync mutex
+
+| R-8
+| Missing recursion depth limit
+| Low
+| Low
+| C
+| Add depth limit
+|===
+
+=== Sensitivity Points
+
+[cols="1,3,1,1"]
+|===
+| ID | Description | Severity | Affected QS
+
+| SP-1
+| RenderedElements mapping in reverse sync
+| HIGH
+| QS-4
+
+| SP-2
+| JSONC PatchSave boundaries and fallback
+| MEDIUM
+| QS-1, QS-4
+
+| SP-3
+| JSON Schema completeness for IDE support
+| MEDIUM
+| QS-1, QS-2
+
+| SP-4
+| add-element / sync state coordination
+| MEDIUM
+| QS-3, QS-4
+
+| SP-5
+| AutoDetect first-match template behavior
+| LOW
+| QS-1
+|===
+
+=== Tradeoff Points
+
+[cols="1,3,2"]
+|===
+| ID | Decision | Quality Attributes in Tension
+
+| TP-1
+| Manual layout (no auto-layout)
+| User control vs. initial productivity, LLM automation
+
+| TP-2
+| JSONC vs. custom DSL
+| IDE support, LLM friendliness vs. conciseness
+
+| TP-3
+| Byte-level patcher vs. full round-trip
+| Comment preservation vs. robustness
+
+| TP-4
+| Model-wins conflict resolution
+| Determinism, LLM workflows vs. draw.io user experience
+
+| TP-5
+| CLI-only interface
+| Installability, automation vs. discoverability, real-time feedback
+
+| TP-6
+| Embedded templates (no gallery)
+| Simplicity, flexibility vs. onboarding experience
+|===
+
+
+== Recommendations
+
+=== Group A — Before v1 Release
+
+[cols="1,3,1"]
+|===
+| ID | Recommendation | Reference
+
+| A.1
+| Document the trust model for CLI flag handling, especially for agent/CI use cases.
+| R-1
+
+| A.2
+| Add a development checklist for new model fields: update PatchSave, add comment-preservation test.
+| R-5
+
+| A.3
+| Ensure `bausteinsicht init` workflow is prominently documented in getting-started guide. Consider adding additional template styles.
+| TP-6
+|===
+
+=== Group B — After v1 Release
+
+[cols="1,3,1"]
+|===
+| ID | Recommendation | Reference
+
+| B.1
+| Add sync state file integrity check with clear error message on corruption.
+| R-2
+
+| B.2
+| Pin tested draw.io version in documentation; add integration tests against multiple versions.
+| R-3
+
+| B.3
+| Version the template format to support future migrations.
+| R-6
+
+| B.4
+| Add single-flight guard for sync execution in watch mode.
+| R-7
+
+| B.5
+| Evaluate auto-layout options (e.g., hierarchical layout on first sync) as opt-in feature.
+| TP-1
+|===
+
+=== Group C — v2 Considerations
+
+[cols="1,3,1"]
+|===
+| ID | Recommendation | Reference
+
+| C.1
+| Profile sync engine with 500+ element models; add performance benchmarks to CI.
+| R-4
+
+| C.2
+| Add configurable recursion depth limit (default 50).
+| R-8
+
+| C.3
+| Evaluate LSP implementation for real-time validation and diagnostics.
+| TP-5
+
+| C.4
+| Consider template gallery or curated template repository.
+| TP-6
+|===
+
+
+== Findings Summary
+
+The Bausteinsicht v1 architecture is *well-suited for its stated quality goals*.
+The core design decisions — JSONC with JSON Schema (AP-1), Go single binary (AP-2), and three-way merge sync (AP-4) — form a coherent architecture that delivers on learnability, IDE support, LLM friendliness, and installability.
+
+The most critical quality attribute, *sync reliability (QS-4)*, is supported by multiple reinforcing approaches (three-way merge, comment-preserving patcher, pipes-and-filters decomposition) and backed by 215 E2E tests.
+The identified sensitivity points (SP-1, SP-2) are in the sync path, consistent with the inherent complexity of bidirectional synchronization.
+
+The *main architectural tradeoffs* are conscious and well-documented:
+
+* *Manual layout (TP-1)* prioritizes user control over automation convenience — acceptable for v1.
+* *Model-wins conflict resolution (TP-4)* prioritizes determinism and LLM workflows over interactive merge — a reasonable default with clear documentation.
+* *CLI-only interface (TP-5)* keeps the system simple and automatable at the cost of discoverability — mitigated by good documentation and JSON Schema support.
+
+The *risk profile is low* (Tier 2 — Extended Assurance per ADR-003).
+No critical unmitigated risks were identified.
+The two highest-priority risks (R-1: path traversal, R-5: PatchSave regression) have straightforward mitigations recommended for pre-release.
+
+The security posture is solid: 9/10 Tier 2 mitigations are active, no command injection or deserialization risks exist, and the supply chain is minimal and verified.
+
+*Overall assessment:* The architecture is ready for v1 release with the Group A recommendations implemented.

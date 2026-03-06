@@ -14,24 +14,53 @@ ifndef::imagesdir[:imagesdir: ../../images]
 == Risks and Technical Debts
 
 
-ifdef::arc42help[]
-[role="arc42help"]
-****
-.Contents
-A list of identified technical risks or technical debts, ordered by priority
+The canonical risk analysis for Bausteinsicht is the link:../2026-03-06-architecture-review.adoc[ATAM Architecture Review (2026-03-06)], which identifies 8 risks, 5 sensitivity points, and 6 tradeoff points.
+This section summarizes the top risks.
+For the complete risk register, sensitivity point analysis, and tradeoff analysis, refer to the full ATAM review.
 
-.Motivation
-“Risk management is project management for grown-ups” (Tim Lister, Atlantic Systems Guild.) 
+=== Top Risks
 
-This should be your motto for systematic detection and evaluation of risks and technical debts in the architecture, which will be needed by management stakeholders (e.g. project managers, product owners) as part of the overall risk analysis and measurement planning.
+[cols=”1,2,1,1,3”]
+|===
+| ID | Risk | Likelihood | Impact | Mitigation
 
-.Form
-List of risks and/or technical debts, probably including suggested measures to minimize, mitigate or avoid risks or reduce technical debts.
+| R-1
+| Path traversal via `--model` / `--template` CLI flags — an automated agent with untrusted input could read/write outside the intended directory.
+| Medium
+| Medium
+| Document trust model. Consider optional `--restrict-to-dir` flag for agent use cases. (Priority: *before release*)
 
+| R-2
+| Sync state file (`.bausteinsicht-sync`) corruption — a corrupted file causes the next sync to treat everything as new, potentially duplicating elements.
+| Low
+| High
+| State file is committed to Git (recoverable). Add integrity check with clear error message. (Priority: *after release*)
 
-.Further Information
+| R-3
+| draw.io XML format changes — the XML format is not formally versioned; breaking changes could break the sync engine.
+| Medium
+| High
+| Custom `bausteinsicht_id` attributes are unlikely to conflict. Pin tested draw.io version in docs. (Priority: *after release*)
 
-See https://docs.arc42.org/section-11/[Risks and Technical Debt] in the arc42 documentation.
+| R-4
+| Large model performance — sync engine processes all elements on every run with O(n*m) element-view matching.
+| Low
+| Medium
+| Go performance makes this unlikely below ~1000 elements. Profile with 500-element model. (Priority: *v2*)
+|===
 
-****
-endif::arc42help[]
+=== Technical Debts
+
+* *No auto-layout (TP-1):* First sync produces a flat row of elements. Users must arrange manually in draw.io. Acceptable for v1; evaluate hierarchical auto-layout as opt-in post-release.
+* *Single template style (TP-6):* `bausteinsicht init` ships a default template, but only one style. Consider additional template styles or a template gallery post-release.
+* *E2E test coverage:* 26 of 215 tests are skipped (mostly environment-related). Reduce skip count in CI to improve confidence.
+
+=== Non-Risks
+
+The following areas were explicitly evaluated and confirmed safe (see link:../2026-03-06-architecture-review.adoc#_non_risks[ATAM Non-Risks]):
+
+* XXE / XML bomb attacks — parser does not expand entities
+* JSON deserialization attacks — Go's `encoding/json` is safe
+* Command injection — no `os/exec` calls in the codebase
+* Supply chain — no npm; Go module verification passes; 5 direct dependencies with no CVEs
+* Regression safety — 188 passing E2E tests, property-based tests, pre-commit hooks
