@@ -60,9 +60,10 @@ RUN GITLEAKS_VERSION=$(curl -sL https://api.github.com/repos/gitleaks/gitleaks/r
 
 # ──────────────────────────────────────────────
 # draw.io Desktop (headless export via xvfb-run)
+# Pin draw.io version for reproducibility. Update and test before changing.
 # ──────────────────────────────────────────────
-RUN DRAWIO_VERSION=$(curl -sL https://api.github.com/repos/jgraph/drawio-desktop/releases/latest | jq -r '.tag_name' | sed 's/^v//') \
- && wget -q "https://github.com/jgraph/drawio-desktop/releases/download/v${DRAWIO_VERSION}/drawio-amd64-${DRAWIO_VERSION}.deb" -O /tmp/drawio.deb \
+ARG DRAWIO_VERSION=29.5.2
+RUN wget -q "https://github.com/jgraph/drawio-desktop/releases/download/v${DRAWIO_VERSION}/drawio-amd64-${DRAWIO_VERSION}.deb" -O /tmp/drawio.deb \
  && apt-get update && apt-get install -y --no-install-recommends /tmp/drawio.deb \
  && rm -f /tmp/drawio.deb && rm -rf /var/lib/apt/lists/*
 
