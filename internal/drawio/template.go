@@ -9,6 +9,9 @@ import (
 	"github.com/beevik/etree"
 )
 
+// CurrentTemplateVersion is the latest template format version supported.
+const CurrentTemplateVersion = 1
+
 // SubCellStyle holds style and geometry for a text sub-cell within an element.
 type SubCellStyle struct {
 	Style         string  // mxCell style string
@@ -31,6 +34,7 @@ type TemplateStyle struct {
 
 // TemplateSet holds all styles parsed from a draw.io template file.
 type TemplateSet struct {
+	Version    int                      // template format version (0 means unset/v1)
 	elements   map[string]TemplateStyle // keyed by kind (actor, system, container, component)
 	boundaries map[string]TemplateStyle // keyed by kind (system_boundary, container_boundary)
 	connector  string                   // default connector style
@@ -58,7 +62,21 @@ func LoadTemplateFromBytes(data []byte) (*TemplateSet, error) {
 		return nil, fmt.Errorf("LoadTemplateFromBytes: not a valid draw.io template (missing <mxfile> root element)")
 	}
 
+	// Read template version from <mxfile> root. Missing → version 1 (backward compat).
+	version := 1
+	if vStr := root.SelectAttrValue("bausteinsicht_template_version", ""); vStr != "" {
+		v, err := strconv.Atoi(vStr)
+		if err != nil {
+			return nil, fmt.Errorf("LoadTemplateFromBytes: invalid template version %q: %w", vStr, err)
+		}
+		version = v
+	}
+	if version > CurrentTemplateVersion {
+		return nil, fmt.Errorf("LoadTemplateFromBytes: template version %d not supported (max: %d)", version, CurrentTemplateVersion)
+	}
+
 	ts := &TemplateSet{
+		Version:    version,
 		elements:   make(map[string]TemplateStyle),
 		boundaries: make(map[string]TemplateStyle),
 	}
