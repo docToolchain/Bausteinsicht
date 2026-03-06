@@ -65,10 +65,27 @@ go build -o bausteinsicht ./cmd/bausteinsicht/
 # Initialize a sample project
 mkdir my-architecture && cd my-architecture
 bausteinsicht init
+----
+
+`bausteinsicht init` creates a sample JSONC model (`architecture.jsonc`) and a default template — everything you need to get started.
+Now run sync to generate diagrams:
+
+[source,bash]
+----
 bausteinsicht sync
 ----
 
 Open `architecture.drawio` in draw.io to see the generated diagrams.
+Edit the JSONC model or the draw.io file and run `sync` again — changes flow in both directions.
+
+For continuous sync on save, use watch mode:
+
+[source,bash]
+----
+bausteinsicht watch
+----
+
+See the link:src/docs/spec/06_tutorial.adoc[Getting Started Tutorial] for a step-by-step walkthrough.
 
 == Features
 
@@ -123,6 +140,13 @@ make check          # all analysis tools + race-detected tests
 * link:src/docs/spec/03_data_models.adoc[Data Models]
 * link:src/docs/spec/05_sync_specification.adoc[Sync Specification]
 * link:src/docs/spec/06_tutorial.adoc[Getting Started Tutorial]
+
+== Security
+
+Bausteinsicht is a local CLI tool with no network access.
+See the link:src/docs/spec/07_trust_model.adoc[Trust Model] for details on trust boundaries and threat assessment.
+
+For security findings and mitigations, see the link:src/docs/security/2026-03-01-security-review.adoc[Security Review].
 
 == License
 
