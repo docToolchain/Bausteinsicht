@@ -174,6 +174,83 @@ func TestComputeHash_MissingFile(t *testing.T) {
 	}
 }
 
+func TestLoadState_ChecksumValid(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, ".bausteinsicht-sync")
+
+	state := &SyncState{
+		Timestamp:     "2024-01-01T00:00:00Z",
+		ModelHash:     "sha256:abc",
+		DrawioHash:    "sha256:def",
+		Elements:      map[string]ElementState{"x": {Title: "X", Kind: "k"}},
+		Relationships: []RelationshipState{},
+	}
+	if err := SaveState(path, state); err != nil {
+		t.Fatalf("SaveState: %v", err)
+	}
+
+	loaded, err := LoadState(path)
+	if err != nil {
+		t.Fatalf("LoadState: %v", err)
+	}
+	if loaded.Elements["x"].Title != "X" {
+		t.Errorf("expected title X, got %q", loaded.Elements["x"].Title)
+	}
+}
+
+func TestLoadState_ChecksumCorrupted(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, ".bausteinsicht-sync")
+
+	state := &SyncState{
+		Timestamp:     "2024-01-01T00:00:00Z",
+		ModelHash:     "sha256:abc",
+		DrawioHash:    "sha256:def",
+		Elements:      map[string]ElementState{"x": {Title: "X", Kind: "k"}},
+		Relationships: []RelationshipState{},
+	}
+	if err := SaveState(path, state); err != nil {
+		t.Fatalf("SaveState: %v", err)
+	}
+
+	// Corrupt the file by modifying content but keeping JSON valid.
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	corrupted := strings.Replace(string(data), `"X"`, `"Y"`, 1)
+	if err := os.WriteFile(path, []byte(corrupted), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = LoadState(path)
+	if err == nil {
+		t.Fatal("expected checksum mismatch error, got nil")
+	}
+	if !strings.Contains(err.Error(), "checksum mismatch") {
+		t.Errorf("expected 'checksum mismatch' in error, got: %v", err)
+	}
+}
+
+func TestLoadState_OldFileWithoutChecksum(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, ".bausteinsicht-sync")
+
+	// Write a valid state file without checksum (old format).
+	oldFormat := `{"timestamp":"2024-01-01T00:00:00Z","model_hash":"sha256:abc","drawio_hash":"sha256:def","elements":{},"relationships":[]}`
+	if err := os.WriteFile(path, []byte(oldFormat), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	loaded, err := LoadState(path)
+	if err != nil {
+		t.Fatalf("expected old file without checksum to load OK, got: %v", err)
+	}
+	if loaded.Timestamp != "2024-01-01T00:00:00Z" {
+		t.Errorf("unexpected timestamp: %q", loaded.Timestamp)
+	}
+}
+
 func TestBuildState_CorrectSnapshot(t *testing.T) {
 	dir := t.TempDir()
 

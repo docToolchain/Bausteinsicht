@@ -15,6 +15,7 @@ import (
 
 // SyncState stores the state after each successful sync.
 type SyncState struct {
+	Checksum         string                  `json:"checksum,omitempty"`
 	Timestamp        string                  `json:"timestamp"`
 	ModelHash        string                  `json:"model_hash"`
 	DrawioHash       string                  `json:"drawio_hash"`
@@ -66,6 +67,22 @@ func LoadState(path string) (*SyncState, error) {
 	if err := json.Unmarshal(data, &state); err != nil {
 		return nil, fmt.Errorf("LoadState %q: %w", path, err)
 	}
+
+	// Verify integrity checksum if present (backward compat: old files without checksum skip validation).
+	if state.Checksum != "" {
+		savedChecksum := state.Checksum
+		state.Checksum = ""
+		canonical, err := json.Marshal(&state)
+		if err != nil {
+			return nil, fmt.Errorf("LoadState %q: checksum verification marshal: %w", path, err)
+		}
+		sum := sha256.Sum256(canonical)
+		computed := fmt.Sprintf("sha256:%x", sum)
+		if computed != savedChecksum {
+			return nil, fmt.Errorf("LoadState %q: sync state corrupted (checksum mismatch); delete .bausteinsicht-sync and re-run sync", path)
+		}
+	}
+
 	if state.Elements == nil {
 		state.Elements = make(map[string]ElementState)
 	}
@@ -77,6 +94,15 @@ func LoadState(path string) (*SyncState, error) {
 
 // SaveState atomically writes state to path using a temp file + rename.
 func SaveState(path string, state *SyncState) error {
+	// Compute integrity checksum: marshal without checksum → hash → set checksum → marshal with checksum.
+	state.Checksum = ""
+	canonical, err := json.Marshal(state)
+	if err != nil {
+		return fmt.Errorf("SaveState checksum marshal: %w", err)
+	}
+	sum := sha256.Sum256(canonical)
+	state.Checksum = fmt.Sprintf("sha256:%x", sum)
+
 	data, err := json.MarshalIndent(state, "", "  ")
 	if err != nil {
 		return fmt.Errorf("SaveState marshal: %w", err)
@@ -127,7 +153,10 @@ func BuildState(m *model.BausteinsichtModel, doc *drawio.Document, modelPath, dr
 		return nil, fmt.Errorf("BuildState drawio hash: %w", err)
 	}
 
-	flat, _ := model.FlattenElements(m)
+	flat, err := model.FlattenElements(m)
+	if err != nil {
+		return nil, fmt.Errorf("BuildState flatten: %w", err)
+	}
 	elements := make(map[string]ElementState, len(flat))
 	for id, elem := range flat {
 		elements[id] = ElementState{
