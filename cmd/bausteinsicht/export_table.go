@@ -108,6 +108,6 @@ func exportTableJSON(cmd *cobra.Command, m *model.BausteinsichtModel, viewKey st
 	if err != nil {
 		return exitWithCode(fmt.Errorf("marshaling JSON: %w", err), 2)
 	}
-	fmt.Fprintln(cmd.OutOrStdout(), string(data))
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), string(data))
 	return nil
 }

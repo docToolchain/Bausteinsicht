@@ -145,11 +145,11 @@ func buildLegendLabel(
 
 		color := extractFillColor(allStyles, kind)
 		sb.WriteString("<br>")
-		sb.WriteString(fmt.Sprintf(
+		fmt.Fprintf(&sb,
 			"<font color=\"%s\">\u25a0</font> %s",
 			html.EscapeString(color),
 			html.EscapeString(ekind.Notation),
-		))
+		)
 	}
 
 	return sb.String()

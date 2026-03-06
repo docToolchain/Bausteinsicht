@@ -50,7 +50,7 @@ func runValidate(cmd *cobra.Command, args []string) error {
 
 	// Verbose output goes to stderr so it doesn't interfere with JSON on stdout.
 	if verbose && format != "json" {
-		flat := model.FlattenElements(m)
+		flat, _ := model.FlattenElements(m)
 		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Validating model: %s\n", modelPath)
 		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "  %d elements, %d relationships, %d views\n",
 			len(flat), len(m.Relationships), len(m.Views))

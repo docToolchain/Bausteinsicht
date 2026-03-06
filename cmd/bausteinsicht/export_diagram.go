@@ -94,7 +94,7 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 			})
 		}
 		data, _ := json.MarshalIndent(entries, "", "  ")
-		fmt.Fprintln(cmd.OutOrStdout(), string(data))
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), string(data))
 		return nil
 	}
 
