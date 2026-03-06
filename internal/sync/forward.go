@@ -174,12 +174,14 @@ func applyForwardPerView(
 		legendEnabled := m.Config.Legend == nil || *m.Config.Legend
 
 		if metadataEnabled && opts != nil {
-			createMetadata(page, viewID, view, m.Config, opts.ModelPath, opts.SyncTime)
-			result.MetadataUpdated++
+			if createMetadata(page, viewID, view, m.Config, opts.ModelPath, opts.SyncTime) {
+				result.MetadataUpdated++
+			}
 		}
 		if legendEnabled {
-			createLegend(page, viewID, m.Specification, templates, elemSet, flat)
-			result.MetadataUpdated++
+			if createLegend(page, viewID, m.Specification, templates, elemSet, flat) {
+				result.MetadataUpdated++
+			}
 		}
 	}
 }

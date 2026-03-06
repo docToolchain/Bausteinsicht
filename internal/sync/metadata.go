@@ -22,6 +22,7 @@ const (
 )
 
 // createMetadata creates or updates a metadata info box on the view page.
+// Returns true if the label was created or changed.
 func createMetadata(
 	page *drawio.Page,
 	viewID string,
@@ -29,29 +30,34 @@ func createMetadata(
 	cfg model.Config,
 	modelPath string,
 	timestamp string,
-) {
+) bool {
 	cellID := metadataPrefix + viewID
 	label := buildMetadataLabel(view, cfg, modelPath, timestamp)
 
 	root := page.Root()
 	if root == nil {
-		return
+		return false
 	}
 
-	// Update existing metadata cell.
+	// Update existing metadata cell — only if label actually changed.
 	for _, obj := range root.SelectElements("object") {
 		if obj.SelectAttrValue("id", "") == cellID {
+			if obj.SelectAttrValue("label", "") == label {
+				return false
+			}
 			obj.CreateAttr("label", label)
-			return
+			return true
 		}
 	}
 
 	// Create new metadata cell.
 	y := computeMaxY(page) + infoBoxGap
 	createInfoBox(root, cellID, label, metadataX, y)
+	return true
 }
 
 // createLegend creates or updates a legend box on the view page.
+// Returns true if the label was created or changed.
 func createLegend(
 	page *drawio.Page,
 	viewID string,
@@ -59,26 +65,30 @@ func createLegend(
 	templates *drawio.TemplateSet,
 	elemSet map[string]bool,
 	flat map[string]*model.Element,
-) {
+) bool {
 	cellID := legendPrefix + viewID
 	label := buildLegendLabel(spec, templates, elemSet, flat)
 
 	root := page.Root()
 	if root == nil {
-		return
+		return false
 	}
 
-	// Update existing legend cell.
+	// Update existing legend cell — only if label actually changed.
 	for _, obj := range root.SelectElements("object") {
 		if obj.SelectAttrValue("id", "") == cellID {
+			if obj.SelectAttrValue("label", "") == label {
+				return false
+			}
 			obj.CreateAttr("label", label)
-			return
+			return true
 		}
 	}
 
 	// Create new legend cell.
 	y := computeMaxY(page) + infoBoxGap
 	createInfoBox(root, cellID, label, legendX, y)
+	return true
 }
 
 // buildMetadataLabel returns an HTML label for the metadata box.

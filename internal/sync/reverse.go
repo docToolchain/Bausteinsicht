@@ -145,6 +145,18 @@ func applyElementChange(ch ElementChange, m *model.BausteinsichtModel, result *R
 			return
 		}
 		result.ElementsDeleted++
+		// Clean orphaned relationships referencing the deleted element (#266).
+		prefix := ch.ID + "."
+		var kept []model.Relationship
+		for _, r := range m.Relationships {
+			if r.From == ch.ID || r.To == ch.ID ||
+				strings.HasPrefix(r.From, prefix) || strings.HasPrefix(r.To, prefix) {
+				result.RelationshipsDeleted++
+				continue
+			}
+			kept = append(kept, r)
+		}
+		m.Relationships = kept
 		// Clean stale references from view include/exclude lists.
 		for viewID, v := range m.Views {
 			v.Include = removeFromSlice(v.Include, ch.ID)

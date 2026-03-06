@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/docToolchain/Bauteinsicht/internal/drawio"
 	"github.com/docToolchain/Bauteinsicht/internal/model"
-	"github.com/docToolchain/Bauteinsicht/internal/sync"
+	bsync "github.com/docToolchain/Bauteinsicht/internal/sync"
 	"github.com/docToolchain/Bauteinsicht/templates"
 	"github.com/spf13/cobra"
 )
@@ -66,9 +67,9 @@ func runInit(cmd *cobra.Command, _ []string) error {
 
 	// Create empty document and run initial forward sync.
 	doc := drawio.NewDocument()
-	emptyState := &sync.SyncState{
-		Elements:      make(map[string]sync.ElementState),
-		Relationships: []sync.RelationshipState{},
+	emptyState := &bsync.SyncState{
+		Elements:      make(map[string]bsync.ElementState),
+		Relationships: []bsync.RelationshipState{},
 	}
 
 	// Add pages for each view before sync.
@@ -76,7 +77,14 @@ func runInit(cmd *cobra.Command, _ []string) error {
 		doc.AddPage("view-"+viewID, view.Title)
 	}
 
-	_ = sync.Run(m, doc, emptyState, tmpl, nil)
+	// Pass ForwardOptions so metadata/legend boxes are created during init,
+	// preventing the first sync from reporting metadata changes (#265).
+	// Use the same relative model path that sync would use.
+	fwdOpts := bsync.ForwardOptions{
+		ModelPath: defaultModelFile,
+		SyncTime:  time.Now().Format("2006-01-02 15:04"),
+	}
+	_ = bsync.Run(m, doc, emptyState, tmpl, nil, fwdOpts)
 
 	// Save generated draw.io file.
 	if err := drawio.SaveDocument(defaultDrawioFile, doc); err != nil {
@@ -84,13 +92,13 @@ func runInit(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Build and save sync state.
-	modelPath, _ := filepath.Abs(defaultModelFile)
-	drawioPath, _ := filepath.Abs(defaultDrawioFile)
-	state, err := sync.BuildState(m, doc, modelPath, drawioPath)
+	absModel, _ := filepath.Abs(defaultModelFile)
+	absDrawio, _ := filepath.Abs(defaultDrawioFile)
+	state, err := bsync.BuildState(m, doc, absModel, absDrawio)
 	if err != nil {
 		return exitWithCode(fmt.Errorf("building sync state: %w", err), 2)
 	}
-	if err := sync.SaveState(defaultSyncState, state); err != nil {
+	if err := bsync.SaveState(defaultSyncState, state); err != nil {
 		return exitWithCode(fmt.Errorf("writing %s: %w", defaultSyncState, err), 2)
 	}
 

@@ -552,3 +552,90 @@ func TestApplyReverse_NewElementWarningMentionsKind(t *testing.T) {
 		t.Errorf("expected warning to mention 'kind', got: %v", result.Warnings)
 	}
 }
+
+// TestApplyReverse_DeletedElementCleansOrphanedRelationships verifies that
+// when an element is deleted from draw.io, all relationships referencing it
+// as from or to are also removed from the model. Regression test for #266.
+func TestApplyReverse_DeletedElementCleansOrphanedRelationships(t *testing.T) {
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"api":      {Kind: "container", Title: "API"},
+			"db":       {Kind: "container", Title: "Database"},
+			"payments": {Kind: "container", Title: "Payments"},
+		},
+		Relationships: []model.Relationship{
+			{From: "api", To: "db", Label: "reads from"},
+			{From: "api", To: "payments", Label: "charges"},
+			{From: "payments", To: "db", Label: "stores"},
+		},
+	}
+
+	// Delete "payments" element from draw.io (without deleting its connectors).
+	cs := elemChangeSet("payments", Deleted, "", "", "")
+
+	r := ApplyReverse(cs, m)
+
+	// Element should be removed.
+	if _, exists := m.Model["payments"]; exists {
+		t.Error("expected element 'payments' to be removed from model")
+	}
+
+	// All relationships referencing "payments" should be cleaned up.
+	for _, rel := range m.Relationships {
+		if rel.From == "payments" || rel.To == "payments" {
+			t.Errorf("orphaned relationship found: %s -> %s (%s)", rel.From, rel.To, rel.Label)
+		}
+	}
+
+	// Only api->db should remain.
+	if len(m.Relationships) != 1 {
+		t.Errorf("expected 1 remaining relationship, got %d: %+v", len(m.Relationships), m.Relationships)
+	}
+
+	if r.ElementsDeleted != 1 {
+		t.Errorf("expected ElementsDeleted=1, got %d", r.ElementsDeleted)
+	}
+	if r.RelationshipsDeleted != 2 {
+		t.Errorf("expected RelationshipsDeleted=2, got %d", r.RelationshipsDeleted)
+	}
+}
+
+// TestApplyReverse_DeletedElementCleansNestedRelationships verifies that
+// deleting a parent element also cleans up relationships referencing its
+// children (e.g., deleting "shop" cleans "shop.api" relationships).
+func TestApplyReverse_DeletedElementCleansNestedRelationships(t *testing.T) {
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"shop": {
+				Kind:  "system",
+				Title: "Shop",
+				Children: map[string]model.Element{
+					"api": {Kind: "container", Title: "API"},
+				},
+			},
+			"db": {Kind: "container", Title: "Database"},
+		},
+		Relationships: []model.Relationship{
+			{From: "shop.api", To: "db", Label: "reads"},
+			{From: "db", To: "shop.api", Label: "responds"},
+		},
+	}
+
+	cs := elemChangeSet("shop", Deleted, "", "", "")
+
+	r := ApplyReverse(cs, m)
+
+	if _, exists := m.Model["shop"]; exists {
+		t.Error("expected element 'shop' to be removed")
+	}
+
+	// Relationships referencing shop.api (child of deleted shop) should be removed.
+	if len(m.Relationships) != 0 {
+		t.Errorf("expected 0 relationships after deleting parent, got %d: %+v",
+			len(m.Relationships), m.Relationships)
+	}
+
+	if r.RelationshipsDeleted != 2 {
+		t.Errorf("expected RelationshipsDeleted=2, got %d", r.RelationshipsDeleted)
+	}
+}

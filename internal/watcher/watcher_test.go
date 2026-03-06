@@ -164,6 +164,52 @@ func TestFileRedetectedAfterDeleteRecreate(t *testing.T) {
 	}
 }
 
+// TestFileRedetectedAfterSlowRecreate verifies that the watcher recovers
+// when a file is deleted and recreated after more than 1 second. Regression
+// test for #268: rewatch only polled 20x50ms=1s, then gave up.
+func TestFileRedetectedAfterSlowRecreate(t *testing.T) {
+	path := createTempFile(t)
+
+	called := make(chan string, 5)
+
+	w, err := New([]string{path}, 100*time.Millisecond, func(changedFile string) {
+		select {
+		case called <- changedFile:
+		default:
+		}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Stop()
+
+	if err := w.Start(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Delete the file.
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+
+	// Wait longer than the old 1s timeout.
+	time.Sleep(1500 * time.Millisecond)
+
+	// Recreate the file — watcher should still detect this.
+	if err := os.WriteFile(path, []byte("late-recreate"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case changedFile := <-called:
+		if changedFile != path {
+			t.Errorf("expected callback for %s, got %s", path, changedFile)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for callback after slow file recreate (>1s)")
+	}
+}
+
 func TestAtomicRenameTriggersCallback(t *testing.T) {
 	path := createTempFile(t)
 

@@ -43,11 +43,12 @@ func TestSyncAfterInit(t *testing.T) {
 
 	buf := make([]byte, 4096)
 	n, _ := r.Read(buf)
-	output := string(buf[:n])
+	output := strings.TrimSpace(string(buf[:n]))
 
-	// After init, sync may detect formatting differences — just verify it runs successfully.
-	if output == "" {
-		t.Error("expected some output from sync")
+	// After init, sync should report "Already in sync" — init must produce
+	// a complete drawio file with metadata/legend already in place (#265).
+	if !strings.Contains(output, "Already in sync") {
+		t.Errorf("expected 'Already in sync' after init, got: %q", output)
 	}
 }
 

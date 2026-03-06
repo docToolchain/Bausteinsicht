@@ -131,11 +131,13 @@ func (w *Watcher) loop() {
 }
 
 // rewatch polls for a removed file to reappear, then re-adds it to the watcher.
+// Uses exponential backoff (50ms → 100ms → ... → 2s max) and polls indefinitely
+// until the file reappears or Stop() is called (#268).
 func (w *Watcher) rewatch(path string) {
-	const maxAttempts = 20
-	const pollInterval = 50 * time.Millisecond
+	backoff := 50 * time.Millisecond
+	const maxBackoff = 2 * time.Second
 
-	for i := 0; i < maxAttempts; i++ {
+	for {
 		select {
 		case <-w.done:
 			return
@@ -160,6 +162,12 @@ func (w *Watcher) rewatch(path string) {
 			}
 			return
 		}
-		time.Sleep(pollInterval)
+		time.Sleep(backoff)
+		if backoff < maxBackoff {
+			backoff *= 2
+			if backoff > maxBackoff {
+				backoff = maxBackoff
+			}
+		}
 	}
 }
