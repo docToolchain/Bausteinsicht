@@ -23,6 +23,7 @@ type Watcher struct {
 	done      chan struct{}
 	syncing   bool
 	mu        sync.Mutex
+	syncMu    sync.Mutex // serializes sync execution to prevent concurrent onChange calls
 }
 
 // New creates a Watcher that monitors the given files. The onChange callback
@@ -113,7 +114,11 @@ func (w *Watcher) loop() {
 			captured := lastFile // capture by value to avoid data race with AfterFunc goroutine
 			timer = time.AfterFunc(w.debounce, func() {
 				if !w.isSyncing() {
-					w.onChange(captured)
+					w.syncMu.Lock()
+					defer w.syncMu.Unlock()
+					if !w.isSyncing() {
+						w.onChange(captured)
+					}
 				}
 			})
 
@@ -145,7 +150,11 @@ func (w *Watcher) rewatch(path string) {
 			if !w.isSyncing() {
 				time.AfterFunc(w.debounce, func() {
 					if !w.isSyncing() {
-						w.onChange(path)
+						w.syncMu.Lock()
+						defer w.syncMu.Unlock()
+						if !w.isSyncing() {
+							w.onChange(path)
+						}
 					}
 				})
 			}
