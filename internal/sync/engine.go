@@ -66,7 +66,7 @@ func Run(
 	// Step 6: Warn about model elements not visible in any view (#183).
 	if len(m.Views) > 0 {
 		visible := computeVisibleElements(m)
-		flat := model.FlattenElements(m)
+		flat, _ := model.FlattenElements(m)
 		var invisible []string
 		for id := range flat {
 			if visible != nil && !visible[id] {

@@ -7,6 +7,9 @@ import (
 	"github.com/docToolchain/Bauteinsicht/internal/model"
 )
 
+// maxReverseDepth limits recursion in modifyInMap/deleteFromMap to prevent stack overflow.
+const maxReverseDepth = model.MaxElementDepth
+
 // ReverseResult summarizes the changes applied back to the model.
 type ReverseResult struct {
 	ElementsCreated      int
@@ -252,6 +255,9 @@ func modifyInMap(elems map[string]model.Element, parts []string, fullID string, 
 	if len(parts) == 0 {
 		return fmt.Errorf("empty path")
 	}
+	if len(parts) > maxReverseDepth {
+		return fmt.Errorf("element path %q exceeds maximum depth of %d", fullID, maxReverseDepth)
+	}
 	key := parts[0]
 	elem, ok := elems[key]
 	if !ok {
@@ -282,6 +288,9 @@ func deleteElement(m *model.BausteinsichtModel, id string) error {
 func deleteFromMap(elems map[string]model.Element, parts []string, fullID string) error {
 	if len(parts) == 0 {
 		return fmt.Errorf("empty path")
+	}
+	if len(parts) > maxReverseDepth {
+		return fmt.Errorf("element path %q exceeds maximum depth of %d", fullID, maxReverseDepth)
 	}
 	key := parts[0]
 	if len(parts) == 1 {

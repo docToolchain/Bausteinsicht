@@ -70,7 +70,7 @@ func FormatCombined(m *model.BausteinsichtModel, f Format) (string, error) {
 	seen := make(map[string]bool)
 	var rows []Row
 
-	flat := model.FlattenElements(m)
+	flat, _ := model.FlattenElements(m)
 	keys := sortedViewKeys(m)
 
 	for _, key := range keys {
@@ -116,7 +116,7 @@ func resolveRows(m *model.BausteinsichtModel, view *model.View) ([]Row, error) {
 		return nil, err
 	}
 
-	flat := model.FlattenElements(m)
+	flat, _ := model.FlattenElements(m)
 	sort.Strings(resolved)
 
 	var rows []Row
@@ -193,7 +193,7 @@ func CollectRows(m *model.BausteinsichtModel, viewKey string, combined bool) ([]
 func collectCombinedRows(m *model.BausteinsichtModel) ([]Row, error) {
 	seen := make(map[string]bool)
 	var rows []Row
-	flat := model.FlattenElements(m)
+	flat, _ := model.FlattenElements(m)
 	for _, key := range sortedViewKeys(m) {
 		view, ok := m.Views[key]
 		if !ok {

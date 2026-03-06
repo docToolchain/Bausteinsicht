@@ -127,7 +127,7 @@ func BuildState(m *model.BausteinsichtModel, doc *drawio.Document, modelPath, dr
 		return nil, fmt.Errorf("BuildState drawio hash: %w", err)
 	}
 
-	flat := model.FlattenElements(m)
+	flat, _ := model.FlattenElements(m)
 	elements := make(map[string]ElementState, len(flat))
 	for id, elem := range flat {
 		elements[id] = ElementState{

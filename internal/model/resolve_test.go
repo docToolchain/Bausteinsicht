@@ -1,6 +1,8 @@
 package model
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -102,7 +104,10 @@ func TestResolve_NonExistent(t *testing.T) {
 
 func TestFlattenElements(t *testing.T) {
 	m := buildTestModel()
-	flat := FlattenElements(m)
+	flat, err := FlattenElements(m)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	expected := []string{
 		"customer",
@@ -125,9 +130,58 @@ func TestFlattenElements(t *testing.T) {
 	}
 }
 
+func TestFlattenElements_DepthLimit(t *testing.T) {
+	// Build a model with 5 levels — should succeed.
+	m := &BausteinsichtModel{
+		Model: map[string]Element{
+			"a": {Kind: "x", Title: "A", Children: map[string]Element{
+				"b": {Kind: "x", Title: "B", Children: map[string]Element{
+					"c": {Kind: "x", Title: "C", Children: map[string]Element{
+						"d": {Kind: "x", Title: "D", Children: map[string]Element{
+							"e": {Kind: "x", Title: "E"},
+						}},
+					}},
+				}},
+			}},
+		},
+	}
+	flat, err := FlattenElements(m)
+	if err != nil {
+		t.Fatalf("5-level model should succeed, got: %v", err)
+	}
+	if len(flat) != 5 {
+		t.Errorf("expected 5 elements, got %d", len(flat))
+	}
+
+	// Build a model exceeding MaxElementDepth.
+	deep := map[string]Element{"level0": {Kind: "x", Title: "L0"}}
+	current := deep
+	for i := 1; i <= MaxElementDepth+1; i++ {
+		child := map[string]Element{
+			fmt.Sprintf("level%d", i): {Kind: "x", Title: fmt.Sprintf("L%d", i)},
+		}
+		for k, v := range current {
+			v.Children = child
+			current[k] = v
+		}
+		current = child
+	}
+	deepModel := &BausteinsichtModel{Model: deep}
+	_, err = FlattenElements(deepModel)
+	if err == nil {
+		t.Fatal("expected depth error for deeply nested model, got nil")
+	}
+	if !strings.Contains(err.Error(), "maximum depth") {
+		t.Errorf("expected 'maximum depth' in error, got: %v", err)
+	}
+}
+
 func TestMatchPattern_Wildcard(t *testing.T) {
 	m := buildTestModel()
-	flat := FlattenElements(m)
+	flat, err := FlattenElements(m)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	tests := []struct {
 		pattern string

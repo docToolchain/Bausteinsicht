@@ -31,7 +31,7 @@ func FormatView(m *model.BausteinsichtModel, viewKey string, f Format) (string, 
 		return "", err
 	}
 
-	flat := model.FlattenElements(m)
+	flat, _ := model.FlattenElements(m)
 	sort.Strings(resolved)
 
 	// Determine C4 level from view content.
