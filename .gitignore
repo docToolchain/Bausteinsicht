@@ -29,6 +29,7 @@ Thumbs.db
 *.tmp
 tmp/
 my-architecture/
+Simon-Brown-Demo/
 
 # Claude Code (track project settings, ignore user-specific files)
 .claude/settings.local.json
