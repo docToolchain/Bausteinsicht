@@ -35,6 +35,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     jq \
     make \
+    # shell enhancements
+    zsh \
+    fzf \
+    # firewall (for --dangerously-skip-permissions security)
+    iptables \
+    ipset \
+    dnsutils \
+    iproute2 \
     && rm -rf /var/lib/apt/lists/*
 
 # ──────────────────────────────────────────────
@@ -74,6 +82,22 @@ RUN wget -q "https://github.com/jgraph/drawio-desktop/releases/download/v${DRAWI
 # dbus: Electron requires a running system bus for IPC
 RUN printf '#!/bin/sh\n# Ensure dbus is running (required by Electron/draw.io)\nif [ ! -S /run/dbus/system_bus_socket ]; then\n  sudo mkdir -p /run/dbus\n  sudo dbus-daemon --system --fork 2>/dev/null || true\nfi\nxvfb-run -a drawio --no-sandbox "$@"\n' > /usr/local/bin/drawio-export \
  && chmod +x /usr/local/bin/drawio-export
+
+# ──────────────────────────────────────────────
+# Firewall script (restricts outbound to whitelisted domains)
+# Enables safe use of `claude --dangerously-skip-permissions`.
+# ──────────────────────────────────────────────
+COPY init-firewall.sh /usr/local/bin/init-firewall.sh
+RUN chmod +x /usr/local/bin/init-firewall.sh \
+ && echo "vscode ALL=(root) NOPASSWD: /usr/local/bin/init-firewall.sh" >> /etc/sudoers.d/firewall
+
+# ──────────────────────────────────────────────
+# zsh setup (better interactive shell with fzf integration)
+# ──────────────────────────────────────────────
+RUN chsh -s /bin/zsh vscode \
+ && mkdir -p /commandhistory \
+ && touch /commandhistory/.zsh_history \
+ && chown -R vscode:vscode /commandhistory
 
 # ──────────────────────────────────────────────
 # Claude Code CLI (native installer, no Node.js dependency)

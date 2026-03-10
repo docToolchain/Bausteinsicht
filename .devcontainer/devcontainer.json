@@ -3,12 +3,20 @@
   "build": {
     "dockerfile": "Dockerfile"
   },
+  "runArgs": [
+    "--cap-add=NET_ADMIN",
+    "--cap-add=NET_RAW"
+  ],
   "containerEnv": {
     "COLORTERM": "truecolor"
   },
   "features": {
     "ghcr.io/devcontainers/features/github-cli:1": {}
   },
+  "mounts": [
+    "source=bausteinsicht-zshhistory-${devcontainerId},target=/commandhistory,type=volume",
+    "source=bausteinsicht-claude-config-${devcontainerId},target=/home/vscode/.claude,type=volume"
+  ],
   "customizations": {
     "vscode": {
       "extensions": [
@@ -21,11 +29,12 @@
         "editor.formatOnSave": true,
         "[go]": {
           "editor.defaultFormatter": "golang.go"
-        }
+        },
+        "terminal.integrated.defaultProfile.linux": "zsh"
       }
     }
   },
   "postCreateCommand": "sudo chown -R vscode:vscode /go && go mod download",
-  "postStartCommand": "sudo mkdir -p /run/dbus && sudo dbus-daemon --system --fork 2>/dev/null || true",
+  "postStartCommand": "sudo mkdir -p /run/dbus && sudo dbus-daemon --system --fork 2>/dev/null || true && sudo /usr/local/bin/init-firewall.sh",
   "remoteUser": "vscode"
 }
