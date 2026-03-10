@@ -11,7 +11,8 @@
     "COLORTERM": "truecolor"
   },
   "features": {
-    "ghcr.io/devcontainers/features/github-cli:1": {}
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
   },
   "mounts": [
     "source=${localWorkspaceFolderBasename}-zshhistory,target=/commandhistory,type=volume",

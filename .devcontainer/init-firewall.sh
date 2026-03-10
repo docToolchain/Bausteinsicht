@@ -61,7 +61,7 @@ while read -r cidr; do
 done < <(echo "$gh_ranges" | jq -r '(.web + .api + .git)[]')
 
 # Resolve and add other allowed domains.
-# Anthropic API + telemetry, Go module proxy, VS Code marketplace, gethuman.
+# Anthropic API + telemetry, Go module proxy, Docker Hub, VS Code marketplace, gethuman.
 for domain in \
     "api.anthropic.com" \
     "sentry.io" \
@@ -72,6 +72,9 @@ for domain in \
     "storage.googleapis.com" \
     "gethuman.sh" \
     "cli.kiro.dev" \
+    "registry-1.docker.io" \
+    "auth.docker.io" \
+    "production.cloudflare.docker.com" \
     "marketplace.visualstudio.com" \
     "vscode.blob.core.windows.net" \
     "update.code.visualstudio.com"; do
