@@ -3,24 +3,36 @@
 #
 # Usage:
 #   ./start-devcontainer.sh                       # just start the container
-#   ./start-devcontainer.sh --rebuild              # rebuild and start
-#   ./start-devcontainer.sh claude -p "prompt"     # start + run claude with args
+#   ./start-devcontainer.sh --rebuild              # rebuild from scratch
+#   ./start-devcontainer.sh -- claude -p "prompt"  # start + run command
+#   ./start-devcontainer.sh --rebuild -- claude     # rebuild + run command
 
 set -euo pipefail
 
 WORKSPACE="$(cd "$(dirname "$0")" && pwd)"
 
-# Check for --rebuild flag
-REBUILD=""
-if [ "${1:-}" = "--rebuild" ]; then
-  REBUILD="--rebuild"
-  shift
-fi
+# Parse flags (everything before --)
+UP_ARGS=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --rebuild)
+      UP_ARGS+=(--remove-existing-container --build-no-cache)
+      shift
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
 
 # Build and start the devcontainer
-devcontainer up --workspace-folder "$WORKSPACE" $REBUILD
+devcontainer up --workspace-folder "$WORKSPACE" "${UP_ARGS[@]+"${UP_ARGS[@]}"}"
 
-# If arguments were passed, execute them inside the container.
+# If arguments remain, execute them inside the container.
 # Otherwise, open an interactive shell.
 if [ $# -gt 0 ]; then
   devcontainer exec --workspace-folder "$WORKSPACE" "$@"
