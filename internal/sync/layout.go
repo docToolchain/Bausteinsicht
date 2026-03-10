@@ -150,6 +150,7 @@ func computeLayeredLayout(
 	curY := cfg.startY
 
 	// 1. Place actor externals above the boundary, centered to boundary width.
+	// Reserve the first row even when there are no actors so users can add them later.
 	if len(actorExternals) > 0 {
 		actorW, actorH := placeLayered(actorExternals, flat, templates, kindTier, maxTier, cfg, cfg.startX, curY, result.Positions)
 		// Center actor row relative to boundary width.
@@ -163,6 +164,9 @@ func computeLayeredLayout(
 			}
 		}
 		curY += actorH + cfg.elementGap
+	} else {
+		// No actors — still reserve space for a potential actor row.
+		curY += defaultHeight + cfg.elementGap
 	}
 
 	// 2. Place scope boundary and its children.
