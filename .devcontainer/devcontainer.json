@@ -26,5 +26,6 @@
     }
   },
   "postCreateCommand": "sudo chown -R vscode:vscode /go && go mod download",
+  "postStartCommand": "sudo mkdir -p /run/dbus && sudo dbus-daemon --system --fork 2>/dev/null || true",
   "remoteUser": "vscode"
 }

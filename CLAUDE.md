@@ -49,6 +49,20 @@ Key details:
 - draw.io runs headless via `xvfb-run` — use `drawio-export` wrapper for exports
 - `COLORTERM=truecolor` is set for correct terminal color rendering
 
+### Headless draw.io Export
+
+The `bausteinsicht export` and `drawio-export` commands require:
+1. **`dbus` daemon running** — Electron needs D-Bus for IPC. If export fails with "Export failed" or "input file/directory not found", start dbus:
+   ```bash
+   sudo mkdir -p /run/dbus && sudo dbus-daemon --system --fork
+   ```
+2. **`xvfb-run -a`** — the `-a` flag auto-picks a free display (avoids conflicts with existing X servers)
+3. **`--no-sandbox`** — required in containers without user namespaces
+
+The devcontainer `postStartCommand` starts dbus automatically. The `drawio-export` wrapper handles xvfb and `--no-sandbox`.
+
+GPU errors in stderr (`"Exiting GPU process due to errors during initialization"`) are **harmless** — draw.io falls back to software rendering.
+
 ### Makefile
 All build, test, and analysis commands are available via `make`:
 - `make build` — build the CLI binary

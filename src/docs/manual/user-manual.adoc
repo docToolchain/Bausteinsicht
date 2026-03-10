@@ -388,10 +388,68 @@ This is intentional. New elements are marked with a red dashed border (`strokeCo
 
 When both the model and draw.io change the same field between syncs, Bausteinsicht reports a conflict. Resolve by choosing one version and running sync again.
 
+==== PNG/SVG export fails in headless or container environments
+
+The `bausteinsicht export` command uses the draw.io Desktop CLI (Electron app) to render images.
+In headless environments (Docker, devcontainers, CI, WSL2), this requires:
+
+1. **A virtual X display** — provided by `xvfb`.
+The `drawio-export` wrapper script handles this automatically.
+
+2. **A running D-Bus system daemon** — Electron requires D-Bus for IPC.
+Without it, export fails with `"Export failed"` or `"input file/directory not found"`.
++
+[source,bash]
+----
+# Start dbus (required once per container session)
+sudo mkdir -p /run/dbus
+sudo dbus-daemon --system --fork
+----
+
+3. **The `--no-sandbox` flag** — required in containers without user namespace support.
+The `drawio-export` wrapper includes this flag.
+
+The Bausteinsicht devcontainer (`.devcontainer/`) handles all of this automatically.
+If you build your own container, ensure `dbus` and `xvfb` are installed and dbus is started before exporting.
+
+NOTE: GPU errors like `"Exiting GPU process due to errors during initialization"` in stderr are harmless — draw.io falls back to software rendering.
+
 ==== draw.io pages look identical
 
 If element IDs collide across pages, draw.io may render pages incorrectly. Bausteinsicht uses page-scoped IDs (`viewID--elementID`) to prevent this. If you see this issue, delete `.bausteinsicht-sync` and `architecture.drawio`, then re-init and sync.
 
+=== Exporting Diagrams
+
+Export views as PNG or SVG images for embedding in documentation:
+
+[source,bash]
+----
+bausteinsicht export --image-format png
+bausteinsicht export --image-format svg --view context
+bausteinsicht export --image-format png --scale 2.0 --output ./images/
+----
+
+Export as text-based diagrams:
+
+[source,bash]
+----
+bausteinsicht export-diagram --diagram-format plantuml
+bausteinsicht export-diagram --diagram-format mermaid
+----
+
+Export element tables:
+
+[source,bash]
+----
+bausteinsicht export-table --table-format adoc --output elements.adoc
+bausteinsicht export-table --table-format markdown
+----
+
+NOTE: Image export requires the draw.io Desktop CLI.
+In containers, the `drawio-export` wrapper handles headless rendering via xvfb.
+See <<troubleshooting>> for common export issues.
+
+[[troubleshooting]]
 === Command Reference
 
 See the link:../spec/02_cli_specification.adoc[CLI Specification] for full command details.
@@ -417,6 +475,15 @@ See the link:../spec/02_cli_specification.adoc[CLI Specification] for full comma
 
 | `bausteinsicht add relationship`
 | Add relationship to model
+
+| `bausteinsicht export`
+| Export views as PNG/SVG images
+
+| `bausteinsicht export-diagram`
+| Export views as PlantUML or Mermaid diagrams
+
+| `bausteinsicht export-table`
+| Export element list as AsciiDoc or Markdown table
 
 | `bausteinsicht --version`
 | Display version number

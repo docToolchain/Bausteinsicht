@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # draw.io / Electron headless requirements
     xvfb \
     xauth \
+    dbus \
     libx11-xcb1 \
     libxcomposite1 \
     libxdamage1 \
@@ -67,8 +68,11 @@ RUN wget -q "https://github.com/jgraph/drawio-desktop/releases/download/v${DRAWI
  && apt-get update && apt-get install -y --no-install-recommends /tmp/drawio.deb \
  && rm -f /tmp/drawio.deb && rm -rf /var/lib/apt/lists/*
 
-# Wrapper script so `drawio` runs headless via xvfb
-RUN printf '#!/bin/sh\nxvfb-run drawio "$@"\n' > /usr/local/bin/drawio-export \
+# Wrapper script so `drawio` runs headless via xvfb with dbus
+# -a: auto-pick a free display number (avoids conflicts with existing Xvfb)
+# --no-sandbox: required in container environments without user namespaces
+# dbus: Electron requires a running system bus for IPC
+RUN printf '#!/bin/sh\n# Ensure dbus is running (required by Electron/draw.io)\nif [ ! -S /run/dbus/system_bus_socket ]; then\n  sudo mkdir -p /run/dbus\n  sudo dbus-daemon --system --fork 2>/dev/null || true\nfi\nxvfb-run -a drawio --no-sandbox "$@"\n' > /usr/local/bin/drawio-export \
  && chmod +x /usr/local/bin/drawio-export
 
 # ──────────────────────────────────────────────
