@@ -1,5 +1,5 @@
 {
-  "name": "Bausteinsicht Dev",
+  "name": "Dev Container",
   "build": {
     "dockerfile": "Dockerfile"
   },
@@ -14,8 +14,8 @@
     "ghcr.io/devcontainers/features/github-cli:1": {}
   },
   "mounts": [
-    "source=bausteinsicht-zshhistory-${devcontainerId},target=/commandhistory,type=volume",
-    "source=bausteinsicht-claude-config-${devcontainerId},target=/home/vscode/.claude,type=volume"
+    "source=devcontainer-zshhistory-${devcontainerId},target=/commandhistory,type=volume",
+    "source=devcontainer-claude-config-${devcontainerId},target=/home/vscode/.claude,type=volume"
   ],
   "customizations": {
     "vscode": {

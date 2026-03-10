@@ -1,5 +1,5 @@
 #!/bin/bash
-# Firewall for Bausteinsicht devcontainer — restricts outbound to whitelisted domains only.
+# Firewall for devcontainer — restricts outbound to whitelisted domains only.
 # Adapted from the Claude Code reference devcontainer.
 # Enables safe use of `claude --dangerously-skip-permissions`.
 set -euo pipefail

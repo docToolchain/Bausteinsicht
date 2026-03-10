@@ -1,4 +1,4 @@
-# Bausteinsicht development container
+# Development container
 # Provides Go toolchain, static analysis, security scanners, draw.io CLI, Claude Code, Kiro CLI, and human CLI.
 
 FROM mcr.microsoft.com/devcontainers/go:1.24
