@@ -13,12 +13,13 @@ import (
 )
 
 const (
-	metadataPrefix = "metadata-"
-	legendPrefix   = "legend-"
-	infoBoxWidth   = 300.0
-	infoBoxGap     = 80.0
-	metadataX      = 40.0
-	legendX        = 400.0
+	metadataPrefix    = "metadata-"
+	legendPrefix      = "legend-"
+	infoBoxGap        = 80.0
+	metadataX         = 40.0
+	metadataWidth     = 500.0
+	legendWidthRatio  = 0.30
+	legendGap         = 60.0
 )
 
 // createMetadata creates or updates a metadata info box on the view page.
@@ -50,9 +51,15 @@ func createMetadata(
 		}
 	}
 
-	// Create new metadata cell.
-	y := computeMaxY(page) + infoBoxGap
-	createInfoBox(root, cellID, label, metadataX, y)
+	// Create new metadata cell — 60% of content width.
+	legendCellID := legendPrefix + viewID
+	y := computeMaxY(page, cellID, legendCellID) + infoBoxGap
+	contentWidth := computeContentWidth(page, cellID, legendCellID)
+	if contentWidth < 600 {
+		contentWidth = 600
+	}
+	width := contentWidth * 0.60
+	createInfoBox(root, cellID, label, metadataX, y, width)
 	return true
 }
 
@@ -85,9 +92,18 @@ func createLegend(
 		}
 	}
 
-	// Create new legend cell.
-	y := computeMaxY(page) + infoBoxGap
-	createInfoBox(root, cellID, label, legendX, y)
+	// Create new legend cell — positioned right of the metadata box, same Y.
+	metaCellID := metadataPrefix + viewID
+	y := computeMaxY(page, cellID, metaCellID) + infoBoxGap
+
+	// Compute content width for legend positioning.
+	contentWidth := computeContentWidth(page, cellID, metaCellID)
+	if contentWidth < 600 {
+		contentWidth = 600
+	}
+	legendWidth := contentWidth * legendWidthRatio
+	legendX := contentWidth - legendWidth + metadataX
+	createInfoBox(root, cellID, label, legendX, y, legendWidth)
 	return true
 }
 
@@ -181,7 +197,7 @@ func extractFillColor(allStyles map[string]drawio.TemplateStyle, kind string) st
 }
 
 // createInfoBox creates a non-model mxCell info box at the given position.
-func createInfoBox(root *etree.Element, id, label string, x, y float64) {
+func createInfoBox(root *etree.Element, id, label string, x, y, width float64) {
 	obj := root.CreateElement("object")
 	obj.CreateAttr("label", label)
 	obj.CreateAttr("id", id)
@@ -194,20 +210,29 @@ func createInfoBox(root *etree.Element, id, label string, x, y float64) {
 	geo := cell.CreateElement("mxGeometry")
 	geo.CreateAttr("x", fmt.Sprintf("%.0f", x))
 	geo.CreateAttr("y", fmt.Sprintf("%.0f", y))
-	geo.CreateAttr("width", fmt.Sprintf("%.0f", infoBoxWidth))
+	geo.CreateAttr("width", fmt.Sprintf("%.0f", width))
 	geo.CreateAttr("height", "120")
 	geo.CreateAttr("as", "geometry")
 }
 
-// computeMaxY finds the bottom-most Y coordinate of elements on the page.
-// This is used to position metadata/legend boxes below existing content.
-func computeMaxY(page *drawio.Page) float64 {
+// computeMaxY finds the bottom-most Y coordinate of elements on the page,
+// excluding the specified cell IDs (used to ignore metadata/legend boxes).
+func computeMaxY(page *drawio.Page, excludeIDs ...string) float64 {
+	exclude := make(map[string]bool, len(excludeIDs))
+	for _, id := range excludeIDs {
+		exclude[id] = true
+	}
+
 	maxY := 0.0
 	root := page.Root()
 	if root == nil {
 		return maxY
 	}
 	for _, obj := range root.ChildElements() {
+		// Skip excluded cells.
+		if id := obj.SelectAttrValue("id", ""); exclude[id] {
+			continue
+		}
 		cell := obj.FindElement("mxCell")
 		if cell == nil {
 			if obj.Tag == "mxCell" {
@@ -227,6 +252,44 @@ func computeMaxY(page *drawio.Page) float64 {
 		}
 	}
 	return maxY
+}
+
+// computeContentWidth finds the rightmost X+Width of elements on the page,
+// excluding the specified cell IDs.
+func computeContentWidth(page *drawio.Page, excludeIDs ...string) float64 {
+	exclude := make(map[string]bool, len(excludeIDs))
+	for _, id := range excludeIDs {
+		exclude[id] = true
+	}
+
+	maxRight := 0.0
+	root := page.Root()
+	if root == nil {
+		return maxRight
+	}
+	for _, obj := range root.ChildElements() {
+		if id := obj.SelectAttrValue("id", ""); exclude[id] {
+			continue
+		}
+		cell := obj.FindElement("mxCell")
+		if cell == nil {
+			if obj.Tag == "mxCell" {
+				cell = obj
+			} else {
+				continue
+			}
+		}
+		geo := cell.FindElement("mxGeometry")
+		if geo == nil {
+			continue
+		}
+		x := parseFloat(geo.SelectAttrValue("x", "0"))
+		w := parseFloat(geo.SelectAttrValue("width", "0"))
+		if right := x + w; right > maxRight {
+			maxRight = right
+		}
+	}
+	return maxRight
 }
 
 // parseFloat parses a string to float64, returning 0 on failure.

@@ -143,19 +143,19 @@ func applyForwardPerView(
 			elemSet[scopeID] = true
 		}
 
-		applyChangesToPage(cs, page, templates, flat, elemSet, viewID, scopeID, result)
-
 		// Populate resolved elements that aren't already on the page.
-		// For new pages this handles elements already in sync state (#184,
-		// #188, #189). For existing pages this handles elements newly
-		// included via view include/exclude changes that don't appear in
-		// the ChangeSet (#231).
+		// This runs BEFORE applyChangesToPage so the layout engine can
+		// position elements on fresh pages. applyChangesToPage will then
+		// skip Added elements that are already placed. For existing pages,
+		// this handles elements newly included via view changes (#231).
 		populateNewPage(page, viewID, scopeID, templates, flat, elemSet, m, result)
+
+		applyChangesToPage(cs, page, templates, flat, elemSet, viewID, scopeID, result)
 
 		// Populate connectors for relationships whose endpoints are both
 		// on the page but whose connector doesn't exist yet. This handles
 		// relationships involving newly populated elements (#231).
-		populateConnectors(page, viewID, m, elemSet, templates, result)
+		populateConnectors(page, viewID, scopeID, m, elemSet, templates, result)
 
 		// Reconciliation: remove elements on the page that are no longer
 		// in the resolved view (e.g., after exclude list changes). #102
@@ -215,9 +215,16 @@ func populateNewPage(
 		return
 	}
 
-	// Determine if this is a fresh page (no existing bausteinsicht elements).
+	// Determine if this is a fresh page (no existing bausteinsicht elements
+	// besides the scope boundary which is created before this function runs).
 	existingElems := page.FindAllElements()
-	isFreshPage := len(existingElems) == 0
+	nonBoundaryCount := 0
+	for _, obj := range existingElems {
+		if obj.SelectAttrValue("bausteinsicht_id", "") != scopeID || scopeID == "" {
+			nonBoundaryCount++
+		}
+	}
+	isFreshPage := nonBoundaryCount == 0
 
 	// Look up the view's layout mode.
 	layoutMode := ""
@@ -230,11 +237,11 @@ func populateNewPage(
 
 	if isFreshPage {
 		// Use layout engine for fresh pages.
-		lr := computeLayout(toPlace, flat, templates, m.ElementOrder, scopeID, layoutMode)
+		lr := computeLayout(toPlace, flat, templates, m.ElementOrder, scopeID, layoutMode, m.Relationships)
 
-		// Resize the scope boundary if the layout engine computed dimensions.
+		// Resize and reposition the scope boundary if the layout engine computed dimensions.
 		if scopeID != "" && lr.BoundaryWidth > 0 && lr.BoundaryHeight > 0 {
-			resizeScopeBoundary(page, scopeID, lr.BoundaryWidth, lr.BoundaryHeight)
+			resizeScopeBoundary(page, scopeID, lr.BoundaryX, lr.BoundaryY, lr.BoundaryWidth, lr.BoundaryHeight)
 		}
 
 		sort.Strings(toPlace)
@@ -243,7 +250,7 @@ func populateNewPage(
 			if !ok {
 				continue
 			}
-			placeSingleElement(id, viewID, scopeID, page, templates, flat, pos.X, pos.Y, result)
+			placeSingleElement(id, viewID, scopeID, page, templates, flat, pos.X, pos.Y, false, result)
 		}
 	} else {
 		// Incremental: fall back to cursor-based placement.
@@ -260,6 +267,7 @@ func populateNewPage(
 func populateConnectors(
 	page *drawio.Page,
 	viewID string,
+	scopeID string,
 	m *model.BausteinsichtModel,
 	elemSet map[string]bool,
 	templates *drawio.TemplateSet,
@@ -274,6 +282,12 @@ func populateConnectors(
 		}
 		// Skip self-referencing lifted relationships.
 		if from == to && (from != rel.From || to != rel.To) {
+			continue
+		}
+		// Skip connectors between the scope boundary and external elements.
+		// The boundary is a visual container — scope↔external relationships
+		// belong in the parent view. Child↔scope connections are allowed.
+		if scopeID != "" && isScopeExternalConnector(from, to, scopeID) {
 			continue
 		}
 
@@ -320,6 +334,19 @@ func scopedCellID(viewID, elemID string) string {
 // Example: isChildOf("shop.api", "shop") → true
 func isChildOf(id, parentID string) bool {
 	return strings.HasPrefix(id, parentID+".")
+}
+
+// isScopeExternalConnector returns true if one endpoint is the scope and
+// the other is NOT a child of the scope. Child↔scope connections are allowed,
+// but scope↔external connections should be shown in the parent view.
+func isScopeExternalConnector(from, to, scopeID string) bool {
+	if from == scopeID && !isChildOf(to, scopeID) {
+		return true
+	}
+	if to == scopeID && !isChildOf(from, scopeID) {
+		return true
+	}
+	return false
 }
 
 // liftEndpoint returns id if it is in elemFilter. Otherwise it walks up the
@@ -474,6 +501,10 @@ func applyChangesToPage(
 					from = liftEndpoint(from, elemFilter)
 					to = liftEndpoint(to, elemFilter)
 					if from == "" || to == "" || (from == to && (from != ch.From || to != ch.To)) {
+						continue
+					}
+					// Skip connectors between scope boundary and externals.
+					if scopeID != "" && isScopeExternalConnector(from, to, scopeID) {
 						continue
 					}
 				}
@@ -636,6 +667,7 @@ func placeSingleElement(
 	templates *drawio.TemplateSet,
 	flat map[string]*model.Element,
 	x, y float64,
+	markNew bool,
 	result *ForwardResult,
 ) {
 	if page.FindElement(id) != nil {
@@ -654,7 +686,10 @@ func placeSingleElement(
 		result.Warnings = append(result.Warnings, "no template style for kind: "+elem.Kind)
 	}
 
-	style := mergeStyles(ts.Style, newElementMarker)
+	style := ts.Style
+	if markNew {
+		style = mergeStyles(ts.Style, newElementMarker)
+	}
 
 	width := ts.Width
 	if width == 0 {
@@ -691,8 +726,8 @@ func placeSingleElement(
 	result.ElementsCreated++
 }
 
-// resizeScopeBoundary updates the geometry of an existing scope boundary element.
-func resizeScopeBoundary(page *drawio.Page, scopeID string, width, height float64) {
+// resizeScopeBoundary updates the geometry and position of an existing scope boundary element.
+func resizeScopeBoundary(page *drawio.Page, scopeID string, x, y, width, height float64) {
 	obj := page.FindElement(scopeID)
 	if obj == nil {
 		return
@@ -705,6 +740,8 @@ func resizeScopeBoundary(page *drawio.Page, scopeID string, width, height float6
 	if geo == nil {
 		return
 	}
+	geo.CreateAttr("x", strconv.FormatFloat(x, 'f', -1, 64))
+	geo.CreateAttr("y", strconv.FormatFloat(y, 'f', -1, 64))
 	geo.CreateAttr("width", strconv.FormatFloat(width, 'f', -1, 64))
 	geo.CreateAttr("height", strconv.FormatFloat(height, 'f', -1, 64))
 }

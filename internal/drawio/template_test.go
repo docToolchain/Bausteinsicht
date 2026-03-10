@@ -26,7 +26,7 @@ func TestGetStyle_ElementKinds(t *testing.T) {
 		t.Fatalf("LoadTemplate: %v", err)
 	}
 
-	kinds := []string{"actor", "system", "container", "component"}
+	kinds := []string{"actor", "system", "container", "component", "datastore", "ui", "queue", "mobile", "filestore"}
 	for _, kind := range kinds {
 		style, ok := ts.GetStyle(kind)
 		if !ok {
@@ -128,7 +128,7 @@ func TestGetStyle_SubCellStyles(t *testing.T) {
 	}
 
 	// All non-actor element kinds should have sub-cell styles.
-	for _, kind := range []string{"system", "container", "component", "external_system"} {
+	for _, kind := range []string{"system", "container", "component", "external_system", "datastore", "ui", "queue", "mobile", "filestore"} {
 		style, ok := ts.GetStyle(kind)
 		if !ok {
 			t.Errorf("GetStyle(%q): expected true", kind)

@@ -121,12 +121,18 @@ func createSubCells(root *etree.Element, parentCellID string, data ElementData, 
 }
 
 // createTextSubCell creates a single text mxCell child element.
+// Sub-cells are locked (non-movable, non-resizable, non-deletable, non-connectable)
+// so that clicking the shape always selects the parent element.
 func createTextSubCell(root *etree.Element, id, parentID, value string, sub *SubCellStyle, parentW, parentH float64) {
 	cell := root.CreateElement("mxCell")
 	cell.CreateAttr("id", id)
 	cell.CreateAttr("value", value)
-	cell.CreateAttr("style", sub.Style)
+	// Make sub-cells transparent to mouse events so clicks pass through
+	// to the parent element. This lets users grab the whole shape at once.
+	style := setStyleFlags(sub.Style, "pointerEvents=0")
+	cell.CreateAttr("style", style)
 	cell.CreateAttr("vertex", "1")
+	cell.CreateAttr("connectable", "0")
 	cell.CreateAttr("parent", parentID)
 
 	geom := cell.CreateElement("mxGeometry")
@@ -381,4 +387,31 @@ func formatFloat(f float64) string {
 		return fmt.Sprintf("%d", int(f))
 	}
 	return fmt.Sprintf("%g", f)
+}
+
+// setStyleFlags sets key=value flags in a draw.io style string,
+// replacing any existing value for each key.
+func setStyleFlags(style string, flags ...string) string {
+	for _, flag := range flags {
+		parts := strings.SplitN(flag, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		key := parts[0]
+		// Remove existing key=value pair.
+		segments := strings.Split(style, ";")
+		var filtered []string
+		for _, seg := range segments {
+			if seg == "" {
+				continue
+			}
+			if strings.HasPrefix(seg, key+"=") {
+				continue
+			}
+			filtered = append(filtered, seg)
+		}
+		filtered = append(filtered, flag)
+		style = strings.Join(filtered, ";") + ";"
+	}
+	return style
 }

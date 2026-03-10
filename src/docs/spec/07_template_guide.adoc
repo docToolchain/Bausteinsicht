@@ -36,8 +36,14 @@ The template file (`template.drawio` by default) is created by `bausteinsicht in
 |===
 | Template Type | Purpose
 
-| **Element templates** (`actor`, `system`, `container`, `component`)
-| Define the visual style for each element kind
+| **Core element templates** (`actor`, `system`, `container`, `component`)
+| Define the visual style for the standard C4 element kinds
+
+| **Specialized element templates** (`datastore`, `ui`, `queue`, `mobile`, `filestore`)
+| Define the visual style for common specialized element kinds: database cylinders, web frontends, message queues, mobile apps, and file stores
+
+| **External system template** (`external_system`)
+| Defines the visual style for external/third-party systems
 
 | **Boundary templates** (`system_boundary`, `container_boundary`)
 | Define the swimlane style when an element is used as a view scope
@@ -111,7 +117,8 @@ Templates are identified by the `bausteinsicht_template` attribute:
 
 Open `template.drawio` in draw.io (desktop app or VS Code extension). You will see the template shapes arranged on a single page:
 
-* **Top row**: Element templates (Actor, System, Container, Component)
+* **Top row**: Core element templates (Actor, System, Container, Component)
+* **Middle rows**: Specialized shapes (Datastore, UI, Queue, Mobile, Filestore) and External System
 * **Bottom row**: Boundary templates (swimlanes)
 * **Arrow**: Connector template linking two elements
 

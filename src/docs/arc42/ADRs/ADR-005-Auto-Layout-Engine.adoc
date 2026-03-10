@@ -1,0 +1,240 @@
+:jbake-title: ADR-005: Auto-Layout Engine
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: Development
+:jbake-order: 6
+
+= ADR-005: Auto-Layout Engine for New Diagram Pages
+
+== Status
+
+Accepted
+
+== Context
+
+When Bausteinsicht creates a new draw.io page during forward sync, all elements are placed in a single horizontal row with non-deterministic ordering (Go map iteration order).
+For diagrams with more than a handful of elements, this produces unreadable layouts where every element sits on the same Y-coordinate.
+
+Users must manually reposition every element after the first sync — a tedious and error-prone process that contradicts the project's learnability goal.
+
+The layout engine must satisfy two constraints:
+
+1. **New pages only**: Auto-layout runs when a page is first created. Existing element positions must never be overwritten during normal sync (user positions are preserved).
+2. **Re-triggerable**: Users can explicitly request a re-layout via a CLI flag (`--relayout`), which clears and re-applies the layout algorithm.
+
+=== Constraints
+
+* No external layout library (keep zero Go dependencies for layout)
+* Must work with arbitrary user-defined element kinds (not hardcoded to C4 levels)
+* Must handle scope boundaries (swimlanes) with internal and external elements
+* Must produce deterministic output (same model → same layout, always)
+* A4 landscape (1169×827 px) as default page size
+
+== Evaluated Options
+
+=== Option A: Layered Layout (Kind-Based Rows)
+
+Elements are grouped into horizontal layers based on their `kind`, using the definition order from `specification.elements` as the tier assignment.
+
+.Example: Specification order determines layers
+[source,jsonc]
+----
+"specification": {
+  "elements": {
+    "actor": { ... },      // → Tier 0 (top row)
+    "system": { ... },     // → Tier 1
+    "container": { ... },  // → Tier 2
+    "datastore": { ... },  // → Tier 3
+    "component": { ... }   // → Tier 4 (bottom row)
+  }
+}
+----
+
+Algorithm:
+
+1. Classify elements into tiers by kind (spec order)
+2. Within each tier: sort elements alphabetically by ID
+3. Place tier by tier, top to bottom, left to right
+4. Row wrapping when elements exceed page width
+5. Scope boundary auto-sizes to fit its children
+
+* Produces architecturally meaningful layouts — actors on top, infrastructure at the bottom
+* Leverages the specification order that users already define
+* Simple algorithm, easy to understand and debug
+* Downside: does not consider relationships (no edge-crossing minimization)
+* Downside: no support for manual hints or constraints
+
+=== Option B: Grid Layout
+
+Elements are sorted alphabetically and placed in a fixed grid pattern.
+
+* Predictable, compact placement
+* Simple algorithm
+* Downside: no architectural meaning — actors next to databases
+* Downside: does not scale well with mixed element sizes
+
+=== Option C: Force-Directed / Graph Layout
+
+Use a force-directed algorithm (e.g., Fruchterman-Reingold) that considers relationships to minimize edge crossings.
+
+* Produces visually clean layouts with short edges
+* Considers relationships, not just element kinds
+* Downside: significant implementation effort
+* Downside: non-deterministic without careful seeding
+* Downside: may produce unexpected layouts for small diagrams
+* Downside: requires iterative simulation (performance concern for large models)
+
+=== Option D: External Layout Library (e.g., ELK via WASM)
+
+Delegate layout to an established graph layout library like Eclipse Layout Kernel (ELK).
+
+* Battle-tested algorithms with many options
+* Supports hierarchical, layered, and force-directed layouts
+* Downside: adds a significant dependency (WASM binary or CGo binding)
+* Downside: contradicts the "zero external dependencies for layout" constraint
+* Downside: configuration complexity for good results
+
+== Weighted Pugh Matrix
+
+Rating scale: -1 = worse than reference, 0 = same as reference, +1 = better than reference
+
+Reference option: *C (Force-Directed)*
+
+[cols="4,1,1,1,1,1"]
+|===
+| Criterion | Weight | A: Layered | B: Grid | C: Force-Directed (Ref) | D: External Lib
+
+| *Layout quality for architecture diagrams*
+| 5
+| +1
+| -1
+| 0
+| +1
+
+| *Implementation effort*
+| 5
+| +1
+| +1
+| 0
+| -1
+
+| *Determinism*
+| 4
+| +1
+| +1
+| 0
+| +1
+
+| *Dependency footprint*
+| 3
+| +1
+| +1
+| 0
+| -1
+
+| *Relationship awareness*
+| 3
+| -1
+| -1
+| 0
+| +1
+
+| *Scope / boundary support*
+| 3
+| +1
+| 0
+| 0
+| +1
+
+| *Debuggability*
+| 2
+| +1
+| +1
+| 0
+| -1
+|===
+
+=== Weighted Results
+
+[cols="3,1,1,1,1"]
+|===
+| Criterion | A: Layered | B: Grid | C: Force-Directed (Ref) | D: External Lib
+
+| Layout quality (×5)           | +5  | -5  | 0 | +5
+| Implementation effort (×5)    | +5  | +5  | 0 | -5
+| Determinism (×4)              | +4  | +4  | 0 | +4
+| Dependency footprint (×3)     | +3  | +3  | 0 | -3
+| Relationship awareness (×3)   | -3  | -3  | 0 | +3
+| Scope / boundary support (×3) | +3  | 0   | 0 | +3
+| Debuggability (×2)            | +2  | +2  | 0 | -2
+| *Total*                       | *+19* | *+6* | *0* | *+5*
+|===
+
+== Decision
+
+**Option A: Layered Layout as default, with Grid as alternative.**
+
+The layered layout provides the best trade-off between layout quality and implementation simplicity:
+
+. *Architecturally meaningful*: Elements are grouped by kind, producing layouts that match how architects think about systems — users at the top, infrastructure at the bottom.
+. *Leverages existing data*: The specification element order already defines the logical hierarchy. No additional configuration needed.
+. *Simple and deterministic*: The algorithm is straightforward to implement, test, and debug. Same input always produces the same output.
+. *No dependencies*: Pure Go implementation with no external libraries.
+
+Grid layout is included as a secondary option for views where kind-based layering is not meaningful (e.g., a flat list of components).
+
+The `layout` property on each view allows users to choose per view: `"layered"` (default), `"grid"`, or `"none"`.
+
+=== Layout Modes
+
+[cols="1,3"]
+|===
+| Mode | Behavior
+
+| `layered` (default)
+| Elements grouped into rows by kind, ordered by `specification.elements` definition order. Within each row: alphabetical by ID. Scope boundary auto-sizes.
+
+| `grid`
+| Elements sorted alphabetically, placed in a fixed-column grid. No kind-based grouping.
+
+| `none`
+| Current behavior (horizontal row). For users who prefer fully manual positioning.
+|===
+
+=== Trigger Rules
+
+[cols="2,3"]
+|===
+| Scenario | Behavior
+
+| New page (first sync of a view)
+| Auto-layout applied based on `view.layout` setting
+
+| Existing page (incremental sync)
+| New elements placed at cursor position (no re-layout). Existing positions preserved.
+
+| `bausteinsicht sync --relayout`
+| All element positions cleared, then auto-layout re-applied from scratch
+|===
+
+== Consequences
+
+=== Positive
+
+* New diagrams are immediately readable after first sync
+* Deterministic: same model always produces the same layout
+* No learning curve — layout happens automatically
+* Per-view control via `layout` property
+* `--relayout` provides an escape hatch for re-applying layout after model changes
+* Zero external dependencies
+
+=== Negative
+
+* Does not consider relationships (edges may cross)
+* No incremental layout for newly added elements on existing pages
+* Users who want relationship-aware layout must position manually
+
+=== Risks
+
+* If the layered algorithm proves insufficient for complex diagrams, a force-directed algorithm can be added later as an additional layout mode without breaking the existing API
+* The specification element order may not always reflect the desired visual hierarchy — users can reorder kinds in their specification to adjust

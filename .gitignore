@@ -27,6 +27,7 @@ Thumbs.db
 
 # Temporary files
 *.tmp
+tmp/
 my-architecture/
 
 # Claude Code (track project settings, ignore user-specific files)

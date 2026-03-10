@@ -44,7 +44,7 @@ func TestComputeLayout_Layered_GroupsByKind(t *testing.T) {
 	elementOrder := []string{"actor", "system", "container"}
 
 	ids := []string{"customer", "admin", "shop", "payments"}
-	result := computeLayout(ids, flat, ts, elementOrder, "", "layered")
+	result := computeLayout(ids, flat, ts, elementOrder, "", "layered", nil)
 
 	// Actors (tier 0) should be above systems (tier 1).
 	customerY := result.Positions["customer"].Y
@@ -69,7 +69,7 @@ func TestComputeLayout_Layered_AlphabeticWithinTier(t *testing.T) {
 	elementOrder := []string{"actor", "system"}
 
 	ids := []string{"customer", "admin", "shop", "payments"}
-	result := computeLayout(ids, flat, ts, elementOrder, "", "layered")
+	result := computeLayout(ids, flat, ts, elementOrder, "", "layered", nil)
 
 	// Within actors tier: admin < customer alphabetically, so admin.X < customer.X
 	if result.Positions["admin"].X >= result.Positions["customer"].X {
@@ -89,8 +89,8 @@ func TestComputeLayout_Layered_Deterministic(t *testing.T) {
 	elementOrder := []string{"actor", "system"}
 	ids := []string{"customer", "admin", "shop", "payments"}
 
-	result1 := computeLayout(ids, flat, ts, elementOrder, "", "layered")
-	result2 := computeLayout(ids, flat, ts, elementOrder, "", "layered")
+	result1 := computeLayout(ids, flat, ts, elementOrder, "", "layered", nil)
+	result2 := computeLayout(ids, flat, ts, elementOrder, "", "layered", nil)
 
 	for _, id := range ids {
 		p1 := result1.Positions[id]
@@ -106,7 +106,7 @@ func TestComputeLayout_Grid(t *testing.T) {
 	ts := loadTestTemplates(t)
 
 	ids := []string{"customer", "admin", "shop", "payments"}
-	result := computeLayout(ids, flat, ts, nil, "", "grid")
+	result := computeLayout(ids, flat, ts, nil, "", "grid", nil)
 
 	if len(result.Positions) != 4 {
 		t.Fatalf("expected 4 positions, got %d", len(result.Positions))
@@ -125,7 +125,7 @@ func TestComputeLayout_None(t *testing.T) {
 	ts := loadTestTemplates(t)
 
 	ids := []string{"customer", "admin", "shop"}
-	result := computeLayout(ids, flat, ts, nil, "", "none")
+	result := computeLayout(ids, flat, ts, nil, "", "none", nil)
 
 	// All elements should be on the same Y (horizontal row).
 	y := result.Positions["admin"].Y
@@ -158,7 +158,7 @@ func TestComputeLayout_Layered_ScopeAware(t *testing.T) {
 	ts := loadTestTemplates(t)
 
 	ids := []string{"customer", "shop.api", "shop.db"}
-	result := computeLayout(ids, flat, ts, m.ElementOrder, "shop", "layered")
+	result := computeLayout(ids, flat, ts, m.ElementOrder, "shop", "layered", nil)
 
 	// Scoped children (shop.api, shop.db) should have positions relative to boundary.
 	apiPos := result.Positions["shop.api"]
@@ -180,10 +180,11 @@ func TestComputeLayout_Layered_ScopeAware(t *testing.T) {
 		t.Errorf("boundary height should be at least 300, got %v", result.BoundaryHeight)
 	}
 
-	// External element (customer) should be below the boundary.
-	if customerPos.Y <= result.BoundaryHeight {
-		t.Errorf("external element should be below boundary: customer.Y=%v, boundary.H=%v",
-			customerPos.Y, result.BoundaryHeight)
+	// Actor external (customer) should be ABOVE the boundary (actors always first row).
+	// Boundary starts after actors, so customer.Y should be less than scope children Y.
+	if customerPos.Y >= apiPos.Y {
+		t.Errorf("actor external should be above scope children: customer.Y=%v, api.Y=%v",
+			customerPos.Y, apiPos.Y)
 	}
 }
 
@@ -198,7 +199,7 @@ func TestComputeLayout_Layered_RowWrapping(t *testing.T) {
 	}
 
 	ts := loadTestTemplates(t)
-	result := computeLayout(ids, flat, ts, []string{"system"}, "", "layered")
+	result := computeLayout(ids, flat, ts, []string{"system"}, "", "layered", nil)
 
 	// With 20 elements and default page width, there should be multiple rows.
 	yValues := make(map[float64]bool)

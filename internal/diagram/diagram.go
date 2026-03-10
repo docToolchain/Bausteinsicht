@@ -147,7 +147,13 @@ func c4Macro(kind string) string {
 		return "System"
 	case "external_system":
 		return "System_Ext"
-	case "container":
+	case "container", "ui", "mobile":
+		return "Container"
+	case "datastore":
+		return "ContainerDb"
+	case "queue":
+		return "ContainerQueue"
+	case "filestore":
 		return "Container"
 	case "component":
 		return "Component"

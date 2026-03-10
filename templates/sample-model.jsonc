@@ -15,14 +15,34 @@
         "description": "A top-level software system",
         "container": true
       },
-      "external": {
+      "external_system": {
         "notation": "External System",
         "description": "A third-party system outside your control"
       },
       "container": {
         "notation": "Container",
-        "description": "A deployable unit (application, service, data store)",
+        "description": "A deployable unit (application, service)",
         "container": true
+      },
+      "datastore": {
+        "notation": "Data Store",
+        "description": "A database or persistent data store"
+      },
+      "ui": {
+        "notation": "UI",
+        "description": "A web frontend or user interface"
+      },
+      "queue": {
+        "notation": "Queue",
+        "description": "A message queue or event broker"
+      },
+      "mobile": {
+        "notation": "Mobile App",
+        "description": "A mobile application"
+      },
+      "filestore": {
+        "notation": "File Store",
+        "description": "A file storage system"
       },
       "component": {
         "notation": "Component",
@@ -62,10 +82,16 @@
       "description": "E-commerce platform for selling products online",
       "children": {
         "frontend": {
-          "kind": "container",
+          "kind": "ui",
           "title": "Web Frontend",
           "technology": "React",
           "description": "Single-page application for browsing and ordering"
+        },
+        "mobile-app": {
+          "kind": "mobile",
+          "title": "Mobile App",
+          "technology": "React Native",
+          "description": "Native mobile app for iOS and Android"
         },
         "api": {
           "kind": "container",
@@ -94,7 +120,7 @@
           }
         },
         "db": {
-          "kind": "container",
+          "kind": "datastore",
           "title": "Database",
           "technology": "PostgreSQL",
           "description": "Stores products, orders and customer data"
@@ -104,19 +130,31 @@
           "title": "Cache",
           "technology": "Redis",
           "description": "Caches product catalog for fast read access"
+        },
+        "message-queue": {
+          "kind": "queue",
+          "title": "Message Queue",
+          "technology": "RabbitMQ",
+          "description": "Asynchronous event bus for order and notification events"
+        },
+        "export-storage": {
+          "kind": "filestore",
+          "title": "Export Storage",
+          "technology": "S3",
+          "description": "Stores generated reports and export files"
         }
       }
     },
 
     // External systems
     "payment-provider": {
-      "kind": "external",
+      "kind": "external_system",
       "title": "Payment Provider",
       "technology": "Stripe API",
       "description": "Processes credit card and bank transfer payments"
     },
     "email-service": {
-      "kind": "external",
+      "kind": "external_system",
       "title": "E-Mail Service",
       "technology": "SMTP",
       "description": "Delivers transactional emails to customers"
@@ -178,6 +216,36 @@
       "to": "email-service",
       "label": "sends emails",
       "kind": "async"
+    },
+    {
+      "from": "customer",
+      "to": "onlineshop.mobile-app",
+      "label": "browses & orders",
+      "kind": "uses"
+    },
+    {
+      "from": "onlineshop.mobile-app",
+      "to": "onlineshop.api",
+      "label": "REST/JSON",
+      "kind": "uses"
+    },
+    {
+      "from": "onlineshop.api.orders",
+      "to": "onlineshop.message-queue",
+      "label": "publishes order events",
+      "kind": "async"
+    },
+    {
+      "from": "onlineshop.api.notifications",
+      "to": "onlineshop.message-queue",
+      "label": "subscribes to events",
+      "kind": "async"
+    },
+    {
+      "from": "onlineshop.api",
+      "to": "onlineshop.export-storage",
+      "label": "writes reports",
+      "kind": "uses"
     }
   ],
 
@@ -193,6 +261,7 @@
       "title": "Container View",
       "scope": "onlineshop",
       "include": ["customer", "backoffice-user", "onlineshop.*", "payment-provider", "email-service"],
+      "layout": "layered",
       "description": "Internal structure of the Online Shop: containers and their interactions"
     },
     "components": {
