@@ -1,5 +1,5 @@
 # Bausteinsicht development container
-# Provides Go toolchain, static analysis, security scanners, draw.io CLI, Claude Code, and human CLI.
+# Provides Go toolchain, static analysis, security scanners, draw.io CLI, Claude Code, Kiro CLI, and human CLI.
 
 FROM mcr.microsoft.com/devcontainers/go:1.24
 
@@ -100,11 +100,12 @@ RUN chsh -s /bin/zsh vscode \
  && chown -R vscode:vscode /commandhistory
 
 # ──────────────────────────────────────────────
-# Claude Code CLI (native installer, no Node.js dependency)
-# Install as vscode user so binary lands in ~/.local/bin/
+# Claude Code CLI + Kiro CLI (native installers, no Node.js dependency)
+# Install as vscode user so binaries land in ~/.local/bin/
 # ──────────────────────────────────────────────
 USER vscode
 RUN curl -fsSL https://claude.ai/install.sh | bash
+RUN curl -fsSL https://cli.kiro.dev/install | bash
 USER root
 
 # ──────────────────────────────────────────────

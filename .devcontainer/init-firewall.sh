@@ -71,6 +71,7 @@ for domain in \
     "sum.golang.org" \
     "storage.googleapis.com" \
     "gethuman.sh" \
+    "cli.kiro.dev" \
     "marketplace.visualstudio.com" \
     "vscode.blob.core.windows.net" \
     "update.code.visualstudio.com"; do
