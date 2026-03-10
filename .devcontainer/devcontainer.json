@@ -14,8 +14,8 @@
     "ghcr.io/devcontainers/features/github-cli:1": {}
   },
   "mounts": [
-    "source=devcontainer-zshhistory-${devcontainerId},target=/commandhistory,type=volume",
-    "source=devcontainer-claude-config-${devcontainerId},target=/home/vscode/.claude,type=volume"
+    "source=${localWorkspaceFolderBasename}-zshhistory,target=/commandhistory,type=volume",
+    "source=${localWorkspaceFolderBasename}-claude-config,target=/home/vscode/.claude,type=volume"
   ],
   "customizations": {
     "vscode": {
