@@ -5,8 +5,7 @@
   },
   "runArgs": [
     "--cap-add=NET_ADMIN",
-    "--cap-add=NET_RAW",
-    "--cap-add=SYSLOG"
+    "--cap-add=NET_RAW"
   ],
   "containerEnv": {
     "COLORTERM": "truecolor"

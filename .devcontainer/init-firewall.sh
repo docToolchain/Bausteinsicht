@@ -4,7 +4,7 @@
 # Enables safe use of `claude --dangerously-skip-permissions`.
 #
 # Security features:
-# - Logs all blocked connections to /var/log/firewall.log
+# - Logs blocked connections to /var/log/firewall.log (via ulogd2 NFLOG)
 # - Locks down iptables binaries after setup (prevents manipulation)
 # - Restricts sudo access to prevent firewall changes
 set -euo pipefail
@@ -16,6 +16,13 @@ LOGFILE="/var/log/firewall.log"
 touch "$LOGFILE"
 chown root:vscode "$LOGFILE"
 chmod 640 "$LOGFILE"
+
+# ──────────────────────────────────────────────
+# Start ulogd2 for NFLOG-based firewall logging (userspace, works in containers)
+# ──────────────────────────────────────────────
+echo "Starting ulogd2 firewall logger..."
+ulogd -c /etc/ulogd-firewall.conf -d
+echo "ulogd2 started, writing blocked connections to $LOGFILE"
 
 # 1. Extract Docker DNS info BEFORE any flushing
 DOCKER_DNS_RULES=$(iptables-save -t nat | grep "127\.0\.0\.11" || true)
@@ -133,9 +140,9 @@ iptables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
 # Allow only outbound traffic to whitelisted domains
 iptables -A OUTPUT -m set --match-set allowed-domains dst -j ACCEPT
 
-# Log blocked connections before rejecting (rate-limited to avoid log flooding)
+# Log blocked connections via NFLOG (userspace, rate-limited to avoid flooding)
 iptables -A OUTPUT -m limit --limit 10/min --limit-burst 30 \
-    -j LOG --log-prefix "FW-BLOCKED: " --log-level 4 --log-uid
+    -j NFLOG --nflog-group 1 --nflog-prefix "FW-BLOCKED:"
 iptables -A OUTPUT -j REJECT --reject-with icmp-admin-prohibited
 
 echo "Firewall configuration complete"
@@ -153,6 +160,9 @@ if ! curl --connect-timeout 5 https://api.github.com/zen >/dev/null 2>&1; then
 else
     echo "OK: api.github.com reachable as expected"
 fi
+
+# Capture rule count BEFORE lockdown
+RULE_COUNT=$(iptables -L OUTPUT -n | tail -n +3 | wc -l)
 
 # ──────────────────────────────────────────────
 # LOCKDOWN: Prevent firewall manipulation from within the container
@@ -189,40 +199,9 @@ rm -f /etc/sudoers.d/firewall
 
 echo "Sudo restricted to: dbus-daemon, mkdir, docker, dockerd, chown"
 
-# ──────────────────────────────────────────────
-# LOGGING: Start background reader for kernel firewall log messages
-# ──────────────────────────────────────────────
-echo "Starting firewall log reader..."
-
-# Read kernel messages and filter for firewall entries, write to log file
-# Uses /dev/kmsg (requires CAP_SYSLOG)
-if [ -r /dev/kmsg ]; then
-    nohup bash -c '
-        # Skip existing messages, only capture new ones
-        exec 3< /dev/kmsg
-        cat <&3 > /dev/null &
-        SKIP_PID=$!
-        sleep 0.5
-        kill $SKIP_PID 2>/dev/null || true
-
-        # Now read new messages and filter for firewall entries
-        while IFS= read -r line <&3; do
-            if [[ "$line" == *"FW-BLOCKED:"* ]]; then
-                timestamp=$(date "+%Y-%m-%d %H:%M:%S")
-                # Extract the useful part after the kernel timestamp
-                msg=$(echo "$line" | sed "s/^[^;]*;//")
-                echo "$timestamp $msg" >> /var/log/firewall.log
-            fi
-        done
-    ' > /dev/null 2>&1 &
-    echo "Log reader started (PID: $!), writing to $LOGFILE"
-else
-    echo "WARNING: /dev/kmsg not readable — firewall logging disabled"
-    echo "Add --cap-add=SYSLOG to container runArgs to enable logging"
-fi
-
 echo "=== Firewall setup complete ==="
-echo "  - Rules active: $(iptables -L OUTPUT -n 2>/dev/null | wc -l) OUTPUT rules"
+echo "  - Rules active: $RULE_COUNT OUTPUT rules"
 echo "  - Firewall tools: LOCKED"
 echo "  - Sudo: RESTRICTED"
-echo "  - Log file: $LOGFILE"
+echo "  - Log file: $LOGFILE (via ulogd2)"
+echo "  - View live: tail -f $LOGFILE"
