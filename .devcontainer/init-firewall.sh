@@ -2,8 +2,20 @@
 # Firewall for devcontainer — restricts outbound to whitelisted domains only.
 # Adapted from the Claude Code reference devcontainer.
 # Enables safe use of `claude --dangerously-skip-permissions`.
+#
+# Security features:
+# - Logs all blocked connections to /var/log/firewall.log
+# - Locks down iptables binaries after setup (prevents manipulation)
+# - Restricts sudo access to prevent firewall changes
 set -euo pipefail
 IFS=$'\n\t'
+
+LOGFILE="/var/log/firewall.log"
+
+# Prepare log file (readable by vscode user, writable only by root)
+touch "$LOGFILE"
+chown root:vscode "$LOGFILE"
+chmod 640 "$LOGFILE"
 
 # 1. Extract Docker DNS info BEFORE any flushing
 DOCKER_DNS_RULES=$(iptables-save -t nat | grep "127\.0\.0\.11" || true)
@@ -72,6 +84,7 @@ for domain in \
     "storage.googleapis.com" \
     "gethuman.sh" \
     "cli.kiro.dev" \
+    "oidc.us-east-1.amazonaws.com" \
     "registry-1.docker.io" \
     "auth.docker.io" \
     "production.cloudflare.docker.com" \
@@ -120,7 +133,9 @@ iptables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
 # Allow only outbound traffic to whitelisted domains
 iptables -A OUTPUT -m set --match-set allowed-domains dst -j ACCEPT
 
-# Reject everything else with immediate feedback
+# Log blocked connections before rejecting (rate-limited to avoid log flooding)
+iptables -A OUTPUT -m limit --limit 10/min --limit-burst 30 \
+    -j LOG --log-prefix "FW-BLOCKED: " --log-level 4 --log-uid
 iptables -A OUTPUT -j REJECT --reject-with icmp-admin-prohibited
 
 echo "Firewall configuration complete"
@@ -138,3 +153,76 @@ if ! curl --connect-timeout 5 https://api.github.com/zen >/dev/null 2>&1; then
 else
     echo "OK: api.github.com reachable as expected"
 fi
+
+# ──────────────────────────────────────────────
+# LOCKDOWN: Prevent firewall manipulation from within the container
+# ──────────────────────────────────────────────
+echo "Locking down firewall tools..."
+
+# Remove execute permissions on all firewall-related binaries
+for bin in iptables ip6tables iptables-save iptables-restore ip6tables-save ip6tables-restore \
+           iptables-legacy ip6tables-legacy iptables-nft ip6tables-nft \
+           ipset nft; do
+    binary_path=$(which "$bin" 2>/dev/null || true)
+    if [ -n "$binary_path" ]; then
+        chmod 000 "$binary_path"
+        echo "  Locked: $binary_path"
+    fi
+done
+
+# Restrict sudo: replace blanket NOPASSWD:ALL with specific allowed commands
+# Keep only what's needed for normal development workflow
+echo "Restricting sudo access..."
+rm -f /etc/sudoers.d/vscode
+cat > /etc/sudoers.d/vscode-restricted << 'SUDOERS'
+# Restricted sudo for devcontainer — no firewall manipulation allowed
+# dbus-daemon: needed for draw.io / Electron
+# mkdir: needed for /run/dbus
+# docker/dockerd: needed for docker-in-docker feature
+# chown: needed for Go module cache permissions
+vscode ALL=(root) NOPASSWD: /usr/bin/dbus-daemon, /usr/bin/mkdir, /usr/bin/docker, /usr/bin/dockerd, /usr/bin/chown
+SUDOERS
+chmod 440 /etc/sudoers.d/vscode-restricted
+
+# Remove the firewall-specific sudoers entry (no longer needed)
+rm -f /etc/sudoers.d/firewall
+
+echo "Sudo restricted to: dbus-daemon, mkdir, docker, dockerd, chown"
+
+# ──────────────────────────────────────────────
+# LOGGING: Start background reader for kernel firewall log messages
+# ──────────────────────────────────────────────
+echo "Starting firewall log reader..."
+
+# Read kernel messages and filter for firewall entries, write to log file
+# Uses /dev/kmsg (requires CAP_SYSLOG)
+if [ -r /dev/kmsg ]; then
+    nohup bash -c '
+        # Skip existing messages, only capture new ones
+        exec 3< /dev/kmsg
+        cat <&3 > /dev/null &
+        SKIP_PID=$!
+        sleep 0.5
+        kill $SKIP_PID 2>/dev/null || true
+
+        # Now read new messages and filter for firewall entries
+        while IFS= read -r line <&3; do
+            if [[ "$line" == *"FW-BLOCKED:"* ]]; then
+                timestamp=$(date "+%Y-%m-%d %H:%M:%S")
+                # Extract the useful part after the kernel timestamp
+                msg=$(echo "$line" | sed "s/^[^;]*;//")
+                echo "$timestamp $msg" >> /var/log/firewall.log
+            fi
+        done
+    ' > /dev/null 2>&1 &
+    echo "Log reader started (PID: $!), writing to $LOGFILE"
+else
+    echo "WARNING: /dev/kmsg not readable — firewall logging disabled"
+    echo "Add --cap-add=SYSLOG to container runArgs to enable logging"
+fi
+
+echo "=== Firewall setup complete ==="
+echo "  - Rules active: $(iptables -L OUTPUT -n 2>/dev/null | wc -l) OUTPUT rules"
+echo "  - Firewall tools: LOCKED"
+echo "  - Sudo: RESTRICTED"
+echo "  - Log file: $LOGFILE"

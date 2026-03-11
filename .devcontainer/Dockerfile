@@ -87,10 +87,18 @@ RUN chmod +x /usr/local/bin/drawio-export
 # ──────────────────────────────────────────────
 # Firewall script (restricts outbound to whitelisted domains)
 # Enables safe use of `claude --dangerously-skip-permissions`.
+# After running, the script:
+#   - Locks iptables/ipset binaries (chmod 000)
+#   - Restricts sudo to specific commands only
+#   - Starts a log reader writing blocked connections to /var/log/firewall.log
 # ──────────────────────────────────────────────
 COPY init-firewall.sh /usr/local/bin/init-firewall.sh
 RUN chmod +x /usr/local/bin/init-firewall.sh \
- && echo "vscode ALL=(root) NOPASSWD: /usr/local/bin/init-firewall.sh" >> /etc/sudoers.d/firewall
+ && echo "vscode ALL=(root) NOPASSWD: /usr/local/bin/init-firewall.sh" >> /etc/sudoers.d/firewall \
+ && mkdir -p /var/log \
+ && touch /var/log/firewall.log \
+ && chown root:vscode /var/log/firewall.log \
+ && chmod 640 /var/log/firewall.log
 
 # ──────────────────────────────────────────────
 # zsh setup (better interactive shell with fzf integration)
@@ -99,6 +107,13 @@ RUN chsh -s /bin/zsh vscode \
  && mkdir -p /commandhistory \
  && touch /commandhistory/.zsh_history \
  && chown -R vscode:vscode /commandhistory
+
+# ──────────────────────────────────────────────
+# Login message: show firewall status on every terminal open
+# ──────────────────────────────────────────────
+COPY firewall-motd.sh /etc/profile.d/firewall-motd.sh
+RUN chmod +r /etc/profile.d/firewall-motd.sh \
+ && echo '[ -f /etc/profile.d/firewall-motd.sh ] && . /etc/profile.d/firewall-motd.sh' >> /etc/zsh/zshrc
 
 # ──────────────────────────────────────────────
 # Claude Code CLI + Kiro CLI (native installers, no Node.js dependency)
