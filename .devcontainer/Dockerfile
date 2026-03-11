@@ -43,6 +43,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ipset \
     dnsutils \
     iproute2 \
+    # firewall logging (NFLOG userspace logger — iptables LOG doesn't work in containers)
+    ulogd2 \
     && rm -rf /var/lib/apt/lists/*
 
 # ──────────────────────────────────────────────
@@ -93,8 +95,13 @@ RUN chmod +x /usr/local/bin/drawio-export
 #   - Starts a log reader writing blocked connections to /var/log/firewall.log
 # ──────────────────────────────────────────────
 COPY init-firewall.sh /usr/local/bin/init-firewall.sh
+COPY ulogd-firewall.conf /etc/ulogd-firewall.conf
 RUN chmod +x /usr/local/bin/init-firewall.sh \
- && echo "vscode ALL=(root) NOPASSWD: /usr/local/bin/init-firewall.sh" >> /etc/sudoers.d/firewall
+ && echo "vscode ALL=(root) NOPASSWD: /usr/local/bin/init-firewall.sh" >> /etc/sudoers.d/firewall \
+ && mkdir -p /var/log \
+ && touch /var/log/firewall.log \
+ && chown root:vscode /var/log/firewall.log \
+ && chmod 640 /var/log/firewall.log
 
 # ──────────────────────────────────────────────
 # zsh setup (better interactive shell with fzf integration)

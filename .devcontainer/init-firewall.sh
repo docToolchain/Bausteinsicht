@@ -4,11 +4,32 @@
 # Enables safe use of `claude --dangerously-skip-permissions`.
 #
 # Security features:
-# - Logs blocked connections to host kernel log (read via dmesg on host)
+# - Logs blocked connections to /var/log/firewall.log (via ulogd2 NFLOG)
 # - Locks down iptables binaries after setup (prevents manipulation)
 # - Restricts sudo access to prevent firewall changes
 set -euo pipefail
 IFS=$'\n\t'
+
+LOGFILE="/var/log/firewall.log"
+
+# Prepare log file (readable by vscode user, writable only by root)
+touch "$LOGFILE"
+chown root:vscode "$LOGFILE"
+chmod 640 "$LOGFILE"
+
+# ──────────────────────────────────────────────
+# Start ulogd2 for NFLOG-based firewall logging
+# (iptables LOG doesn't work in Docker — writes to host kernel log)
+# ──────────────────────────────────────────────
+echo "Starting ulogd2 firewall logger..."
+ulogd -c /etc/ulogd-firewall.conf -d
+sleep 0.5
+if pgrep -x ulogd > /dev/null; then
+    echo "ulogd2 started (PID: $(pgrep -x ulogd)), writing to $LOGFILE"
+else
+    echo "WARNING: ulogd2 failed to start:"
+    cat /var/log/ulogd.log 2>/dev/null || echo "  (no log file)"
+fi
 
 # 1. Extract Docker DNS info BEFORE any flushing
 DOCKER_DNS_RULES=$(iptables-save -t nat | grep "127\.0\.0\.11" || true)
@@ -126,10 +147,9 @@ iptables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
 # Allow only outbound traffic to whitelisted domains
 iptables -A OUTPUT -m set --match-set allowed-domains dst -j ACCEPT
 
-# Log blocked connections to host kernel log (rate-limited to avoid flooding)
-# Read on host with: dmesg | grep FW-BLOCKED
+# Log blocked connections via NFLOG (userspace, rate-limited to avoid flooding)
 iptables -A OUTPUT -m limit --limit 10/min --limit-burst 30 \
-    -j LOG --log-prefix "FW-BLOCKED: " --log-level 4 --log-uid
+    -j NFLOG --nflog-group 1 --nflog-prefix "FW-BLOCKED:"
 iptables -A OUTPUT -j REJECT --reject-with icmp-admin-prohibited
 
 echo "Firewall configuration complete"
@@ -190,5 +210,5 @@ echo "=== Firewall setup complete ==="
 echo "  - Rules active: $RULE_COUNT OUTPUT rules"
 echo "  - Firewall tools: LOCKED"
 echo "  - Sudo: RESTRICTED"
-echo "  - Blocked connections logged to host kernel log"
-echo "  - Read on host: dmesg | grep FW-BLOCKED"
+echo "  - Log file: $LOGFILE (via ulogd2)"
+echo "  - View live: tail -f $LOGFILE"

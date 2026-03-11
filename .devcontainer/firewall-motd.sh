@@ -2,14 +2,17 @@
 # Firewall status message — shown on every terminal login
 # Sourced via /etc/zsh/zshrc and /etc/profile.d/
 
-echo ""
-echo "╔══════════════════════════════════════════════════════════╗"
-echo "║  FIREWALL ACTIVE — outbound restricted to whitelist     ║"
-echo "║                                                         ║"
-echo "║  iptables/ipset: LOCKED (not modifiable)                ║"
-echo "║                                                         ║"
-echo "║  Blocked connections are logged to the host kernel log. ║"
-echo "║  Read on host:  dmesg | grep FW-BLOCKED                ║"
-echo "║  Or live:       dmesg -wT | grep FW-BLOCKED            ║"
-echo "╚══════════════════════════════════════════════════════════╝"
-echo ""
+if [ -f /var/log/firewall.log ]; then
+    blocked_count=$(wc -l < /var/log/firewall.log 2>/dev/null || echo "0")
+
+    echo ""
+    echo "╔══════════════════════════════════════════════════════════╗"
+    echo "║  FIREWALL ACTIVE — outbound restricted to whitelist     ║"
+    echo "║                                                         ║"
+    echo "║  Blocked:   ${blocked_count} connection(s) so far"
+    echo "║  Log file:  /var/log/firewall.log                       ║"
+    echo "║  View live: tail -f /var/log/firewall.log               ║"
+    echo "║  iptables/ipset: LOCKED (not modifiable)                ║"
+    echo "╚══════════════════════════════════════════════════════════╝"
+    echo ""
+fi
