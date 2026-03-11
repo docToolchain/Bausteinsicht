@@ -22,7 +22,13 @@ chmod 640 "$LOGFILE"
 # ──────────────────────────────────────────────
 echo "Starting ulogd2 firewall logger..."
 ulogd -c /etc/ulogd-firewall.conf -d
-echo "ulogd2 started, writing blocked connections to $LOGFILE"
+sleep 0.5
+if pgrep -x ulogd > /dev/null; then
+    echo "ulogd2 started (PID: $(pgrep -x ulogd)), writing to $LOGFILE"
+else
+    echo "WARNING: ulogd2 failed to start. Check /var/log/ulogd.log for details:"
+    cat /var/log/ulogd.log 2>/dev/null || echo "  (no log file found)"
+fi
 
 # 1. Extract Docker DNS info BEFORE any flushing
 DOCKER_DNS_RULES=$(iptables-save -t nat | grep "127\.0\.0\.11" || true)
