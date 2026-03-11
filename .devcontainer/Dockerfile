@@ -95,6 +95,8 @@ RUN chmod +x /usr/local/bin/drawio-export
 #   - Starts a log reader writing blocked connections to /var/log/firewall.log
 # ──────────────────────────────────────────────
 COPY init-firewall.sh /usr/local/bin/init-firewall.sh
+COPY firewall-log.sh /usr/local/bin/firewall-log
+RUN chmod +x /usr/local/bin/firewall-log
 COPY ulogd-firewall.conf /etc/ulogd-firewall.conf
 RUN chmod +x /usr/local/bin/init-firewall.sh \
  && echo "vscode ALL=(root) NOPASSWD: /usr/local/bin/init-firewall.sh" >> /etc/sudoers.d/firewall \
