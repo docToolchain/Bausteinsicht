@@ -26,6 +26,22 @@ while [ $# -gt 0 ]; do
       UP_ARGS+=(--remove-existing-container --build-no-cache)
       shift
       ;;
+    -h|--help)
+      echo "Usage: $(basename "$0") [OPTIONS] [-- COMMAND...]"
+      echo ""
+      echo "Start the devcontainer and optionally run a command in it."
+      echo ""
+      echo "Options:"
+      echo "  --refresh   Rebuild with Docker layer cache (fast, ~seconds)"
+      echo "  --rebuild   Full rebuild without cache (slow, ~10min)"
+      echo "  -h, --help  Show this help"
+      echo ""
+      echo "Examples:"
+      echo "  $(basename "$0")                        Start/reuse container, open shell"
+      echo "  $(basename "$0") --refresh              Rebuild with cache"
+      echo "  $(basename "$0") -- claude -p \"prompt\"  Start + run command"
+      exit 0
+      ;;
     --)
       shift
       break
