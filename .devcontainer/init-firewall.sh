@@ -86,40 +86,24 @@ while read -r cidr; do
     ipset add allowed-domains "$cidr" 2>/dev/null || true
 done < <(echo "$gh_ranges" | jq -r '(.web + .api + .git)[]')
 
-# Resolve and add other allowed domains.
+# Resolve and add other allowed domains (parallel for speed).
 # Anthropic API + telemetry, Go module proxy, Docker Hub, VS Code marketplace, gethuman.
-for domain in \
-    "api.anthropic.com" \
-    "sentry.io" \
-    "statsig.anthropic.com" \
-    "statsig.com" \
-    "proxy.golang.org" \
-    "sum.golang.org" \
-    "storage.googleapis.com" \
-    "gethuman.sh" \
-    "cli.kiro.dev" \
-    "oidc.us-east-1.amazonaws.com" \
-    "registry-1.docker.io" \
-    "auth.docker.io" \
-    "production.cloudflare.docker.com" \
-    "marketplace.visualstudio.com" \
-    "vscode.blob.core.windows.net" \
-    "update.code.visualstudio.com"; do
-    echo "Resolving $domain..."
-    ips=$(dig +noall +answer A "$domain" | awk '$4 == "A" {print $5}')
-    if [ -z "$ips" ]; then
-        echo "WARNING: Failed to resolve $domain (skipping)"
-        continue
-    fi
+DOMAINS="api.anthropic.com sentry.io statsig.anthropic.com statsig.com \
+proxy.golang.org sum.golang.org storage.googleapis.com gethuman.sh cli.kiro.dev \
+oidc.us-east-1.amazonaws.com registry-1.docker.io auth.docker.io \
+production.cloudflare.docker.com marketplace.visualstudio.com \
+vscode.blob.core.windows.net update.code.visualstudio.com"
 
-    while read -r ip; do
-        if [[ ! "$ip" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
-            echo "WARNING: Skipping invalid IP from DNS for $domain: $ip"
-            continue
-        fi
+echo "Resolving $(echo $DOMAINS | wc -w) domains in parallel..."
+RESOLVED_IPS=$(echo "$DOMAINS" | tr ' ' '\n' | xargs -P 8 -I{} sh -c \
+    'dig +noall +answer +short A "$1" 2>/dev/null' _ {} | sort -u)
+
+while read -r ip; do
+    if [[ "$ip" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
         ipset add allowed-domains "$ip" 2>/dev/null || true
-    done < <(echo "$ips")
-done
+    fi
+done < <(echo "$RESOLVED_IPS")
+echo "Resolved $(echo "$RESOLVED_IPS" | grep -c '^[0-9]') IPs"
 
 # Get host IP from default route
 HOST_IP=$(ip route | grep default | cut -d" " -f3)

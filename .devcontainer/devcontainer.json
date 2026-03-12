@@ -19,7 +19,8 @@
   "mounts": [
     "source=${localWorkspaceFolderBasename}-zshhistory,target=/commandhistory,type=volume",
     "source=${localWorkspaceFolderBasename}-claude-config,target=/home/vscode/.claude,type=volume",
-    "source=${localWorkspaceFolderBasename}-kiro-config,target=/home/vscode/.kiro,type=volume"
+    "source=${localWorkspaceFolderBasename}-kiro-config,target=/home/vscode/.kiro,type=volume",
+    "source=${localWorkspaceFolderBasename}-go-mod-cache,target=/go/pkg/mod,type=volume"
   ],
   "customizations": {
     "vscode": {
