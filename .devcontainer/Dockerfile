@@ -113,7 +113,7 @@ RUN chsh -s /bin/zsh vscode \
  && mkdir -p /commandhistory \
  && touch /commandhistory/.zsh_history \
  && chown -R vscode:vscode /commandhistory \
- && echo 'PROMPT="%F{red}[SANDBOX]%f $PROMPT"' >> /etc/zsh/zshrc
+ && echo 'PROMPT="%F{green}[SANDBOX]%f $PROMPT"' >> /etc/zsh/zshrc
 
 # ──────────────────────────────────────────────
 # Login message: show firewall status on every terminal open
