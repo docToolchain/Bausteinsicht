@@ -3,9 +3,10 @@
 #
 # Usage:
 #   ./start-devcontainer.sh                       # just start the container
-#   ./start-devcontainer.sh --rebuild              # rebuild from scratch
+#   ./start-devcontainer.sh --refresh              # rebuild with cache (fast, ~seconds)
+#   ./start-devcontainer.sh --rebuild              # rebuild from scratch (slow, ~10min)
 #   ./start-devcontainer.sh -- claude -p "prompt"  # start + run command
-#   ./start-devcontainer.sh --rebuild -- claude     # rebuild + run command
+#   ./start-devcontainer.sh --refresh -- claude    # refresh + run command
 
 set -euo pipefail
 
@@ -15,7 +16,13 @@ WORKSPACE="$(cd "$(dirname "$0")" && pwd)"
 UP_ARGS=()
 while [ $# -gt 0 ]; do
   case "$1" in
+    --refresh)
+      # Rebuild using Docker layer cache — fast for small Dockerfile changes
+      UP_ARGS+=(--remove-existing-container)
+      shift
+      ;;
     --rebuild)
+      # Full rebuild without cache — use when cache is stale or broken
       UP_ARGS+=(--remove-existing-container --build-no-cache)
       shift
       ;;
