@@ -38,6 +38,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # shell enhancements
     zsh \
     fzf \
+    tmux \
     # firewall (for --dangerously-skip-permissions security)
     iptables \
     ipset \
@@ -111,7 +112,8 @@ RUN chmod +x /usr/local/bin/init-firewall.sh \
 RUN chsh -s /bin/zsh vscode \
  && mkdir -p /commandhistory \
  && touch /commandhistory/.zsh_history \
- && chown -R vscode:vscode /commandhistory
+ && chown -R vscode:vscode /commandhistory \
+ && echo 'PROMPT="%F{red}[SANDBOX]%f $PROMPT"' >> /etc/zsh/zshrc
 
 # ──────────────────────────────────────────────
 # Login message: show firewall status on every terminal open
