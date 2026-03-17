@@ -79,6 +79,44 @@ func TestBuildExportArgs(t *testing.T) {
 	}
 }
 
+// TestBuildExportArgs_InputFileIsLastArg is a regression test for the bug where
+// unrecognized Electron flags (e.g. --disable-gpu) passed before the input file
+// would land as program.args[0] in draw.io's CLI parser, causing
+// "Error: input file/directory not found" with exit code 0.
+// The input file must always be the last argument so it is unambiguously paths[0].
+func TestBuildExportArgs_InputFileIsLastArg(t *testing.T) {
+	for _, scale := range []float64{0, 1.0, 2.0} {
+		args := BuildExportArgs(ExportOptions{
+			Format:     "png",
+			PageIndex:  1,
+			OutputPath: "/tmp/out.png",
+			InputFile:  "arch.drawio",
+			Scale:      scale,
+		})
+		if args[len(args)-1] != "arch.drawio" {
+			t.Errorf("scale=%v: input file must be the last argument, got %q (full args: %v)", scale, args[len(args)-1], args)
+		}
+	}
+}
+
+// TestBuildExportArgs_ScaleOneNotIncluded verifies that Scale=1.0 (the headless-safe
+// default) does not add a --scale flag, avoiding the GPU process crash that occurs
+// when draw.io tries to render at scale > 1 without hardware GPU acceleration.
+func TestBuildExportArgs_ScaleOneNotIncluded(t *testing.T) {
+	args := BuildExportArgs(ExportOptions{
+		Format:     "png",
+		PageIndex:  1,
+		OutputPath: "/tmp/out.png",
+		InputFile:  "arch.drawio",
+		Scale:      1.0,
+	})
+	for i, arg := range args {
+		if arg == "--scale" {
+			t.Errorf("--scale should not be present for Scale=1.0 (GPU not required), but found at index %d", i)
+		}
+	}
+}
+
 func TestBuildExportArgs_WithoutEmbed(t *testing.T) {
 	args := BuildExportArgs(ExportOptions{
 		Format:       "svg",

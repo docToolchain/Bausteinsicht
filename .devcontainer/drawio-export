@@ -1,0 +1,20 @@
+#!/bin/bash
+# Wrapper for draw.io CLI in headless container environments.
+#
+# draw.io is an Electron app (Chromium-based) that requires:
+#   - A virtual display (Xvfb) — no physical monitor available in containers
+#   - A running D-Bus system daemon — Electron uses it for internal IPC
+#   - --no-sandbox — containers typically lack user namespaces for Chromium sandbox
+#   - --disable-gpu — no GPU/rendering backend in containers
+#
+# Without this wrapper, draw.io exits with code 0 but produces no output file.
+set -euo pipefail
+
+# dbus-run-session starts a private D-Bus session bus for the child process,
+# which Electron requires for IPC. The system bus (dbus-daemon --system) is
+# not sufficient — Electron specifically needs a session bus.
+# ELECTRON_DISABLE_GPU bypasses GPU acceleration without passing --disable-gpu
+# as a CLI flag. drawio's arg parser only filters --no-sandbox from program.args,
+# so --disable-gpu would land as paths[0] and break input file detection.
+export ELECTRON_DISABLE_GPU=1
+exec dbus-run-session -- xvfb-run -a drawio --no-sandbox "$@"
