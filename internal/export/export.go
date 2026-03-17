@@ -42,7 +42,13 @@ func BuildExportArgs(opts ExportOptions) []string {
 	if opts.EmbedDiagram {
 		args = append(args, "--embed-diagram")
 	}
-	if opts.Scale > 0 {
+	// Only pass --scale for values > 1. Scale=1 is draw.io's native resolution
+	// and does not need an explicit flag. Scale > 1 (e.g. 2.0 for retina) uses
+	// the GPU rendering pipeline and requires hardware GPU acceleration.
+	// Passing --scale 2 in headless containers (where the GPU process is
+	// disabled via ELECTRON_DISABLE_GPU) causes the GPU process to crash with
+	// exit code 9, resulting in a silent export failure (exit 0, no output file).
+	if opts.Scale > 1 {
 		args = append(args, "--scale", fmt.Sprintf("%g", opts.Scale))
 	}
 	args = append(args, opts.InputFile)
