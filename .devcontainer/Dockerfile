@@ -79,9 +79,10 @@ RUN wget -q "https://github.com/jgraph/drawio-desktop/releases/download/v${DRAWI
 # Wrapper script so `drawio` runs headless via xvfb with dbus
 # -a: auto-pick a free display number (avoids conflicts with existing Xvfb)
 # --no-sandbox: required in container environments without user namespaces
+# --disable-gpu: required in containers without GPU/rendering backend
 # dbus: Electron requires a running system bus for IPC
-RUN printf '#!/bin/sh\n# Ensure dbus is running (required by Electron/draw.io)\nif [ ! -S /run/dbus/system_bus_socket ]; then\n  sudo mkdir -p /run/dbus\n  sudo dbus-daemon --system --fork 2>/dev/null || true\nfi\nxvfb-run -a drawio --no-sandbox "$@"\n' > /usr/local/bin/drawio-export \
- && chmod +x /usr/local/bin/drawio-export
+COPY drawio-export /usr/local/bin/drawio-export
+RUN chmod +x /usr/local/bin/drawio-export
 
 # ──────────────────────────────────────────────
 # Firewall script (restricts outbound to whitelisted domains)

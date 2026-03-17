@@ -23,7 +23,7 @@ func newExportCmd() *cobra.Command {
 	cmd.Flags().String("view", "", "Export only this view (by key)")
 	cmd.Flags().String("output", ".", "Output directory")
 	cmd.Flags().Bool("embed-diagram", false, "Embed draw.io XML source in output")
-	cmd.Flags().Float64("scale", 2.0, "Export scale factor (e.g. 2.0 for retina, 3.0 for print)")
+	cmd.Flags().Float64("scale", 1.0, "Export scale factor (e.g. 2.0 for retina, 3.0 for print); scale > 1 requires hardware GPU")
 	return cmd
 }
 
