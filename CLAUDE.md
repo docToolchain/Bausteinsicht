@@ -1,3 +1,7 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # Bausteinsicht
 
 Architecture-as-code tool with draw.io as visual frontend and bidirectional synchronization.
@@ -83,6 +87,39 @@ All build, test, and analysis commands are available via `make`:
 - `draw.io` CLI (headless via xvfb in devcontainer)
 - `claude` (Claude Code CLI)
 - `human` (gethuman.sh — AI agent issue tracker integration)
+
+## Code Architecture
+
+### Package Structure
+
+```
+cmd/bausteinsicht/     # CLI entry point — Cobra commands, one file per command
+internal/model/        # DSL types, loader (JSONC→struct), validation, patch, resolve
+internal/drawio/       # draw.io XML document/element/connector/label/template wrappers (beevik/etree)
+internal/sync/         # Bidirectional sync engine: diff, forward/reverse apply, conflict resolution, state
+internal/diagram/      # Export to C4-PlantUML / Mermaid text formats
+internal/watcher/      # File-system watcher (fsnotify) for --watch mode
+```
+
+### Data Flow
+
+1. **Model** — JSONC file parsed by `internal/model.Load()` into `BausteinsichtModel` (elements keyed by dot-path variable names, e.g. `system.backend.api`)
+2. **Sync cycle** (`internal/sync.Run`) — pure function; no I/O:
+   - `DetectChanges` diffs model+drawio against stored `SyncState` (`.bausteinsicht-sync` JSON file)
+   - Conflict resolution: model always wins
+   - `ApplyForward` writes model changes → draw.io XML
+   - `ApplyReverse` writes draw.io label edits → model struct
+3. **State** persisted atomically to `.bausteinsicht-sync` (SHA-256 checksummed JSON) so next sync can detect what changed on either side
+4. **Export** — `export diagram` renders views to PlantUML/Mermaid; `export table` produces CSV/Markdown; `export` calls headless draw.io for PNG/PDF
+
+### Key Conventions
+
+- **Element IDs are dot-separated variable paths** — `parent.child.grandchild`. `model.FlattenElements` recursively expands the nested map to a flat `map[string]*Element`.
+- **draw.io elements carry `bausteinsicht_id` attribute** — this is the synchronization anchor between the two file formats.
+- **Views filter what is rendered** — each view has `include`/`exclude` lists; `model.ResolveView` expands them to a flat element ID set.
+- **Templates are `.drawio` files** — visual styles come from template pages, not hardcoded; `internal/drawio.TemplateSet` loads and clones them.
+- **Run a single package's tests:** `go test ./internal/sync/` (or any other package path)
+- **Run a single test:** `go test -run TestName ./internal/sync/`
 
 ## Workflow Rules
 
