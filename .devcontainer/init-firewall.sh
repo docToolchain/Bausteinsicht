@@ -7,14 +7,30 @@
 # - Logs blocked connections to /var/log/firewall.log (via ulogd2 NFLOG)
 # - Locks down iptables binaries after setup (prevents manipulation)
 # - Restricts sudo access to prevent firewall changes
+#
+# User detection: uses SUDO_USER (set automatically when invoked via sudo).
+# This makes the script portable across different base images (node, vscode, etc.).
 set -euo pipefail
 IFS=$'\n\t'
 
 LOGFILE="/var/log/firewall.log"
 
-# Prepare log file (readable by vscode user, writable only by root)
+# Detect the non-root dev user (the one who called sudo)
+DEV_USER="${SUDO_USER:-}"
+if [ -z "$DEV_USER" ] || [ "$DEV_USER" = "root" ]; then
+    echo "ERROR: Must be run via sudo (SUDO_USER not set)"
+    exit 1
+fi
+# Validate username to prevent injection in sudoers file and shell expansion
+if ! [[ "$DEV_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]; then
+    echo "ERROR: Invalid username: $DEV_USER"
+    exit 1
+fi
+echo "Detected dev user: $DEV_USER"
+
+# Prepare log file (readable by dev user, writable only by root)
 touch "$LOGFILE"
-chown root:vscode "$LOGFILE"
+chown "root:$DEV_USER" "$LOGFILE"
 chmod 640 "$LOGFILE"
 
 # ──────────────────────────────────────────────
@@ -87,12 +103,13 @@ while read -r cidr; do
 done < <(echo "$gh_ranges" | jq -r '(.web + .api + .git)[]')
 
 # Resolve and add other allowed domains (parallel for speed).
-# Anthropic API + telemetry, Go module proxy, Docker Hub, VS Code marketplace, gethuman.
+# Anthropic API + telemetry, Docker Hub, VS Code marketplace, gethuman, package registries.
+# Project-specific domains (npm, Go proxy, etc.) are also included here — harmless if unused.
 DOMAINS="api.anthropic.com sentry.io statsig.anthropic.com statsig.com \
-proxy.golang.org sum.golang.org storage.googleapis.com gethuman.sh cli.kiro.dev \
-oidc.us-east-1.amazonaws.com registry-1.docker.io auth.docker.io \
-production.cloudflare.docker.com marketplace.visualstudio.com \
-vscode.blob.core.windows.net update.code.visualstudio.com"
+registry.npmjs.org proxy.golang.org sum.golang.org storage.googleapis.com \
+gethuman.sh cli.kiro.dev oidc.us-east-1.amazonaws.com \
+registry-1.docker.io auth.docker.io production.cloudflare.docker.com \
+marketplace.visualstudio.com vscode.blob.core.windows.net update.code.visualstudio.com"
 
 echo "Resolving $(echo $DOMAINS | wc -w) domains in parallel..."
 RESOLVED_IPS=$(echo "$DOMAINS" | tr ' ' '\n' | xargs -P 8 -I{} sh -c \
@@ -174,16 +191,16 @@ done
 # Restrict sudo: replace blanket NOPASSWD:ALL with specific allowed commands
 # Keep only what's needed for normal development workflow
 echo "Restricting sudo access..."
-rm -f /etc/sudoers.d/vscode
-cat > /etc/sudoers.d/vscode-restricted << 'SUDOERS'
+rm -f "/etc/sudoers.d/$DEV_USER"
+cat > "/etc/sudoers.d/$DEV_USER-restricted" << SUDOERS
 # Restricted sudo for devcontainer — no firewall manipulation allowed
-# dbus-daemon: needed for draw.io / Electron
+# dbus-daemon: needed for draw.io / Electron / Playwright
 # mkdir: needed for /run/dbus
 # docker/dockerd: needed for docker-in-docker feature
-# chown: needed for Go module cache permissions
-vscode ALL=(root) NOPASSWD: /usr/bin/dbus-daemon, /usr/bin/mkdir, /usr/bin/docker, /usr/bin/dockerd, /usr/bin/chown
+# chown: needed for cache permissions
+$DEV_USER ALL=(root) NOPASSWD: /usr/bin/dbus-daemon, /usr/bin/mkdir, /usr/bin/docker, /usr/bin/dockerd, /usr/bin/chown
 SUDOERS
-chmod 440 /etc/sudoers.d/vscode-restricted
+chmod 440 "/etc/sudoers.d/$DEV_USER-restricted"
 
 # Remove the firewall-specific sudoers entry (no longer needed)
 rm -f /etc/sudoers.d/firewall
