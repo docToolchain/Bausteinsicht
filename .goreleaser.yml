@@ -31,10 +31,27 @@ checksum:
   name_template: "checksums.txt"
 
 changelog:
+  use: github
   sort: asc
+  groups:
+    - title: "New Features"
+      regexp: '^feat'
+    - title: "Bug Fixes"
+      regexp: '^fix'
+    - title: "Security"
+      regexp: '^security'
+    - title: "Performance"
+      regexp: '^perf'
+    - title: "Refactoring"
+      regexp: '^refactor'
+    - title: "Other"
+      order: 999
   filters:
     exclude:
       - "^docs:"
       - "^chore:"
       - "^ci:"
       - "^style:"
+      - "^test:"
+      - "^Merge pull request"
+      - "^trigger CI"
