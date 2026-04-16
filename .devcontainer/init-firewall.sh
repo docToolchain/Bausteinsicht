@@ -122,7 +122,8 @@ DOMAINS="api.anthropic.com sentry.io statsig.anthropic.com statsig.com \
 registry.npmjs.org proxy.golang.org sum.golang.org storage.googleapis.com \
 gethuman.sh cli.kiro.dev oidc.us-east-1.amazonaws.com \
 registry-1.docker.io auth.docker.io production.cloudflare.docker.com \
-marketplace.visualstudio.com vscode.blob.core.windows.net update.code.visualstudio.com"
+marketplace.visualstudio.com vscode.blob.core.windows.net update.code.visualstudio.com \
+vuln.go.dev"
 
 echo "Resolving $(echo $DOMAINS | wc -w) domains in parallel..."
 RESOLVED_IPS=$(echo "$DOMAINS" | tr ' ' '\n' | xargs -P 8 -I{} sh -c \
