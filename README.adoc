@@ -119,7 +119,7 @@ For continuous sync on save, use watch mode:
 bausteinsicht watch
 ----
 
-See the link:src/docs/spec/06_tutorial.adoc[Getting Started Tutorial] for a step-by-step walkthrough.
+See the link:src/docs/spec/06_tutorial.adoc[Getting Started Tutorial] for a step-by-step walkthrough, or browse the link:examples/online-shop[Online Shop example] to see a complete model.
 
 == Features
 
