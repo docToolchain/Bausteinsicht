@@ -55,13 +55,47 @@ See the link:src/docs/manual/user-manual.adoc#multi-view[User Manual — Multi-V
 **Let AI agents modify your architecture** — every CLI command supports `--format json` for LLM-driven workflows.
 See the link:src/docs/manual/user-manual.adoc#llm-workflows[User Manual — LLM Workflows].
 
+== Installation
+
+=== Binary Download (recommended)
+
+Download the latest release for your platform from the https://github.com/docToolchain/Bausteinsicht/releases[Releases page].
+
+[source,bash]
+----
+# Linux (amd64)
+curl -Lo bausteinsicht.tar.gz https://github.com/docToolchain/Bausteinsicht/releases/latest/download/bausteinsicht_linux_amd64.tar.gz
+tar xzf bausteinsicht.tar.gz
+sudo mv bausteinsicht /usr/local/bin/
+
+# macOS (Apple Silicon)
+curl -Lo bausteinsicht.tar.gz https://github.com/docToolchain/Bausteinsicht/releases/latest/download/bausteinsicht_darwin_arm64.tar.gz
+tar xzf bausteinsicht.tar.gz
+sudo mv bausteinsicht /usr/local/bin/
+----
+
+=== Go Install
+
+Requires Go 1.25+:
+
+[source,bash]
+----
+go install github.com/docToolchain/Bauteinsicht/cmd/bausteinsicht@latest
+----
+
+=== Build from Source
+
+[source,bash]
+----
+git clone https://github.com/docToolchain/Bausteinsicht.git
+cd Bausteinsicht
+make build
+----
+
 == Quick Start
 
 [source,bash]
 ----
-# Build from source
-go build -o bausteinsicht ./cmd/bausteinsicht/
-
 # Initialize a sample project
 mkdir my-architecture && cd my-architecture
 bausteinsicht init
@@ -117,7 +151,7 @@ Included tools: Go, staticcheck, gosec, nilaway, govulncheck, golangci-lint, git
 
 === Manual Setup
 
-Requires Go 1.24+. Install analysis tools with:
+Requires Go 1.25+. Install analysis tools with:
 
 [source,bash]
 ----
