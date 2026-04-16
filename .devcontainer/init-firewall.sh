@@ -28,6 +28,19 @@ if ! [[ "$DEV_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]; then
 fi
 echo "Detected dev user: $DEV_USER"
 
+# ──────────────────────────────────────────────
+# Restore firewall binaries if previously locked (container restart)
+# ──────────────────────────────────────────────
+for bin in iptables ip6tables iptables-save iptables-restore ip6tables-save ip6tables-restore \
+           iptables-legacy ip6tables-legacy iptables-nft ip6tables-nft \
+           ipset nft; do
+    binary_path=$(which "$bin" 2>/dev/null || find /usr/sbin /sbin /usr/bin -name "$bin" 2>/dev/null | head -1 || true)
+    if [ -n "$binary_path" ] && [ ! -x "$binary_path" ]; then
+        chmod 755 "$binary_path"
+        echo "  Unlocked: $binary_path"
+    fi
+done
+
 # Prepare log file (readable by dev user, writable only by root)
 touch "$LOGFILE"
 chown "root:$DEV_USER" "$LOGFILE"
@@ -194,11 +207,12 @@ echo "Restricting sudo access..."
 rm -f "/etc/sudoers.d/$DEV_USER"
 cat > "/etc/sudoers.d/$DEV_USER-restricted" << SUDOERS
 # Restricted sudo for devcontainer — no firewall manipulation allowed
+# init-firewall.sh: needed for container restart (postStartCommand)
 # dbus-daemon: needed for draw.io / Electron / Playwright
 # mkdir: needed for /run/dbus
 # docker/dockerd: needed for docker-in-docker feature
 # chown: needed for cache permissions
-$DEV_USER ALL=(root) NOPASSWD: /usr/bin/dbus-daemon, /usr/bin/mkdir, /usr/bin/docker, /usr/bin/dockerd, /usr/bin/chown
+$DEV_USER ALL=(root) NOPASSWD: /usr/local/bin/init-firewall.sh, /usr/bin/dbus-daemon, /usr/bin/mkdir, /usr/bin/docker, /usr/bin/dockerd, /usr/bin/chown
 SUDOERS
 chmod 440 "/etc/sudoers.d/$DEV_USER-restricted"
 
