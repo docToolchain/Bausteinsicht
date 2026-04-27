@@ -286,12 +286,14 @@ func updateSubCells(root *etree.Element, parentCellID string, cells map[string]*
 	// Update title.
 	if tc, ok := cells["title"]; ok {
 		setAttr(tc, "value", data.Title)
+		ensureSubCellStyle(tc)
 	}
 
 	// Update or add/remove technology cell.
 	if tc, ok := cells["tech"]; ok {
 		if data.Technology != "" {
 			setAttr(tc, "value", "["+data.Technology+"]")
+			ensureSubCellStyle(tc)
 		} else {
 			root.RemoveChild(tc)
 		}
@@ -301,9 +303,20 @@ func updateSubCells(root *etree.Element, parentCellID string, cells map[string]*
 	if dc, ok := cells["desc"]; ok {
 		if data.Description != "" {
 			setAttr(dc, "value", truncateText(data.Description, 120))
+			ensureSubCellStyle(dc)
 		} else {
 			root.RemoveChild(dc)
 		}
+	}
+}
+
+// ensureSubCellStyle applies required style flags to an existing sub-cell.
+// This migrates older sub-cells that were created before these flags existed.
+func ensureSubCellStyle(cell *etree.Element) {
+	style := cell.SelectAttrValue("style", "")
+	updated := setStyleFlags(style, "pointerEvents=0", "overflow=hidden")
+	if updated != style {
+		setAttr(cell, "style", updated)
 	}
 }
 

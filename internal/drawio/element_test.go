@@ -689,6 +689,66 @@ func TestCreateElement_ExistingHtml1NotDuplicated(t *testing.T) {
 	}
 }
 
+// TestUpdateElementSubCells_OverflowHiddenMigrated verifies that overflow=hidden
+// is applied to existing sub-cells (created before the fix) when they are updated. (#307)
+func TestUpdateElementSubCells_OverflowHiddenMigrated(t *testing.T) {
+	page := newInternalTestPage(t)
+	// Create element with sub-cells; createTextSubCell already sets overflow=hidden.
+	data := ElementData{
+		ID:          "svc",
+		Kind:        "container",
+		Title:       "Old",
+		Technology:  "Go",
+		Description: "Old desc",
+		ParentID:    "1",
+		Width:       240,
+		Height:      150,
+		SubCells:    testSubCellTemplates(),
+	}
+	if err := page.CreateElement(data, "rounded=1;container=1;"); err != nil {
+		t.Fatalf("CreateElement: %v", err)
+	}
+
+	// Manually strip overflow=hidden from the desc sub-cell to simulate an old
+	// draw.io file that was created before the overflow=hidden fix.
+	root := page.Root()
+	descCell := findCellByID(root, "svc-desc")
+	if descCell == nil {
+		t.Fatal("desc sub-cell not found after create")
+	}
+	oldStyle := strings.ReplaceAll(descCell.SelectAttrValue("style", ""), "overflow=hidden;", "")
+	setAttrTest(descCell, "style", oldStyle)
+	if strings.Contains(descCell.SelectAttrValue("style", ""), "overflow=hidden") {
+		t.Fatal("precondition failed: overflow=hidden should be absent after manual removal")
+	}
+
+	// Now update the element — ensureSubCellStyle should re-apply overflow=hidden.
+	page.UpdateElement("svc", ElementData{
+		Title:       "New",
+		Technology:  "Go",
+		Description: "New desc",
+	})
+
+	descCell = findCellByID(root, "svc-desc")
+	if descCell == nil {
+		t.Fatal("desc sub-cell not found after update")
+	}
+	style := descCell.SelectAttrValue("style", "")
+	if !strings.Contains(style, "overflow=hidden") {
+		t.Errorf("expected overflow=hidden in desc style after update, got %q", style)
+	}
+}
+
+// setAttrTest is a test-local helper to set an attribute directly.
+func setAttrTest(el *etree.Element, key, value string) {
+	attr := el.SelectAttr(key)
+	if attr != nil {
+		attr.Value = value
+	} else {
+		el.CreateAttr(key, value)
+	}
+}
+
 func findCellByID(root *etree.Element, id string) *etree.Element {
 	if root == nil {
 		return nil
