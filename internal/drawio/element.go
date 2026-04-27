@@ -300,7 +300,7 @@ func updateSubCells(root *etree.Element, parentCellID string, cells map[string]*
 	// Update or add/remove description cell.
 	if dc, ok := cells["desc"]; ok {
 		if data.Description != "" {
-			setAttr(dc, "value", data.Description)
+			setAttr(dc, "value", truncateText(data.Description, 120))
 		} else {
 			root.RemoveChild(dc)
 		}
