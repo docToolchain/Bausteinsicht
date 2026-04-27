@@ -139,7 +139,9 @@ func createTextSubCell(root *etree.Element, id, parentID, value string, sub *Sub
 	cell.CreateAttr("value", value)
 	// Make sub-cells transparent to mouse events so clicks pass through
 	// to the parent element. This lets users grab the whole shape at once.
-	style := setStyleFlags(sub.Style, "pointerEvents=0")
+	// overflow=hidden clips text at the fixed sub-cell boundary; the full
+	// content remains accessible via the element's tooltip attribute.
+	style := setStyleFlags(sub.Style, "pointerEvents=0", "overflow=hidden")
 	cell.CreateAttr("style", style)
 	cell.CreateAttr("vertex", "1")
 	cell.CreateAttr("connectable", "0")

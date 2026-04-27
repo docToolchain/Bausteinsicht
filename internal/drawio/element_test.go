@@ -555,6 +555,38 @@ func TestFindAllElements_ExcludesSubCells(t *testing.T) {
 	}
 }
 
+// TestCreateElementSubCells_OverflowHidden verifies that sub-cells always have
+// overflow=hidden so that long text is clipped at the fixed boundary. (#307)
+func TestCreateElementSubCells_OverflowHidden(t *testing.T) {
+	page := newInternalTestPage(t)
+	data := ElementData{
+		ID:          "svc",
+		Kind:        "container",
+		Title:       "Service",
+		Technology:  "Go",
+		Description: "This is a very long description that would overflow the fixed sub-cell height if not clipped by overflow=hidden.",
+		ParentID:    "1",
+		Width:       240,
+		Height:      150,
+		SubCells:    testSubCellTemplates(),
+	}
+	if err := page.CreateElement(data, "rounded=1;container=1;"); err != nil {
+		t.Fatalf("CreateElement: %v", err)
+	}
+
+	root := page.Root()
+	for _, suffix := range []string{"-title", "-tech", "-desc"} {
+		cell := findCellByID(root, "svc"+suffix)
+		if cell == nil {
+			t.Fatalf("sub-cell %s not found", suffix)
+		}
+		style := cell.SelectAttrValue("style", "")
+		if !strings.Contains(style, "overflow=hidden") {
+			t.Errorf("sub-cell %s: expected overflow=hidden in style, got %q", suffix, style)
+		}
+	}
+}
+
 // TestCreateElement_UnknownKindGetsHtml1 verifies that elements with an unknown kind
 // (which receive an empty style fallback) still have html=1 injected so that draw.io
 // renders the HTML label as rich text instead of raw markup. (#307)
