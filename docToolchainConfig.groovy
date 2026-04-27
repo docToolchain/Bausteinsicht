@@ -105,19 +105,19 @@ microsite.with {
     //
     // contact eMail
     // example: mailto:bert@example.com
-    footerMail = '-'
+    footerMail = ''
     //
     // twitter account url
-    footerTwitter = '-'
+    footerTwitter = ''
     //
     // Stackoverflow QA
-    footerSO = '-'
+    footerSO = ''
     //
     // Github Repository
     footerGithub = 'https://github.com/docToolchain/Bausteinsicht'
     //
     // Slack Channel
-    footerSlack = '-'
+    footerSlack = ''
     //
     // Footer Text
     // example: <small class="text-white">built with docToolchain and jBake <br /> theme: docsy</small>
