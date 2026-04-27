@@ -37,6 +37,9 @@
 
 | 2026-04-27 (govulncheck)
 | Fixed SEC-017: govulncheck v1.1.4 (Go 1.22.2) could not analyze `fsnotify` v1.9.0 internal packages. Updated to v1.3.0 (Go 1.25.9) — scan now passes with 0 vulnerabilities in called code.
+
+| 2026-04-27 (path traversal)
+| Fixed SEC-015: view keys used directly in export filenames without sanitization. Added `SafeViewKey()` using `filepath.Base` to strip directory components at all three export paths.
 |===
 
 === Scope
@@ -125,7 +128,7 @@ The primary risk scenario is a **malicious or crafted model/drawio file** shared
 | SEC-015
 | Medium
 | View key used directly in export filenames without path traversal sanitization
-| Open
+| Fixed (SafeViewKey)
 
 | SEC-016
 | Low
@@ -289,9 +292,9 @@ Confirmed by `govulncheck` — no vulnerable symbols called by project code.
 
 **Fix applied in #235:** `requirePage` test helpers and `strings.Cut` refactor. Nil checks added.
 
-==== SEC-015: View Key Path Traversal in Export Filenames (Medium) — NEW
+==== SEC-015: View Key Path Traversal in Export Filenames (Medium) — FIXED
 
-_Added 2026-03-30_
+_Added 2026-03-30, fixed 2026-04-27_
 
 **Affected files:**
 
@@ -300,7 +303,7 @@ _Added 2026-03-30_
 * `internal/export/export.go:53-54` — `OutputFileName(viewKey, format)`
 
 **Description:**
-View keys from the JSONC model are used directly in output filenames without sanitization.
+View keys from the JSONC model were used directly in output filenames without sanitization.
 A malicious model file could define a view key containing path separators or `..` sequences:
 
 [source,json]
@@ -314,12 +317,8 @@ A malicious model file could define a view key containing path separators or `..
 
 When exported with `--output ./docs`, this would write to `./docs/../../../tmp/pwned.puml`.
 
-**Risk:**
-For a local CLI tool this requires the user to run export on a malicious model file.
-In LLM agent or CI/CD pipelines processing untrusted models, this is exploitable for arbitrary file writes.
-
-**Recommendation:**
-Add view key validation in `validateViews()` restricting keys to `^[a-zA-Z0-9_-]+$`, or sanitize using `filepath.Base()` in `OutputFileName()`.
+**Fix:**
+Added `export.SafeViewKey()` which normalizes backslashes to forward slashes and applies `filepath.Base()` to strip directory components. Applied at all three export paths (`export.go`, `export_diagram.go`, `export_table.go`). The malicious key above now safely resolves to `pwned.puml` in the output directory.
 
 ==== SEC-016: No Output Directory Boundary Check (Low) — NEW
 
@@ -483,9 +482,6 @@ SEC-004, SEC-007, SEC-011 verified fixed 2026-03-30 (see individual findings abo
 | Document that `--model`/`--template` paths are fully trusted; add path validation if CLI is used in automation
 
 | Medium
-| SEC-015
-| Sanitize view keys in export filenames — restrict to `^[a-zA-Z0-9_-]+$` or use `filepath.Base()`
-
 | Medium
 | SEC-014
 | Add checksum verification for Dockerfile script downloads
@@ -516,7 +512,7 @@ SEC-004, SEC-007, SEC-011 verified fixed 2026-03-30 (see individual findings abo
 
 The next security review should:
 
-* Fix SEC-015 (view key path traversal) — highest priority open finding
+* Verify SEC-015 fix (view key sanitization) works in integration with real exports
 * Address SEC-014 (Dockerfile checksum verification)
 * Check for new CVEs in dependencies (govulncheck now functional — SEC-017 fixed)
 * Verify `gitleaks` runs in CI (currently only available in devcontainer)
