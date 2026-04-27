@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/docToolchain/Bauteinsicht/main/schema/bausteinsicht.schema.json",
   "config": {
-    "author": "ralf.d.mueller@gmail.com with Claude.ai",
+    "author": "Bausteinsicht contributors",
     "repo": "github.com/docToolchain/Bauteinsicht"
   },
   "specification": {
