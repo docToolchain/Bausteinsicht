@@ -40,6 +40,9 @@
 
 | 2026-04-27 (path traversal)
 | Fixed SEC-015: view keys used directly in export filenames without sanitization. Added `SafeViewKey()` using `filepath.Base` to strip directory components at all three export paths.
+
+| 2026-04-27 (batch fix)
+| Fixed SEC-001 (path traversal via CLI flags — reject `..` in `--model`/`--template`/`--output`), SEC-005 (error on multiple `.jsonc` files), SEC-006 (10 MB file size limit), SEC-008 (`stripTags` attribute quoting), SEC-013 (`sanitizeID` strips dots/slashes), SEC-016 (`--output` path traversal). SEC-014 (Dockerfile checksums) deferred — upstream projects don't publish checksums.
 |===
 
 === Scope
@@ -73,7 +76,7 @@ The primary risk scenario is a **malicious or crafted model/drawio file** shared
 | SEC-001
 | Medium
 | No path boundary check on `--model` / `--template` flags; write paths derived from user-controlled input
-| Open
+| Fixed (reject `..` traversal)
 
 | SEC-002
 | Low-Medium
@@ -93,12 +96,12 @@ The primary risk scenario is a **malicious or crafted model/drawio file** shared
 | SEC-005
 | Low
 | `AutoDetect` silently picks first `.jsonc` file alphabetically (confused deputy)
-| Open
+| Fixed (error on multiple files)
 
 | SEC-006
 | Low
 | No file size limit on JSONC model parsing (memory exhaustion DoS)
-| Open
+| Fixed (10 MB limit)
 
 | SEC-007
 | Low
@@ -108,7 +111,7 @@ The primary risk scenario is a **malicious or crafted model/drawio file** shared
 | SEC-008
 | Low
 | `stripTags` incorrectly handles `>` inside HTML attribute values
-| Open
+| Fixed (attribute quoting)
 
 | SEC-009
 | Medium
@@ -133,7 +136,7 @@ The primary risk scenario is a **malicious or crafted model/drawio file** shared
 | SEC-016
 | Low
 | `--output` directory in export commands has no boundary check (absolute paths allowed)
-| Open
+| Fixed (reject `..` traversal)
 
 | SEC-017
 | Info
@@ -148,12 +151,12 @@ The primary risk scenario is a **malicious or crafted model/drawio file** shared
 | SEC-013
 | Low
 | `sanitizeID` in `diff.go` does not strip dots/slashes from titles, potentially creating IDs that interfere with dot-notation hierarchy
-| Open
+| Fixed (strips dots/slashes)
 
 | SEC-014
 | Medium
 | Dockerfile downloads and pipes install scripts (golangci-lint, Claude Code, human CLI) without checksum verification
-| Open
+| Deferred (upstream projects don't publish checksums)
 
 | SEC-018
 | Medium
@@ -478,33 +481,8 @@ SEC-004, SEC-007, SEC-011 verified fixed 2026-03-30 (see individual findings abo
 | Priority | ID | Action
 
 | Medium
-| SEC-001
-| Document that `--model`/`--template` paths are fully trusted; add path validation if CLI is used in automation
-
-| Medium
-| Medium
 | SEC-014
-| Add checksum verification for Dockerfile script downloads
-
-| Low
-| SEC-005
-| Error on multiple `.jsonc` files without explicit `--model`
-
-| Low
-| SEC-006
-| Add 10 MB file size limit to `model.Load`
-
-| Low
-| SEC-008
-| Improve `stripTags` attribute handling (backward-compat fallback only)
-
-| Low
-| SEC-013
-| Improve `sanitizeID` to handle dots/slashes from titles
-
-| Low
-| SEC-016
-| Document that `--output` is a fully trusted CLI flag
+| Deferred: upstream projects (Claude CLI, Kiro, human CLI) don't publish checksums. Revisit when checksum support becomes available.
 
 |===
 
@@ -512,8 +490,7 @@ SEC-004, SEC-007, SEC-011 verified fixed 2026-03-30 (see individual findings abo
 
 The next security review should:
 
-* Verify SEC-015 fix (view key sanitization) works in integration with real exports
-* Address SEC-014 (Dockerfile checksum verification)
+* Revisit SEC-014 (Dockerfile checksum verification) — check if upstream projects now publish checksums
 * Check for new CVEs in dependencies (govulncheck now functional — SEC-017 fixed)
 * Verify `gitleaks` runs in CI (currently only available in devcontainer)
 * Review any new CLI commands or features added since this review
