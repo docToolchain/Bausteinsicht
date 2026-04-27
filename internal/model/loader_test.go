@@ -335,3 +335,33 @@ func TestLoad_NullJSONRoot(t *testing.T) {
 		t.Error("expected error for null JSON root, got nil")
 	}
 }
+
+func TestLoad_RejectsOversizedFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "huge.jsonc")
+	data := make([]byte, MaxModelFileSize+1)
+	for i := range data {
+		data[i] = ' '
+	}
+	if err := os.WriteFile(path, data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	_, err := Load(path)
+	if err == nil {
+		t.Error("expected error for oversized file, got nil")
+	}
+}
+
+func TestAutoDetect_ErrorOnMultipleFiles(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{"a.jsonc", "b.jsonc"} {
+		path := filepath.Join(dir, name)
+		if err := os.WriteFile(path, []byte(`{"specification":{}}`), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_, err := AutoDetect(dir)
+	if err == nil {
+		t.Error("expected error when multiple .jsonc files found without explicit --model")
+	}
+}

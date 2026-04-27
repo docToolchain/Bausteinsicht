@@ -10,8 +10,18 @@ import (
 	"strings"
 )
 
+// MaxModelFileSize is the maximum allowed model file size (10 MB).
+const MaxModelFileSize = 10 * 1024 * 1024
+
 // Load reads a JSONC file, strips comments and trailing commas, and parses it.
 func Load(path string) (*BausteinsichtModel, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, fmt.Errorf("reading %s: %w", path, err)
+	}
+	if info.Size() > MaxModelFileSize {
+		return nil, fmt.Errorf("reading %s: file size %d exceeds limit of %d bytes", path, info.Size(), MaxModelFileSize)
+	}
 	data, err := os.ReadFile(path) // #nosec G304 -- path from CLI flag
 	if err != nil {
 		return nil, fmt.Errorf("reading %s: %w", path, err)
@@ -135,6 +145,9 @@ func AutoDetect(dir string) (string, error) {
 	}
 	if len(matches) == 0 {
 		return "", fmt.Errorf("no .jsonc file found in %s", dir)
+	}
+	if len(matches) > 1 {
+		return "", fmt.Errorf("multiple .jsonc files in %s — use --model to select one", dir)
 	}
 	return matches[0], nil
 }
