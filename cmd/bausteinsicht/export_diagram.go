@@ -34,6 +34,12 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 	diagramFormat, _ := cmd.Flags().GetString("diagram-format")
 	outputDir, _ := cmd.Flags().GetString("output")
 
+	if outputDir != "" {
+		if err := validatePathContainment(outputDir); err != nil {
+			return exitWithCode(fmt.Errorf("--output: %w", err), 2)
+		}
+	}
+
 	if modelPath == "" {
 		detected, err := model.AutoDetect(".")
 		if err != nil {

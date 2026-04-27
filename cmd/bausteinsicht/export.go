@@ -43,6 +43,12 @@ func runExport(cmd *cobra.Command, _ []string) error {
 	embedDiagram, _ := cmd.Flags().GetBool("embed-diagram")
 	scale, _ := cmd.Flags().GetFloat64("scale")
 
+	if outputDir != "" {
+		if err := validatePathContainment(outputDir); err != nil {
+			return exitWithCode(fmt.Errorf("--output: %w", err), 2)
+		}
+	}
+
 	// Validate image format.
 	if imageFormat != "png" && imageFormat != "svg" {
 		return exitWithCode(fmt.Errorf("unsupported image format %q; use png or svg", imageFormat), 2)
