@@ -63,8 +63,8 @@ func TestCreateElement(t *testing.T) {
 	if got := cell.SelectAttrValue("parent", ""); got != "1" {
 		t.Errorf("parent: got %q, want %q", got, "1")
 	}
-	if got := cell.SelectAttrValue("style", ""); got != "rounded=1;" {
-		t.Errorf("style: got %q, want %q", got, "rounded=1;")
+	if got := cell.SelectAttrValue("style", ""); got != "rounded=1;html=1;" {
+		t.Errorf("style: got %q, want %q", got, "rounded=1;html=1;")
 	}
 
 	geom := cell.FindElement("mxGeometry")
@@ -552,6 +552,65 @@ func TestFindAllElements_ExcludesSubCells(t *testing.T) {
 	elems := page.FindAllElements()
 	if len(elems) != 1 {
 		t.Errorf("FindAllElements: got %d elements, want 1 (sub-cells should not be returned)", len(elems))
+	}
+}
+
+// TestCreateElement_UnknownKindGetsHtml1 verifies that elements with an unknown kind
+// (which receive an empty style fallback) still have html=1 injected so that draw.io
+// renders the HTML label as rich text instead of raw markup. (#307)
+func TestCreateElement_UnknownKindGetsHtml1(t *testing.T) {
+	page := newInternalTestPage(t)
+	data := ElementData{
+		ID:          "bbcli",
+		Kind:        "client_tool", // kind not in template → empty style fallback
+		Title:       "bbcli",
+		Technology:  "Go / Cobra",
+		Description: "CLI tool",
+		ParentID:    "1",
+	}
+	if err := page.CreateElement(data, ""); err != nil {
+		t.Fatalf("CreateElement: %v", err)
+	}
+
+	obj := page.FindElement("bbcli")
+	if obj == nil {
+		t.Fatal("element not found")
+	}
+	cell := obj.FindElement("mxCell")
+	if cell == nil {
+		t.Fatal("mxCell not found")
+	}
+	style := cell.SelectAttrValue("style", "")
+	if !strings.Contains(style, "html=1") {
+		t.Errorf("expected html=1 in style, got %q", style)
+	}
+}
+
+// TestCreateElement_ExistingHtml1NotDuplicated ensures html=1 is not appended twice
+// when a template already contains it.
+func TestCreateElement_ExistingHtml1NotDuplicated(t *testing.T) {
+	page := newInternalTestPage(t)
+	data := ElementData{
+		ID:    "svc",
+		Kind:  "container",
+		Title: "Service",
+	}
+	if err := page.CreateElement(data, "rounded=1;html=1;"); err != nil {
+		t.Fatalf("CreateElement: %v", err)
+	}
+
+	obj := page.FindElement("svc")
+	if obj == nil {
+		t.Fatal("element not found")
+	}
+	cell := obj.FindElement("mxCell")
+	if cell == nil {
+		t.Fatal("mxCell not found")
+	}
+	style := cell.SelectAttrValue("style", "")
+	count := strings.Count(style, "html=1")
+	if count != 1 {
+		t.Errorf("expected html=1 to appear exactly once, got %d times in style %q", count, style)
 	}
 }
 

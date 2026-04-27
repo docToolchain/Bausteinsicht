@@ -72,6 +72,16 @@ func (p *Page) CreateElement(data ElementData, style string) error {
 		}
 	}
 
+	// HTML labels require html=1 in the cell style; without it draw.io renders
+	// the raw markup as plain text. This guard covers elements whose kind has no
+	// template entry and therefore receives an empty style fallback.
+	if data.SubCells == nil && !strings.Contains(style, "html=1") {
+		if style != "" && !strings.HasSuffix(style, ";") {
+			style += ";"
+		}
+		style += "html=1;"
+	}
+
 	cell := obj.CreateElement("mxCell")
 	cell.CreateAttr("style", style)
 	cell.CreateAttr("vertex", "1")
