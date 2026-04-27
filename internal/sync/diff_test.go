@@ -1523,3 +1523,23 @@ func TestDetectChanges_ActualDrawioDeletionStillDetected(t *testing.T) {
 		t.Error("expected draw.io-side deletion when element was previously rendered")
 	}
 }
+
+func TestSanitizeID_StripsDangerousCharacters(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"My System", "my-system"},
+		{"../../../tmp", "tmp"},
+		{"foo.bar.baz", "foobarbaz"},
+		{"path/to/thing", "pathtothing"},
+		{"normal", "normal"},
+		{"  Spaces  ", "spaces"},
+	}
+	for _, tt := range tests {
+		got := sanitizeID(tt.input)
+		if got != tt.want {
+			t.Errorf("sanitizeID(%q) = %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}
