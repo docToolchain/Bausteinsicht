@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/docToolchain/Bauteinsicht/internal/drawio"
-	"github.com/docToolchain/Bauteinsicht/internal/model"
+	"github.com/docToolchain/Bausteinsicht/internal/drawio"
+	"github.com/docToolchain/Bausteinsicht/internal/model"
 )
 
 // SyncState stores the state after each successful sync.

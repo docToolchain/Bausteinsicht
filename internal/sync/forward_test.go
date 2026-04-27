@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/docToolchain/Bauteinsicht/internal/drawio"
-	"github.com/docToolchain/Bauteinsicht/internal/model"
+	"github.com/docToolchain/Bausteinsicht/internal/drawio"
+	"github.com/docToolchain/Bausteinsicht/internal/model"
 )
 
 // minimalTemplates returns a TemplateSet loaded from a small inline template.

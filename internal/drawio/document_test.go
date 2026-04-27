@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/docToolchain/Bauteinsicht/internal/drawio"
+	"github.com/docToolchain/Bausteinsicht/internal/drawio"
 )
 
 func TestLoadDocument_Simple(t *testing.T) {

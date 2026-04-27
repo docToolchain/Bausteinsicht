@@ -6,8 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/docToolchain/Bauteinsicht/internal/model"
-	"github.com/docToolchain/Bauteinsicht/internal/table"
+	"github.com/docToolchain/Bausteinsicht/internal/model"
+	"github.com/docToolchain/Bausteinsicht/internal/table"
 	"github.com/spf13/cobra"
 )
 

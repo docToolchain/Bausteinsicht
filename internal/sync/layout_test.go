@@ -3,9 +3,9 @@ package sync
 import (
 	"testing"
 
-	"github.com/docToolchain/Bauteinsicht/internal/drawio"
-	"github.com/docToolchain/Bauteinsicht/internal/model"
-	"github.com/docToolchain/Bauteinsicht/templates"
+	"github.com/docToolchain/Bausteinsicht/internal/drawio"
+	"github.com/docToolchain/Bausteinsicht/internal/model"
+	"github.com/docToolchain/Bausteinsicht/templates"
 )
 
 func loadTestTemplates(t *testing.T) *drawio.TemplateSet {

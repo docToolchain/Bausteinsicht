@@ -103,7 +103,7 @@ The architecture model has four sections:
 
 ```jsonc
 {
-  "$schema": "https://raw.githubusercontent.com/docToolchain/Bauteinsicht/main/schema/bausteinsicht.schema.json",
+  "$schema": "https://raw.githubusercontent.com/docToolchain/Bausteinsicht/main/schema/bausteinsicht.schema.json",
 
   // 1. Specification: Define element kinds and relationship kinds
   "specification": {

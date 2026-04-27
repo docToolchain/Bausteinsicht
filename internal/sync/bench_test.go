@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/docToolchain/Bauteinsicht/internal/drawio"
-	"github.com/docToolchain/Bauteinsicht/internal/model"
+	"github.com/docToolchain/Bausteinsicht/internal/drawio"
+	"github.com/docToolchain/Bausteinsicht/internal/model"
 )
 
 func generateBenchModel(n int) *model.BausteinsichtModel {

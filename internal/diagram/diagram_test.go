@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/docToolchain/Bauteinsicht/internal/model"
+	"github.com/docToolchain/Bausteinsicht/internal/model"
 )
 
 func testModel() *model.BausteinsichtModel {

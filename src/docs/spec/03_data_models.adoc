@@ -38,7 +38,7 @@ The model consists of four top-level sections:
 [source,jsonc]
 ----
 {
-  "$schema": "https://raw.githubusercontent.com/docToolchain/Bauteinsicht/main/schema/bausteinsicht.schema.json",
+  "$schema": "https://raw.githubusercontent.com/docToolchain/Bausteinsicht/main/schema/bausteinsicht.schema.json",
 
   // Define available element and relationship kinds
   "specification": {

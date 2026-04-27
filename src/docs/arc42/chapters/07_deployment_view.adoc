@@ -119,11 +119,11 @@ Each tagged version produces binaries for all target platforms via GoReleaser:
 
 ....
 # Direct download (example for Linux amd64)
-curl -L https://github.com/docToolchain/Bauteinsicht/releases/latest/download/bausteinsicht-linux-amd64 -o bausteinsicht
+curl -L https://github.com/docToolchain/Bausteinsicht/releases/latest/download/bausteinsicht-linux-amd64 -o bausteinsicht
 chmod +x bausteinsicht
 
 # Or via Go install
-go install github.com/docToolchain/Bauteinsicht/cmd/bausteinsicht@latest
+go install github.com/docToolchain/Bausteinsicht/cmd/bausteinsicht@latest
 ....
 
 ==== Embedded Resources

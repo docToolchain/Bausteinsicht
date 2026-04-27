@@ -80,7 +80,7 @@ Requires Go 1.25+:
 
 [source,bash]
 ----
-go install github.com/docToolchain/Bauteinsicht/cmd/bausteinsicht@latest
+go install github.com/docToolchain/Bausteinsicht/cmd/bausteinsicht@latest
 ----
 
 === Build from Source

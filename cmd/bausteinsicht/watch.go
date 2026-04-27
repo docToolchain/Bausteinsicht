@@ -8,11 +8,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/docToolchain/Bauteinsicht/internal/drawio"
-	"github.com/docToolchain/Bauteinsicht/internal/model"
-	bsync "github.com/docToolchain/Bauteinsicht/internal/sync"
-	"github.com/docToolchain/Bauteinsicht/internal/watcher"
-	"github.com/docToolchain/Bauteinsicht/templates"
+	"github.com/docToolchain/Bausteinsicht/internal/drawio"
+	"github.com/docToolchain/Bausteinsicht/internal/model"
+	bsync "github.com/docToolchain/Bausteinsicht/internal/sync"
+	"github.com/docToolchain/Bausteinsicht/internal/watcher"
+	"github.com/docToolchain/Bausteinsicht/templates"
 	"github.com/spf13/cobra"
 )
 

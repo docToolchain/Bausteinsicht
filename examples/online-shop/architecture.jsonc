@@ -1,5 +1,5 @@
 {
-  "$schema": "https://raw.githubusercontent.com/docToolchain/Bauteinsicht/main/schema/bausteinsicht.schema.json",
+  "$schema": "https://raw.githubusercontent.com/docToolchain/Bausteinsicht/main/schema/bausteinsicht.schema.json",
 
   // Specification: define the element kinds and relationship types used in this model.
   // The order of element kinds determines the layer order in auto-layout

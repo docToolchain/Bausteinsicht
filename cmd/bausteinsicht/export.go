@@ -6,9 +6,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/docToolchain/Bauteinsicht/internal/drawio"
-	"github.com/docToolchain/Bauteinsicht/internal/export"
-	"github.com/docToolchain/Bauteinsicht/internal/model"
+	"github.com/docToolchain/Bausteinsicht/internal/drawio"
+	"github.com/docToolchain/Bausteinsicht/internal/export"
+	"github.com/docToolchain/Bausteinsicht/internal/model"
 	"github.com/spf13/cobra"
 )
 
