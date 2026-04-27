@@ -587,6 +587,49 @@ func TestCreateElementSubCells_OverflowHidden(t *testing.T) {
 	}
 }
 
+// TestCreateElementSubCells_DescTruncated verifies that long descriptions are
+// truncated in the sub-cell while the full text remains in the tooltip. (#307)
+func TestCreateElementSubCells_DescTruncated(t *testing.T) {
+	page := newInternalTestPage(t)
+	longDesc := strings.Repeat("a", 200)
+	data := ElementData{
+		ID:          "svc",
+		Kind:        "container",
+		Title:       "Service",
+		Description: longDesc,
+		ParentID:    "1",
+		Width:       240,
+		Height:      150,
+		SubCells:    testSubCellTemplates(),
+	}
+	if err := page.CreateElement(data, "rounded=1;container=1;"); err != nil {
+		t.Fatalf("CreateElement: %v", err)
+	}
+
+	// Tooltip must contain the full description.
+	obj := page.FindElement("svc")
+	if obj == nil {
+		t.Fatal("element not found")
+	}
+	if got := obj.SelectAttrValue("tooltip", ""); got != longDesc {
+		t.Errorf("tooltip: got %d chars, want %d", len([]rune(got)), len([]rune(longDesc)))
+	}
+
+	// Desc sub-cell must be truncated to ≤ 120 runes.
+	root := page.Root()
+	descCell := findCellByID(root, "svc-desc")
+	if descCell == nil {
+		t.Fatal("desc sub-cell not found")
+	}
+	value := descCell.SelectAttrValue("value", "")
+	if len([]rune(value)) > 120 {
+		t.Errorf("desc sub-cell value too long: %d runes (want ≤ 120)", len([]rune(value)))
+	}
+	if !strings.HasSuffix(value, "…") {
+		t.Errorf("expected truncated value to end with '…', got %q", value)
+	}
+}
+
 // TestCreateElement_UnknownKindGetsHtml1 verifies that elements with an unknown kind
 // (which receive an empty style fallback) still have html=1 injected so that draw.io
 // renders the HTML label as rich text instead of raw markup. (#307)

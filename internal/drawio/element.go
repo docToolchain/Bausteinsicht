@@ -124,10 +124,21 @@ func createSubCells(root *etree.Element, parentCellID string, data ElementData, 
 	}
 
 	// Description sub-cell (only when description is non-empty).
+	// The display value is truncated to avoid visual overflow; the full text
+	// is preserved in the element's tooltip attribute.
 	if sc.Desc != nil && data.Description != "" {
-		createTextSubCell(root, parentCellID+"-desc", parentCellID, data.Description,
+		createTextSubCell(root, parentCellID+"-desc", parentCellID, truncateText(data.Description, 120),
 			sc.Desc, data.Width, data.Height)
 	}
+}
+
+// truncateText shortens s to maxLen runes, appending "…" if truncated.
+func truncateText(s string, maxLen int) string {
+	runes := []rune(s)
+	if len(runes) <= maxLen {
+		return s
+	}
+	return string(runes[:maxLen-1]) + "…"
 }
 
 // createTextSubCell creates a single text mxCell child element.
