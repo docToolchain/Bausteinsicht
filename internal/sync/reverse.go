@@ -25,8 +25,13 @@ type ReverseResult struct {
 func ApplyReverse(changes *ChangeSet, m *model.BausteinsichtModel) *ReverseResult {
 	result := &ReverseResult{}
 
+	// Pre-compute the flat model for accurate existence checks.
+	// m.Model is a top-level map, so a key like "parent.child" won't be found
+	// there directly. We need the flattened view to properly detect nested elements.
+	flatModel, _ := model.FlattenElements(m)
+
 	for _, ch := range changes.DrawioElementChanges {
-		applyElementChange(ch, m, result)
+		applyElementChange(ch, m, flatModel, result)
 	}
 
 	// Detect direction-swap pairs (Deleted a→b + Added b→a) so we can
@@ -111,7 +116,7 @@ func applyRelSwap(newFrom, newTo string, m *model.BausteinsichtModel, result *Re
 	result.RelationshipsCreated++
 }
 
-func applyElementChange(ch ElementChange, m *model.BausteinsichtModel, result *ReverseResult) {
+func applyElementChange(ch ElementChange, m *model.BausteinsichtModel, flatModel map[string]*model.Element, result *ReverseResult) {
 	switch ch.Type {
 	case Modified:
 		// Reject empty title updates from draw.io (#150).
@@ -170,7 +175,11 @@ func applyElementChange(ch ElementChange, m *model.BausteinsichtModel, result *R
 		if m.Model == nil {
 			m.Model = make(map[string]model.Element)
 		}
-		if _, exists := m.Model[ch.ID]; exists {
+		// Use the pre-computed flat model to check existence across the full
+		// hierarchy. A naive m.Model[ch.ID] check misses nested elements whose
+		// IDs are dot-paths (e.g. "parent.child"), causing them to be
+		// re-created as spurious top-level entries with empty titles (#307).
+		if _, exists := flatModel[ch.ID]; exists {
 			result.Warnings = append(result.Warnings,
 				fmt.Sprintf("New element %q from draw.io skipped: ID already exists in model.", ch.ID))
 			return
