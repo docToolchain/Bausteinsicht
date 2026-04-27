@@ -154,6 +154,45 @@ func TestOutputFileName(t *testing.T) {
 	}
 }
 
+func TestOutputFileName_StripsPathTraversal(t *testing.T) {
+	tests := []struct {
+		viewKey string
+		format  string
+		want    string
+	}{
+		{"../../../tmp/pwned", "png", "architecture-pwned.png"},
+		{"/etc/passwd", "svg", "architecture-passwd.svg"},
+		{"foo/../../bar", "png", "architecture-bar.png"},
+		{"normal-key", "png", "architecture-normal-key.png"},
+	}
+	for _, tt := range tests {
+		got := OutputFileName(tt.viewKey, tt.format)
+		if got != tt.want {
+			t.Errorf("OutputFileName(%q, %q) = %q, want %q", tt.viewKey, tt.format, got, tt.want)
+		}
+	}
+}
+
+func TestSafeViewKey(t *testing.T) {
+	tests := []struct {
+		key  string
+		want string
+	}{
+		{"context", "context"},
+		{"my-view", "my-view"},
+		{"../../../tmp/pwned", "pwned"},
+		{"/etc/passwd", "passwd"},
+		{"foo/bar", "bar"},
+		{"foo\\bar", "bar"},
+	}
+	for _, tt := range tests {
+		got := SafeViewKey(tt.key)
+		if got != tt.want {
+			t.Errorf("SafeViewKey(%q) = %q, want %q", tt.key, got, tt.want)
+		}
+	}
+}
+
 // TestExportPage_ErrorWhenOutputMissing verifies that ExportPage returns an
 // error when the draw.io CLI exits successfully but the output file does not
 // exist (e.g., permission denied on output directory). (#195)
