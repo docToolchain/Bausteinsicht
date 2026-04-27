@@ -155,14 +155,22 @@ func unescapeHTML(s string) string {
 }
 
 // stripTags removes all HTML tags from a string.
+// Handles '>' inside quoted attribute values correctly (SEC-008).
 func stripTags(s string) string {
 	var b strings.Builder
 	inTag := false
+	var quote rune
 	for _, r := range s {
 		switch {
+		case inTag && quote != 0:
+			if r == quote {
+				quote = 0
+			}
+		case inTag && (r == '"' || r == '\''):
+			quote = r
 		case r == '<':
 			inTag = true
-		case r == '>':
+		case r == '>' && inTag:
 			inTag = false
 		case !inTag:
 			b.WriteRune(r)

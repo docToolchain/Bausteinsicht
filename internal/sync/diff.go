@@ -283,11 +283,13 @@ func detectUnmanagedDrawioElements(cs *ChangeSet, doc *drawio.Document) {
 }
 
 // sanitizeID converts a title to a lowercase, hyphen-separated ID suitable
-// for use as a model element key.
+// for use as a model element key. Strips dots, slashes, and backslashes to
+// prevent IDs that interfere with dot-notation hierarchy (SEC-013).
 func sanitizeID(title string) string {
 	title = strings.TrimSpace(title)
 	title = strings.ToLower(title)
 	title = strings.ReplaceAll(title, " ", "-")
+	title = strings.NewReplacer(".", "", "/", "", "\\", "").Replace(title)
 	return title
 }
 

@@ -152,3 +152,46 @@ func TestRootCmd_AcceptsEmptyTemplate(t *testing.T) {
 		t.Fatalf("expected no error without --template flag, got: %v", err)
 	}
 }
+
+func TestRootCmd_RejectsModelPathTraversal(t *testing.T) {
+	_, err := executeRootCmd("validate", "--model", "../../etc/model.jsonc")
+	if err == nil {
+		t.Fatal("expected error for model path with traversal")
+	}
+	if !strings.Contains(err.Error(), "traversal") {
+		t.Fatalf("expected 'traversal' in error, got: %v", err)
+	}
+}
+
+func TestRootCmd_RejectsTemplatePathTraversal(t *testing.T) {
+	dir := t.TempDir()
+	modelPath := filepath.Join(dir, "model.jsonc")
+	if err := os.WriteFile(modelPath, templates.SampleModel, 0644); err != nil {
+		t.Fatal(err)
+	}
+	_, err := executeRootCmd("validate", "--model", modelPath, "--template", "../../../tmp/evil.drawio")
+	if err == nil {
+		t.Fatal("expected error for template path with traversal")
+	}
+	if !strings.Contains(err.Error(), "traversal") {
+		t.Fatalf("expected 'traversal' in error, got: %v", err)
+	}
+}
+
+func TestValidatePathContainment(t *testing.T) {
+	if err := validatePathContainment("subdir/file.jsonc"); err != nil {
+		t.Errorf("relative sub-path should be allowed: %v", err)
+	}
+	if err := validatePathContainment("./file.jsonc"); err != nil {
+		t.Errorf("current-dir path should be allowed: %v", err)
+	}
+	if err := validatePathContainment("/tmp/absolute/file.jsonc"); err != nil {
+		t.Errorf("absolute path should be allowed: %v", err)
+	}
+	if err := validatePathContainment("../../etc/passwd"); err == nil {
+		t.Error("path traversal should be rejected")
+	}
+	if err := validatePathContainment("foo/../../bar"); err == nil {
+		t.Error("hidden path traversal should be rejected")
+	}
+}

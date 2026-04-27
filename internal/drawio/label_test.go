@@ -267,3 +267,22 @@ func TestRoundTrip(t *testing.T) {
 		}
 	}
 }
+
+func TestStripTags_HandlesGreaterThanInAttributes(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{`<b>hello</b>`, "hello"},
+		{`<a title="x > y">link</a>`, "link"},
+		{`<span style="font-size: 12px">text</span>`, "text"},
+		{`no tags`, "no tags"},
+		{`<div class="a>b">content</div>`, "content"},
+	}
+	for _, tt := range tests {
+		got := stripTags(tt.input)
+		if got != tt.want {
+			t.Errorf("stripTags(%q) = %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}

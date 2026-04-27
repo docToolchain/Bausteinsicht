@@ -36,6 +36,12 @@ func runExportTable(cmd *cobra.Command, _ []string) error {
 	outputDir, _ := cmd.Flags().GetString("output")
 	combined, _ := cmd.Flags().GetBool("combined")
 
+	if outputDir != "" {
+		if err := validatePathContainment(outputDir); err != nil {
+			return exitWithCode(fmt.Errorf("--output: %w", err), 2)
+		}
+	}
+
 	if modelPath == "" {
 		detected, err := model.AutoDetect(".")
 		if err != nil {

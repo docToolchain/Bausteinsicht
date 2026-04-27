@@ -30,6 +30,19 @@ func NewRootCmd() *cobra.Command {
 				return fmt.Errorf("template file %q must have a .drawio extension", templatePath)
 			}
 
+			// Validate --model path is under working directory (SEC-001).
+			modelPath, _ := cmd.Flags().GetString("model")
+			if modelPath != "" {
+				if err := validatePathContainment(modelPath); err != nil {
+					return fmt.Errorf("--model: %w", err)
+				}
+			}
+			if templatePath != "" {
+				if err := validatePathContainment(templatePath); err != nil {
+					return fmt.Errorf("--template: %w", err)
+				}
+			}
+
 			return nil
 		},
 	}
@@ -60,6 +73,19 @@ func (e *exitError) Error() string { return e.err.Error() }
 
 func exitWithCode(err error, code int) *exitError {
 	return &exitError{err: err, code: code}
+}
+
+// validatePathContainment normalizes a path and rejects directory traversal
+// sequences that could be used to write files at unexpected locations
+// (SEC-001, SEC-016).
+func validatePathContainment(path string) error {
+	cleaned := filepath.Clean(path)
+	for _, component := range strings.Split(cleaned, string(filepath.Separator)) {
+		if component == ".." {
+			return fmt.Errorf("path %q contains directory traversal", path)
+		}
+	}
+	return nil
 }
 
 // ExecuteRoot runs the root command and writes errors in the appropriate format
