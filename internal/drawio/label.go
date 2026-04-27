@@ -13,6 +13,12 @@ const (
 	descColor = "#BBBBBB"
 )
 
+// maxLabelDescLen is the maximum rune length of the description portion of an
+// HTML label. HTML labels are rendered inside a fixed-size element box
+// (typically 120×60 px) that has no sub-cell clipping, so descriptions must
+// be kept short. The full text is always preserved in the tooltip attribute.
+const maxLabelDescLen = 60
+
 // GenerateLabel creates an HTML label for draw.io elements.
 // Format: <b>Title</b><br><font color="..."><i>[Technology]</i></font><br><font color="..." style="font-size:11px">Description</font>
 // Technology is wrapped in square brackets per C4 convention and rendered in italic.
@@ -25,7 +31,7 @@ func GenerateLabel(title, technology, description string) string {
 		b.WriteString("<br><font color=\"" + techColor + "\"><i>[" + escapeHTML(technology) + "]</i></font>")
 	}
 	if description != "" {
-		b.WriteString("<br><font color=\"" + descColor + "\" style=\"font-size:11px\">" + escapeHTML(description) + "</font>")
+		b.WriteString("<br><font color=\"" + descColor + "\" style=\"font-size:11px\">" + escapeHTML(truncateText(description, maxLabelDescLen)) + "</font>")
 	}
 	return b.String()
 }
