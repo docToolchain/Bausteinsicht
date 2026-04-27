@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
+	"strings"
 )
 
 // ExportOptions configures a single page export operation.
@@ -55,9 +57,16 @@ func BuildExportArgs(opts ExportOptions) []string {
 	return args
 }
 
+// SafeViewKey strips directory components from a view key to prevent
+// path traversal when used in filenames (SEC-015).
+func SafeViewKey(key string) string {
+	key = filepath.Base(strings.ReplaceAll(key, "\\", "/"))
+	return key
+}
+
 // OutputFileName returns the canonical output file name for a view export.
 func OutputFileName(viewKey, format string) string {
-	return fmt.Sprintf("architecture-%s.%s", viewKey, format)
+	return fmt.Sprintf("architecture-%s.%s", SafeViewKey(viewKey), format)
 }
 
 // ExportPage runs the draw.io CLI to export a single page.

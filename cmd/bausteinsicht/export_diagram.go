@@ -8,6 +8,7 @@ import (
 	"sort"
 
 	"github.com/docToolchain/Bausteinsicht/internal/diagram"
+	"github.com/docToolchain/Bausteinsicht/internal/export"
 	"github.com/docToolchain/Bausteinsicht/internal/model"
 	"github.com/spf13/cobra"
 )
@@ -112,7 +113,7 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 		if err := os.MkdirAll(outputDir, 0750); err != nil {
 			return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
 		}
-		outPath := filepath.Join(outputDir, key+"."+ext)
+		outPath := filepath.Join(outputDir, export.SafeViewKey(key)+"."+ext)
 		if err := os.WriteFile(outPath, []byte(result), 0600); err != nil { //nolint:gosec // output files are non-sensitive documentation
 			return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
 		}

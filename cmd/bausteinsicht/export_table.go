@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/docToolchain/Bausteinsicht/internal/export"
 	"github.com/docToolchain/Bausteinsicht/internal/model"
 	"github.com/docToolchain/Bausteinsicht/internal/table"
 	"github.com/spf13/cobra"
@@ -72,7 +73,7 @@ func runExportTable(cmd *cobra.Command, _ []string) error {
 		filename = "elements." + tableFormat
 	case viewKey != "":
 		result, err = table.FormatView(m, viewKey, f)
-		filename = viewKey + "-elements." + tableFormat
+		filename = export.SafeViewKey(viewKey) + "-elements." + tableFormat
 	default:
 		result, err = table.FormatAllViews(m, f)
 		filename = "all-views-elements." + tableFormat
