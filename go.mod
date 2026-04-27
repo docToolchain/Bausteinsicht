@@ -1,6 +1,6 @@
 module github.com/docToolchain/Bauteinsicht
 
-go 1.24.0
+go 1.25.8
 
 require (
 	github.com/beevik/etree v1.6.0

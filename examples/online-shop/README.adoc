@@ -1,0 +1,26 @@
+= Online Shop Example
+
+A multi-level architecture model of an e-commerce platform, demonstrating:
+
+* **Element kinds:** actors, systems, containers, components, datastores, queues, UI, mobile, file storage
+* **Nested hierarchy:** system → containers → components (3 levels)
+* **Relationship types:** synchronous (`uses`) and asynchronous (`async`)
+* **Multiple views:** System Context, Container View, API Components
+
+== Usage
+
+[source,bash]
+----
+cd examples/online-shop
+bausteinsicht sync
+----
+
+This generates `architecture.drawio` with three diagram pages — one for each view.
+
+Open in https://www.drawio.com/[draw.io], rearrange elements visually, then run `sync` again to merge changes back into the JSONC model.
+
+== What to try
+
+1. Add a new container (e.g., an admin dashboard) in `architecture.jsonc` and run `sync`
+2. Rename an element label in draw.io, save, and run `sync` — the label flows back to JSONC
+3. Run `bausteinsicht watch` for continuous sync on save

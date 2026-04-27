@@ -2,8 +2,63 @@
 # Firewall for devcontainer — restricts outbound to whitelisted domains only.
 # Adapted from the Claude Code reference devcontainer.
 # Enables safe use of `claude --dangerously-skip-permissions`.
+#
+# Security features:
+# - Logs blocked connections to /var/log/firewall.log (via ulogd2 NFLOG)
+# - Locks down iptables binaries after setup (prevents manipulation)
+# - Restricts sudo access to prevent firewall changes
+#
+# User detection: uses SUDO_USER (set automatically when invoked via sudo).
+# This makes the script portable across different base images (node, vscode, etc.).
 set -euo pipefail
 IFS=$'\n\t'
+
+LOGFILE="/var/log/firewall.log"
+
+# Detect the non-root dev user (the one who called sudo)
+DEV_USER="${SUDO_USER:-}"
+if [ -z "$DEV_USER" ] || [ "$DEV_USER" = "root" ]; then
+    echo "ERROR: Must be run via sudo (SUDO_USER not set)"
+    exit 1
+fi
+# Validate username to prevent injection in sudoers file and shell expansion
+if ! [[ "$DEV_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]; then
+    echo "ERROR: Invalid username: $DEV_USER"
+    exit 1
+fi
+echo "Detected dev user: $DEV_USER"
+
+# ──────────────────────────────────────────────
+# Restore firewall binaries if previously locked (container restart)
+# ──────────────────────────────────────────────
+for bin in iptables ip6tables iptables-save iptables-restore ip6tables-save ip6tables-restore \
+           iptables-legacy ip6tables-legacy iptables-nft ip6tables-nft \
+           ipset nft; do
+    binary_path=$(which "$bin" 2>/dev/null || find /usr/sbin /sbin /usr/bin -name "$bin" 2>/dev/null | head -1 || true)
+    if [ -n "$binary_path" ] && [ ! -x "$binary_path" ]; then
+        chmod 755 "$binary_path"
+        echo "  Unlocked: $binary_path"
+    fi
+done
+
+# Prepare log file (readable by dev user, writable only by root)
+touch "$LOGFILE"
+chown "root:$DEV_USER" "$LOGFILE"
+chmod 640 "$LOGFILE"
+
+# ──────────────────────────────────────────────
+# Start ulogd2 for NFLOG-based firewall logging
+# (iptables LOG doesn't work in Docker — writes to host kernel log)
+# ──────────────────────────────────────────────
+echo "Starting ulogd2 firewall logger..."
+ulogd -c /etc/ulogd-firewall.conf -d
+sleep 0.5
+if pgrep -x ulogd > /dev/null; then
+    echo "ulogd2 started (PID: $(pgrep -x ulogd)), writing to $LOGFILE"
+else
+    echo "WARNING: ulogd2 failed to start:"
+    cat /var/log/ulogd.log 2>/dev/null || echo "  (no log file)"
+fi
 
 # 1. Extract Docker DNS info BEFORE any flushing
 DOCKER_DNS_RULES=$(iptables-save -t nat | grep "127\.0\.0\.11" || true)
@@ -60,39 +115,26 @@ while read -r cidr; do
     ipset add allowed-domains "$cidr" 2>/dev/null || true
 done < <(echo "$gh_ranges" | jq -r '(.web + .api + .git)[]')
 
-# Resolve and add other allowed domains.
-# Anthropic API + telemetry, Go module proxy, Docker Hub, VS Code marketplace, gethuman.
-for domain in \
-    "api.anthropic.com" \
-    "sentry.io" \
-    "statsig.anthropic.com" \
-    "statsig.com" \
-    "proxy.golang.org" \
-    "sum.golang.org" \
-    "storage.googleapis.com" \
-    "gethuman.sh" \
-    "cli.kiro.dev" \
-    "registry-1.docker.io" \
-    "auth.docker.io" \
-    "production.cloudflare.docker.com" \
-    "marketplace.visualstudio.com" \
-    "vscode.blob.core.windows.net" \
-    "update.code.visualstudio.com"; do
-    echo "Resolving $domain..."
-    ips=$(dig +noall +answer A "$domain" | awk '$4 == "A" {print $5}')
-    if [ -z "$ips" ]; then
-        echo "WARNING: Failed to resolve $domain (skipping)"
-        continue
-    fi
+# Resolve and add other allowed domains (parallel for speed).
+# Anthropic API + telemetry, Docker Hub, VS Code marketplace, gethuman, package registries.
+# Project-specific domains (npm, Go proxy, etc.) are also included here — harmless if unused.
+DOMAINS="api.anthropic.com sentry.io statsig.anthropic.com statsig.com \
+registry.npmjs.org proxy.golang.org sum.golang.org storage.googleapis.com \
+gethuman.sh cli.kiro.dev oidc.us-east-1.amazonaws.com \
+registry-1.docker.io auth.docker.io production.cloudflare.docker.com \
+marketplace.visualstudio.com vscode.blob.core.windows.net update.code.visualstudio.com \
+vuln.go.dev"
 
-    while read -r ip; do
-        if [[ ! "$ip" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
-            echo "WARNING: Skipping invalid IP from DNS for $domain: $ip"
-            continue
-        fi
+echo "Resolving $(echo $DOMAINS | wc -w) domains in parallel..."
+RESOLVED_IPS=$(echo "$DOMAINS" | tr ' ' '\n' | xargs -P 8 -I{} sh -c \
+    'dig +noall +answer +short A "$1" 2>/dev/null' _ {} | sort -u)
+
+while read -r ip; do
+    if [[ "$ip" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
         ipset add allowed-domains "$ip" 2>/dev/null || true
-    done < <(echo "$ips")
-done
+    fi
+done < <(echo "$RESOLVED_IPS")
+echo "Resolved $(echo "$RESOLVED_IPS" | grep -c '^[0-9]') IPs"
 
 # Get host IP from default route
 HOST_IP=$(ip route | grep default | cut -d" " -f3)
@@ -120,7 +162,9 @@ iptables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
 # Allow only outbound traffic to whitelisted domains
 iptables -A OUTPUT -m set --match-set allowed-domains dst -j ACCEPT
 
-# Reject everything else with immediate feedback
+# Log blocked connections via NFLOG (userspace, rate-limited to avoid flooding)
+iptables -A OUTPUT -m limit --limit 10/min --limit-burst 30 \
+    -j NFLOG --nflog-group 1 --nflog-prefix "FW-BLOCKED:"
 iptables -A OUTPUT -j REJECT --reject-with icmp-admin-prohibited
 
 echo "Firewall configuration complete"
@@ -138,3 +182,49 @@ if ! curl --connect-timeout 5 https://api.github.com/zen >/dev/null 2>&1; then
 else
     echo "OK: api.github.com reachable as expected"
 fi
+
+# Capture rule count BEFORE lockdown
+RULE_COUNT=$(iptables -L OUTPUT -n | tail -n +3 | wc -l)
+
+# ──────────────────────────────────────────────
+# LOCKDOWN: Prevent firewall manipulation from within the container
+# ──────────────────────────────────────────────
+echo "Locking down firewall tools..."
+
+# Remove execute permissions on all firewall-related binaries
+for bin in iptables ip6tables iptables-save iptables-restore ip6tables-save ip6tables-restore \
+           iptables-legacy ip6tables-legacy iptables-nft ip6tables-nft \
+           ipset nft; do
+    binary_path=$(which "$bin" 2>/dev/null || true)
+    if [ -n "$binary_path" ]; then
+        chmod 000 "$binary_path"
+        echo "  Locked: $binary_path"
+    fi
+done
+
+# Restrict sudo: replace blanket NOPASSWD:ALL with specific allowed commands
+# Keep only what's needed for normal development workflow
+echo "Restricting sudo access..."
+rm -f "/etc/sudoers.d/$DEV_USER"
+cat > "/etc/sudoers.d/$DEV_USER-restricted" << SUDOERS
+# Restricted sudo for devcontainer — no firewall manipulation allowed
+# init-firewall.sh: needed for container restart (postStartCommand)
+# dbus-daemon: needed for draw.io / Electron / Playwright
+# mkdir: needed for /run/dbus
+# docker/dockerd: needed for docker-in-docker feature
+# chown: needed for cache permissions
+$DEV_USER ALL=(root) NOPASSWD: /usr/local/bin/init-firewall.sh, /usr/bin/dbus-daemon, /usr/bin/mkdir, /usr/bin/docker, /usr/bin/dockerd, /usr/bin/chown
+SUDOERS
+chmod 440 "/etc/sudoers.d/$DEV_USER-restricted"
+
+# Remove the firewall-specific sudoers entry (no longer needed)
+rm -f /etc/sudoers.d/firewall
+
+echo "Sudo restricted to: dbus-daemon, mkdir, docker, dockerd, chown"
+
+echo "=== Firewall setup complete ==="
+echo "  - Rules active: $RULE_COUNT OUTPUT rules"
+echo "  - Firewall tools: LOCKED"
+echo "  - Sudo: RESTRICTED"
+echo "  - Log file: $LOGFILE (via ulogd2)"
+echo "  - View live: tail -f $LOGFILE"

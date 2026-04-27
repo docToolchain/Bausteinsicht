@@ -28,6 +28,9 @@
 
 | 2026-03-05 (nilaway + review)
 | Fixed SEC-012 (nil panics from `GetPage()`) via `requirePage` test helpers and `strings.Cut` refactor (#235). Full code review + security review of metadata feature, nilaway fixes, Kroki config, Dockerfile. Added SEC-013 (`sanitizeID` permissiveness) and SEC-014 (Dockerfile script downloads without checksums). HTML escaping in new `metadata.go` confirmed correct.
+
+| 2026-03-30 (full review)
+| Full security review at current main. Verified fixes: SEC-004 (now 0600), SEC-007 (MaxElementDepth=50), SEC-011 (`_ = tmp.Close()`). Added SEC-015 (view key path traversal in export filenames), SEC-016 (no output-dir boundary check), SEC-017 (govulncheck broken). All dependencies current, no new CVEs. gosec/staticcheck/nilaway clean. Re-confirmed XXE not exploitable.
 |===
 
 === Scope
@@ -76,7 +79,7 @@ The primary risk scenario is a **malicious or crafted model/drawio file** shared
 | SEC-004
 | Low
 | File permissions hardcoded to `0644` (world-readable) for model and template files
-| Open
+| Fixed (init.go now uses 0600)
 
 | SEC-005
 | Low
@@ -91,7 +94,7 @@ The primary risk scenario is a **malicious or crafted model/drawio file** shared
 | SEC-007
 | Low
 | No recursion depth limit on `Element.Children` traversal (stack overflow DoS)
-| Open
+| Fixed (MaxElementDepth=50)
 
 | SEC-008
 | Low
@@ -111,6 +114,21 @@ The primary risk scenario is a **malicious or crafted model/drawio file** shared
 | SEC-011
 | Low
 | Unhandled `tmp.Close()` error in `model.Save` cleanup path
+| Fixed (`_ = tmp.Close()`)
+
+| SEC-015
+| Medium
+| View key used directly in export filenames without path traversal sanitization
+| Open
+
+| SEC-016
+| Low
+| `--output` directory in export commands has no boundary check (absolute paths allowed)
+| Open
+
+| SEC-017
+| Info
+| `govulncheck` fails with internal error on `golang.org/x/sys/unix` import from `fsnotify`
 | Open
 
 | SEC-012
@@ -179,21 +197,9 @@ At minimum, document that paths are fully trusted and the tool must not be run w
 
 **Fix applied in PR #77:** Added `captured := lastFile` before `time.AfterFunc` closure to capture the variable by value instead of by reference. Verified with `go test -race ./...`.
 
-==== SEC-004: World-Readable File Permissions (Low)
+==== SEC-004: World-Readable File Permissions (Low) — FIXED
 
-**Affected files:**
-
-* `cmd/bausteinsicht/init.go:46, 51` — `os.WriteFile(..., 0644)`
-* `internal/model/loader.go:33` — `os.WriteFile(..., 0644)`
-
-**Description:**
-Model and template files are written with `0644` (world-readable).
-On a shared system, the architecture model is readable by all local users.
-
-**Tool correlation:** Flagged by `gosec` as G306 (CWE-276) in `init.go:46` and `init.go:51`.
-
-**Recommendation:**
-Use `0600` for model files, or let the user's umask control permissions.
+**Fix verified 2026-03-30:** `init.go` now uses `0600` for both model and template files. `model.Save` uses atomic temp file with restricted permissions.
 
 ==== SEC-005: AutoDetect Confused Deputy (Low)
 
@@ -223,27 +229,14 @@ If more than one `.jsonc` is found and `--model` was not specified, return an er
 `model.Load` reads the entire file into memory with `os.ReadFile` without a size check.
 A crafted multi-gigabyte `.jsonc` file could exhaust memory.
 
-Additionally, `StripJSONC` does not handle block comments (`/* ... */`), causing confusing parse errors rather than a clear message.
+**Update (2026-03-30):** `StripJSONC` now handles block comments (`/* ... */`). The size limit issue remains open.
 
 **Recommendation:**
 Add a maximum file size check (e.g., reject files over 10 MB).
 
-==== SEC-007: Unbounded Recursion on Element Hierarchy (Low)
+==== SEC-007: Unbounded Recursion on Element Hierarchy (Low) — FIXED
 
-**Affected files:**
-
-* `internal/model/resolve.go:33` — `flattenInto`
-* `internal/model/validate.go:35` — `validateElement`
-* `internal/model/validate.go:127` — `lookupChild`
-* `internal/sync/reverse.go:128` — `modifyInMap`
-* `internal/sync/reverse.go:159` — `deleteFromMap`
-
-**Description:**
-All five functions recursively traverse `Element.Children` without a depth limit.
-A deeply nested model (50,000+ levels) would exhaust the goroutine stack and panic.
-
-**Recommendation:**
-Add a `maxDepth` parameter (e.g., 100 levels) and return an error if exceeded.
+**Fix verified 2026-03-30:** `MaxElementDepth = 50` constant in `resolve.go:11` is enforced in `flattenInto`, `validateElement`, and `reverse.go` (`maxReverseDepth`). Tests cover the depth limit.
 
 ==== SEC-008: stripTags Incorrect Parsing (Low — reduced)
 
@@ -277,47 +270,81 @@ Confirmed by `govulncheck` — no vulnerable symbols called by project code.
 
 **Fix applied in PR #77:** Updated via `go get golang.org/x/sys@latest && go mod tidy`.
 
-==== SEC-011: Unhandled Error in model.Save Cleanup (Low)
+==== SEC-011: Unhandled Error in model.Save Cleanup (Low) — FIXED
 
-_Added 2026-03-01 — discovered by `gosec` (G104, CWE-703)_
+**Fix verified 2026-03-30:** `loader.go:115` now uses `_ = tmp.Close()` to explicitly discard the error.
 
-**Affected file:** `internal/model/loader.go:40`
+==== SEC-012: Potential Nil Panics from Unchecked GetPage() (Low) — FIXED
 
-[source,go]
-----
-if _, err := tmp.Write(data); err != nil {
-    tmp.Close()          // error return value not checked
-    _ = os.Remove(tmpName)
-    return ...
-}
-----
+**Fix applied in #235:** `requirePage` test helpers and `strings.Cut` refactor. Nil checks added.
 
-**Description:**
-In the error cleanup path of `model.Save`, `tmp.Close()` is called without checking its return value.
-While unlikely to cause data loss (the write already failed), it violates Go error handling best practices.
+==== SEC-015: View Key Path Traversal in Export Filenames (Medium) — NEW
 
-**Recommendation:**
-Use `_ = tmp.Close()` to explicitly discard the error, or log it.
-
-==== SEC-012: Potential Nil Panics from Unchecked GetPage() (Low)
-
-_Added 2026-03-01 — discovered by `nilaway`_
+_Added 2026-03-30_
 
 **Affected files:**
 
-* `internal/drawio/document.go:129` — `Page.diagram` accessed without nil check
-* `internal/model/validate.go:117` — `strings.SplitN` result used without nil check
-* Test files: `sync/forward_scoped_ids_test.go`, `sync/forward_views_test.go`, `sync/forward_test.go`
+* `cmd/bausteinsicht/export_diagram.go:115` — `outPath := filepath.Join(outputDir, key+"."+ext)`
+* `cmd/bausteinsicht/export_table.go:75` — `filename = viewKey + "-elements." + tableFormat`
+* `internal/export/export.go:53-54` — `OutputFileName(viewKey, format)`
 
 **Description:**
-`GetPage()` can return `nil` when a page is not found (`document.go:86`).
-Multiple call sites — both in production code and tests — use the return value without checking for `nil`.
-If a view references a non-existent page, the program would panic with a nil pointer dereference.
+View keys from the JSONC model are used directly in output filenames without sanitization.
+A malicious model file could define a view key containing path separators or `..` sequences:
 
-In test code this is less critical (tests would fail with a clear panic), but in production code paths it should be handled gracefully.
+[source,json]
+----
+{
+  "views": {
+    "../../../tmp/pwned": { "title": "Malicious View" }
+  }
+}
+----
+
+When exported with `--output ./docs`, this would write to `./docs/../../../tmp/pwned.puml`.
+
+**Risk:**
+For a local CLI tool this requires the user to run export on a malicious model file.
+In LLM agent or CI/CD pipelines processing untrusted models, this is exploitable for arbitrary file writes.
 
 **Recommendation:**
-Add nil checks after `GetPage()` calls in production code. In tests, use `t.Fatal` if page is nil.
+Add view key validation in `validateViews()` restricting keys to `^[a-zA-Z0-9_-]+$`, or sanitize using `filepath.Base()` in `OutputFileName()`.
+
+==== SEC-016: No Output Directory Boundary Check (Low) — NEW
+
+_Added 2026-03-30_
+
+**Affected files:**
+
+* `cmd/bausteinsicht/export_diagram.go:34` — `--output` flag
+* `cmd/bausteinsicht/export_table.go:35` — `--output` flag
+* `cmd/bausteinsicht/export.go:42` — `--output` flag
+
+**Description:**
+The `--output` flag accepts arbitrary paths including absolute paths and paths with `..` sequences.
+Combined with SEC-015 (view key traversal), this expands the write surface.
+
+**Risk:**
+Low for direct CLI usage (operator controls their own flags).
+Medium if the CLI is wrapped in automation with untrusted input.
+
+**Recommendation:**
+Document that `--output` is a fully trusted CLI flag. Optionally validate that the path is relative.
+
+==== SEC-017: govulncheck Internal Error (Info) — NEW
+
+_Added 2026-03-30_
+
+**Description:**
+`govulncheck ./...` fails with:
+----
+internal error: package "golang.org/x/sys/unix" without types was imported from "github.com/fsnotify/fsnotify/internal"
+----
+
+This prevents automated vulnerability scanning. Likely a tooling bug with the current `fsnotify` v1.9.0 and govulncheck combination.
+
+**Recommendation:**
+Monitor for govulncheck updates. In the meantime, manually verify dependencies against the OSV database.
 
 === Not Vulnerable
 
@@ -340,7 +367,7 @@ The following attack vectors were explicitly tested and confirmed **not exploita
 | Go's `encoding/json` is not susceptible to unsafe deserialization. No `interface{}` unmarshaling of untrusted data.
 
 | Command Injection
-| No use of `os/exec`, `syscall.Exec`, or shell invocation anywhere in the codebase.
+| `exec.Command` in `export.go` uses `exec.LookPath` for the binary and array-separated arguments — no shell interpretation. `#nosec G204` justified.
 
 | Privilege Escalation
 | No setuid, no capability use, no privileged file paths accessed.
@@ -349,46 +376,25 @@ The following attack vectors were explicitly tested and confirmed **not exploita
 | `go mod verify` passes. All dependency hashes match. No CVEs in `beevik/etree`, `cobra`, or `fsnotify`.
 |===
 
-=== Dependency Status
+=== Dependency Status (verified 2026-03-30)
 
-[cols="2,1,1,1"]
+All dependencies at latest versions. No known CVEs. `go mod verify` — **PASS**.
+
+[cols="2,1,1"]
 |===
-| Module | Version | Latest | CVEs
+| Module | Version | CVEs
 
-| `github.com/beevik/etree`
-| v1.6.0
-| v1.6.0
-| None
-
-| `github.com/spf13/cobra`
-| v1.10.2
-| v1.10.2
-| None
-
-| `github.com/fsnotify/fsnotify`
-| v1.9.0
-| v1.9.0
-| None
-
-| `github.com/spf13/pflag`
-| v1.0.10
-| v1.0.10
-| None
-
-| `golang.org/x/sys`
-| v0.41.0
-| v0.41.0
-| None
-
-| Go stdlib
-| 1.24.0
-| 1.24.x
-| None called by project code
+| `beevik/etree` | v1.6.0 | None
+| `spf13/cobra` | v1.10.2 | None
+| `fsnotify/fsnotify` | v1.9.0 | None
+| `spf13/pflag` | v1.0.10 | None
+| `golang.org/x/sys` | v0.41.0 | None
+| Go stdlib | 1.24.0 | None called
 |===
-
-`go.sum` integrity: **PASS** (`go mod verify` — all modules verified)
 
 === Automated Tool Results
+
+==== Latest run (2026-03-30)
 
 [cols="1,1,1,3"]
 |===
@@ -406,18 +412,23 @@ The following attack vectors were explicitly tested and confirmed **not exploita
 
 | `gosec`
 | latest
-| 7 findings
-| 4× G304 (path traversal, → SEC-001), 2× G306 (file permissions, → SEC-004), 1× G104 (unhandled error, → SEC-011)
+| 0 issues
+| All previous findings resolved or suppressed with justified `#nosec` (8 suppressions audited)
 
 | `nilaway`
 | latest
-| 14 findings
-| Nil panics from unchecked `GetPage()` returns (→ SEC-012), `SplitN` result in `validate.go`
+| PASS
+| No findings (SEC-012 fixes verified)
 
 | `govulncheck`
 | latest
 | Error
-| Internal error on `golang.org/x/sys/unix` import; needs investigation
+| Same internal error persists (→ SEC-017)
+
+| `gitleaks`
+| —
+| Not installed
+| Not available outside devcontainer; no secrets found via manual grep
 
 | `go test -race`
 | go1.24.0
@@ -429,30 +440,8 @@ The following attack vectors were explicitly tested and confirmed **not exploita
 
 ==== Completed
 
-[cols="1,3,1"]
-|===
-| Priority | Action | PR
-
-| High
-| Upgrade Go toolchain from 1.23.0 to 1.24.0 (SEC-009)
-| #77
-
-| High
-| Update `golang.org/x/sys` from v0.13.0 to v0.41.0 (SEC-010)
-| #77
-
-| Medium
-| Fix predictable temp file in `model.Save` (SEC-002)
-| #77
-
-| Medium
-| Fix data race in watcher debounce closure (SEC-003)
-| #77
-
-| —
-| Add Makefile with lint and security tools
-| #78
-|===
+SEC-002 (PR #77), SEC-003 (PR #77), SEC-009 (PR #77), SEC-010 (PR #77), SEC-012 (#235).
+SEC-004, SEC-007, SEC-011 verified fixed 2026-03-30 (see individual findings above).
 
 ==== Remaining Open
 
@@ -464,9 +453,13 @@ The following attack vectors were explicitly tested and confirmed **not exploita
 | SEC-001
 | Document that `--model`/`--template` paths are fully trusted; add path validation if CLI is used in automation
 
-| Low
-| SEC-004
-| Use `0600` instead of `0644` for model files
+| Medium
+| SEC-015
+| Sanitize view keys in export filenames — restrict to `^[a-zA-Z0-9_-]+$` or use `filepath.Base()`
+
+| Medium
+| SEC-014
+| Add checksum verification for Dockerfile script downloads
 
 | Low
 | SEC-005
@@ -477,29 +470,29 @@ The following attack vectors were explicitly tested and confirmed **not exploita
 | Add 10 MB file size limit to `model.Load`
 
 | Low
-| SEC-007
-| Add max depth (100) to recursive `Children` traversal
-
-| Low
 | SEC-008
-| Improve `stripTags` attribute handling
+| Improve `stripTags` attribute handling (backward-compat fallback only)
 
 | Low
-| SEC-011
-| Explicitly discard `tmp.Close()` error in cleanup path
+| SEC-013
+| Improve `sanitizeID` to handle dots/slashes from titles
 
 | Low
-| SEC-012
-| Add nil checks after `GetPage()` calls in production code
+| SEC-016
+| Document that `--output` is a fully trusted CLI flag
+
+| Info
+| SEC-017
+| Monitor for govulncheck fix; manually verify dependencies against OSV database
 |===
 
 === Next Review
 
 The next security review should:
 
-* Verify all remaining open items
-* Re-run `govulncheck` (investigate internal error with `x/sys/unix`)
+* Fix SEC-015 (view key path traversal) — highest priority open finding
+* Address SEC-014 (Dockerfile checksum verification)
+* Re-run `govulncheck` when tooling bug with `fsnotify` v1.9.0 is resolved (SEC-017)
+* Check for new CVEs in dependencies
+* Verify `gitleaks` runs in CI (currently only available in devcontainer)
 * Review any new CLI commands or features added since this review
-* Check for new CVEs in dependencies (especially `beevik/etree` for XML parsing)
-* Re-run full `make check` and compare results
-* If export command (#63) is implemented, review for file write safety and draw.io CLI invocation

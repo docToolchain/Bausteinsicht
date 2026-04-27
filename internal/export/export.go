@@ -51,7 +51,7 @@ func BuildExportArgs(opts ExportOptions) []string {
 	if opts.Scale > 1 {
 		args = append(args, "--scale", fmt.Sprintf("%g", opts.Scale))
 	}
-	args = append(args, opts.InputFile)
+	args = append(args, "--", opts.InputFile)
 	return args
 }
 

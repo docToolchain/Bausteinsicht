@@ -67,7 +67,7 @@ func TestBuildExportArgs(t *testing.T) {
 		"--page-index", "2",
 		"--output", "/tmp/out.png",
 		"--embed-diagram",
-		"arch.drawio",
+		"--", "arch.drawio",
 	}
 	if len(args) != len(expected) {
 		t.Fatalf("expected %d args, got %d: %v", len(expected), len(args), args)
@@ -95,6 +95,9 @@ func TestBuildExportArgs_InputFileIsLastArg(t *testing.T) {
 		})
 		if args[len(args)-1] != "arch.drawio" {
 			t.Errorf("scale=%v: input file must be the last argument, got %q (full args: %v)", scale, args[len(args)-1], args)
+		}
+		if args[len(args)-2] != "--" {
+			t.Errorf("scale=%v: '--' separator must precede input file, got %q (full args: %v)", scale, args[len(args)-2], args)
 		}
 	}
 }
