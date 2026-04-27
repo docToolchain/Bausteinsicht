@@ -47,7 +47,7 @@ bausteinsicht snapshot restore snapshot-001 --output-section asIs
 
 ## Implementation Plan
 
-See [`docs/plans/2026-03-18-versioned-snapshots.md`](../plans/2026-03-18-versioned-snapshots.md)
+See the implementation plan embedded in the GitHub issue.
 
 ## Affected Components
 

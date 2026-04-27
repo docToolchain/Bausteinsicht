@@ -47,7 +47,7 @@ bausteinsicht lint [--format text|json]
 
 ## Implementation Plan
 
-See [`docs/plans/2026-03-18-architecture-constraints-lint.md`](../plans/2026-03-18-architecture-constraints-lint.md)
+See the implementation plan embedded in the GitHub issue.
 
 ## Affected Components
 

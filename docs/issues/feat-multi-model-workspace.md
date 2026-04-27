@@ -50,7 +50,7 @@ bausteinsicht workspace list     [--workspace workspace.jsonc]
 
 ## Implementation Plan
 
-See [`docs/plans/2026-03-18-multi-model-workspace.md`](../plans/2026-03-18-multi-model-workspace.md)
+See the implementation plan embedded in the GitHub issue.
 
 ## Affected Components
 

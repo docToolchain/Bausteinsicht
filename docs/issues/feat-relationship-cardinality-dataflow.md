@@ -40,7 +40,7 @@ Extend the Relationship struct with three optional fields: `cardinality` (1:N), 
 
 ## Implementation Plan
 
-See [`docs/plans/2026-03-18-relationship-cardinality-dataflow.md`](../plans/2026-03-18-relationship-cardinality-dataflow.md)
+See the implementation plan embedded in the GitHub issue.
 
 ## Affected Components
 

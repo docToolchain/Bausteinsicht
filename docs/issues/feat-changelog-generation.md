@@ -46,7 +46,7 @@ bausteinsicht changelog --since "30 days ago"
 
 ## Implementation Plan
 
-See [`docs/plans/2026-03-18-changelog-generation.md`](../plans/2026-03-18-changelog-generation.md)
+See the implementation plan embedded in the GitHub issue.
 
 ## Affected Components
 

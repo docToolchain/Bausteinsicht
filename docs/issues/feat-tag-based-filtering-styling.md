@@ -43,7 +43,7 @@ The `tags` field already exists on elements but has no effect beyond storage. Th
 
 ## Implementation Plan
 
-See [`docs/plans/2026-03-18-tag-based-filtering-styling.md`](../plans/2026-03-18-tag-based-filtering-styling.md)
+See the implementation plan embedded in the GitHub issue.
 
 ## Affected Components
 

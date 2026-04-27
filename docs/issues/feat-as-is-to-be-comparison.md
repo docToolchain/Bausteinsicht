@@ -39,7 +39,7 @@ bausteinsicht diff [--view <key>] [--format text|json]
 
 ## Implementation Plan
 
-See [`docs/plans/2026-03-18-as-is-to-be-comparison.md`](../plans/2026-03-18-as-is-to-be-comparison.md)
+See the implementation plan embedded in the GitHub issue.
 
 ## Affected Components
 

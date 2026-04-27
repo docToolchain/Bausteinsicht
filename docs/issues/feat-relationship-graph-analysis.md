@@ -51,7 +51,7 @@ bausteinsicht analyze [--metric all|centrality|cycles|chains|isolation|fanout] [
 
 ## Implementation Plan
 
-See [`docs/plans/2026-03-18-relationship-graph-analysis.md`](../plans/2026-03-18-relationship-graph-analysis.md)
+See the implementation plan embedded in the GitHub issue.
 
 ## Affected Components
 

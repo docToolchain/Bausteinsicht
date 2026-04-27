@@ -47,7 +47,7 @@ bausteinsicht import --from likec4 <input.c4> [--output architecture.jsonc]
 
 ## Implementation Plan
 
-See [`docs/plans/2026-03-18-import-structurizr-likec4.md`](../plans/2026-03-18-import-structurizr-likec4.md)
+See the implementation plan embedded in the GitHub issue.
 
 ## Affected Components
 

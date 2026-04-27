@@ -48,7 +48,7 @@ legacy-auth  [service]  Last changed: 187 days ago
 
 ## Implementation Plan
 
-See [`docs/plans/2026-03-18-stale-element-detection.md`](../plans/2026-03-18-stale-element-detection.md)
+See the implementation plan embedded in the GitHub issue.
 
 ## Affected Components
 

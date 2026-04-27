@@ -44,7 +44,7 @@ bausteinsicht overlay list metrics.json
 
 ## Implementation Plan
 
-See [`docs/plans/2026-03-18-metric-overlays.md`](../plans/2026-03-18-metric-overlays.md)
+See the implementation plan embedded in the GitHub issue.
 
 ## Affected Components
 

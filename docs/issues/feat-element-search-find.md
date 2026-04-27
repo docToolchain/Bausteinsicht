@@ -52,7 +52,7 @@ ADRs: ADR-012
 
 ## Implementation Plan
 
-See [`docs/plans/2026-03-18-element-search-find.md`](../plans/2026-03-18-element-search-find.md)
+See the implementation plan embedded in the GitHub issue.
 
 ## Affected Components
 

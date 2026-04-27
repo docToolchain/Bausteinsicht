@@ -46,7 +46,7 @@ C4Context
 
 ## Implementation Plan
 
-See [`docs/plans/2026-03-18-mermaid-live-preview-hook.md`](../plans/2026-03-18-mermaid-live-preview-hook.md)
+See the implementation plan embedded in the GitHub issue.
 
 ## Affected Components
 

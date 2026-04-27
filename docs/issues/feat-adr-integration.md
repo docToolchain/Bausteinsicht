@@ -47,7 +47,7 @@ bausteinsicht adr show <adr-id>
 
 ## Implementation Plan
 
-See [`docs/plans/2026-03-18-adr-integration.md`](../plans/2026-03-18-adr-integration.md)
+See the implementation plan embedded in the GitHub issue.
 
 ## Affected Components
 

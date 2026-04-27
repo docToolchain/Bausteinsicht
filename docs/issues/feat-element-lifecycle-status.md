@@ -38,7 +38,7 @@ bausteinsicht status [--filter deployed] [--format text|json]
 
 ## Implementation Plan
 
-See [`docs/plans/2026-03-18-element-lifecycle-status.md`](../plans/2026-03-18-element-lifecycle-status.md)
+See the implementation plan embedded in the GitHub issue.
 
 ## Affected Components
 
