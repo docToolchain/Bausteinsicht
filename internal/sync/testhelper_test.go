@@ -3,7 +3,7 @@ package sync
 import (
 	"testing"
 
-	"github.com/docToolchain/Bauteinsicht/internal/drawio"
+	"github.com/docToolchain/Bausteinsicht/internal/drawio"
 )
 
 // requirePage retrieves a page by view key, failing the test if not found.

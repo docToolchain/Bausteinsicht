@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/docToolchain/Bauteinsicht/internal/drawio"
-	"github.com/docToolchain/Bauteinsicht/internal/model"
+	"github.com/docToolchain/Bausteinsicht/internal/drawio"
+	"github.com/docToolchain/Bausteinsicht/internal/model"
 )
 
 // modelWithRel builds a model with one element and one relationship.

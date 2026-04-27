@@ -10,7 +10,7 @@
                 Maintain your software architecture in a structured JSON model and visualize it in draw.io — with full bidirectional synchronization. No more outdated diagrams.
             </p>
             <p style="margin-top: 1.5rem;">
-                <a href="https://github.com/rdmueller/Bauteinsicht" class="btn btn-light btn-lg" style="font-weight: 600;">
+                <a href="https://github.com/docToolchain/Bausteinsicht" class="btn btn-light btn-lg" style="font-weight: 600;">
                     Get Started
                 </a>
                 <a href="arc42/chapters/01_introduction_and_goals.html" class="btn btn-outline-light btn-lg" style="margin-left: 0.5rem;">
@@ -155,7 +155,7 @@ bausteinsicht validate</code></pre>
         <div class="text-center p-4 rounded" style="background-color: #f0f7ff;">
             <h3 style="color: #1a365d;">Ready to structure your architecture?</h3>
             <p>
-                <a href="https://github.com/rdmueller/Bauteinsicht" class="btn btn-primary btn-lg">View on GitHub</a>
+                <a href="https://github.com/docToolchain/Bausteinsicht" class="btn btn-primary btn-lg">View on GitHub</a>
                 <a href="spec/01_use_cases.html" class="btn btn-outline-secondary btn-lg">Specification</a>
                 <a href="PRD/PRD-001-Bausteinsicht.html" class="btn btn-outline-secondary btn-lg">Product Requirements</a>
             </p>

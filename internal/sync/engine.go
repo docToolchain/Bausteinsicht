@@ -5,8 +5,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/docToolchain/Bauteinsicht/internal/drawio"
-	"github.com/docToolchain/Bauteinsicht/internal/model"
+	"github.com/docToolchain/Bausteinsicht/internal/drawio"
+	"github.com/docToolchain/Bausteinsicht/internal/model"
 )
 
 // SyncResult contains the comprehensive result of a sync cycle.

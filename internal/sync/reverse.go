@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/docToolchain/Bauteinsicht/internal/model"
+	"github.com/docToolchain/Bausteinsicht/internal/model"
 )
 
 // maxReverseDepth limits recursion in modifyInMap/deleteFromMap to prevent stack overflow.

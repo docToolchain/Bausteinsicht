@@ -3,7 +3,7 @@ package drawio_test
 import (
 	"testing"
 
-	"github.com/docToolchain/Bauteinsicht/internal/drawio"
+	"github.com/docToolchain/Bausteinsicht/internal/drawio"
 )
 
 const testStyle = "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;"

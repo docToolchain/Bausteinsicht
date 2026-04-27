@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/docToolchain/Bauteinsicht/internal/diagram"
-	"github.com/docToolchain/Bauteinsicht/internal/model"
+	"github.com/docToolchain/Bausteinsicht/internal/diagram"
+	"github.com/docToolchain/Bausteinsicht/internal/model"
 	"github.com/spf13/cobra"
 )
 

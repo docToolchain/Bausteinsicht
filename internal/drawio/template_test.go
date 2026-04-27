@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/docToolchain/Bauteinsicht/internal/drawio"
+	"github.com/docToolchain/Bausteinsicht/internal/drawio"
 )
 
 const defaultTemplatePath = "../../templates/default.drawio"

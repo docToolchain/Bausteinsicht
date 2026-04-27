@@ -361,7 +361,7 @@ The model file references a JSON Schema for IDE autocompletion and validation:
 [source,jsonc]
 ----
 {
-  "$schema": "https://raw.githubusercontent.com/docToolchain/Bauteinsicht/main/schema/bausteinsicht.schema.json",
+  "$schema": "https://raw.githubusercontent.com/docToolchain/Bausteinsicht/main/schema/bausteinsicht.schema.json",
   ...
 }
 ----

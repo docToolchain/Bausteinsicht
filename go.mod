@@ -1,4 +1,4 @@
-module github.com/docToolchain/Bauteinsicht
+module github.com/docToolchain/Bausteinsicht
 
 go 1.25.8
 

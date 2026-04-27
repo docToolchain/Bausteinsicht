@@ -31,6 +31,9 @@
 
 | 2026-03-30 (full review)
 | Full security review at current main. Verified fixes: SEC-004 (now 0600), SEC-007 (MaxElementDepth=50), SEC-011 (`_ = tmp.Close()`). Added SEC-015 (view key path traversal in export filenames), SEC-016 (no output-dir boundary check), SEC-017 (govulncheck broken). All dependencies current, no new CVEs. gosec/staticcheck/nilaway clean. Re-confirmed XXE not exploitable.
+
+| 2026-04-27 (typo-squatting)
+| Fixed SEC-018: Go module path, `go install` URL in README, and landing page buttons all used misspelled `Bauteinsicht` (missing "s") or wrong GitHub owner (`rdmueller`). Renamed module to `github.com/docToolchain/Bausteinsicht`, corrected all URLs. Also fixed dead link to `CLAUDE.md` in trust model (`../../` → `../../../`).
 |===
 
 === Scope
@@ -145,6 +148,11 @@ The primary risk scenario is a **malicious or crafted model/drawio file** shared
 | Medium
 | Dockerfile downloads and pipes install scripts (golangci-lint, Claude Code, human CLI) without checksum verification
 | Open
+
+| SEC-018
+| Medium
+| Typo-squatting risk: Go module path, README `go install`, and landing page all used misspelled `Bauteinsicht` or wrong owner `rdmueller`
+| Fixed
 |===
 
 === Findings
@@ -345,6 +353,21 @@ This prevents automated vulnerability scanning. Likely a tooling bug with the cu
 
 **Recommendation:**
 Monitor for govulncheck updates. In the meantime, manually verify dependencies against the OSV database.
+
+==== SEC-018: Typo-Squatting in Go Module Path and Documentation (Medium) — Fixed
+
+_Added 2026-04-27_
+
+**Description:**
+The Go module path was registered as `github.com/docToolchain/Bauteinsicht` (missing "s"), which does not match the actual repository name `Bausteinsicht`. The README's `go install` command and the landing page buttons also used misspelled URLs and/or the wrong GitHub owner (`rdmueller` instead of `docToolchain`).
+
+An attacker could register the misspelled path `github.com/docToolchain/Bauteinsicht` and serve a malicious Go module to anyone following the `go install` instructions.
+
+**Risk:**
+Medium. Users copying the `go install` command from the README would fetch from a path that could be claimed by a third party.
+
+**Fix:**
+Renamed the Go module to `github.com/docToolchain/Bausteinsicht` across the entire codebase (go.mod, all imports, schema URLs, documentation). Corrected landing page URLs to `docToolchain/Bausteinsicht`.
 
 === Not Vulnerable
 

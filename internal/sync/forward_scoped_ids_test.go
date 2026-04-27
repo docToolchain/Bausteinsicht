@@ -3,8 +3,8 @@ package sync
 import (
 	"testing"
 
-	"github.com/docToolchain/Bauteinsicht/internal/drawio"
-	"github.com/docToolchain/Bauteinsicht/internal/model"
+	"github.com/docToolchain/Bausteinsicht/internal/drawio"
+	"github.com/docToolchain/Bausteinsicht/internal/model"
 )
 
 // TestApplyForward_ScopedIDs verifies that when an element appears on multiple

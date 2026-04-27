@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/docToolchain/Bauteinsicht/internal/model"
+	"github.com/docToolchain/Bausteinsicht/internal/model"
 )
 
 // Format represents the output format for table export.

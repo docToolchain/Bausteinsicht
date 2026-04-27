@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/docToolchain/Bauteinsicht/templates"
+	"github.com/docToolchain/Bausteinsicht/templates"
 )
 
 func executeValidateCmd(args ...string) (string, error) {

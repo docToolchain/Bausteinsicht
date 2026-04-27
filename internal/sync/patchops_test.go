@@ -3,7 +3,7 @@ package sync
 import (
 	"testing"
 
-	"github.com/docToolchain/Bauteinsicht/internal/model"
+	"github.com/docToolchain/Bausteinsicht/internal/model"
 )
 
 func TestReversePatchOps_ElementModified(t *testing.T) {

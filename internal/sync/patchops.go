@@ -3,7 +3,7 @@ package sync
 import (
 	"strings"
 
-	"github.com/docToolchain/Bauteinsicht/internal/model"
+	"github.com/docToolchain/Bausteinsicht/internal/model"
 )
 
 // ReversePatchOps converts the reverse (draw.io → model) changes in cs into
