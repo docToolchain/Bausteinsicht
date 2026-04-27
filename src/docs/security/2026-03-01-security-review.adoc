@@ -34,6 +34,9 @@
 
 | 2026-04-27 (typo-squatting)
 | Fixed SEC-018: Go module path, `go install` URL in README, and landing page buttons all used misspelled `Bauteinsicht` (missing "s") or wrong GitHub owner (`rdmueller`). Renamed module to `github.com/docToolchain/Bausteinsicht`, corrected all URLs. Also fixed dead link to `CLAUDE.md` in trust model (`../../` → `../../../`).
+
+| 2026-04-27 (govulncheck)
+| Fixed SEC-017: govulncheck v1.1.4 (Go 1.22.2) could not analyze `fsnotify` v1.9.0 internal packages. Updated to v1.3.0 (Go 1.25.9) — scan now passes with 0 vulnerabilities in called code.
 |===
 
 === Scope
@@ -132,7 +135,7 @@ The primary risk scenario is a **malicious or crafted model/drawio file** shared
 | SEC-017
 | Info
 | `govulncheck` fails with internal error on `golang.org/x/sys/unix` import from `fsnotify`
-| Open
+| Fixed (updated to v1.3.0)
 
 | SEC-012
 | Low
@@ -339,20 +342,23 @@ Medium if the CLI is wrapped in automation with untrusted input.
 **Recommendation:**
 Document that `--output` is a fully trusted CLI flag. Optionally validate that the path is relative.
 
-==== SEC-017: govulncheck Internal Error (Info) — NEW
+==== SEC-017: govulncheck Internal Error (Info) — FIXED
 
-_Added 2026-03-30_
+_Added 2026-03-30, fixed 2026-04-27_
 
 **Description:**
-`govulncheck ./...` fails with:
+`govulncheck ./...` failed with:
 ----
 internal error: package "golang.org/x/sys/unix" without types was imported from "github.com/fsnotify/fsnotify/internal"
 ----
 
-This prevents automated vulnerability scanning. Likely a tooling bug with the current `fsnotify` v1.9.0 and govulncheck combination.
+This prevented automated vulnerability scanning.
 
-**Recommendation:**
-Monitor for govulncheck updates. In the meantime, manually verify dependencies against the OSV database.
+**Root cause:**
+govulncheck v1.1.4 (built with Go 1.22.2) was too old to analyze the internal package structure of `fsnotify` v1.9.0. The type analysis engine crashed before reaching the vulnerability scan.
+
+**Fix:**
+Updated govulncheck to v1.3.0 (Go 1.25.9) via `go install golang.org/x/vuln/cmd/govulncheck@latest`. Makefile and Dockerfile already used `@latest` — the issue was a stale local binary. Scan now passes: 0 vulnerabilities in called code.
 
 ==== SEC-018: Typo-Squatting in Go Module Path and Documentation (Medium) — Fixed
 
@@ -444,9 +450,9 @@ All dependencies at latest versions. No known CVEs. `go mod verify` — **PASS**
 | No findings (SEC-012 fixes verified)
 
 | `govulncheck`
-| latest
-| Error
-| Same internal error persists (→ SEC-017)
+| v1.3.0
+| PASS
+| 0 vulnerabilities in called code (SEC-017 fixed)
 
 | `gitleaks`
 | —
@@ -504,9 +510,6 @@ SEC-004, SEC-007, SEC-011 verified fixed 2026-03-30 (see individual findings abo
 | SEC-016
 | Document that `--output` is a fully trusted CLI flag
 
-| Info
-| SEC-017
-| Monitor for govulncheck fix; manually verify dependencies against OSV database
 |===
 
 === Next Review
@@ -515,7 +518,6 @@ The next security review should:
 
 * Fix SEC-015 (view key path traversal) — highest priority open finding
 * Address SEC-014 (Dockerfile checksum verification)
-* Re-run `govulncheck` when tooling bug with `fsnotify` v1.9.0 is resolved (SEC-017)
-* Check for new CVEs in dependencies
+* Check for new CVEs in dependencies (govulncheck now functional — SEC-017 fixed)
 * Verify `gitleaks` runs in CI (currently only available in devcontainer)
 * Review any new CLI commands or features added since this review
