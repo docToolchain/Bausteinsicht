@@ -46,4 +46,4 @@ The trust model assumes the user (or their agent framework) controls filesystem 
 == Related Documents
 
 * link:../security/2026-03-01-security-review.adoc[Security Review]
-* link:../../CLAUDE.md[Project Conventions — Security Report]
+* link:../../../CLAUDE.md[Project Conventions — Security Report]
