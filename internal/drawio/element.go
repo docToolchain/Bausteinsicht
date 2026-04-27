@@ -72,6 +72,16 @@ func (p *Page) CreateElement(data ElementData, style string) error {
 		}
 	}
 
+	// HTML labels require html=1 in the cell style; without it draw.io renders
+	// the raw markup as plain text. This guard covers elements whose kind has no
+	// template entry and therefore receives an empty style fallback.
+	if data.SubCells == nil && !strings.Contains(style, "html=1") {
+		if style != "" && !strings.HasSuffix(style, ";") {
+			style += ";"
+		}
+		style += "html=1;"
+	}
+
 	cell := obj.CreateElement("mxCell")
 	cell.CreateAttr("style", style)
 	cell.CreateAttr("vertex", "1")
@@ -114,10 +124,21 @@ func createSubCells(root *etree.Element, parentCellID string, data ElementData, 
 	}
 
 	// Description sub-cell (only when description is non-empty).
+	// The display value is truncated to avoid visual overflow; the full text
+	// is preserved in the element's tooltip attribute.
 	if sc.Desc != nil && data.Description != "" {
-		createTextSubCell(root, parentCellID+"-desc", parentCellID, data.Description,
+		createTextSubCell(root, parentCellID+"-desc", parentCellID, truncateText(data.Description, 120),
 			sc.Desc, data.Width, data.Height)
 	}
+}
+
+// truncateText shortens s to maxLen runes, appending "…" if truncated.
+func truncateText(s string, maxLen int) string {
+	runes := []rune(s)
+	if len(runes) <= maxLen {
+		return s
+	}
+	return string(runes[:maxLen-1]) + "…"
 }
 
 // createTextSubCell creates a single text mxCell child element.
@@ -129,7 +150,9 @@ func createTextSubCell(root *etree.Element, id, parentID, value string, sub *Sub
 	cell.CreateAttr("value", value)
 	// Make sub-cells transparent to mouse events so clicks pass through
 	// to the parent element. This lets users grab the whole shape at once.
-	style := setStyleFlags(sub.Style, "pointerEvents=0")
+	// overflow=hidden clips text at the fixed sub-cell boundary; the full
+	// content remains accessible via the element's tooltip attribute.
+	style := setStyleFlags(sub.Style, "pointerEvents=0", "overflow=hidden")
 	cell.CreateAttr("style", style)
 	cell.CreateAttr("vertex", "1")
 	cell.CreateAttr("connectable", "0")
@@ -263,12 +286,14 @@ func updateSubCells(root *etree.Element, parentCellID string, cells map[string]*
 	// Update title.
 	if tc, ok := cells["title"]; ok {
 		setAttr(tc, "value", data.Title)
+		ensureSubCellStyle(tc)
 	}
 
 	// Update or add/remove technology cell.
 	if tc, ok := cells["tech"]; ok {
 		if data.Technology != "" {
 			setAttr(tc, "value", "["+data.Technology+"]")
+			ensureSubCellStyle(tc)
 		} else {
 			root.RemoveChild(tc)
 		}
@@ -277,10 +302,21 @@ func updateSubCells(root *etree.Element, parentCellID string, cells map[string]*
 	// Update or add/remove description cell.
 	if dc, ok := cells["desc"]; ok {
 		if data.Description != "" {
-			setAttr(dc, "value", data.Description)
+			setAttr(dc, "value", truncateText(data.Description, 120))
+			ensureSubCellStyle(dc)
 		} else {
 			root.RemoveChild(dc)
 		}
+	}
+}
+
+// ensureSubCellStyle applies required style flags to an existing sub-cell.
+// This migrates older sub-cells that were created before these flags existed.
+func ensureSubCellStyle(cell *etree.Element) {
+	style := cell.SelectAttrValue("style", "")
+	updated := setStyleFlags(style, "pointerEvents=0", "overflow=hidden")
+	if updated != style {
+		setAttr(cell, "style", updated)
 	}
 }
 

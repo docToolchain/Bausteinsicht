@@ -63,8 +63,8 @@ func TestCreateElement(t *testing.T) {
 	if got := cell.SelectAttrValue("parent", ""); got != "1" {
 		t.Errorf("parent: got %q, want %q", got, "1")
 	}
-	if got := cell.SelectAttrValue("style", ""); got != "rounded=1;" {
-		t.Errorf("style: got %q, want %q", got, "rounded=1;")
+	if got := cell.SelectAttrValue("style", ""); got != "rounded=1;html=1;" {
+		t.Errorf("style: got %q, want %q", got, "rounded=1;html=1;")
 	}
 
 	geom := cell.FindElement("mxGeometry")
@@ -552,6 +552,200 @@ func TestFindAllElements_ExcludesSubCells(t *testing.T) {
 	elems := page.FindAllElements()
 	if len(elems) != 1 {
 		t.Errorf("FindAllElements: got %d elements, want 1 (sub-cells should not be returned)", len(elems))
+	}
+}
+
+// TestCreateElementSubCells_OverflowHidden verifies that sub-cells always have
+// overflow=hidden so that long text is clipped at the fixed boundary. (#307)
+func TestCreateElementSubCells_OverflowHidden(t *testing.T) {
+	page := newInternalTestPage(t)
+	data := ElementData{
+		ID:          "svc",
+		Kind:        "container",
+		Title:       "Service",
+		Technology:  "Go",
+		Description: "This is a very long description that would overflow the fixed sub-cell height if not clipped by overflow=hidden.",
+		ParentID:    "1",
+		Width:       240,
+		Height:      150,
+		SubCells:    testSubCellTemplates(),
+	}
+	if err := page.CreateElement(data, "rounded=1;container=1;"); err != nil {
+		t.Fatalf("CreateElement: %v", err)
+	}
+
+	root := page.Root()
+	for _, suffix := range []string{"-title", "-tech", "-desc"} {
+		cell := findCellByID(root, "svc"+suffix)
+		if cell == nil {
+			t.Fatalf("sub-cell %s not found", suffix)
+		}
+		style := cell.SelectAttrValue("style", "")
+		if !strings.Contains(style, "overflow=hidden") {
+			t.Errorf("sub-cell %s: expected overflow=hidden in style, got %q", suffix, style)
+		}
+	}
+}
+
+// TestCreateElementSubCells_DescTruncated verifies that long descriptions are
+// truncated in the sub-cell while the full text remains in the tooltip. (#307)
+func TestCreateElementSubCells_DescTruncated(t *testing.T) {
+	page := newInternalTestPage(t)
+	longDesc := strings.Repeat("a", 200)
+	data := ElementData{
+		ID:          "svc",
+		Kind:        "container",
+		Title:       "Service",
+		Description: longDesc,
+		ParentID:    "1",
+		Width:       240,
+		Height:      150,
+		SubCells:    testSubCellTemplates(),
+	}
+	if err := page.CreateElement(data, "rounded=1;container=1;"); err != nil {
+		t.Fatalf("CreateElement: %v", err)
+	}
+
+	// Tooltip must contain the full description.
+	obj := page.FindElement("svc")
+	if obj == nil {
+		t.Fatal("element not found")
+	}
+	if got := obj.SelectAttrValue("tooltip", ""); got != longDesc {
+		t.Errorf("tooltip: got %d chars, want %d", len([]rune(got)), len([]rune(longDesc)))
+	}
+
+	// Desc sub-cell must be truncated to ≤ 120 runes.
+	root := page.Root()
+	descCell := findCellByID(root, "svc-desc")
+	if descCell == nil {
+		t.Fatal("desc sub-cell not found")
+	}
+	value := descCell.SelectAttrValue("value", "")
+	if len([]rune(value)) > 120 {
+		t.Errorf("desc sub-cell value too long: %d runes (want ≤ 120)", len([]rune(value)))
+	}
+	if !strings.HasSuffix(value, "…") {
+		t.Errorf("expected truncated value to end with '…', got %q", value)
+	}
+}
+
+// TestCreateElement_UnknownKindGetsHtml1 verifies that elements with an unknown kind
+// (which receive an empty style fallback) still have html=1 injected so that draw.io
+// renders the HTML label as rich text instead of raw markup. (#307)
+func TestCreateElement_UnknownKindGetsHtml1(t *testing.T) {
+	page := newInternalTestPage(t)
+	data := ElementData{
+		ID:          "bbcli",
+		Kind:        "client_tool", // kind not in template → empty style fallback
+		Title:       "bbcli",
+		Technology:  "Go / Cobra",
+		Description: "CLI tool",
+		ParentID:    "1",
+	}
+	if err := page.CreateElement(data, ""); err != nil {
+		t.Fatalf("CreateElement: %v", err)
+	}
+
+	obj := page.FindElement("bbcli")
+	if obj == nil {
+		t.Fatal("element not found")
+	}
+	cell := obj.FindElement("mxCell")
+	if cell == nil {
+		t.Fatal("mxCell not found")
+	}
+	style := cell.SelectAttrValue("style", "")
+	if !strings.Contains(style, "html=1") {
+		t.Errorf("expected html=1 in style, got %q", style)
+	}
+}
+
+// TestCreateElement_ExistingHtml1NotDuplicated ensures html=1 is not appended twice
+// when a template already contains it.
+func TestCreateElement_ExistingHtml1NotDuplicated(t *testing.T) {
+	page := newInternalTestPage(t)
+	data := ElementData{
+		ID:    "svc",
+		Kind:  "container",
+		Title: "Service",
+	}
+	if err := page.CreateElement(data, "rounded=1;html=1;"); err != nil {
+		t.Fatalf("CreateElement: %v", err)
+	}
+
+	obj := page.FindElement("svc")
+	if obj == nil {
+		t.Fatal("element not found")
+	}
+	cell := obj.FindElement("mxCell")
+	if cell == nil {
+		t.Fatal("mxCell not found")
+	}
+	style := cell.SelectAttrValue("style", "")
+	count := strings.Count(style, "html=1")
+	if count != 1 {
+		t.Errorf("expected html=1 to appear exactly once, got %d times in style %q", count, style)
+	}
+}
+
+// TestUpdateElementSubCells_OverflowHiddenMigrated verifies that overflow=hidden
+// is applied to existing sub-cells (created before the fix) when they are updated. (#307)
+func TestUpdateElementSubCells_OverflowHiddenMigrated(t *testing.T) {
+	page := newInternalTestPage(t)
+	// Create element with sub-cells; createTextSubCell already sets overflow=hidden.
+	data := ElementData{
+		ID:          "svc",
+		Kind:        "container",
+		Title:       "Old",
+		Technology:  "Go",
+		Description: "Old desc",
+		ParentID:    "1",
+		Width:       240,
+		Height:      150,
+		SubCells:    testSubCellTemplates(),
+	}
+	if err := page.CreateElement(data, "rounded=1;container=1;"); err != nil {
+		t.Fatalf("CreateElement: %v", err)
+	}
+
+	// Manually strip overflow=hidden from the desc sub-cell to simulate an old
+	// draw.io file that was created before the overflow=hidden fix.
+	root := page.Root()
+	descCell := findCellByID(root, "svc-desc")
+	if descCell == nil {
+		t.Fatal("desc sub-cell not found after create")
+	}
+	oldStyle := strings.ReplaceAll(descCell.SelectAttrValue("style", ""), "overflow=hidden;", "")
+	setAttrTest(descCell, "style", oldStyle)
+	if strings.Contains(descCell.SelectAttrValue("style", ""), "overflow=hidden") {
+		t.Fatal("precondition failed: overflow=hidden should be absent after manual removal")
+	}
+
+	// Now update the element — ensureSubCellStyle should re-apply overflow=hidden.
+	page.UpdateElement("svc", ElementData{
+		Title:       "New",
+		Technology:  "Go",
+		Description: "New desc",
+	})
+
+	descCell = findCellByID(root, "svc-desc")
+	if descCell == nil {
+		t.Fatal("desc sub-cell not found after update")
+	}
+	style := descCell.SelectAttrValue("style", "")
+	if !strings.Contains(style, "overflow=hidden") {
+		t.Errorf("expected overflow=hidden in desc style after update, got %q", style)
+	}
+}
+
+// setAttrTest is a test-local helper to set an attribute directly.
+func setAttrTest(el *etree.Element, key, value string) {
+	attr := el.SelectAttr(key)
+	if attr != nil {
+		attr.Value = value
+	} else {
+		el.CreateAttr(key, value)
 	}
 }
 

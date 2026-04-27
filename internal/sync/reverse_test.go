@@ -153,6 +153,28 @@ func TestApplyReverse_AddedElementWarning(t *testing.T) {
 	}
 }
 
+func TestApplyReverse_AddedNestedElementSkipped(t *testing.T) {
+	// When sync state is reset (e.g. .bausteinsicht-sync deleted), all draw.io
+	// elements appear as "Added" from the draw.io side. Nested elements with
+	// dot-path IDs (e.g. "parent.child") must NOT be created as spurious
+	// top-level entries — they already exist in the model hierarchy. (#307)
+	m := modelWithChild("parent", "child")
+	cs := elemChangeSet("parent.child", Added, "", "", "")
+
+	r := ApplyReverse(cs, m)
+
+	// The nested element must NOT be created as a top-level entry.
+	if _, exists := m.Model["parent.child"]; exists {
+		t.Error("should not create a spurious top-level entry for a nested element")
+	}
+	if r.ElementsCreated != 0 {
+		t.Errorf("expected ElementsCreated=0, got %d", r.ElementsCreated)
+	}
+	if len(r.Warnings) == 0 || !strings.Contains(r.Warnings[0], "already exists") {
+		t.Errorf("expected 'already exists' warning, got %v", r.Warnings)
+	}
+}
+
 func TestApplyReverse_ModifyMissingElement(t *testing.T) {
 	m := emptyModel()
 	cs := elemChangeSet("nonexistent", Modified, "title", "", "New")

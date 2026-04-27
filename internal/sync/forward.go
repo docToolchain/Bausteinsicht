@@ -602,8 +602,17 @@ func applyElementAdded(
 	pl *placement,
 	result *ForwardResult,
 ) {
-	// Skip if element already exists on the page (prevents duplicates on sync state reset). (#141)
+	// Skip layout/creation if element already exists on the page (prevents duplicates on sync
+	// state reset, #141). Still update content so model values are applied (e.g. description
+	// truncation kicks in even on existing elements after a state reset).
 	if page.FindElement(id) != nil {
+		if elem, ok := flat[id]; ok {
+			page.UpdateElement(id, drawio.ElementData{
+				Title:       elem.Title,
+				Technology:  elem.Technology,
+				Description: elem.Description,
+			})
+		}
 		return
 	}
 

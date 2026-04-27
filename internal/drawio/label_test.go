@@ -1,6 +1,7 @@
 package drawio
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -70,6 +71,19 @@ func TestGenerateLabel(t *testing.T) {
 				t.Errorf("GenerateLabel(%q, %q, %q)\n  got:  %q\n  want: %q", tt.title, tt.technology, tt.description, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestGenerateLabel_LongDescriptionTruncated(t *testing.T) {
+	// HTML labels live in small fixed-size boxes; descriptions longer than
+	// maxLabelDescLen must be truncated to avoid visual overflow. (#307)
+	long := strings.Repeat("x", maxLabelDescLen+20)
+	got := GenerateLabel("Title", "", long)
+	if strings.Contains(got, long) {
+		t.Error("GenerateLabel should truncate long description in HTML label")
+	}
+	if !strings.Contains(got, "…") {
+		t.Error("GenerateLabel should append ellipsis after truncation")
 	}
 }
 
