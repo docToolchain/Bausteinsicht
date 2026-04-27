@@ -88,6 +88,7 @@ microsite.with {
 
     // is your microsite deployed with a context path?
     contextPath = '/'
+    host = 'https://doctoolchain.org/Bausteinsicht'
     // the folder of a site definition (theme) relative to the docDir+inputPath
     //siteFolder = '../site'
 
@@ -104,19 +105,19 @@ microsite.with {
     //
     // contact eMail
     // example: mailto:bert@example.com
-    footerMail = '##footer-email##'
+    footerMail = '-'
     //
     // twitter account url
-    footerTwitter = '##twitter-url##'
+    footerTwitter = '-'
     //
     // Stackoverflow QA
-    footerSO = '##Stackoverflow-url##'
+    footerSO = '-'
     //
     // Github Repository
-    footerGithub = '##Github-url##'
+    footerGithub = 'https://github.com/docToolchain/Bausteinsicht'
     //
     // Slack Channel
-    footerSlack = '##Slack-url##'
+    footerSlack = '-'
     //
     // Footer Text
     // example: <small class="text-white">built with docToolchain and jBake <br /> theme: docsy</small>
@@ -127,12 +128,12 @@ microsite.with {
     //
     // the url to create an issue in github
     // Example: https://github.com/docToolchain/docToolchain/issues/new
-    issueUrl = '##issue-url##'
+    issueUrl = 'https://github.com/docToolchain/Bausteinsicht/issues/new'
     //
     // the base url for code files in github
     // Example: https://github.com/doctoolchain/doctoolchain/edit/master/src/docs
     branch = System.getenv("DTC_PROJECT_BRANCH")?:'-'
-    gitRepoUrl = '##git-repo-url##'
+    gitRepoUrl = 'https://github.com/docToolchain/Bausteinsicht/edit/main/src/docs'
 
     //
     // the location of the landing page
