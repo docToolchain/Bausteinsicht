@@ -4,18 +4,29 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
-func TestDetectDrawioBinary_FindsDrawioExport(t *testing.T) {
-	// Create a fake drawio-export in a temp dir.
-	dir := t.TempDir()
-	fakeBin := filepath.Join(dir, "drawio-export")
-	if err := os.WriteFile(fakeBin, []byte("#!/bin/sh\n"), 0755); err != nil {
+// fakeBinary creates a minimal executable in dir with the given base name,
+// adding .exe on Windows so exec.LookPath can find it.
+func fakeBinary(t *testing.T, dir, name string) string {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
+	path := filepath.Join(dir, name)
+	if err := os.WriteFile(path, []byte("#!/bin/sh\n"), 0755); err != nil {
 		t.Fatal(err)
 	}
+	return path
+}
+
+func TestDetectDrawioBinary_FindsDrawioExport(t *testing.T) {
+	dir := t.TempDir()
+	fakeBin := fakeBinary(t, dir, "drawio-export")
 	origPath := os.Getenv("PATH")
-	t.Setenv("PATH", dir+":"+origPath)
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+origPath)
 
 	bin, err := DetectDrawioBinary()
 	if err != nil {
@@ -28,10 +39,7 @@ func TestDetectDrawioBinary_FindsDrawioExport(t *testing.T) {
 
 func TestDetectDrawioBinary_FallsBackToDrawio(t *testing.T) {
 	dir := t.TempDir()
-	fakeBin := filepath.Join(dir, "drawio")
-	if err := os.WriteFile(fakeBin, []byte("#!/bin/sh\n"), 0755); err != nil {
-		t.Fatal(err)
-	}
+	fakeBin := fakeBinary(t, dir, "drawio")
 	// Set PATH to only the temp dir so drawio-export is NOT found.
 	t.Setenv("PATH", dir)
 
@@ -46,6 +54,10 @@ func TestDetectDrawioBinary_FallsBackToDrawio(t *testing.T) {
 
 func TestDetectDrawioBinary_ErrorWhenNotFound(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
+	// Override platform paths so filesystem installs don't interfere.
+	old := platformPaths
+	platformPaths = func() []string { return nil }
+	t.Cleanup(func() { platformPaths = old })
 	_, err := DetectDrawioBinary()
 	if err == nil {
 		t.Error("expected error when no draw.io binary found")

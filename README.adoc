@@ -92,6 +92,20 @@ cd Bausteinsicht
 make build
 ----
 
+Cross-compilation for any platform works out of the box — no extra tooling needed:
+
+[source,bash]
+----
+make build_linux_amd64      # → dist/bausteinsicht_linux_amd64/bausteinsicht
+make build_linux_arm64      # → dist/bausteinsicht_linux_arm64/bausteinsicht
+make build_darwin_amd64     # → dist/bausteinsicht_darwin_amd64/bausteinsicht
+make build_darwin_arm64     # → dist/bausteinsicht_darwin_arm64/bausteinsicht
+make build_windows_amd64    # → dist/bausteinsicht_windows_amd64/bausteinsicht.exe
+make build_windows_arm64    # → dist/bausteinsicht_windows_arm64/bausteinsicht.exe
+
+make build_all              # build all platforms at once
+----
+
 == Quick Start
 
 [source,bash]
@@ -130,6 +144,7 @@ See the link:src/docs/spec/06_tutorial.adoc[Getting Started Tutorial] for a step
 * **Relationship lifting** — connectors auto-lift to parent when endpoint is not on a view
 * **CLI-first** — all commands support `--format json` for LLM/AI agent workflows
 * **JSON Schema** — IDE autocompletion without plugins
+* **Cross-platform** — native binaries for Linux, macOS, and Windows (amd64 + arm64)
 
 == Development
 
