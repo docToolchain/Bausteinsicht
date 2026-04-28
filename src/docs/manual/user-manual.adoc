@@ -388,6 +388,23 @@ This is intentional. New elements are marked with a red dashed border (`strokeCo
 
 When both the model and draw.io change the same field between syncs, Bausteinsicht reports a conflict. Resolve by choosing one version and running sync again.
 
+==== Image export on Windows
+
+The `bausteinsicht export` command uses the draw.io Desktop CLI (Electron app) to render images.
+On Windows, install draw.io from https://www.drawio.com/ and Bausteinsicht detects it automatically.
+
+Bausteinsicht checks the following locations in order:
+
+1. `drawio-export` on PATH (not available on native Windows — devcontainer wrapper only)
+2. `drawio` on PATH (if added manually)
+3. `%LOCALAPPDATA%\Programs\draw.io\draw.io.exe` — standard per-user install via the official installer
+4. `%PROGRAMFILES%\draw.io\draw.io.exe` — system-wide install
+5. `%PROGRAMFILES(X86)%\draw.io\draw.io.exe` — 32-bit system-wide install
+
+No additional configuration is required on native Windows — xvfb, D-Bus, and `--no-sandbox` are Linux/container-only concerns.
+
+NOTE: If you run Bausteinsicht inside **WSL2**, treat it as a Linux environment: xvfb, D-Bus, and `--no-sandbox` apply as described below.
+
 ==== PNG/SVG export fails in headless or container environments
 
 The `bausteinsicht export` command uses the draw.io Desktop CLI (Electron app) to render images.
