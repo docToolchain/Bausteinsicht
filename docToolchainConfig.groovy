@@ -184,13 +184,9 @@ Needs `python3` and `docutils` installed.
 
 //*****************************************************************************************
 
-// Kroki.io for rendering PlantUML and Mermaid diagrams server-side (via jBake/asciidoctor-diagram)
+// PlantUML diagrams rendered locally via asciidoctor-diagram (no external server)
 jbake = [:]
-jbake.asciidoctorAttributes = [
-    'diagram-server-url=https://kroki.io/',
-    'diagram-server-type=kroki_io',
-    'kroki-server-url=https://kroki.io/',
-]
+jbake.asciidoctorAttributes = []
 
 //*****************************************************************************************
 
