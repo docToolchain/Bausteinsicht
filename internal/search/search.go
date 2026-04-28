@@ -53,12 +53,8 @@ func Run(query string, m *model.BausteinsichtModel, opts Options) Response {
 	}
 
 	if opts.Type == "" || opts.Type == ResultRelationship {
-		for i, rel := range m.Relationships {
+		for _, rel := range m.Relationships {
 			id := rel.From + "->" + rel.To
-			if i < len(m.Relationships) {
-				// Use index-based stable ID to allow multiple rels between same pair.
-				_ = i
-			}
 			score, matched := scoreRelationship(id, rel.Label, rel.Kind, titleOf(rel.From), titleOf(rel.To), words)
 			if score == 0 {
 				continue
