@@ -46,6 +46,10 @@ func TestDetectDrawioBinary_FallsBackToDrawio(t *testing.T) {
 
 func TestDetectDrawioBinary_ErrorWhenNotFound(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
+	// Override platform paths so filesystem installs don't interfere.
+	old := platformPaths
+	platformPaths = func() []string { return nil }
+	t.Cleanup(func() { platformPaths = old })
 	_, err := DetectDrawioBinary()
 	if err == nil {
 		t.Error("expected error when no draw.io binary found")

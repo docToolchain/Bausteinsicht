@@ -21,13 +21,24 @@ type ExportOptions struct {
 	Scale        float64 // export scale factor (0 = default, e.g. 2.0 for retina)
 }
 
-// DetectDrawioBinary finds the draw.io CLI binary. It checks for
-// "drawio-export" first (devcontainer wrapper with xvfb), then "drawio".
+// platformPaths is a function variable so tests can override it.
+var platformPaths = platformDrawioPaths
+
+// DetectDrawioBinary finds the draw.io CLI binary.
+// Search order:
+//  1. "drawio-export" — devcontainer wrapper (Linux, adds xvfb + --no-sandbox)
+//  2. "drawio" — on PATH (Linux package install)
+//  3. Platform-native install paths (Windows, macOS) via platformPaths()
 func DetectDrawioBinary() (string, error) {
 	for _, name := range []string{"drawio-export", "drawio"} {
 		path, err := exec.LookPath(name)
 		if err == nil {
 			return path, nil
+		}
+	}
+	for _, candidate := range platformPaths() {
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate, nil
 		}
 	}
 	return "", fmt.Errorf("draw.io CLI not found; install from https://www.drawio.com/")
