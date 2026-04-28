@@ -125,7 +125,7 @@ func printShowJSON(cmd *cobra.Command, id string, elem *model.Element, rels []sh
 		out.Views = []string{}
 	}
 	for _, r := range rels {
-		out.Rels = append(out.Rels, showRelJSON{r.Direction, r.Other, r.Label, r.Kind})
+		out.Rels = append(out.Rels, showRelJSON(r))
 	}
 	data, err := json.MarshalIndent(out, "", "  ")
 	if err != nil {
