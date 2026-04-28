@@ -249,6 +249,39 @@
     }
   ],
 
+  // Dynamic Views: sequence diagrams describing runtime behaviour
+  // Export with: bausteinsicht export-sequence
+  "dynamicViews": [
+    {
+      "key": "checkout-flow",
+      "title": "Checkout Flow",
+      "description": "Customer places an order via the mobile app",
+      "steps": [
+        { "index": 1, "from": "customer",                     "to": "onlineshop.mobile-app",   "label": "tap 'Place Order'",     "type": "sync" },
+        { "index": 2, "from": "onlineshop.mobile-app",        "to": "onlineshop.api",          "label": "POST /orders",           "type": "sync" },
+        { "index": 3, "from": "onlineshop.api.orders",        "to": "payment-provider",        "label": "charge(amount)",         "type": "sync" },
+        { "index": 4, "from": "payment-provider",             "to": "onlineshop.api.orders",   "label": "chargeResult",           "type": "return" },
+        { "index": 5, "from": "onlineshop.api.orders",        "to": "onlineshop.db",           "label": "persist order",          "type": "sync" },
+        { "index": 6, "from": "onlineshop.api.orders",        "to": "onlineshop.message-queue","label": "OrderPlaced event",      "type": "async" },
+        { "index": 7, "from": "onlineshop.api",               "to": "onlineshop.mobile-app",   "label": "201 Created + orderId",  "type": "return" }
+      ]
+    },
+    {
+      "key": "catalog-browse",
+      "title": "Catalog Browse",
+      "description": "Customer browses the product catalog (cache-first)",
+      "steps": [
+        { "index": 1, "from": "customer",               "to": "onlineshop.frontend",    "label": "GET /products",         "type": "sync" },
+        { "index": 2, "from": "onlineshop.frontend",    "to": "onlineshop.api",         "label": "GET /api/products",     "type": "sync" },
+        { "index": 3, "from": "onlineshop.api.catalog", "to": "onlineshop.cache",       "label": "cache lookup",          "type": "sync" },
+        { "index": 4, "from": "onlineshop.cache",       "to": "onlineshop.api.catalog", "label": "cache miss",            "type": "return" },
+        { "index": 5, "from": "onlineshop.api.catalog", "to": "onlineshop.db",          "label": "query products",        "type": "sync" },
+        { "index": 6, "from": "onlineshop.db",          "to": "onlineshop.api.catalog", "label": "product list",          "type": "return" },
+        { "index": 7, "from": "onlineshop.api",         "to": "onlineshop.frontend",    "label": "product list JSON",     "type": "return" }
+      ]
+    }
+  ],
+
   // Views: each view becomes a page in the draw.io diagram
   "views": {
     "context": {
