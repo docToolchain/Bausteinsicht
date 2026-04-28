@@ -208,4 +208,8 @@ If you are evaluating alternatives or want to understand the landscape, these pr
 * https://isoflow.io/[Isoflow] — a visual-first architecture diagramming tool with an isometric rendering style. Focused on the visual editing experience rather than text-based modeling.
 * https://github.com/SlavaVedernikov/C4InterFlow[C4InterFlow] — extends the C4 model with interface and flow concepts for documenting system interactions at a more granular level.
 
-Bausteinsicht's unique contribution is **bidirectional synchronization** between a text model (JSONC) and draw.io diagrams — edits in either direction are merged. See link:src/docs/arc42/ADRs/ADR-001-DSL-Format.adoc[ADR-001] for a d
+Bausteinsicht's unique contribution is **bidirectional synchronization** between a text model (JSONC) and draw.io diagrams — edits in either direction are merged. See link:src/docs/arc42/ADRs/ADR-001-DSL-Format.adoc[ADR-001] for a detailed comparison of DSL formats.
+
+== License
+
+See link:LICENSE[LICENSE].
