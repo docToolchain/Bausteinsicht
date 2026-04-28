@@ -92,6 +92,20 @@ cd Bausteinsicht
 make build
 ----
 
+Cross-compilation for any platform works out of the box — no extra tooling needed:
+
+[source,bash]
+----
+make build_linux_amd64      # → dist/bausteinsicht_linux_amd64/bausteinsicht
+make build_linux_arm64      # → dist/bausteinsicht_linux_arm64/bausteinsicht
+make build_darwin_amd64     # → dist/bausteinsicht_darwin_amd64/bausteinsicht
+make build_darwin_arm64     # → dist/bausteinsicht_darwin_arm64/bausteinsicht
+make build_windows_amd64    # → dist/bausteinsicht_windows_amd64/bausteinsicht.exe
+make build_windows_arm64    # → dist/bausteinsicht_windows_arm64/bausteinsicht.exe
+
+make build_all              # build all platforms at once
+----
+
 == Quick Start
 
 [source,bash]
@@ -130,6 +144,7 @@ See the link:src/docs/spec/06_tutorial.adoc[Getting Started Tutorial] for a step
 * **Relationship lifting** — connectors auto-lift to parent when endpoint is not on a view
 * **CLI-first** — all commands support `--format json` for LLM/AI agent workflows
 * **JSON Schema** — IDE autocompletion without plugins
+* **Cross-platform** — native binaries for Linux, macOS, and Windows (amd64 + arm64)
 
 == Development
 
@@ -193,8 +208,4 @@ If you are evaluating alternatives or want to understand the landscape, these pr
 * https://isoflow.io/[Isoflow] — a visual-first architecture diagramming tool with an isometric rendering style. Focused on the visual editing experience rather than text-based modeling.
 * https://github.com/SlavaVedernikov/C4InterFlow[C4InterFlow] — extends the C4 model with interface and flow concepts for documenting system interactions at a more granular level.
 
-Bausteinsicht's unique contribution is **bidirectional synchronization** between a text model (JSONC) and draw.io diagrams — edits in either direction are merged. See link:src/docs/arc42/ADRs/ADR-001-DSL-Format.adoc[ADR-001] for a detailed comparison of DSL formats.
-
-== License
-
-See link:LICENSE[LICENSE].
+Bausteinsicht's unique contribution is **bidirectional synchronization** between a text model (JSONC) and draw.io diagrams — edits in either direction are merged. See link:src/docs/arc42/ADRs/ADR-001-DSL-Format.adoc[ADR-001] for a d
