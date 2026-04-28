@@ -2,6 +2,60 @@
 
 > Architecture-as-code tool with draw.io as visual frontend and bidirectional synchronization.
 > Define your architecture in a JSONC text file; Bausteinsicht generates and syncs draw.io diagrams in both directions.
+> Single Go binary, no runtime dependencies, LLM-friendly CLI.
+
+## Core Concepts
+
+**Model** — architecture is defined in a JSONC file as a tree of named elements. Each element has a `kind` (user-defined, e.g. `actor`, `system`, `container`), a `title`, optional `technology`, and optional `children`. Element IDs are dot-separated paths (`onlineshop.api`).
+
+**Views** — a view selects which elements to render in a diagram page. Each view has an `include` list (element IDs or glob patterns like `onlineshop.*`) and an optional `scope` that draws a bounding box around a parent element.
+
+**Sync** — `bausteinsicht sync` is a pure diff-and-apply operation: it compares the JSONC model and the draw.io XML against a stored state file (`.bausteinsicht-sync`), then applies changes in both directions. The model always wins on conflict.
+
+**Specification** — the `specification` block in the JSONC file defines which element kinds and relationship types exist, and maps them to draw.io template shapes.
+
+## Minimal Example
+
+```jsonc
+{
+  "specification": {
+    "elements": {
+      "actor":  { "notation": "Actor" },
+      "system": { "notation": "Software System", "container": true }
+    },
+    "relationships": {
+      "uses": { "notation": "uses" }
+    }
+  },
+  "model": {
+    "customer": { "kind": "actor", "title": "Customer" },
+    "shop": {
+      "kind": "system", "title": "Online Shop",
+      "children": {
+        "api": { "kind": "container", "title": "REST API", "technology": "Go" }
+      }
+    }
+  },
+  "relationships": [
+    { "from": "customer", "to": "shop", "kind": "uses" }
+  ],
+  "views": {
+    "context": { "title": "System Context", "include": ["customer", "shop"] }
+  }
+}
+```
+
+## CLI Quick Reference
+
+```bash
+bausteinsicht init              # scaffold architecture.jsonc + template in current dir
+bausteinsicht sync              # sync model ↔ draw.io (bidirectional)
+bausteinsicht watch             # continuous sync on file save
+bausteinsicht validate          # validate model against JSON Schema
+bausteinsicht export png        # export diagram pages to PNG via headless draw.io
+bausteinsicht export table      # export element list as CSV or Markdown
+bausteinsicht --format json … # machine-readable JSON output for any command (LLM use)
+```
 
 ## Getting Started
 
