@@ -1,3 +1,9 @@
+:jbake-title: Trust Model
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: Specification
+:jbake-order: 7
+
 = Trust Model
 
 == Overview
