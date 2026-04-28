@@ -1,0 +1,23 @@
+# Bausteinsicht
+
+> Architecture-as-code tool with draw.io as visual frontend and bidirectional synchronization.
+> Define your architecture in a JSONC text file; Bausteinsicht generates and syncs draw.io diagrams in both directions.
+
+## Getting Started
+
+- [Getting Started Tutorial](https://doctoolchain.github.io/Bausteinsicht/spec/06_tutorial.html): Step-by-step walkthrough from `bausteinsicht init` to a working diagram
+- [User Manual](https://doctoolchain.github.io/Bausteinsicht/manual/user-manual.html): Full CLI reference, watch mode, multi-view navigation, LLM workflows
+
+## Reference
+
+- [CLI Specification](https://doctoolchain.github.io/Bausteinsicht/spec/02_cli_specification.html): All commands, flags, and exit codes
+- [Data Models](https://doctoolchain.github.io/Bausteinsicht/spec/03_data_models.html): JSONC model schema — elements, relationships, views, specifications
+- [Sync Specification](https://doctoolchain.github.io/Bausteinsicht/spec/05_sync_specification.html): How bidirectional sync works, conflict resolution, state file format
+
+## Security & Trust
+
+- [Trust Model](https://doctoolchain.github.io/Bausteinsicht/spec/07_trust_model.html): Trust boundaries, threat assessment, what Bausteinsicht does and does not do
+
+## Source
+
+- [GitHub Repository](https://github.com/docToolchain/Bausteinsicht): Source code, issues, releases
