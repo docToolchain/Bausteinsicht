@@ -39,6 +39,7 @@ func ValidateWithWarnings(m *BausteinsichtModel) ValidationResult {
 	result.Errors = append(result.Errors, validateElements(m)...)
 	result.Errors = append(result.Errors, validateRelationships(m)...)
 	result.Errors = append(result.Errors, validateViews(m)...)
+	result.Errors = append(result.Errors, validateDynamicViews(m)...)
 	result.Warnings = append(result.Warnings, validateEmptyModel(m)...)
 	return result
 }
@@ -213,6 +214,60 @@ func validateViews(m *BausteinsichtModel) []ValidationError {
 					Message: fmt.Sprintf("element %q does not exist", entry),
 				})
 			}
+		}
+	}
+	return errs
+}
+
+var validStepTypes = map[StepType]bool{
+	StepSync:   true,
+	StepAsync:  true,
+	StepReturn: true,
+	"":         true, // omitted → default sync
+}
+
+func validateDynamicViews(m *BausteinsichtModel) []ValidationError {
+	var errs []ValidationError
+	for vi, dv := range m.DynamicViews {
+		path := fmt.Sprintf("dynamicViews[%d]", vi)
+		if dv.Key == "" {
+			errs = append(errs, ValidationError{Path: path, Message: "missing required field \"key\""})
+		}
+		if dv.Title == "" {
+			errs = append(errs, ValidationError{Path: path, Message: "missing required field \"title\""})
+		}
+		if len(dv.Steps) == 0 {
+			errs = append(errs, ValidationError{Path: path, Message: "dynamic view must have at least one step"})
+			continue
+		}
+		seenIndex := make(map[int]bool)
+		for si, step := range dv.Steps {
+			spath := fmt.Sprintf("%s.steps[%d]", path, si)
+			if _, err := lookupElement(m, step.From); err != nil {
+				errs = append(errs, ValidationError{
+					Path:    spath,
+					Message: fmt.Sprintf("from %q does not resolve to an existing element", step.From),
+				})
+			}
+			if _, err := lookupElement(m, step.To); err != nil {
+				errs = append(errs, ValidationError{
+					Path:    spath,
+					Message: fmt.Sprintf("to %q does not resolve to an existing element", step.To),
+				})
+			}
+			if !validStepTypes[step.Type] {
+				errs = append(errs, ValidationError{
+					Path:    spath,
+					Message: fmt.Sprintf("invalid type %q (must be \"sync\", \"async\", or \"return\")", step.Type),
+				})
+			}
+			if seenIndex[step.Index] {
+				errs = append(errs, ValidationError{
+					Path:    spath,
+					Message: fmt.Sprintf("duplicate step index %d", step.Index),
+				})
+			}
+			seenIndex[step.Index] = true
 		}
 	}
 	return errs

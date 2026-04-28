@@ -16,10 +16,37 @@ type BausteinsichtModel struct {
 	Model         map[string]Element `json:"model"`
 	Relationships []Relationship     `json:"relationships"`
 	Views         map[string]View    `json:"views"`
+	DynamicViews  []DynamicView      `json:"dynamicViews,omitempty"`
 
 	// ElementOrder stores the definition order of element kinds from
 	// specification.elements. Used by the layout engine for layer assignment.
 	ElementOrder []string `json:"-"`
+}
+
+// StepType describes how a sequence step arrow is rendered.
+type StepType string
+
+const (
+	StepSync   StepType = "sync"
+	StepAsync  StepType = "async"
+	StepReturn StepType = "return"
+)
+
+// SequenceStep is one message/call in a dynamic view.
+type SequenceStep struct {
+	Index int      `json:"index"`
+	From  string   `json:"from"`
+	To    string   `json:"to"`
+	Label string   `json:"label"`
+	Type  StepType `json:"type,omitempty"`
+}
+
+// DynamicView describes a sequence of interactions between elements.
+type DynamicView struct {
+	Key         string         `json:"key"`
+	Title       string         `json:"title"`
+	Description string         `json:"description,omitempty"`
+	Steps       []SequenceStep `json:"steps"`
 }
 
 type Specification struct {
