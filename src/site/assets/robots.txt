@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://doctoolchain.github.io/Bausteinsicht/sitemap.xml
+
+# LLM instructions: /llms.txt
