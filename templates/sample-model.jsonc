@@ -282,6 +282,29 @@
     }
   ],
 
+  // Constraints: architectural rules enforced by `bausteinsicht lint`
+  "constraints": [
+    {
+      "id":          "C01",
+      "description": "External actors must not access internal containers directly",
+      "rule":        "no-relationship",
+      "from-kind":   "person",
+      "to-kind":     "container"
+    },
+    {
+      "id":           "C02",
+      "description":  "All containers must declare their technology",
+      "rule":         "required-field",
+      "element-kind": "container",
+      "field":        "technology"
+    },
+    {
+      "id":          "C03",
+      "description": "No circular dependencies allowed",
+      "rule":        "no-circular-dependency"
+    }
+  ],
+
   // Views: each view becomes a page in the draw.io diagram
   "views": {
     "context": {
