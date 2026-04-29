@@ -17,6 +17,7 @@ type BausteinsichtModel struct {
 	Relationships []Relationship     `json:"relationships"`
 	Views         map[string]View    `json:"views"`
 	DynamicViews  []DynamicView      `json:"dynamicViews,omitempty"`
+	Constraints   []Constraint       `json:"constraints,omitempty"`
 
 	// ElementOrder stores the definition order of element kinds from
 	// specification.elements. Used by the layout engine for layer assignment.
@@ -47,6 +48,28 @@ type DynamicView struct {
 	Title       string         `json:"title"`
 	Description string         `json:"description,omitempty"`
 	Steps       []SequenceStep `json:"steps"`
+}
+
+// Constraint defines an architectural rule that can be enforced via `bausteinsicht lint`.
+type Constraint struct {
+	ID          string `json:"id"`
+	Description string `json:"description"`
+	Rule        string `json:"rule"`
+
+	// no-relationship / allowed-relationship
+	FromKind  string   `json:"from-kind,omitempty"`
+	ToKind    string   `json:"to-kind,omitempty"`
+	FromKinds []string `json:"from-kinds,omitempty"`
+
+	// required-field
+	ElementKind string `json:"element-kind,omitempty"`
+	Field       string `json:"field,omitempty"`
+
+	// max-depth
+	Max int `json:"max,omitempty"`
+
+	// technology-allowed
+	Technologies []string `json:"technologies,omitempty"`
 }
 
 type Specification struct {
