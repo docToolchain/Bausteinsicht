@@ -1,0 +1,95 @@
+= PRD-001 — Bausteinsicht
+:toc: left
+
+NOTE: Every claim in this PRD is annotated with the question ID from
+`QUESTION_TREE.adoc` that supports it. Items that depend on
+`[OPEN]` leaves are marked `[OPEN]`.
+
+== Problem
+
+A team that practices architecture-as-code wants the rigour of a text
+source of truth (reviewable in pull requests, diffable, scriptable)
+*and* the editing comfort of a visual diagram tool. Existing tools
+generally pick one side: a text DSL with read-only rendering
+(Structurizr, LikeC4) or a visual editor with no text round-trip
+(Isoflow, draw.io itself). Bausteinsicht lets both authoring modes
+coexist by treating the text model and the draw.io diagram as two
+projections of the same architecture, kept in sync. _(Q-1.2;
+motivation framing — Q-1.1.2 is `[OPEN]`.)_
+
+== Users and JTBD
+
+Three user roles are visible in the code surface:
+
+* **Architect / engineer** — primary author of the JSONC model and
+  the draw.io diagram. _(Q-1.1.1)_
+* **LLM / AI agent** — drives the CLI through `--format json` to
+  inspect, mutate, and export the model. _(Q-1.1.1)_
+* **Documentation reader** — recipient of `export`, `export-table`,
+  and `export-diagram` outputs. _(Q-1.1.1)_
+
+Jobs-to-be-Done (each realised by one or more commands): _(Q-1.2)_
+
+. Define architecture in text, get diagrams automatically — `bausteinsicht sync` (forward).
+. Edit diagrams visually, keep the model in sync — `bausteinsicht sync` (reverse).
+. Navigate multi-level views like a map — drill-down links plus a back-navigation button on detail pages.
+. Let AI agents modify the architecture — `--format json` on every command.
+
+== Product principles (inferred from code)
+
+* **One source of truth, two editable surfaces.** The model is the
+  authoritative side: on a head-on conflict, the model wins.
+  _(Q-3.4.1, Q-3.6.3)_
+* **Local-first, no network.** Bausteinsicht is a CLI that reads/writes
+  files on disk; the only outbound process call is to the *local*
+  draw.io CLI for image export. _(Q-3.3.1, Q-4.7.1)_
+* **LLM-friendly by construction.** Every command can return JSON;
+  errors and summaries are machine-parseable. _(Q-2.1.2, Q-4.4.1)_
+* **Deterministic and pure sync core.** `sync.Run` is a pure function
+  on `(model, doc, lastState, templates)` — easy to unit-test, no
+  hidden side-effects. _(Q-3.4.1)_
+
+== In scope (v1)
+
+* JSONC model file with a user-defined element-kind specification.
+* Bidirectional sync between model and draw.io with three-way diff
+  against a `.bausteinsicht-sync` state file. _(Q-3.6.1)_
+* Watch mode (debounced fsnotify, default 300 ms). _(Q-2.1.8)_
+* Validation (`validate`) with both errors and warnings.
+  _(Q-2.3.4)_
+* CLI mutators: `add element`, `add relationship`, both
+  comment-preserving. _(Q-2.3.5, Q-2.3.6)_
+* Image export (PNG/SVG) via the local draw.io CLI. _(Q-2.3.7)_
+* Text export: AsciiDoc/Markdown/JSON tables and PlantUML/Mermaid C4
+  diagrams. _(Q-2.3.8, Q-2.3.9)_
+
+== Out of scope (v1)
+
+* Network-based features (no remote model registry, no sharing service).
+  _(Q-3.3.1)_
+* Conflict resolution strategies beyond *model wins*. The interface
+  exists; only one resolver ships. _(Q-5.2.1)_
+
+== Quality attributes the design optimises for
+
+* Cross-platform single static binary (`CGO_ENABLED=0`, six target
+  matrices). _(Q-3.7.1)_
+* Robustness on partial/atomic writes (temp + rename, checksum on
+  state, BOM-tolerant JSONC stripper). _(Q-3.8.2, Q-3.8.3, Q-5.3.1)_
+* Reviewable code base (`make check` aggregates `go vet`, staticcheck,
+  gosec, nilaway, govulncheck, race-tested unit tests). _(Q-4.6.2)_
+
+Priorities between these attributes are `[OPEN]` _(Q-3.1.2)_.
+
+== Risks
+
+. *Documentation drift*: README references several `.adoc` documents
+  that do not exist in the repository (tutorial, sync spec, CLI spec,
+  trust model, ADR-001, security review). _(Q-5.1.1)_
+. *Missing JSON Schema*: the schema URL referenced from the sample
+  model and `CONTRIBUTING.md` does not exist in the repo. IDE
+  autocomplete will not work without it. _(Q-5.4.1)_
+. *Headless export with `--scale > 1`*: silently fails on containers
+  without GPU; mitigated only when scale is exactly `1`. _(Q-5.5.2)_
+. *State-file deletion*: removing `.bausteinsicht-sync` resets the
+  diff, allowing destructive next-sync behaviour. _(Q-5.5.1)_

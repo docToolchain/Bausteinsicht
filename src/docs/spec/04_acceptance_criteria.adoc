@@ -1,0 +1,78 @@
+= Acceptance Criteria
+:toc: left
+
+These criteria are derived from validation rules, sync invariants,
+and code-level guards present in the repository. Each cites the
+question-tree leaf that supports it.
+
+== Validation rules _(Q-2.3.4)_
+
+. `kind` is required and must exist in `specification.elements`.
+. `title` is required.
+. `children` only on container kinds.
+. Element nesting depth ≤ 50.
+. `relationships[].from`/`to` must resolve.
+. `relationships[].kind` must exist in `specification.relationships`
+  if set.
+. Fully duplicate relationships (from+to+kind+label) are an error.
+. Multiple relationships between the same pair are allowed if they
+  differ in `kind` or `label`.
+. View `title` is required.
+. View `layout` ∈ { "", "layered", "grid", "none" }.
+. View `scope` must resolve.
+. View `include`/`exclude` non-pattern entries must resolve.
+
+== Sync invariants _(Q-3.6.1, Q-3.6.3)_
+
+. Forward sync never deletes a managed element on draw.io that the
+  view filter excludes — exclusion is not deletion.
+  _(Q-4.1.1, `internal/sync/diff.go:486-508`)_
+. Reverse sync never creates a phantom relationship for a *lifted*
+  connector. _(`internal/sync/diff.go:710-718,765-793`)_
+. On conflict, the model value wins; the draw.io-side change is
+  dropped from the change set before reverse sync. _(Q-3.6.3)_
+. The sync state file is corruption-resistant: SHA-256 checksum,
+  zero-byte file treated as missing, atomic temp+rename writes.
+  _(Q-3.8.2)_
+. Renaming a view (changing the view key) results in the old view
+  page being removed and a new one being created with the new title.
+  _(Q-5.5.1)_
+
+== File-write durability _(Q-3.8.3)_
+
+All mutating writes (`*.jsonc`, `*.drawio`, `.bausteinsicht-sync`)
+use `os.CreateTemp` + `os.Rename` in the destination directory.
+A partial write never corrupts the destination file.
+
+== JSONC comment preservation _(Q-3.8.1)_
+
+. A simple field-modification reverse change (`title`, `description`,
+  `technology` of an existing element) preserves comments and key
+  ordering in the model file.
+. A structural reverse change (added/deleted element, structural
+  conflict) falls back to a full marshal that preserves the
+  preamble (everything before the first `{`).
+
+== Watch-mode invariants _(Q-3.6.2)_
+
+. The watcher's own writes do not retrigger a sync (`syncing` flag).
+. Atomic-rename writes from editors are recovered: the watcher polls
+  the path with exponential backoff up to 2 s and re-adds it.
+
+== CLI invariants _(Q-2.1.2, Q-2.1.12)_
+
+. `--format` accepts only `text` and `json`.
+. Path flags (`--model`, `--template`, `--output`) reject any `..`
+  component.
+. `--template` must end in `.drawio`.
+. Exit codes: `0`/`1`/`2` as specified in `02_cli_specification.adoc`.
+
+== Security guards _(Q-4.7.1)_
+
+. Path-containment check (SEC-001/SEC-016) rejects directory traversal
+  in `--model`, `--template`, `--output`.
+. ID sanitisation (SEC-013) on imported draw.io labels strips `. / \`.
+. View-key sanitisation (SEC-015) strips directory components.
+. HTML-label parser tolerates `>` inside quoted attribute values
+  (SEC-008).
+. Model-file size ≤ 10 MiB; depth ≤ 50.

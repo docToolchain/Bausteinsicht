@@ -1,0 +1,56 @@
+=== ADR-001: Use JSONC as the model file format
+
+[NOTE]
+====
+This ADR was reverse-engineered from code (Q-3.9.2) — no
+authored ADR exists in the repository at the time of writing.
+====
+
+==== Status
+
+Implicit (in force). No formal acceptance record.
+
+==== Context
+
+The model is the source of truth. Authors want to add inline
+explanatory comments next to elements ("// External systems",
+"// Actors") and section headers. Standard JSON does not allow
+comments. The team also wants schema-driven IDE autocomplete and
+machine consumability.
+
+==== Decision
+
+Use JSON-with-comments (JSONC) as the on-disk format. Implement a
+hand-rolled `StripJSONC` that removes line and block comments and
+trailing commas before unmarshalling. Preserve comments and key
+ordering across saves via `PatchSave` for simple field updates and
+preamble preservation for full-file rewrites. Reference a JSON
+Schema via `$schema`.
+
+==== Consequences
+
+. Authors can keep comments alive across CLI edits and reverse-sync
+  updates of common fields.
+. The hand-rolled parser is a maintenance liability — there is no
+  shared library being shadowed, and JSON5-style extensions
+  (unquoted keys, single-quoted strings) are not supported.
+. The schema URL is referenced from `templates/sample-model.jsonc` but
+  no schema file is shipped in the repo (see Q-5.4.1).
+
+==== Pugh Matrix (alternatives considered)
+
+[options="header"]
+|===
+| Criterion (weight)         | JSONC | Plain JSON | YAML | Custom DSL (Structurizr-like)
+| Comments preserved (3)     | + 3   | -3         | + 3  | + 3
+| IDE / Schema tooling (2)   |  0    | + 2        |  0   | -2
+| LLM-friendly write surface (3) | + 3 | + 3      | -3   | -3
+| Diff readability (2)       | + 2   | + 2        | + 2  | + 2
+| Roundtrip stability (3)    | + 3   | + 3        | -3   | + 3
+| Implementation effort (-2) | -2    | 0          | -2   | -6
+| **Total**                  | **9** | **7**      | **-3** | **-3**
+|===
+
+(Scores are author-applied based on observed code; see Q-1.1.2 for the
+unanswered question of why JSONC was preferred over plain JSON in
+practice.)

@@ -1,0 +1,37 @@
+== Introduction and Goals
+
+=== Problem statement _(Q-1.2)_
+
+Bausteinsicht is an architecture-as-code CLI that keeps a JSONC text
+model and a draw.io diagram in sync, in both directions. The text
+model is the source of truth on conflict; the draw.io file is an
+editable visual projection.
+
+=== Quality goals (inferred from code)
+
+The README's feature bullets enumerate four implicit goals (Q-3.1.1):
+
+. *Cross-platform single-binary distribution* — six target matrices,
+  `CGO_ENABLED=0`.
+. *CLI-first / LLM-friendly* — `--format json` on every command.
+. *Local-only* — no network access; only outbound process call is
+  the local draw.io CLI on `export`.
+. *Robust file handling* — atomic temp+rename writes, SHA-256-protected
+  state, BOM-tolerant JSONC stripper, depth/size caps.
+
+[NOTE]
+====
+Priorities between these goals are not stated in code or
+documentation. See `OPEN_QUESTIONS.adoc` (Q-3.1.2).
+====
+
+=== Stakeholders
+
+[options="header"]
+|===
+| Role | Concern
+| Architect / engineer | Author and review architecture in text and visually.
+| LLM / AI agent | Drive the CLI programmatically via JSON I/O.
+| Documentation reader | Consume PNG/SVG, AsciiDoc/Markdown, PlantUML/Mermaid exports.
+| Open-source maintainer | Build & release across six platform matrices, keep the test surface clean.
+|===

@@ -1,0 +1,30 @@
+== Context and Scope
+
+=== Business context _(Q-3.3.1)_
+
+Bausteinsicht runs as a CLI on the user's workstation or CI runner.
+There are no remote services. The system interacts with:
+
+* **User (human)** — runs commands; edits `architecture.jsonc` and
+  `architecture.drawio` with their preferred tools.
+* **LLM/agent** — runs commands with `--format json`.
+* **draw.io desktop / web** — opens the generated `architecture.drawio`
+  for visual editing; output is read back on the next `sync`.
+* **draw.io CLI / `drawio-export` wrapper** — invoked only by `export`
+  to render PNG/SVG.
+* **File system** — sole persistence layer.
+
+There are no network calls anywhere in the codebase. The only outbound
+process invocation is to the local draw.io CLI binary.
+
+=== Technical context
+
+[options="header"]
+|===
+| External | Bausteinsicht side | Direction | Format
+| `*.jsonc` model file | Read on `Load`, written via `PatchSave` / `Save` | both | JSONC, UTF-8
+| `*.drawio` diagram file | Read on `LoadDocument`, written via `SaveDocument` | both | mxfile XML
+| `.bausteinsicht-sync` state | Read on `LoadState`, written via `SaveState` | both | JSON with SHA-256 checksum
+| draw.io CLI | Spawned by `internal/export.ExportPage` | outbound only | argv + exit code + file output
+| Operating system | fsnotify subscription on the two files | inbound | OS file events
+|===

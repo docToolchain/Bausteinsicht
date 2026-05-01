@@ -1,0 +1,64 @@
+== Cross-cutting Concepts
+
+=== JSONC comment preservation _(Q-3.8.1)_
+
+Two complementary mechanisms:
+
+* `internal/model/patch.go:PatchSave` rewrites only the targeted
+  values in the raw text, leaving comments and key ordering intact.
+  Used when reverse changes can be expressed as `(path, value)`
+  patches.
+* `internal/model/loader.go:Save` falls back to a full marshal that
+  preserves the file's *preamble* (everything before the first `{`)
+  to keep top-of-file comments alive across structural changes.
+
+Stripping is implemented in `StripJSONC` and handles UTF-8 BOM, line
+and block comments outside of strings, escape sequences inside strings,
+indentation cleanup before own-line comments, and trailing-comma
+removal.
+
+=== Sync-state integrity _(Q-3.8.2)_
+
+`SyncState` is JSON with a SHA-256 `checksum` field. Loader
+recomputes the hash on the rest of the document and rejects mismatches.
+States without the field (older files) skip integrity checking.
+Zero-byte files are treated as "no state" so a partial write does not
+brick the project.
+
+=== Atomic file writes _(Q-3.8.3)_
+
+All persistent files use `os.CreateTemp` + `os.Rename` in the
+destination directory. Failed writes leave the destination unchanged.
+
+=== Element/diagram correlation _(Q-3.8.4)_
+
+Each managed shape carries `bausteinsicht_id` (canonical model
+dot-path) and `bausteinsicht_kind` attributes. When views are used,
+the cell `id` is scoped (`<viewID>--<elemID>`) so the same element
+can appear on multiple pages while remaining identifiable.
+
+=== Unmanaged shapes _(Q-3.8.5)_
+
+A `<object>` without `bausteinsicht_id` that wraps a vertex mxCell is
+treated as a user-drawn addition by reverse sync. The element ID is
+derived from the label via `sanitizeID` (lowercase, dash-separated,
+strip `. / \`). Reserved-prefix IDs (`nav-back-`, `metadata-`,
+`legend-`) are skipped.
+
+=== Auto-layout _(Q-3.8.6)_
+
+`internal/sync/layout.go` computes positions for newly placed elements
+on a fresh page, using A4-landscape geometry (`pageWidth=1169`,
+`elementGap=60`, `padding=60`). Layouts: `layered`, `grid`, `none`,
+empty (default).
+
+The layered-view *layer order* uses the user's order of
+`specification.elements`, captured by streaming JSON tokens at load
+(`extractElementOrder`).
+
+=== Multi-view drill-down _(Q-3.8.7)_
+
+For each view that has a `scope`, the scope element is given a draw.io
+`link` attribute pointing at the corresponding view page. Detail-view
+pages get a back-navigation button; both link and button are ignored
+by reverse sync.

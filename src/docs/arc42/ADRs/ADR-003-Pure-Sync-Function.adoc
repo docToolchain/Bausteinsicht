@@ -1,0 +1,46 @@
+=== ADR-003: Sync engine is a pure function
+
+[NOTE]
+====
+Reverse-engineered from code (Q-3.4.1, Q-3.9.2).
+====
+
+==== Status
+
+Implicit (in force).
+
+==== Context
+
+Bidirectional sync is the most complex piece of behaviour in the
+project. It must be exhaustively tested across many input
+permutations (added/deleted/modified on either side, conflicts,
+view filters, lifted relationships, scope boundaries, …).
+
+==== Decision
+
+`internal/sync/engine.go:Run` is implemented as a pure function on
+`(model, doc, lastState, templates, newPageIDs, opts)` returning a
+`SyncResult`. All file I/O lives in the CLI command layer
+(`cmd/bausteinsicht`). The state file is the only side-channel
+that survives across invocations.
+
+==== Consequences
+
+. Easy to unit-test: tests construct in-memory inputs and assert on
+  the returned `SyncResult` without touching disk.
+. The `etree.Document` passed in is mutated in-place by the engine —
+  callers must own the lifecycle of that mutation.
+. CLI-level concerns (verbose logging, summary printing, exit code)
+  cannot leak into the engine, keeping the engine reusable.
+
+==== Pugh Matrix
+
+[options="header"]
+|===
+| Criterion (weight)            | Pure function | Engine owns I/O | Stateful service
+| Testability (3)               | + 3           | -3              | -3
+| Modularity (2)                | + 2           | -2              | -2
+| Day-1 implementation cost (-2) | -2           | 0               | -4
+| Reuse (e.g. as library) (1)   | + 1           | -1              | -1
+| **Total**                     | **4**         | **-6**          | **-10**
+|===

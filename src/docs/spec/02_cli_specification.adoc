@@ -1,0 +1,121 @@
+= CLI Specification
+:toc: left
+
+== Top-level command _(Q-2.1.1, Q-2.1.2)_
+
+[source]
+----
+bausteinsicht [global flags] <command> [command flags]
+----
+
+Global persistent flags:
+
+[options="header"]
+|===
+| Flag | Default | Description
+| `--format` | `text` | Output format. One of `text`, `json`. Validated in `PersistentPreRunE`.
+| `--model` | (auto) | Path to the JSONC model file. `..` traversal is rejected.
+| `--template` | (auto) | Path to a `.drawio` template file. The `.drawio` extension is enforced; `..` rejected.
+| `--verbose` | `false` | Print extra detail to stderr.
+|===
+
+Sub-commands: `init`, `sync`, `validate`, `add element`, `add relationship`,
+`watch`, `export`, `export-table`, `export-diagram`.
+
+== `init` _(Q-2.1.3)_
+
+No command-specific flags. Refuses to run if any of `architecture.jsonc`,
+`architecture.drawio`, `template.drawio` exists. Creates these three
+files plus `.bausteinsicht-sync`. Exit code `2` on conflict.
+
+== `sync` _(Q-2.1.4)_
+
+Flags:
+
+[options="header"]
+|===
+| Flag | Default | Description
+| `--relayout` | `false` | Clear element positions on every view page and re-apply auto-layout.
+|===
+
+Behaviour: see UC-2 in `01_use_cases.adoc`.
+Exit codes: `0` success, `1` validation failure or conflicts detected,
+`2` configuration / file errors.
+
+== `validate` _(Q-2.1.5)_
+
+No command-specific flags. Exit `1` on validation errors, `2` on load
+errors. Warnings are printed in both text and JSON modes but do not
+affect the exit code.
+
+== `add element` _(Q-2.1.6)_
+
+Required: `--id`, `--kind`, `--title`.
+Optional: `--parent`, `--technology`, `--description`.
+ID must match `^[a-zA-Z][a-zA-Z0-9_-]*$`.
+
+== `add relationship` _(Q-2.1.7)_
+
+Required: `--from`, `--to`. Optional: `--label`, `--kind`, `--description`.
+Endpoints must resolve via dot-notation; `--kind` must exist in
+`specification.relationships` if provided.
+
+== `watch` _(Q-2.1.8)_
+
+No command-specific flags. Verifies the existence of the model and
+`architecture.drawio`. Debounce: 300 ms. Exits cleanly on
+SIGINT/SIGTERM.
+
+== `export` _(Q-2.1.9)_
+
+[options="header"]
+|===
+| Flag | Default | Description
+| `--image-format` | `png` | Output format: `png` or `svg`.
+| `--view` | (all) | Restrict to a single view key.
+| `--output` | `.` | Output directory; `..` rejected.
+| `--embed-diagram` | `false` | Embed source `.drawio` XML inside the output.
+| `--scale` | `1.0` | Render scale; `>1` requires hardware GPU.
+|===
+
+Output filename pattern: `architecture-<viewKey>.<ext>`.
+
+== `export-table` _(Q-2.1.10)_
+
+[options="header"]
+|===
+| Flag | Default | Description
+| `--view` | (all) | Single view key.
+| `--table-format` | `adoc` | `adoc` or `md`.
+| `--output` | (stdout) | Output directory; `..` rejected.
+| `--combined` | `false` | Deduplicate elements across all views.
+|===
+
+With `--format json`, JSON rows are emitted regardless of `--table-format`.
+
+== `export-diagram` _(Q-2.1.11)_
+
+[options="header"]
+|===
+| Flag | Default | Description
+| `--view` | (all) | Single view key.
+| `--diagram-format` | `plantuml` | `plantuml` or `mermaid`.
+| `--output` | (stdout) | Output directory; `..` rejected.
+|===
+
+Output filename: `<safeViewKey>.{puml,mmd}`.
+
+== Exit-code policy _(Q-2.1.12)_
+
+* `0` — success.
+* `1` — domain errors: validation failed, conflicts resolved, missing
+  view/element, partial export failure.
+* `2` — configuration errors: invalid flag value, file not found,
+  parse error, path traversal rejection.
+
+== Error reporting _(Q-4.4.1)_
+
+In `--format text`, errors and warnings are printed to stderr with
+`ERROR:` / `WARNING:` prefixes. In `--format json`, errors are emitted
+to stderr as `{"error": "...", "code": N}`; data output goes to
+stdout, summaries and per-step verbose output go to stderr.

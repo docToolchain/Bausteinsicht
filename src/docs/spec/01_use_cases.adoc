@@ -1,0 +1,132 @@
+= Specification — Use Cases
+:toc: left
+
+Each use case below cites the question-tree leaf it was synthesised
+from. Format follows the Cockburn "casual" style.
+
+== UC-1: Initialise an architecture project _(Q-2.3.1)_
+
+Primary actor:: Architect.
+Trigger:: `bausteinsicht init` in a directory.
+Pre-conditions:: None of `architecture.jsonc`, `architecture.drawio`,
+`template.drawio` exist in the current directory.
+Main success scenario::
+. Verify no conflict files exist.
+. Write `architecture.jsonc` (embedded sample).
+. Write `template.drawio` (embedded default template).
+. Load model and run an initial forward sync to populate
+  `architecture.drawio`.
+. Save `.bausteinsicht-sync` state.
+. Print "Next steps" guidance.
+Failure modes::
+* A conflict file already exists → exit code `2`.
+* Template parse failure → exit code `2`.
+
+== UC-2: Run one bidirectional sync _(Q-2.3.2, Q-3.6.1)_
+
+Primary actor:: Architect or LLM agent.
+Trigger:: `bausteinsicht sync`.
+Pre-conditions:: Model file exists (auto-detected if `--model` is omitted
+and exactly one `*.jsonc` is in the working directory).
+Main success scenario::
+. Validate model. If errors, print them and exit `1`.
+. Load draw.io document; recreate from template if missing or empty.
+. Load sync state (verify SHA-256 checksum).
+. Detect changes (three-way diff).
+. Resolve conflicts: model wins; drop draw.io-side changes for fields
+  in conflict.
+. Apply forward sync (model → drawio) per view.
+. Apply reverse sync (drawio → model).
+. Save model (comment-preserving patch when possible, full save otherwise).
+. Save drawio document atomically.
+. Save new sync state with checksum.
+. Print summary; exit `1` if conflicts were detected, else `0`.
+
+== UC-3: Continuous sync (watch mode) _(Q-2.3.3, Q-3.6.2)_
+
+Primary actor:: Architect.
+Trigger:: `bausteinsicht watch`.
+Pre-conditions:: Both `architecture.jsonc` and `architecture.drawio`
+exist.
+Main success scenario::
+. Start an fsnotify watcher on both files.
+. On any write/create event, debounce `300 ms`.
+. Run the same sync pipeline as UC-2.
+. Suppress events caused by the watcher's own writes via the `syncing`
+  flag.
+. On atomic-rename writes (editor save), poll until the path reappears
+  and re-add the watch.
+Termination:: SIGINT or SIGTERM stops the watcher cleanly.
+
+== UC-4: Validate the model _(Q-2.3.4)_
+
+Primary actor:: Architect or CI pipeline.
+Trigger:: `bausteinsicht validate`.
+Main success scenario::
+. Load the model.
+. Run validation (errors + warnings).
+. Print results in text or JSON form.
+Errors include:
+* Missing `kind` or `title`.
+* Unknown `kind`.
+* Children declared on a non-container kind.
+* Element nesting > 50.
+* Invalid layout value.
+* `from`/`to`/`scope` references that do not resolve.
+* Duplicate relationships (same from+to+kind+label).
+Warnings include:
+* Specification has no element kinds.
+* Model has no elements.
+
+== UC-5: Add an element via CLI _(Q-2.3.5)_
+
+Primary actor:: Architect or LLM agent.
+Trigger:: `bausteinsicht add element --id ID --kind K --title T [--parent P] [--technology …] [--description …]`.
+Main success scenario::
+. Validate ID against `^[a-zA-Z][a-zA-Z0-9_-]*$`.
+. Validate that `--title` is non-empty.
+. Resolve `--parent` if given; verify parent's kind is a container.
+. Reject duplicate IDs at the chosen scope.
+. Insert the element using a comment-preserving JSONC patch
+  (fall back to full save).
+
+== UC-6: Add a relationship via CLI _(Q-2.3.6)_
+
+Primary actor:: Architect or LLM agent.
+Trigger:: `bausteinsicht add relationship --from A --to B [--kind K] [--label L] [--description …]`.
+Main success scenario::
+. Resolve both endpoints via dot-notation.
+. Verify `--kind` exists in `specification.relationships` if given.
+. Reject duplicates (same from+to+kind).
+. Append using a comment-preserving JSONC array patch (fall back to
+  full save).
+
+== UC-7: Export views as images _(Q-2.3.7)_
+
+Primary actor:: Documentation reader.
+Trigger:: `bausteinsicht export --image-format {png|svg} [--view V] [--output DIR] [--scale F] [--embed-diagram]`.
+Pre-conditions:: A draw.io CLI (or the `drawio-export` wrapper) is on PATH
+or at a known platform-native install path.
+Main success scenario::
+. Detect draw.io binary.
+. For each view (or `--view`), run draw.io with the matching page index.
+. Verify the output file was actually created (some failure modes
+  return exit 0 with no file).
+Failure modes::
+* draw.io CLI not found → exit `2`.
+* Per-view export failure → exit `1` after attempting all views.
+
+== UC-8: Export elements as a table _(Q-2.3.8)_
+
+Primary actor:: Documentation reader / LLM agent.
+Trigger:: `bausteinsicht export-table [--view V | --combined] [--table-format {adoc|md}] [--output DIR]`.
+Outputs columns: Element / Kind / Technology / Description.
+With `--format json`, returns structured JSON rows instead of a table.
+
+== UC-9: Export views as text C4 diagrams _(Q-2.3.9)_
+
+Primary actor:: Documentation reader.
+Trigger:: `bausteinsicht export-diagram --diagram-format {plantuml|mermaid} [--view V] [--output DIR]`.
+The C4 level (Context / Container / Component) is detected from the
+kinds present in the resolved view.
+With `--format json`, returns an array of `{view, format, source}` entries.
