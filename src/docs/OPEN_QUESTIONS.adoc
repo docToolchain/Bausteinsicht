@@ -1,0 +1,374 @@
+= Open Questions
+:toc: left
+:toclevels: 2
+:sectnums:
+:icons: font
+
+This list captures every assumption made while writing PRD-001, the specification (`spec/01..05`) and the arc42 chapters that could **not** be proven from the code alone.
+Each entry follows the prescribed structure.
+
+== Business Context
+
+[[OQ-001]]
+=== OQ-001: Who is the formal product owner / sponsor?
+
+Category:: Business Context
+Confidence:: Low
+Your Best Guess:: docToolchain maintainers — the repository lives under `github.com/docToolchain` and CONTRIBUTING.md mentions arc42 ADRs as a first-class artefact.
+Why You Can't Be Sure:: The repo has no `OWNERS`, `MAINTAINERS`, governance file, or "About" prose beyond the README. No `CODEOWNERS` either.
+What Would Help:: A short governance/maintainership note in CONTRIBUTING.md or README.
+
+[[OQ-002]]
+=== OQ-002: Is Bausteinsicht an experiment, an incubation, or a long-term product?
+
+Category:: Business Context
+Confidence:: Low
+Your Best Guess:: Long-term — the project ships releases, has CI on three OSes, and embeds a Claude Code skill suggesting third-party integrations are anticipated.
+Why You Can't Be Sure:: No roadmap document, no version history beyond `version="dev"` in `main.go`.
+What Would Help:: A `ROADMAP.adoc` or release notes referenced from README.
+
+[[OQ-003]]
+=== OQ-003: What success metrics matter for v1?
+
+Category:: Business Context
+Confidence:: Low
+Your Best Guess:: Adoption (release downloads), round-trip fidelity (no JSONC comment loss in production usage), low CI failure rate on `make check`.
+Why You Can't Be Sure:: No analytics / telemetry / KPIs are defined anywhere in the repo.
+What Would Help:: A "success criteria" paragraph in PRD-001 (this PRD lists this question instead).
+
+== Stakeholder Context
+
+[[OQ-010]]
+=== OQ-010: Are there expected enterprise integrations beyond docToolchain?
+
+Category:: Stakeholder Context
+Confidence:: Low
+Your Best Guess:: Generic — the JSON-everywhere CLI suggests downstream integration with arbitrary CI/CD or doc generators rather than a specific vendor.
+Why You Can't Be Sure:: Only docToolchain and Claude Code are explicitly mentioned. No examples integrating with Backstage, Confluence, etc.
+What Would Help:: A concrete "integrations" matrix in README.
+
+[[OQ-011]]
+=== OQ-011: Who runs Bausteinsicht — humans, CI, or AI agents in production?
+
+Category:: Stakeholder Context
+Confidence:: Medium
+Your Best Guess:: All three. The CLI is designed for local interactive use (watch mode) but every command has `--format json` for non-interactive use and there is a Claude Code skill.
+Why You Can't Be Sure:: No telemetry to confirm.
+What Would Help:: User-research notes or a section in the README summarising primary usage modes.
+
+== Design Rationale
+
+[[OQ-020]]
+=== OQ-020: Why JSONC instead of YAML or a custom DSL? What was rejected and why?
+
+Category:: Design Rationale
+Confidence:: Medium
+Your Best Guess:: ADR-001 captures my reconstruction (familiarity, comment support, schema-driven IDE tooling).
+Why You Can't Be Sure:: There is no original ADR file in the repo at the path README links (`src/docs/arc42/ADRs/ADR-001-DSL-Format.adoc`); the link is "future work" until generated.
+What Would Help:: The author's original notes or PR discussion.
+
+[[OQ-021]]
+=== OQ-021: Why "model wins" by default for conflicts?
+
+Category:: Design Rationale
+Confidence:: Medium
+Your Best Guess:: It aligns with "JSONC is source of truth"; it is deterministic and CI-friendly. ADR-004 captures this rationale.
+Why You Can't Be Sure:: The interface (`ConflictResolver`) is in place but only one implementation exists. No design doc explains whether other resolvers are planned for v1.x or v2.
+What Would Help:: A maintained roadmap entry on conflict-policy expansion.
+
+[[OQ-022]]
+=== OQ-022: Why is the layout engine bespoke instead of using Graphviz / dagre / d3-hierarchy?
+
+Category:: Design Rationale
+Confidence:: Low
+Your Best Guess:: Independence from external runtimes (preserves the static-binary property), and the limited set of layouts (layered/grid/none) is enough for C4-style architecture pictures.
+Why You Can't Be Sure:: No comments in `internal/sync/layout.go` discuss alternatives.
+What Would Help:: A short note in `08_crosscutting_concepts.adoc` justifying the layout choice.
+
+[[OQ-023]]
+=== OQ-023: Why a self-checksum on the state file rather than relying on file hashes alone?
+
+Category:: Design Rationale
+Confidence:: Medium
+Your Best Guess:: To detect manual edits / corruption of `.bausteinsicht-sync` and to give a clean error/recovery path.
+Why You Can't Be Sure:: No comment cites a specific incident or threat.
+What Would Help:: A `# rationale:` comment near `state.go::SaveState`.
+
+[[OQ-024]]
+=== OQ-024: What is the format-version policy for `.bausteinsicht-sync`?
+
+Category:: Design Rationale
+Confidence:: Low
+Your Best Guess:: There is no version field on `SyncState` today; corruption / mismatch is the only handled case. A future format change would require a migrator or a "delete and re-sync" message.
+Why You Can't Be Sure:: No version field, no migration code.
+What Would Help:: An explicit `Schema int` on `SyncState` and a documented migration plan.
+
+[[OQ-025]]
+=== OQ-025: Why is `architecture.drawio` the hard-coded sibling of the model file?
+
+Category:: Design Rationale
+Confidence:: Low
+Your Best Guess:: Convention-over-configuration; matches what `init` produces. Allowing arbitrary names would require a flag and would clash with auto-detection of the model.
+Why You Can't Be Sure:: No flag and no override is exposed.
+What Would Help:: An explicit `bausteinsicht.toml` or a top-level `drawio` field in the JSONC model.
+
+[[OQ-026]]
+=== OQ-026: Why are `Element.Tags` and `Element.Metadata` declared but not consumed?
+
+Category:: Design Rationale
+Confidence:: Low
+Your Best Guess:: Reserved for future filtering or rendering; declared early to avoid a future schema break.
+Why You Can't Be Sure:: No consumer found and no comment explains the intent.
+What Would Help:: Either remove the fields or add a `// TODO: ...` with the planned consumer.
+
+[[OQ-027]]
+=== OQ-027: Is `bausteinsicht_template_version = 1` meant to be incremented soon?
+
+Category:: Design Rationale
+Confidence:: Low
+Your Best Guess:: It is forward-looking — present so that future template format changes can be detected without breaking installed users.
+Why You Can't Be Sure:: No migration code or v0/v1 difference is currently encoded.
+What Would Help:: An ADR documenting the template-versioning policy.
+
+== Domain Knowledge
+
+[[OQ-030]]
+=== OQ-030: What is the canonical list of layout values? Code accepts `""`, `"layered"`, `"grid"`, `"none"` — is `""` documented as "use the default" or as a separate value?
+
+Category:: Domain Knowledge
+Confidence:: Medium
+Your Best Guess:: `""` means "use default" (treated as `"layered"`).
+Why You Can't Be Sure:: The validator accepts both empty and `"layered"` without distinguishing them.
+What Would Help:: An explicit default value in the JSON Schema and a unit-test naming this behaviour.
+
+[[OQ-031]]
+=== OQ-031: Are pattern globs `*` and `**` strictly mutually exclusive at a given path component?
+
+Category:: Domain Knowledge
+Confidence:: Medium
+Your Best Guess:: Yes — `MatchPattern` does not support combinations like `prefix.x*y`.
+Why You Can't Be Sure:: The implementation handles the four documented forms and the literal-equality case but I did not see explicit rejection of malformed patterns.
+What Would Help:: A unit test that pins down behaviour for `prefix.x*y` (accept literally? reject?).
+
+[[OQ-032]]
+=== OQ-032: Is the C4 level always one of {Context, Container, Component} or could a future model introduce a "Code" level?
+
+Category:: Domain Knowledge
+Confidence:: Medium
+Your Best Guess:: Limited to the three; `internal/diagram/diagram.go::detectLevel` only emits these three.
+Why You Can't Be Sure:: PlantUML's C4-PlantUML library supports a Code level; the project may add it later.
+What Would Help:: Comment in `detectLevel` stating "only Context/Container/Component for now" or a plan for Code.
+
+[[OQ-033]]
+=== OQ-033: How are "external" elements detected for top/bottom layout placement?
+
+Category:: Domain Knowledge
+Confidence:: Low
+Your Best Guess:: Heuristic — actors at the top, scope-children inside, others at the bottom. The exact rule (kind name? presence of `external_system`?) was not unambiguously visible.
+Why You Can't Be Sure:: I traced the layered layout but the kind-classification heuristic deserves direct inspection that I could not complete in the time available.
+What Would Help:: A comment in `internal/sync/layout.go` naming the rule, or a "first kind = top, last kind = bottom" pinning.
+
+[[OQ-034]]
+=== OQ-034: Are duplicate relationships with same `from`/`to` but different `kind` always rendered as separate edges, or could they be merged into one labelled edge?
+
+Category:: Domain Knowledge
+Confidence:: Medium
+Your Best Guess:: Always separate edges, identified by `rel-<from>-<to>-<index>`.
+Why You Can't Be Sure:: `TestRun_MultipleRelsSamePair` confirms the model supports them — it does not specify visual rendering details.
+What Would Help:: An explicit visual test fixture.
+
+[[OQ-035]]
+=== OQ-035: Element ID grammar — does `_` need to be supported, or only `-`?
+
+Category:: Domain Knowledge
+Confidence:: High
+Your Best Guess:: Both are supported per the regex `^[a-zA-Z][a-zA-Z0-9_-]*$`.
+Why You Can't Be Sure:: I confirmed in `add_element.go` and `TestAddElementValidIDs`.
+What Would Help:: This is essentially closed; included for completeness.
+
+== Future Direction
+
+[[OQ-040]]
+=== OQ-040: Is a `--dry-run` / `plan` flag planned?
+
+Category:: Future Direction
+Confidence:: Low
+Your Best Guess:: It is implied (the diff engine could emit a plan without writing files) but no flag exists today.
+Why You Can't Be Sure:: No flag and no comment hints at it.
+What Would Help:: An issue / ADR draft.
+
+[[OQ-041]]
+=== OQ-041: Will the project ship a JSON Schema (`bausteinsicht.schema.json`)?
+
+Category:: Future Direction
+Confidence:: High
+Your Best Guess:: Yes — the embedded sample references it via a stable URL (`https://raw.githubusercontent.com/.../schema/bausteinsicht.schema.json`). The repo currently does not contain `schema/` so the URL 404s.
+Why You Can't Be Sure:: The file is referenced but missing; either the schema is generated at release time (we did not find a script for that) or it is genuinely TODO.
+What Would Help:: Either commit the schema or remove the `$schema` reference until it exists.
+
+[[OQ-042]]
+=== OQ-042: Is collaborative editing (multi-user) a target?
+
+Category:: Future Direction
+Confidence:: Low
+Your Best Guess:: Not in v1 — the design assumes a single workstation; concurrent edits would require richer conflict policy than "model wins".
+Why You Can't Be Sure:: No CRDT, OT, or merge code.
+What Would Help:: Explicit non-goal in PRD.
+
+[[OQ-043]]
+=== OQ-043: Will the export pipeline ever stop depending on the draw.io binary?
+
+Category:: Future Direction
+Confidence:: Low
+Your Best Guess:: Maybe — the project already emits PlantUML and Mermaid; an "SVG without draw.io" path is technically feasible.
+Why You Can't Be Sure:: No comment in `internal/export` discusses this.
+What Would Help:: An ADR draft on rendering strategy.
+
+[[OQ-044]]
+=== OQ-044: Will additional output formats (DOT, structurizr DSL) be added?
+
+Category:: Future Direction
+Confidence:: Low
+Your Best Guess:: Possibly — the `Format` enum (`internal/diagram/diagram.go`) is shaped for extension.
+Why You Can't Be Sure:: No issue / TODO found.
+
+== Quality Goals
+
+[[OQ-050]]
+=== OQ-050: What is the formal performance budget?
+
+Category:: Quality Goals
+Confidence:: Low
+Your Best Guess:: Sync should complete in well under a second for n≤500 elements (informed by the bench timings in the explore agent's report).
+Why You Can't Be Sure:: Benchmarks exist but no thresholds; no performance test asserts anything.
+What Would Help:: A `bench_threshold_test.go` that fails on regression.
+
+[[OQ-051]]
+=== OQ-051: What is the supported maximum architecture size?
+
+Category:: Quality Goals
+Confidence:: Medium
+Your Best Guess:: Several thousand elements would be feasible (10 MiB JSONC ≫ 500 elements). Hard limits are file size and depth (50).
+Why You Can't Be Sure:: No documented "supported scale" statement.
+What Would Help:: A scale section in PRD.
+
+[[OQ-052]]
+=== OQ-052: Are there accessibility requirements for the rendered diagrams?
+
+Category:: Quality Goals
+Confidence:: Low
+Your Best Guess:: Not in v1 — colours are hard-coded gray (`#CCCCCC`, `#BBBBBB`); no high-contrast / dyslexia-friendly mode found.
+What Would Help:: Either a stated non-goal or a backlog item.
+
+[[OQ-053]]
+=== OQ-053: What is the threat model?
+
+Category:: Quality Goals
+Confidence:: Medium
+Your Best Guess:: Local CLI; trust the user's own model; defensive against tampered state files; SEC-001/008/013/015/016 codify the boundaries.
+Why You Can't Be Sure:: README references `src/docs/spec/07_trust_model.adoc` and `src/docs/security/2026-03-01-security-review.adoc` which are not present. The trust model is implied, not stated.
+What Would Help:: Author the linked trust-model document.
+
+== Process / Documentation
+
+[[OQ-060]]
+=== OQ-060: Where is the actual `bausteinsicht.schema.json`?
+
+Category:: Domain Knowledge
+Confidence:: High
+Your Best Guess:: Not in the repository on the working branch. The README and sample model link to a path under `schema/` but the directory does not exist.
+What Would Help:: Add `schema/bausteinsicht.schema.json` and a CI step that regenerates it from the Go structs (e.g., via `invopop/jsonschema`).
+
+[[OQ-061]]
+=== OQ-061: Where is the User Manual?
+
+Category:: Documentation
+Confidence:: High
+Your Best Guess:: README links `src/docs/manual/user-manual.adoc` (multi-view, llm-workflows anchors); the file is not present in the repo today.
+What Would Help:: Author the user manual; this PRD/spec/arc42 set covers spec-level content but not step-by-step user guidance.
+
+[[OQ-062]]
+=== OQ-062: Where is the Tutorial linked from README ("Getting Started Tutorial" — `src/docs/spec/06_tutorial.adoc`)?
+
+Category:: Documentation
+Confidence:: High
+Your Best Guess:: Not in the repo on this branch; it is a planned artefact.
+What Would Help:: Author the tutorial, or remove the broken link.
+
+[[OQ-063]]
+=== OQ-063: Where is the Trust Model document referenced from README ("Security" → `src/docs/spec/07_trust_model.adoc`)?
+
+Category:: Documentation
+Confidence:: High
+Your Best Guess:: Not in the repo on this branch; the SEC-NNN codes scattered in the source code are the *only* trace of the threat model.
+What Would Help:: Consolidate the SEC mitigations into a dedicated trust-model document.
+
+[[OQ-064]]
+=== OQ-064: Where is the Security Review referenced from README (`src/docs/security/2026-03-01-security-review.adoc`)?
+
+Category:: Documentation
+Confidence:: High
+Your Best Guess:: Not in the repo on this branch.
+What Would Help:: Either create the file as part of the next security pass or update the README to remove the link.
+
+== Specific small uncertainties
+
+[[OQ-070]]
+=== OQ-070: Does `--scale` >1 cause a runtime warning or fail when no GPU is available?
+
+Category:: Domain Knowledge
+Confidence:: Low
+Your Best Guess:: Behaviour depends entirely on the underlying `drawio` CLI; Bausteinsicht just passes the value through.
+What Would Help:: A note in CLI Spec naming "behaviour delegated to draw.io".
+
+[[OQ-071]]
+=== OQ-071: When `--combined` and `--view` are both set on `export-table`, which wins?
+
+Category:: Domain Knowledge
+Confidence:: Medium
+Your Best Guess:: Implementation likely treats `--combined` as overriding `--view`, since it produces a single merged table.
+What Would Help:: Either a CLI test for the combination or an explicit rejection when both are passed.
+
+[[OQ-072]]
+=== OQ-072: Is `bausteinsicht_id` required or optional on a draw.io `<object>`?
+
+Category:: Domain Knowledge
+Confidence:: Medium
+Your Best Guess:: Optional. Cells without it are user content; cells with it are managed.
+What Would Help:: A test fixture mixing managed and unmanaged cells.
+
+[[OQ-073]]
+=== OQ-073: Does the metadata box render when `config.metadata` is `false` and was previously `true`?
+
+Category:: Domain Knowledge
+Confidence:: Medium
+Your Best Guess:: The box is removed (since the next sync sees no demand for it). I did not trace deletion of pre-existing metadata cells.
+What Would Help:: A test fixture toggling `config.metadata` between syncs.
+
+[[OQ-074]]
+=== OQ-074: Are JSONC nested block comments handled?
+
+Category:: Domain Knowledge
+Confidence:: Medium
+Your Best Guess:: Not handled — typical JSONC parsers do not support nesting and `StripJSONC`'s state machine looks single-level.
+What Would Help:: Either a fixture asserting the un-supported behaviour or a comment in `StripJSONC` stating the limitation.
+
+[[OQ-075]]
+=== OQ-075: How is element creation under a deeply nested parent flattened by `InsertObjectEntry`?
+
+Category:: Domain Knowledge
+Confidence:: Medium
+Your Best Guess:: It walks the path and adds the entry at the bottom of the corresponding object literal; the helper computes indent from existing whitespace.
+What Would Help:: A property test (rapid) over arbitrary nesting depths to pin behaviour.
+
+[[OQ-076]]
+=== OQ-076: Is the stable JSON schema for command outputs versioned?
+
+Category:: Quality Goals
+Confidence:: Low
+Your Best Guess:: Implicitly v1; no `--api-version` flag exists.
+What Would Help:: A `bausteinsicht --json-version` flag or a documented stability policy.
+
+== Closing note
+
+This list is the canonical inventory of "things I assumed but could not verify". If you read PRD-001 and noticed a definitive-sounding statement, the corresponding uncertainty is here.

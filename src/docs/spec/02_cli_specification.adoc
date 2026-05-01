@@ -1,0 +1,488 @@
+= CLI Specification
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+
+This specification was reverse-engineered from the Cobra command definitions in `cmd/bausteinsicht/`, the integration tests in `cmd/bausteinsicht/*_test.go`, and the persistent flag setup in `cmd/bausteinsicht/root.go`.
+
+== Conventions
+
+* All commands are subcommands of the root `bausteinsicht` command.
+* Flags are processed by https://github.com/spf13/cobra[Cobra] / pflag — long flags (`--flag value`) and equals form (`--flag=value`) are both accepted.
+* Where a flag's "default" cell is empty, the flag is optional and the underlying behaviour treats absence as a distinct case.
+* Output channels: structured results go to **stdout**; warnings, conflicts, verbose progress, and errors go to **stderr**.
+* All commands respect the global flags below in addition to their own.
+
+== Global flags
+
+Defined in `cmd/bausteinsicht/root.go:50-53`.
+
+[cols="2,1,1,4", options="header"]
+|===
+| Flag | Type | Default | Description
+
+| `--format` | string | `text` | Output format. Allowed values: `text`, `json` (case-insensitive). Invalid values fail in `PersistentPreRunE` with `unknown format "X": valid values are "text" and "json"`.
+| `--model` | string | _(empty)_ | Path to the JSONC model file. Auto-detected when unset (single `*.jsonc` in the current directory). Rejected if it contains `..` (SEC-001).
+| `--template` | string | _(empty)_ | Path to a draw.io template file. MUST end in `.drawio`. Rejected if it contains `..` (SEC-016).
+| `--verbose` | bool | `false` | Emit progress logs to stderr.
+| `--version` | flag | _(n/a)_ | Standard Cobra `--version` flag — prints `version` (set at build time, defaults to `"dev"`).
+| `-h`, `--help` | flag | _(n/a)_ | Standard Cobra help.
+|===
+
+=== Path containment (SEC-001 / SEC-016)
+
+`validatePathContainment` (`cmd/bausteinsicht/root.go:81-88`) cleans the path with `filepath.Clean` and rejects any component equal to `..`. Applies to `--model`, `--template`, and the `export --output` directory.
+
+== Exit codes
+
+Exit codes are produced via `exitWithCode` (`cmd/bausteinsicht/root.go:74-76`) and the standard cobra error wrapper:
+
+[cols="1,4", options="header"]
+|===
+| Code | Meaning
+| 0 | Success.
+| 1 | Validation, business-rule, or sync-conflict failure (the command ran, but produced a logical error). For `sync`, also emitted when conflicts were resolved.
+| 2 | Pre-flight or I/O failure: missing file, unparseable JSONC, missing draw.io binary, format flag rejected, init target file already exists, etc.
+|===
+
+When `--format json`, errors are emitted as a JSON object on stderr by `ExecuteRoot` (`root.go:93-115`):
+
+[source,json]
+----
+{"error":"<message>","code":<int>}
+----
+
+== Command summary
+
+[cols="1,3", options="header"]
+|===
+| Command | Purpose
+| `init` | Scaffold a new project (sample model, template, drawio, sync state).
+| `sync` | Bidirectional sync between model and `architecture.drawio`.
+| `validate` | Validate model; report errors and warnings.
+| `add element` | Insert an element with comment-preserving JSONC patch.
+| `add relationship` | Append a relationship with comment-preserving JSONC patch.
+| `watch` | Run `sync` continuously on file changes.
+| `export` | Export view pages as PNG/SVG via draw.io CLI.
+| `export-table` | Emit element tables as AsciiDoc / Markdown / JSON.
+| `export-diagram` | Emit view diagrams as PlantUML / Mermaid.
+|===
+
+== `bausteinsicht init`
+
+Source: `cmd/bausteinsicht/init.go`.
+
+Scaffolds a new project in the current directory.
+
+=== Synopsis
+
+[source,bash]
+----
+bausteinsicht init [--format text|json] [--verbose]
+----
+
+=== Behaviour
+
+. Targets these files in the current directory: `architecture.jsonc`, `template.drawio`, `architecture.drawio`, `.bausteinsicht-sync`.
+. If any target already exists: error `file "<name>" already exists; remove it or use a different directory` → exit 2.
+. Writes `architecture.jsonc` from the embedded sample (`templates/sample-model.jsonc`, mode 0600).
+. Writes `template.drawio` from the embedded default template (mode 0600).
+. Loads model and template, runs an initial forward sync that populates pages and creates metadata/legend boxes (so the next `sync` is a no-op).
+. Persists `architecture.drawio` and `.bausteinsicht-sync` atomically.
+
+=== Output
+
+[%nowrap]
+[source]
+----
+text:
+  Initialized Bausteinsicht project:
+    - architecture.jsonc
+    - template.drawio
+    - architecture.drawio
+    - .bausteinsicht-sync
+
+  Next steps:
+    1. Edit architecture.jsonc to define your architecture
+    2. Run 'bausteinsicht sync' to update the draw.io diagram
+    3. Open architecture.drawio in draw.io to arrange elements
+
+json:
+  {"success":true,"files":["architecture.jsonc","template.drawio","architecture.drawio",".bausteinsicht-sync"]}
+----
+
+== `bausteinsicht sync`
+
+Source: `cmd/bausteinsicht/sync.go`.
+
+=== Synopsis
+
+[source,bash]
+----
+bausteinsicht sync [--relayout] [--model PATH] [--template PATH] [--format text|json] [--verbose]
+----
+
+=== Flags
+
+[cols="2,1,1,4", options="header"]
+|===
+| Flag | Type | Default | Description
+| `--relayout` | bool | `false` | Re-apply auto-layout to all view pages, resetting element positions.
+|===
+
+=== Pre-flight
+
+. Resolve model file (auto-detect if `--model` not given). Missing file → exit 2.
+. **Validate model** before any write. Errors → exit 1 with message `model validation failed with N error(s); fix the model before syncing`.
+. Locate `architecture.drawio` next to the model. Missing or no `<diagram>` → recreate from template, log warning, drop stale state.
+. Load `.bausteinsicht-sync`; verify checksum.
+
+=== Sync run
+
+. Ensure pages exist for every model view (`view-<viewID>`); remove orphan pages.
+. Run `sync.Run` (see `05_sync_specification.adoc`).
+. Save model with comment-preserving patch when only field updates apply; otherwise full save (the user's preamble before the first `{` is preserved).
+. Atomically save draw.io and the new sync state.
+. Print summary; if conflicts > 0 → exit 1.
+
+=== Output schema (JSON)
+
+Stable keys (`cmd/bausteinsicht/sync.go` `syncSummary`):
+
+[source,json]
+----
+{
+  "forward_added":   <int>,
+  "forward_updated": <int>,
+  "forward_deleted": <int>,
+  "reverse_added":   <int>,
+  "reverse_updated": <int>,
+  "reverse_deleted": <int>,
+  "metadata_updated":<int>,
+  "conflicts":       <int>
+}
+----
+
+=== Text output
+
+[source]
+----
+Forward (model → draw.io): 3 added, 1 updated, 0 deleted
+Reverse (draw.io → model): 0 added, 2 updated, 0 deleted
+Conflicts: 0 (resolved: model wins)
+----
+
+Or `Already in sync. No changes.` when nothing to do.
+
+== `bausteinsicht validate`
+
+Source: `cmd/bausteinsicht/validate.go`.
+
+=== Synopsis
+
+[source,bash]
+----
+bausteinsicht validate [--model PATH] [--format text|json]
+----
+
+=== Behaviour
+
+. Resolve model path (auto-detect when `--model` is empty).
+. Load and `ValidateWithWarnings`.
+. Errors → exit 1; warnings only → exit 0.
+
+=== Output schema (JSON)
+
+[source,json]
+----
+{
+  "valid":   <bool>,
+  "errors":  [ {"path":"<json-path>", "message":"<msg>"} ],
+  "warnings":[ {"path":"<json-path>", "message":"<msg>"} ]
+}
+----
+
+=== Text
+
+[source]
+----
+ERROR:   [model.foo] missing required field "kind"
+WARNING: [specification] no element kinds defined in specification
+Model is valid.   <-- only when no errors
+----
+
+== `bausteinsicht add element`
+
+Source: `cmd/bausteinsicht/add_element.go`.
+
+=== Synopsis
+
+[source,bash]
+----
+bausteinsicht add element \
+    --id ID --kind KIND --title TITLE \
+    [--parent PARENT.PATH] \
+    [--technology TECH] \
+    [--description DESC]
+----
+
+=== Flags
+
+[cols="2,1,1,4", options="header"]
+|===
+| Flag | Type | Required | Description
+| `--id`           | string | yes | Element ID. Validated against `^[a-zA-Z][a-zA-Z0-9_-]*$`.
+| `--kind`         | string | yes | Must exist in `specification.elements`.
+| `--title`        | string | yes | Must not be empty.
+| `--parent`       | string | no  | Dot-notation parent path (e.g. `onlineshop.api`). Parent's kind must have `container: true`.
+| `--technology`   | string | no  | Free-form text.
+| `--description`  | string | no  | Free-form text.
+|===
+
+=== Errors
+
+[cols="2,1", options="header"]
+|===
+| Message | Exit
+| `invalid element ID "X": must contain only letters, digits, hyphens, or underscores` | 1
+| `unknown element kind "X"; valid kinds: ...` | 1
+| `title must not be empty` | 1
+| `parent "X" not found` | 1
+| `parent kind "K" does not allow children (container: false)` | 1
+| `element "X" already exists ...` | 1
+| Model load / save failure | 2
+|===
+
+=== Output schema (JSON)
+
+[source,json]
+----
+{
+  "id":          "<dot.path>",
+  "kind":        "<kind>",
+  "title":       "<title>",
+  "technology":  "<tech>",
+  "description": "<desc>"
+}
+----
+
+=== Text
+
+`Added element 'onlineshop.api' (kind: container) to model.`
+
+== `bausteinsicht add relationship`
+
+Source: `cmd/bausteinsicht/add_relationship.go`.
+
+=== Synopsis
+
+[source,bash]
+----
+bausteinsicht add relationship \
+    --from FROM.PATH --to TO.PATH \
+    [--label LABEL] \
+    [--kind KIND] \
+    [--description DESC]
+----
+
+=== Flags
+
+[cols="2,1,1,4", options="header"]
+|===
+| Flag | Type | Required | Description
+| `--from`        | string | yes | Source element. Dot notation. Must resolve.
+| `--to`          | string | yes | Target element. Dot notation. Must resolve.
+| `--label`       | string | no  | Edge label.
+| `--kind`        | string | no  | Must exist in `specification.relationships` if given.
+| `--description` | string | no  | Free-form text.
+|===
+
+=== Errors
+
+* `element "X" not found` (from / to)
+* `unknown relationship kind "X" not defined in specification`
+* `relationship X → Y (kind K) already exists`
+
+=== Output schema (JSON)
+
+[source,json]
+----
+{
+  "from":        "<dot.path>",
+  "to":          "<dot.path>",
+  "label":       "<label>",
+  "kind":        "<kind>",
+  "description": "<desc>"
+}
+----
+
+== `bausteinsicht watch`
+
+Source: `cmd/bausteinsicht/watch.go`.
+
+=== Synopsis
+
+[source,bash]
+----
+bausteinsicht watch [--model PATH] [--template PATH] [--format text|json] [--verbose]
+----
+
+=== Behaviour
+
+. Resolve model + matching `architecture.drawio` (both must exist).
+. Subscribe via `internal/watcher` (300 ms debounce); on each event run the same logic as `sync`.
+. Print `[HH:MM:SS] Sync triggered by <file>` and the same summary line as `sync`.
+. Errors and warnings are reported but **do not** terminate the watcher.
+. Stops on `SIGINT` or `SIGTERM`.
+
+== `bausteinsicht export`
+
+Source: `cmd/bausteinsicht/export.go`.
+
+=== Synopsis
+
+[source,bash]
+----
+bausteinsicht export \
+    [--image-format png|svg] \
+    [--view VIEW_KEY] \
+    [--output DIR] \
+    [--embed-diagram] \
+    [--scale FLOAT]
+----
+
+=== Flags
+
+[cols="2,1,1,4", options="header"]
+|===
+| Flag | Type | Default | Description
+| `--image-format` | string | `png` | One of `png`, `svg`. Other values → exit 2.
+| `--view`         | string | _(all)_ | View key (without the `view-` page prefix). When omitted, exports all views.
+| `--output`       | string | `.` | Output directory. Path containment check (SEC-015): `..` rejected.
+| `--embed-diagram`| bool   | `false` | If `true`, draw.io is asked to embed the diagram XML into the output (SVG/PDF feature).
+| `--scale`        | float  | `1.0` | Scale factor passed to draw.io. Values > 1 require GPU access.
+|===
+
+=== Pre-flight
+
+* Detect draw.io CLI via `internal/export.DetectDrawioBinary` (search order: `drawio-export`, `drawio` on PATH, platform-specific paths in `internal/export/platform_*.go`).
+* On miss: exit 2 with message containing `https://www.drawio.com/`.
+
+=== Output
+
+* Files named `architecture-<view>.<png|svg>` (`view` is `filepath.Base`-cleaned).
+* JSON: `{"files":[...],"errors":[...],"success":true|false}`.
+* Per-view export errors are accumulated; partial success returns exit 1.
+
+== `bausteinsicht export-table`
+
+Source: `cmd/bausteinsicht/export_table.go`.
+
+=== Synopsis
+
+[source,bash]
+----
+bausteinsicht export-table \
+    [--view VIEW_KEY] \
+    [--table-format adoc|md] \
+    [--output DIR] \
+    [--combined]
+----
+
+=== Flags
+
+[cols="2,1,1,4", options="header"]
+|===
+| Flag | Type | Default | Description
+| `--view`         | string | _(all)_ | Single view to export.
+| `--table-format` | string | `adoc`  | One of `adoc`, `md` (Markdown). Invalid → exit 2.
+| `--output`       | string | _(stdout)_ | Output directory; if omitted, writes to stdout.
+| `--combined`     | bool   | `false` | Emit a single deduplicated table over all views.
+|===
+
+=== JSON override
+
+If global `--format json` is set, the command emits a JSON array of row objects regardless of `--table-format`:
+
+[source,json]
+----
+[
+  {"id":"customer","title":"Customer","kind":"actor","technology":"","description":"End user"}
+]
+----
+
+=== AsciiDoc shape
+
+[source,asciidoc]
+----
+=== <View Title>
+
+|===
+| Element | Kind | Technology | Description
+
+| customer
+| actor
+|
+| End user
+|===
+----
+
+=== Markdown shape
+
+[source,markdown]
+----
+### <View Title>
+
+| Element | Kind | Technology | Description |
+|---------|------|-----------|-------------|
+| customer | actor | | End user |
+----
+
+== `bausteinsicht export-diagram`
+
+Source: `cmd/bausteinsicht/export_diagram.go`.
+
+=== Synopsis
+
+[source,bash]
+----
+bausteinsicht export-diagram \
+    [--view VIEW_KEY] \
+    [--diagram-format plantuml|mermaid] \
+    [--output DIR]
+----
+
+=== Flags
+
+[cols="2,1,1,4", options="header"]
+|===
+| Flag | Type | Default | Description
+| `--view`           | string | _(all)_     | Restrict to one view.
+| `--diagram-format` | string | `plantuml`  | One of `plantuml`, `mermaid`. Invalid → exit 2.
+| `--output`         | string | _(stdout)_  | Output directory; if omitted, prints to stdout.
+|===
+
+=== JSON override
+
+Global `--format json` makes the command emit a JSON array:
+
+[source,json]
+----
+[ {"view":"<key>","format":"plantuml","source":"@startuml ...@enduml"} ]
+----
+
+=== File extensions
+
+* PlantUML → `.puml`
+* Mermaid  → `.mmd`
+
+=== C4 level detection
+
+`internal/diagram/diagram.go` `detectLevel`:
+
+* "Component" if any element has `kind == "component"`.
+* "Container" if any element has `container: true` or the view has a `scope`.
+* "Context"   otherwise.
+
+PlantUML output uses `!include <C4/C4_Context|C4_Container|C4_Component>`.

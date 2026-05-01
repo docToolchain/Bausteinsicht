@@ -1,0 +1,39 @@
+= Risks and Technical Debt
+
+== Risks
+
+[cols="2,3,3", options="header"]
+|===
+| Risk | Description | Mitigation / Status
+
+| **Single-strategy conflict resolution** | `ModelWinsResolver` is the only resolver. Architects who prefer to capture diagram-side edits silently lose them on a conflicting save. | Interface seam already in place (`ConflictResolver`). Future ADR could add a draw.io-wins or interactive resolver. See ADR-004 and OQ.
+| **Reverse sync of structural changes is conservative** | Adding a brand-new element in draw.io that has no `bausteinsicht_id` is *not* synced into the model. Only the schema-aware tools that know to set the attribute can drive structural model changes through draw.io. | Documented behaviour. Open Question on whether a heuristic add-by-shape ever needs to be supported.
+| **draw.io CLI dependency for image export** | Only `export` requires the binary. If the binary is absent the command fails. | Detected with a clear error message and a download URL.
+| **Layout heuristic only — no manual layout in the model** | The architect cannot pin a position in JSONC; positions live in the draw.io file. If the diagram is regenerated from the template, manual positions are lost. | Mitigated by recording layout in the draw.io file and only reusing it on subsequent syncs. `--relayout` is opt-in.
+| **No formal JSON Schema in the repository** | `templates/sample-model.jsonc` references `$schema: ...bausteinsicht.schema.json` but the schema file is not in the repo. IDE users following the link see a 404. | Open Question (OQ).
+| **`Element.Tags` and `Element.Metadata` are dead fields** | Declared in `types.go` but no consumer found — risk of users relying on something that does nothing. | Either remove or wire up to a filter / rendering hook.
+| **`Tags` may surprise on round-trip** | Nothing prevents a draw.io export from clearing the field on save (since it is not part of the diff). | Open Question.
+| **No diff/preview command** | The user must run `sync` to see what would change. There is no `bausteinsicht plan` or `--dry-run`. | Future enhancement.
+| **`TestRun_*` tests rely on map-iteration ordering being normalized** | Any future change in the diff that introduces non-determinism would only show up as flake. | Mitigated by sorting before emit.
+| **Integrity of `.bausteinsicht-sync`** | The checksum protects against corruption / accidental edits, *not* against adversarial commits. | Documented; the file is local-only and not security-critical.
+|===
+
+== Technical debt
+
+[cols="2,4", options="header"]
+|===
+| Item | Notes
+
+| `Element.Metadata map[string]string` | Declared, never read by any production code path we could trace.
+| `Element.Tags []string` | Same as above.
+| `template_version` set but no migration | `CurrentTemplateVersion = 1` and the loader reads the attribute but no migration code exists for v0 → v1 (the comment says "backward compatible with v0").
+| Watch mode hard-codes `architecture.drawio` | The model can be auto-detected, but the matching draw.io file name is fixed.
+| Tests live next to code (`*_test.go`) — good — but cross-package E2E coverage is mostly in `cmd/bausteinsicht/sync_test.go`. | An explicit `e2e/` package may make the contract clearer over time.
+| `--model` and `--template` validation lives in the persistent prerun, not in a typed flag wrapper. | A small typed-flag helper would be safer.
+|===
+
+== Out-of-scope topics that may become risks if not addressed
+
+* Concurrent edits by multiple architects (the current design assumes a single workstation; collaborative editing isn't modelled).
+* Encrypted/secret content in models (no scrubbing performed).
+* Schema evolution of the model itself (rename a field, retire a field) — patch-save would silently lose data.

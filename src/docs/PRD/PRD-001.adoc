@@ -1,0 +1,276 @@
+= PRD-001: Bausteinsicht — Architecture-as-Code with Bidirectional draw.io Sync
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+
+[NOTE]
+====
+This Product Requirements Document was reverse-engineered from the source code, CLI surface, embedded templates, error messages, and tests.
+Statements that could not be traced to code are tracked in `src/docs/OPEN_QUESTIONS.adoc`.
+====
+
+== Vision
+
+Bausteinsicht is a local CLI that lets a team **define a software-architecture model in a single JSONC file and keep it visually in sync with draw.io diagrams in both directions**.
+The text file is the version-controllable source of truth for diff/review/CI; the draw.io file is the rich visual surface for human editing.
+Both surfaces remain authoritative for a defined set of edits, and changes flow either way without losing comments, formatting, or visual layout.
+
+The product is C4-inspired but not limited to four fixed levels — element kinds and relationship kinds are user-defined in the model's `specification` block (templates/sample-model.jsonc, README.adoc).
+
+== Problem Statement
+
+Architecture-as-code tooling today forces a tradeoff:
+
+* **Diagram-first tools** (raw draw.io, Lucidchart) make beautiful pictures but the model is locked inside an XML or proprietary file. Code review and refactoring of the architecture are awkward.
+* **Text-first tools** (Structurizr DSL, LikeC4, PlantUML) are versionable and reviewable but require contributors to learn a DSL, and visual editing requires re-rendering. Drag-and-drop layout edits do not propagate back to the source (README.adoc — "Related Projects").
+
+Bausteinsicht resolves the tradeoff: a JSONC source of truth, comment-preserving patches, and a sync engine that merges draw.io edits back into the JSONC. The user picks the surface they prefer for any given edit.
+
+== Target Audience
+
+Derived from CLI affordances, embedded skill (`.kiro/skills/bausteinsicht/SKILL.md`), example model (`examples/online-shop/architecture.jsonc`), and README workflows:
+
+* **Software architects and tech leads** maintaining living architecture documentation across multiple C4 levels.
+* **Platform / DevOps engineers** who want architecture diagrams in CI alongside code (single CLI binary, no Java/Node runtime — go.mod, Makefile).
+* **arc42 / docToolchain users** — the project lives under `github.com/docToolchain` and the README and CONTRIBUTING.md reference arc42 ADRs as a documentation target.
+* **AI/LLM-driven workflows** — every command has a documented JSON output mode (`--format json`, root.go:50) and there is an explicit `bausteinsicht` Claude Code skill (`.kiro/skills/bausteinsicht/SKILL.md`) that exposes the CLI to agents.
+
+== Functional Requirements
+
+=== Model and Source of Truth
+
+[cols="1,4", options="header"]
+|===
+| ID | Requirement
+
+| FR-001
+| The system MUST accept a single JSONC file (JSON with `//` line comments, `/* */` block comments, and trailing commas) as the architecture model. _Source: internal/model/loader.go `StripJSONC`._
+
+| FR-002
+| The model MUST have four sections: `specification` (element kinds and relationship kinds), `model` (element hierarchy), `relationships` (array of edges), `views` (named visualisations). An optional `config` block sets metadata-box content. _Source: internal/model/types.go `BausteinsichtModel`._
+
+| FR-003
+| Element kinds and relationship kinds MUST be user-defined inside `specification.elements` and `specification.relationships`. The element-kind definition order MUST be preserved and used as the layout tier order. _Source: internal/model/loader.go `extractElementOrder`, internal/sync/layout.go._
+
+| FR-004
+| Elements MUST nest hierarchically through a `children` map; nesting depth MUST be limited to 50 to bound recursion. _Source: internal/model/types.go `Element.Children`, internal/model/resolve.go `MaxElementDepth = 50`._
+
+| FR-005
+| Element IDs in CLI input MUST match `^[a-zA-Z][a-zA-Z0-9_-]*$`; dot is reserved as the hierarchy separator in path references such as `onlineshop.api.catalog`. _Source: cmd/bausteinsicht/add_element.go (regex), internal/model/resolve.go `Resolve`._
+
+| FR-006
+| Model file size MUST be limited to 10 MiB. _Source: internal/model/loader.go `MaxModelFileSize = 10 * 1024 * 1024`._
+|===
+
+=== CLI Commands
+
+[cols="1,4", options="header"]
+|===
+| ID | Requirement
+
+| FR-010
+| `bausteinsicht init` MUST scaffold a new project (`architecture.jsonc`, `template.drawio`, `architecture.drawio`, `.bausteinsicht-sync`) and refuse to overwrite any existing file. _Source: cmd/bausteinsicht/init.go._
+
+| FR-011
+| `bausteinsicht sync` MUST run a bidirectional three-way sync: model → draw.io and draw.io → model. _Source: cmd/bausteinsicht/sync.go, internal/sync/engine.go._
+
+| FR-012
+| `bausteinsicht validate` MUST validate the model and report errors and warnings without modifying any file. _Source: cmd/bausteinsicht/validate.go._
+
+| FR-013
+| `bausteinsicht add element` MUST add a new element with comment-preserving JSONC patching. _Source: cmd/bausteinsicht/add_element.go, internal/model/patch.go `InsertObjectEntry`._
+
+| FR-014
+| `bausteinsicht add relationship` MUST append a new relationship with comment-preserving JSONC patching and reject exact duplicates. _Source: cmd/bausteinsicht/add_relationship.go, internal/model/patch.go `AppendArrayEntry`._
+
+| FR-015
+| `bausteinsicht watch` MUST run continuously, debounce file-system events (default 300 ms), and re-sync on changes to either the model or the draw.io file. _Source: cmd/bausteinsicht/watch.go, internal/watcher/watcher.go `DefaultDebounce`._
+
+| FR-016
+| `bausteinsicht export` MUST shell out to a detected draw.io CLI to render PNG/SVG images per view. _Source: cmd/bausteinsicht/export.go, internal/export/._
+
+| FR-017
+| `bausteinsicht export-table` MUST emit per-view or combined element tables as AsciiDoc or Markdown (and JSON when `--format json` is set). _Source: cmd/bausteinsicht/export_table.go, internal/table/._
+
+| FR-018
+| `bausteinsicht export-diagram` MUST emit per-view diagrams as PlantUML C4 or Mermaid. _Source: cmd/bausteinsicht/export_diagram.go, internal/diagram/._
+
+| FR-019
+| Every command MUST support `--format text|json` for machine-readable output. _Source: cmd/bausteinsicht/root.go:50._
+
+| FR-020
+| Every command MUST auto-detect the model file (single `*.jsonc` in the current directory) when `--model` is not supplied. _Source: internal/model/loader.go `AutoDetect`._
+|===
+
+=== Synchronization
+
+[cols="1,4", options="header"]
+|===
+| ID | Requirement
+
+| FR-030
+| Forward sync (model → draw.io) MUST create, update, and delete elements and connectors so that each defined view becomes a draw.io page identified by `view-<viewID>`. _Source: internal/sync/forward.go, cmd/bausteinsicht/sync.go._
+
+| FR-031
+| Newly created elements MUST be visually marked with a red dashed border (`strokeColor=#FF0000;dashed=1;`) so the user can recognise unplaced elements. _Source: internal/sync/forward.go `newElementMarker`._
+
+| FR-032
+| Reverse sync (draw.io → model) MUST propagate changes to element title, description, and technology fields, plus relationship label changes, back into the JSONC model. _Source: internal/sync/reverse.go, internal/sync/diff.go._
+
+| FR-033
+| When a user reverses a connector in draw.io (Deleted A→B + Added B→A) the system MUST detect the swap and update the existing relationship in place to preserve `kind`, `label`, and `description`. _Source: internal/sync/reverse.go `applyRelSwap`._
+
+| FR-034
+| Conflicts (same field changed in both surfaces since the last sync) MUST be resolved with **model wins** by default; the losing draw.io change MUST be reported as a warning. _Source: internal/sync/conflict.go `ModelWinsResolver`._
+
+| FR-035
+| The sync engine MUST persist a sync state file (`.bausteinsicht-sync`) that records last-synced field values and SHA-256 hashes of both files, with a SHA-256 integrity checksum on the state file itself. _Source: internal/sync/state.go._
+
+| FR-036
+| If the draw.io file is missing or contains no `<diagram>` elements, sync MUST recreate it from the template and discard the stale sync state. _Source: cmd/bausteinsicht/sync.go._
+
+| FR-037
+| The sync engine MUST preserve JSONC comments and formatting when only field-level updates need to be saved (comment-preserving patch path); structural changes MUST fall back to a full marshal that preserves the file's pre-`{` preamble. _Source: internal/sync/patchops.go `ReversePatchOps`, internal/model/loader.go `Save`._
+
+| FR-038
+| Forward sync MUST relayout pages on `--relayout`, otherwise it MUST preserve manual positions of existing elements. _Source: cmd/bausteinsicht/sync.go (`--relayout` flag), internal/sync/forward.go._
+
+| FR-039
+| The sync engine MUST suppress false-positive deletions for elements that appear only on newly created view pages. _Source: internal/sync/diff.go `computeNewPageOnlyElements`._
+
+| FR-040
+| Empty title updates from draw.io MUST be rejected and reported as a warning. _Source: internal/sync/reverse.go (#150)._
+|===
+
+=== Views and Layout
+
+[cols="1,4", options="header"]
+|===
+| ID | Requirement
+
+| FR-050
+| A view MUST select elements with `include` patterns (literal IDs or globs `*` and `**`), refine with `exclude`, and optionally draw a boundary around a `scope` element. _Source: internal/model/resolve.go `MatchPattern`, `ResolveView`._
+
+| FR-051
+| Pattern semantics MUST be: `**` = all elements; `*` = top-level only; `prefix.*` = direct children; `prefix.**` = all descendants; otherwise exact match. _Source: internal/model/resolve.go `MatchPattern`._
+
+| FR-052
+| A view MUST support layout modes `layered` (default), `grid`, and `none`. _Source: internal/sync/layout.go `computeLayout`._
+
+| FR-053
+| In `layered` layout, element kinds MUST be ordered into tiers using the order in which they were defined in `specification.elements`. _Source: internal/sync/layout.go, internal/model/loader.go `extractElementOrder`._
+
+| FR-054
+| When a relationship endpoint is not visible on a view but an ancestor is, the connector MUST be lifted to the visible ancestor instead of being silently dropped. _Source: internal/sync/diff.go `computeVisibleRelationships` ("relationship lifting" — README.adoc Features)._
+
+| FR-055
+| Each view page SHOULD include a metadata box (view title, description, repo URL, model path, sync timestamp, author) and a legend of element-kind notations and colours, controlled by `config.metadata` and `config.legend`. _Source: internal/sync/metadata.go, internal/model/types.go `Config`._
+|===
+
+=== Validation
+
+[cols="1,4", options="header"]
+|===
+| ID | Requirement
+
+| FR-060
+| The validator MUST reject empty/whitespace element IDs, missing required fields (`kind`, `title`), unknown kinds, and unknown relationship kinds. _Source: internal/model/validate.go._
+
+| FR-061
+| The validator MUST reject `children` on a kind that does not declare `container: true`. _Source: internal/model/validate.go._
+
+| FR-062
+| The validator MUST reject relationships whose `from` or `to` does not resolve and MUST flag exact duplicates (same from/to/kind/label). _Source: internal/model/validate.go._
+
+| FR-063
+| The validator MUST reject views with invalid `layout` values, unresolved `scope`, or literal include/exclude IDs that do not exist; pattern entries (containing `*`) MUST NOT be flagged as missing. _Source: internal/model/validate.go._
+
+| FR-064
+| The validator MUST emit warnings (not errors) when the specification has no element kinds or the model is empty. _Source: internal/model/validate.go._
+|===
+
+=== Output, Errors, and Exit Codes
+
+[cols="1,4", options="header"]
+|===
+| ID | Requirement
+
+| FR-070
+| Exit code MUST be `0` on success, `1` on validation/business-rule failure or unresolved conflicts, `2` on I/O / file-not-found / pre-flight error. _Source: cmd/bausteinsicht/*.go (`exitWithCode`)._
+
+| FR-071
+| When `--format json` is set, errors MUST be emitted to stderr as `{"error": <msg>, "code": <int>}`. _Source: cmd/bausteinsicht/root.go `ExecuteRoot`._
+
+| FR-072
+| Verbose mode (`--verbose`) MUST log a per-command progress trace to stderr. _Source: cmd/bausteinsicht/sync.go, watch.go._
+|===
+
+== Non-Functional Requirements
+
+[cols="1,4", options="header"]
+|===
+| ID | Requirement
+
+| NFR-001 _(Portability)_
+| The CLI MUST build as a single static binary for linux/darwin/windows × amd64/arm64 with `CGO_ENABLED=0`. _Source: Makefile, .goreleaser.yml._
+
+| NFR-002 _(Reproducibility)_
+| The build MUST require Go 1.25+ and only the dependencies pinned in `go.mod` (cobra, etree, fsnotify, rapid). No network access at run time. _Source: go.mod, README.adoc "Security"._
+
+| NFR-003 _(Atomicity / Durability)_
+| Every file write (model save, drawio save, sync-state save) MUST use a write-to-temp-then-rename pattern. _Source: internal/model/loader.go `Save`, internal/drawio/document.go `SaveDocument`, internal/sync/state.go `SaveState`._
+
+| NFR-004 _(Integrity)_
+| The sync state file MUST carry a `sha256:<hex>` self-checksum and detect tampering or corruption. _Source: internal/sync/state.go._
+
+| NFR-005 _(Security — path containment)_
+| `--model`, `--template`, and the export `--output` directory MUST be rejected if they contain `..` traversal components. _Source: cmd/bausteinsicht/root.go `validatePathContainment` (SEC-001, SEC-016), cmd/bausteinsicht/export.go (SEC-015)._
+
+| NFR-006 _(Security — HTML escaping)_
+| Element titles, technology and description rendered in draw.io HTML labels and metadata boxes MUST be HTML-escaped. _Source: internal/drawio/label.go `escapeHTML` (SEC-008), internal/sync/metadata.go._
+
+| NFR-007 _(Robustness — input bounds)_
+| The loader MUST cap model files at 10 MiB and traversal/recursion at depth 50. _Source: internal/model/loader.go `MaxModelFileSize`, internal/model/resolve.go `MaxElementDepth`._
+
+| NFR-008 _(Performance)_
+| Sync, flatten, and load operations MUST have benchmark coverage at n=10 / 100 / 500 elements. _Source: internal/model/bench_test.go, internal/sync/bench_test.go._
+
+| NFR-009 _(Quality gates)_
+| `make check` MUST run `go vet`, `staticcheck`, `gosec`, `nilaway`, `govulncheck`, plus race-detected tests; pre-commit hook MUST also run `gofmt`, `golangci-lint`, and `gitleaks`. _Source: Makefile, scripts/pre-commit._
+
+| NFR-010 _(IDE ergonomics)_
+| The model MUST advertise a `$schema` URL so editors can offer autocompletion without plugins. _Source: templates/sample-model.jsonc, README.adoc Features._
+
+| NFR-011 _(LLM ergonomics)_
+| Every command's machine output MUST be stable JSON. _Source: each command file's JSON branch._
+
+| NFR-012 _(Cross-platform export)_
+| draw.io CLI detection MUST consider `drawio-export` (devcontainer), `drawio` on PATH, and platform-specific paths on linux/darwin/windows. _Source: internal/export/platform_*.go._
+
+| NFR-013 _(Observability)_
+| Warnings, conflicts, and errors MUST go to stderr; structured "results" go to stdout. _Source: cmd/bausteinsicht/sync.go etc._
+|===
+
+== Success Metrics
+
+Not directly observable in code. See OQ entries.
+
+* **Adoption:** GitHub stars / release downloads (.goreleaser.yml).
+* **Round-trip fidelity:** zero loss of JSONC comments after a draw.io edit (CONTRIBUTING.md mandates a comment-preservation E2E test for every new field).
+* **Sync latency:** watch-mode debounce of 300 ms is the implicit upper bound on perceived editor latency (`internal/watcher/watcher.go`).
+
+== Future Considerations
+
+The following capabilities are *implied* by code structure or comments but not yet implemented:
+
+* **Pluggable conflict resolvers** — `ConflictResolver` is an interface with only `ModelWinsResolver` (internal/sync/conflict.go); a "draw.io wins" or interactive resolver could be added.
+* **Template versioning** — `bausteinsicht_template_version` already declared (`drawio/template.go`, `CurrentTemplateVersion = 1`); migration paths for v2 are not yet present.
+* **Additional export formats** — current diagram exports are PlantUML and Mermaid; a `Format` enum (internal/diagram/diagram.go) suggests the list is meant to grow.
+* **Tags on elements** (`Element.Tags []string`, types.go) — not yet used in layout, validation, or any view filter that we could trace.
+* **Element metadata map** (`Element.Metadata map[string]string`, types.go) — declared but no consuming code path was found.
+* **Watch mode for non-default file names** — watch.go expects `architecture.drawio` next to the model.
+
+== Open Questions
+
+See `src/docs/OPEN_QUESTIONS.adoc`. All assumptions made in this PRD that could not be proven from code are listed there.

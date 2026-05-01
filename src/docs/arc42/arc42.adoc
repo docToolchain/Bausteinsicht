@@ -1,0 +1,21 @@
+= Bausteinsicht — Architecture Documentation (arc42)
+:toc: left
+:toclevels: 2
+:sectnums:
+:icons: font
+
+This is the master file for the arc42 architecture documentation.
+The 12 chapters live in `chapters/` and architecture decisions in `ADRs/`.
+
+include::chapters/01_introduction_and_goals.adoc[leveloffset=+1]
+include::chapters/02_architecture_constraints.adoc[leveloffset=+1]
+include::chapters/03_system_scope_and_context.adoc[leveloffset=+1]
+include::chapters/04_solution_strategy.adoc[leveloffset=+1]
+include::chapters/05_building_block_view.adoc[leveloffset=+1]
+include::chapters/06_runtime_view.adoc[leveloffset=+1]
+include::chapters/07_deployment_view.adoc[leveloffset=+1]
+include::chapters/08_crosscutting_concepts.adoc[leveloffset=+1]
+include::chapters/09_architecture_decisions.adoc[leveloffset=+1]
+include::chapters/10_quality_requirements.adoc[leveloffset=+1]
+include::chapters/11_risks_and_technical_debt.adoc[leveloffset=+1]
+include::chapters/12_glossary.adoc[leveloffset=+1]

@@ -1,0 +1,451 @@
+= Data Models
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+
+This specification documents the JSONC architecture model, the sync state file, the draw.io extensions, and supporting types — all reverse-engineered from `internal/model/*.go`, `internal/sync/state.go`, `internal/drawio/*.go`, and the test fixtures in `internal/model/testdata/` and `templates/sample-model.jsonc`.
+
+== File inventory
+
+[cols="2,2,4", options="header"]
+|===
+| Filename | Path | Role
+| `architecture.jsonc` | working dir | Architecture model — single source of truth.
+| `template.drawio`    | working dir | draw.io template that defines element styles.
+| `architecture.drawio`| working dir | Generated/edited diagram with one page per view.
+| `.bausteinsicht-sync`| working dir | Sync state (last-synced field values, hashes, integrity checksum).
+| `bausteinsicht.schema.json` | (referenced via `$schema` URL) | JSON Schema for IDE autocompletion. _Referenced from `templates/sample-model.jsonc` but not present in the repo._
+|===
+
+== Architecture model — JSONC root
+
+Authoritative type: `BausteinsichtModel` in `internal/model/types.go:12-23`.
+
+[source,go]
+----
+type BausteinsichtModel struct {
+    Schema        string
+    Config        Config
+    Specification Specification
+    Model         map[string]Element
+    Relationships []Relationship
+    Views         map[string]View
+    ElementOrder  []string  // implicit: insertion order of specification.elements
+}
+----
+
+Top-level JSONC layout:
+
+[source,jsonc]
+----
+{
+  "$schema": "https://raw.githubusercontent.com/docToolchain/Bausteinsicht/main/schema/bausteinsicht.schema.json",
+
+  "config":         { ... },           // optional
+  "specification":  { ... },           // required
+  "model":          { ... },           // required (may be empty → warning)
+  "relationships":  [ ... ],           // optional, default []
+  "views":          { ... }            // optional, default {}
+}
+----
+
+JSONC features handled by `loader.StripJSONC`:
+
+* UTF-8 BOM
+* `// line comments`
+* `/* block comments */`
+* trailing commas before `}` or `]`
+
+Hard limits (`internal/model/loader.go`, `internal/model/resolve.go`):
+
+* `MaxModelFileSize = 10 * 1024 * 1024` bytes (10 MiB).
+* `MaxElementDepth = 50` levels of nesting.
+
+== `config`
+
+`internal/model/types.go:4-9`.
+
+[source,go]
+----
+type Config struct {
+    Metadata *bool  // enable / disable metadata box (per-view)
+    Legend   *bool  // enable / disable legend box (per-view)
+    Author   string
+    Repo     string
+}
+----
+
+* Both flags use `*bool` so that "unset" is distinct from `false`.
+* `Author` and `Repo` are rendered into the metadata box (`internal/sync/metadata.go`).
+
+[source,jsonc]
+----
+"config": {
+  "metadata": true,
+  "legend":   true,
+  "author":   "Architecture Guild",
+  "repo":     "https://github.com/example/onlineshop"
+}
+----
+
+== `specification`
+
+`internal/model/types.go:25-39`.
+
+[source,go]
+----
+type Specification struct {
+    Elements      map[string]ElementKind
+    Relationships map[string]RelationshipKind
+}
+type ElementKind struct {
+    Notation    string  // C4 notation label
+    Description string
+    Container   bool    // may have children
+}
+type RelationshipKind struct {
+    Notation string
+    Dashed   bool
+}
+----
+
+[NOTE]
+====
+**Definition order matters.** The order in which kinds appear in `specification.elements` becomes their layer order in the layered layout. `loader.extractElementOrder` reads them with a streaming JSON decoder to preserve insertion order. (`internal/model/loader.go:51-99`, `internal/sync/layout.go`.)
+====
+
+[source,jsonc]
+----
+"specification": {
+  "elements": {
+    "actor":     { "notation": "Actor" },
+    "system":    { "notation": "Software System", "container": true },
+    "container": { "notation": "Container",       "container": true },
+    "component": { "notation": "Component",       "container": true }
+  },
+  "relationships": {
+    "uses":  { "notation": "uses" },
+    "async": { "notation": "publishes/subscribes", "dashed": true }
+  }
+}
+----
+
+== `model.<id>` — Element
+
+`internal/model/types.go:41-49`.
+
+[source,go]
+----
+type Element struct {
+    Kind        string
+    Title       string
+    Description string
+    Technology  string
+    Tags        []string             // declared but no consumer in v1 — see Open Questions
+    Children    map[string]Element
+    Metadata    map[string]string    // declared but no consumer in v1 — see Open Questions
+}
+----
+
+Required fields for validation: `kind`, `title`. `kind` must reference a key in `specification.elements`. `children` is allowed only if the kind has `container: true`.
+
+[source,jsonc]
+----
+"model": {
+  "customer": {
+    "kind": "actor",
+    "title": "Customer",
+    "description": "End user"
+  },
+  "onlineshop": {
+    "kind": "system",
+    "title": "Online Shop",
+    "children": {
+      "api": {
+        "kind": "container",
+        "title": "REST API",
+        "technology": "Go"
+      }
+    }
+  }
+}
+----
+
+=== Element ID rules
+
+* Object key in JSONC.
+* CLI input regex: `^[a-zA-Z][a-zA-Z0-9_-]*$` (`cmd/bausteinsicht/add_element.go:15`).
+* Reference path uses `.` as separator: `onlineshop.api`. Therefore the ID itself must not contain a dot.
+
+== `relationships`
+
+`internal/model/types.go:51-57`.
+
+[source,go]
+----
+type Relationship struct {
+    From        string
+    To          string
+    Label       string
+    Kind        string
+    Description string
+}
+----
+
+* `From` and `To` are dot-notation references; both must resolve to a model element.
+* `Kind` (when set) must be a key in `specification.relationships`.
+* Duplicates are forbidden when **all** of `(from, to, kind, label)` match.
+
+[source,jsonc]
+----
+"relationships": [
+  { "from": "customer",          "to": "onlineshop.api", "label": "uses",   "kind": "uses" },
+  { "from": "onlineshop.api",    "to": "onlineshop.db",  "label": "writes", "kind": "uses" }
+]
+----
+
+== `views`
+
+`internal/model/types.go:59-66`.
+
+[source,go]
+----
+type View struct {
+    Title       string
+    Scope       string
+    Include     []string
+    Exclude     []string
+    Description string
+    Layout      string  // "" | "layered" | "grid" | "none"
+}
+----
+
+[cols="1,4", options="header"]
+|===
+| Field | Semantics
+| `title`       | Required. Used as draw.io page name and metadata-box header.
+| `scope`       | Optional. Element drawn as boundary swimlane. Must resolve.
+| `include`     | Patterns selecting elements (see below). Empty `include` ⇒ empty view.
+| `exclude`     | Patterns subtracting elements after `include`.
+| `description` | Optional. Rendered into the metadata box.
+| `layout`      | One of `""` (treated as `"layered"`), `"layered"`, `"grid"`, `"none"`.
+|===
+
+=== Pattern semantics (`internal/model/resolve.go:72-121`)
+
+[cols="1,3,3", options="header"]
+|===
+| Pattern | Matches | Example
+| `**` | Every element in the model | `**`
+| `*`  | Every top-level element (no `.`) | `*`
+| `prefix.*` | Direct children of `prefix` | `onlineshop.*`
+| `prefix.**`| All descendants of `prefix` | `onlineshop.**`
+| `exact.path`| Exact element | `onlineshop.api.catalog`
+|===
+
+[source,jsonc]
+----
+"views": {
+  "containers": {
+    "title":   "Container View",
+    "scope":   "onlineshop",
+    "include": ["customer", "onlineshop.*", "payment-provider"],
+    "layout":  "layered"
+  }
+}
+----
+
+== Sync state — `.bausteinsicht-sync`
+
+Authoritative type: `SyncState` in `internal/sync/state.go:17-25`.
+
+[source,go]
+----
+type SyncState struct {
+    Checksum         string                       // "sha256:<hex>" of the rest of the file
+    Timestamp        string                       // ISO-8601
+    ModelHash        string                       // "sha256:<hex>" of the model file
+    DrawioHash       string                       // "sha256:<hex>" of the drawio file
+    Elements         map[string]ElementState      // key = dot-path
+    Relationships    []RelationshipState
+    RenderedElements map[string]bool              // which IDs are actually on a page
+}
+
+type ElementState struct {
+    Title, Description, Technology, Kind string
+}
+
+type RelationshipState struct {
+    From, To string
+    Index    int
+    Label    string
+    Kind     string
+}
+----
+
+The `Checksum` is computed by marshaling the rest of the struct, hashing with SHA-256, and storing as `sha256:<hex>`. On load, a checksum mismatch fails with the message `sync state corrupted (checksum mismatch); delete .bausteinsicht-sync and re-run sync` (`internal/sync/state.go:46-93`).
+
+[source,json]
+----
+{
+  "checksum":   "sha256:7a1f...",
+  "timestamp":  "2026-05-01T12:34:56Z",
+  "modelHash":  "sha256:...",
+  "drawioHash": "sha256:...",
+  "elements": {
+    "customer":            {"title":"Customer","description":"End user","technology":"","kind":"actor"},
+    "onlineshop.api":      {"title":"REST API","description":"...","technology":"Go","kind":"container"}
+  },
+  "relationships": [
+    {"from":"customer","to":"onlineshop.api","index":0,"label":"uses","kind":"uses"}
+  ],
+  "renderedElements": {
+    "customer": true,
+    "onlineshop.api": true
+  }
+}
+----
+
+== Draw.io document — Bausteinsicht extensions
+
+The XML follows the standard draw.io schema with `<mxfile>` / `<diagram>` / `<mxGraphModel>` / `<root>` / `<object>` / `<mxCell>` (`internal/drawio/document.go`).
+
+Bausteinsicht layers two custom attributes onto each element's `<object>`:
+
+[cols="2,4", options="header"]
+|===
+| Attribute | Meaning
+| `bausteinsicht_id`   | Dot-path of the model element (matches the JSONC key path).
+| `bausteinsicht_kind` | Reference to a key in `specification.elements`.
+|===
+
+Optional element attributes:
+
+* `technology` — verbatim from the model.
+* `tooltip`    — the description.
+* `link`       — drill-down hint (e.g. `data:page/id,view-containers`).
+
+Each connector is a regular `<mxCell edge="1">` whose `id` is `rel-<from>-<to>-<index>` (`internal/drawio/connector.go:21-23`).
+
+Newly created elements receive an extra style segment:
+
+[source]
+----
+strokeColor=#FF0000;dashed=1;
+----
+
+(`internal/sync/forward.go` `newElementMarker`).
+
+== Draw.io template — recognised attributes
+
+Authoritative type: `TemplateSet` in `internal/drawio/template.go:36-41`.
+
+* The template MUST be an `<mxfile>` document with `bausteinsicht_template_version` (defaults to 1; `CurrentTemplateVersion = 1`).
+* Each `<object>` carrying `bausteinsicht_template="<kind>"` defines the style for that element kind. The associated `<mxCell>` provides the draw.io style string and default geometry.
+* Sub-cell templates (children of the template object with id suffixes `-title`, `-tech`, `-desc`) declare per-line styles for grouped-text elements; their absence selects the legacy HTML-label rendering.
+* The template can also provide boundary styles (rendered around scope elements) and a default connector style.
+
+== HTML labels
+
+`internal/drawio/label.go`.
+
+`GenerateLabel(title, technology, description)` produces:
+
+[source,html]
+----
+<b>Title</b><br>
+<font color="#CCCCCC"><i>[Technology]</i></font><br>
+<font color="#BBBBBB" style="font-size:11px">Description</font>
+----
+
+* All values are passed through `escapeHTML` for `&`, `<`, `>`, `"` (SEC-008).
+* Empty lines are omitted.
+* Description is truncated at `maxLabelDescLen = 60` runes with `…` (or 120 in the sub-cell variant) to fit the element box.
+
+== Validation errors and warnings — JSON shapes
+
+`internal/model/validate.go:8-22`.
+
+[source,go]
+----
+type ValidationError struct {
+    Path    string  // e.g. "model.foo.title", "relationships[2]", "views.context.include"
+    Message string
+}
+type ValidationWarning struct {
+    Path    string
+    Message string
+}
+type ValidationResult struct {
+    Errors   []ValidationError
+    Warnings []ValidationWarning
+}
+----
+
+Error messages observable in `internal/model/validate.go`:
+
+* `invalid element ID "X": must not be empty or whitespace`
+* `missing required field "kind"` / `missing required field "title"`
+* `unknown kind "X"`
+* `kind "K" does not allow children (container: false)`
+* `from "X" does not resolve to an existing element`
+* `to "X" does not resolve to an existing element`
+* `unknown relationship kind "X"`
+* `duplicate relationship X → Y (first at relationships[I])`
+* `invalid layout "X" (must be "layered", "grid", "none", or empty)`
+* `scope "X" does not resolve to an existing element`
+* `element "X" does not exist`
+
+Warnings:
+
+* `no element kinds defined in specification`
+* `model is empty (no elements defined)`
+
+== Test fixtures
+
+=== `internal/model/testdata/minimal-model.jsonc`
+
+[source,jsonc]
+----
+{
+  "specification": {
+    "elements": {
+      "system": { "notation": "System" }
+    }
+  },
+  "model": {
+    "root": { "kind": "system", "title": "Root" }
+  },
+  "relationships": [],
+  "views": {}
+}
+----
+
+=== `internal/model/testdata/valid-model.jsonc`
+
+Demonstrates the full set of JSONC features (line comments, trailing commas, nested specification entries) and acts as the canonical happy-path input for the loader and validator.
+
+=== `internal/model/testdata/invalid-json.jsonc`
+
+Triggers the unmarshaler — an unquoted key inside `specification.elements` — to verify that `Load` surfaces a parse error.
+
+=== `templates/sample-model.jsonc`
+
+Embedded by `templates/embed.go` and emitted by `bausteinsicht init`. Contains 10 element kinds, a 3-level hierarchy (`onlineshop.api.catalog`), 14 relationships, and three views (`context`, `containers`, `components`). The full text is in `examples/online-shop/architecture.jsonc`.
+
+== JSON output schemas — index
+
+[cols="2,4", options="header"]
+|===
+| Command | Schema reference
+| `init`            | `{"success":bool,"files":[string]}`
+| `sync`            | `{"forward_added":int, "forward_updated":int, "forward_deleted":int, "reverse_added":int, "reverse_updated":int, "reverse_deleted":int, "metadata_updated":int, "conflicts":int}`
+| `validate`        | `{"valid":bool, "errors":[{path,message}], "warnings":[{path,message}]}`
+| `add element`     | `{"id":string,"kind":string,"title":string,"technology":string,"description":string}`
+| `add relationship`| `{"from":string,"to":string,"label":string,"kind":string,"description":string}`
+| `export`          | `{"files":[string],"errors":[string],"success":bool}`
+| `export-table`    | `[{id,title,kind,technology,description}]`
+| `export-diagram`  | `[{view,format,source}]`
+| _(error envelope)_| `{"error":string,"code":int}` on stderr
+|===

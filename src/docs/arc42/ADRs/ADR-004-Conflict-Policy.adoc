@@ -1,0 +1,51 @@
+= ADR-004: Default conflict policy — model wins
+
+== Status
+
+Accepted (`internal/sync/conflict.go::ModelWinsResolver`).
+
+== Context
+
+When the same field changes on both surfaces between two syncs, exactly one value can survive. Architects need a default that is **predictable**, **explainable**, and aligned with the principle that JSONC is the source of truth (ADR-001). The choice of default has a downstream effect on the meaning of `--format json` summaries and exit codes.
+
+== Decision
+
+Default conflict policy is **model wins**. The `ConflictResolver` interface (`internal/sync/conflict.go:22-24`) is the extension seam:
+
+[source,go]
+----
+type ConflictResolver interface {
+    Resolve([]Conflict) []ResolvedConflict
+}
+----
+
+`ModelWinsResolver` is the only implementation in v1. It always picks the model value and emits a warning naming the field, both values, and the last-synced value. Whenever at least one conflict was resolved, `bausteinsicht sync` exits with code **1** (success-with-warnings).
+
+== Alternatives considered
+
+. **draw.io wins** — preserves visual-side edits.
+. **Last-writer wins** (file mtime) — automatic but fragile.
+. **Interactive resolver** — prompts the user.
+. **Three-way merge** (similar to git) — composes both changes when they don't actually conflict on the same byte; mismatch keeps both values somehow.
+
+== Pugh Matrix
+
+Baseline = "draw.io wins".
+
+[cols="3,1,1,1,1,1", options="header"]
+|===
+| Quality goal (weight)                          | Model wins | Last-writer | Interactive | 3-way merge | drawio wins (baseline)
+| Predictability (×3)                             | +1         | -1          | 0           | -1          | 0
+| Aligns with "JSONC is SoT" (×3)                 | +1         |  0          | 0           | 0           | 0
+| Reviewability of resolution (×2)                | +1         | -1          | 0           | -1          | 0
+| Suitable for non-interactive CI (×2)            | +1         | +1          | -1          | 0           | 0
+| LLM-friendliness (×2)                           | +1         |  0          | -1          | 0           | 0
+| Lossless (preserves both edits when possible) (×1) | -1     | -1          | +1          | +1          | 0
+| **Weighted total**                              | **+11**    | **-3**      | **-3**      | **-3**      | **0**
+|===
+
+== Consequences
+
+* **Positive:** the policy matches the broader "JSONC is the source of truth" stance; behaviour is identical between interactive and non-interactive callers; warnings make the loss of a draw.io edit auditable.
+* **Negative:** an architect who edits exclusively in draw.io and then runs sync on a stale model will lose those edits, with only a stderr warning. We accept this because the warning is loud and the user is encouraged to update the model first.
+* **Future:** alternative resolvers can be plugged in via `ConflictResolver`; a user-facing flag (e.g. `--on-conflict=drawio|model|interactive`) is a documented future enhancement.

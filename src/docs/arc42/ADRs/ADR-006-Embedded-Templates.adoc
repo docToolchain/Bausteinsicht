@@ -1,0 +1,44 @@
+= ADR-006: Embedded sample model and default template
+
+== Status
+
+Accepted (`templates/embed.go` uses `//go:embed`; `cmd/bausteinsicht/init.go` reads `templates.SampleModel` and `templates.DefaultTemplate`).
+
+== Context
+
+`bausteinsicht init` must produce a working project — a JSONC model, a draw.io template, and an initial diagram — in a directory that is otherwise empty. Two payloads (the sample model and the default template) need to ship with the binary:
+
+* It would be unergonomic to require the user to download or `curl` these files.
+* A single-binary distribution is a stated quality goal (NFR-001).
+
+== Decision
+
+Use Go's `embed` package: `templates/embed.go` declares `var SampleModel []byte` and `var DefaultTemplate []byte` backed by `templates/sample-model.jsonc` and `templates/default.drawio`. Init writes them verbatim into the working directory; sync uses `DefaultTemplate` as fallback when `--template` is not provided.
+
+== Alternatives considered
+
+. **Go string literals** — embed as huge `const` strings; harder to maintain (no syntax highlighting, no test fixtures shared with code).
+. **External download on first run** — small binary, but breaks the "no network" property (NFR-002, README "Security").
+. **External path required** — push the burden to the user; bad first-run experience.
+
+== Pugh Matrix
+
+Baseline = "Go string literals".
+
+[cols="3,1,1,1,1", options="header"]
+|===
+| Quality goal (weight)               | go:embed | External download | External required | string literals (baseline)
+| First-run UX (×3)                    | +1       | -1                | -1                | 0
+| No network at runtime (×3)           | +1       | -1                |  0                | 0
+| Files are first-class assets         |          |                   |                   |
+| (editable, lintable, testable) (×2)  | +1       |  0                | +1                | 0
+| Single-binary distribution (×2)      | +1       | -1                | -1                | 0
+| Maintenance overhead (×1)            | -1       | -1                |  0                | 0
+| **Weighted total**                   | **+9**   | **-9**            | **-3**            | **0**
+|===
+
+== Consequences
+
+* **Positive:** the binary is fully self-contained; `bausteinsicht init` works on an air-gapped machine; the embedded files are the same ones used as test fixtures (`templates/embed_test.go`).
+* **Negative:** any change to the sample model is a re-build of the binary. Users who want a custom default must pass `--template`.
+* **Followup:** the default template carries `bausteinsicht_template_version`; future versions of this template will require migration code (see Risks chapter).

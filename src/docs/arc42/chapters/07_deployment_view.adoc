@@ -1,0 +1,51 @@
+= Deployment View
+
+Bausteinsicht is a single statically-linked binary. There is no server, no daemon, and no installer.
+
+[plantuml, deploy, svg]
+....
+@startuml
+node "Workstation / CI runner" as box {
+  artifact "bausteinsicht (static binary)" as bin
+  artifact "architecture.jsonc"            as model
+  artifact "architecture.drawio"           as drawio
+  artifact ".bausteinsicht-sync"           as state
+  artifact "template.drawio"               as tpl
+  artifact "drawio CLI (optional)"         as drawio_cli
+}
+
+bin .right.> model    : read/write
+bin .right.> drawio   : read/write
+bin .right.> state    : read/write (sha256)
+bin .right.> tpl      : read
+bin ..> drawio_cli    : exec (export only)
+@enduml
+....
+
+== Distribution
+
+Configured by `.goreleaser.yml`:
+
+* Builds 6 platform/arch combinations: linux/darwin/windows × amd64/arm64.
+* `CGO_ENABLED=0`.
+* `ldflags: -s -w -X main.version={{.Version}}` (the binary embeds its release tag).
+* Tar/zip archives named `bausteinsicht_{Version}_{OS}_{Arch}.{tar.gz,zip}`.
+* Checksums file `checksums.txt`.
+* Release changelog grouped by conventional-commit prefix.
+
+Triggered by `.github/workflows/release.yml` on a `v*` git tag.
+
+== Continuous Integration
+
+`.github/workflows/go.yml`:
+
+* Matrix: ubuntu-latest, windows-latest, macos-latest.
+* Steps per OS: `go build ./...` + `go test ./...`.
+* Separate `lint` job: `golangci-lint` on ubuntu-latest.
+* Permissions are scoped to `contents: read` per job.
+
+The full local quality gate is `make check` (`vet`, `staticcheck`, `gosec`, `nilaway`, `govulncheck`, race-tests). The pre-commit hook (`scripts/pre-commit`) additionally enforces `gofmt`, `golangci-lint`, and `gitleaks` on staged content.
+
+== Development environment
+
+`.devcontainer/devcontainer.json` provides a reproducible container with Go, all the analysis tools, and the headless draw.io CLI for image-export tests. Contributors who do not use the devcontainer can install the toolchain manually with `make install-tools`.

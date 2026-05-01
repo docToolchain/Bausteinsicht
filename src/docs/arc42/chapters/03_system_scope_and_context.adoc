@@ -1,0 +1,53 @@
+= System Scope and Context
+
+== Business context
+
+Bausteinsicht is a local CLI invoked by humans, by editors via watch mode, by CI pipelines, and by AI agents. It interacts with the file system and with one external binary (the draw.io CLI) for image export.
+
+[plantuml, c4-context, svg]
+....
+@startuml
+!include <C4/C4_Context>
+
+LAYOUT_WITH_LEGEND()
+
+title System Context — Bausteinsicht
+
+Person(architect,  "Architect / Developer", "Edits the JSONC model and the draw.io diagram.")
+Person(agent,      "AI Agent / LLM",        "Calls bausteinsicht with --format json.")
+System_Boundary(local, "Workstation / CI runner") {
+  System(bausteinsicht, "Bausteinsicht CLI", "Architecture-as-code with bidirectional sync.")
+  ContainerDb(model_file, "architecture.jsonc", "JSONC", "Model: source of truth.")
+  ContainerDb(drawio_file, "architecture.drawio", "XML",  "Diagram surface.")
+  ContainerDb(state_file,  ".bausteinsicht-sync", "JSON", "Sync state with sha256 checksum.")
+}
+System_Ext(drawio_cli, "draw.io CLI",        "Optional. Used by `export` to render PNG/SVG.")
+System_Ext(editor,     "draw.io desktop / web", "Where the architect edits the diagram visually.")
+
+Rel(architect,    bausteinsicht, "runs commands")
+Rel(agent,        bausteinsicht, "runs commands (--format json)")
+Rel(architect,    editor,        "edits architecture.drawio")
+Rel(bausteinsicht, model_file,   "read / write (JSONC patch + full save)")
+Rel(bausteinsicht, drawio_file,  "read / write (atomic)")
+Rel(bausteinsicht, state_file,   "read / write (atomic, sha256)")
+Rel(bausteinsicht, drawio_cli,   "exec (export only)")
+Rel(editor,        drawio_file,  "read / write")
+@enduml
+....
+
+== Technical context
+
+The CLI's only external boundary at runtime is the local file system plus the optional `drawio` / `drawio-export` binary discovered via `internal/export/platform_*.go`.
+
+[cols="2,2,4", options="header"]
+|===
+| Channel | Direction | Notes
+
+| File system (read / write) | both | All access is mediated by the `model`, `drawio`, and `sync.state` packages. Writes are atomic (temp + rename).
+| `os/exec` to draw.io CLI | outbound | Only by the `export` command. The binary is discovered, never bundled.
+| `fsnotify` events | inbound | Only used by `watch`.
+| Stdin | none | Bausteinsicht does not read from stdin.
+| Stdout | outbound | Structured results — text or JSON.
+| Stderr | outbound | Errors, warnings, verbose progress.
+| Network | none | The CLI does not make network calls. The `$schema` URL in the JSONC model is consumed only by IDEs/editors.
+|===

@@ -1,0 +1,48 @@
+= ADR-003: Three-way diff with explicit state file
+
+== Status
+
+Accepted (`internal/sync/state.go`, `internal/sync/diff.go`).
+
+== Context
+
+Forward sync (model → drawio) is straightforward — render the model. Reverse sync (drawio → model) needs to know **which side changed since the last sync** to avoid clobbering edits. Two structural choices apply:
+
+* **Stateless** — diff model and draw.io directly. If they differ, pick one as the source of truth.
+* **Stateful** — record what was synced and run a three-way diff between model, draw.io, and that recorded state.
+
+The stateless approach cannot distinguish "I updated the title in draw.io" from "I deleted the model element". A three-way diff can.
+
+== Decision
+
+Persist a **`.bausteinsicht-sync` state file** containing the last-synced field values for every element/relationship plus SHA-256 hashes of the model and drawio files plus a SHA-256 self-checksum on the state object.
+
+Use `internal/sync/diff.go::DetectChanges` to compute four buckets per field — `M==S?`, `D==S?` — and classify each (field, element) pair as: unchanged / model-side / drawio-side / conflict.
+
+== Alternatives considered
+
+. **Stateless reconciliation** — rely on draw.io as authoritative on visual edits, JSONC on structural edits. Reduces moving parts, but cannot detect deletions in JSONC vs. a stale draw.io file.
+. **Inline state in the draw.io file** (custom attributes) — keeps state portable; risks corruption when the user edits the file by hand.
+. **Inline state in the JSONC file** — survives `init`/clean checkouts; pollutes the source of truth.
+
+== Pugh Matrix
+
+Baseline = stateless reconciliation.
+
+[cols="3,1,1,1,1", options="header"]
+|===
+| Quality goal (weight)                       | State file | State in drawio | State in JSONC | Stateless (baseline)
+| Three-way diff possible (×3)                 | +1         | +1              | +1             | 0
+| Source-of-truth files stay clean (×3)        | +1         | -1              | -1             | 0
+| Survives `git clean -fd` / fresh checkout (×1) | -1       | +1              | +1             | 0
+| Tamper detection (×2)                        | +1         | 0               | 0              | 0
+| User can recover (delete + re-sync) (×2)     | +1         | -1              | -1             | 0
+| Implementation simplicity (×1)               | 0          | -1              | 0              | 0
+| **Weighted total**                            | **+10**    | **-1**          | **-2**         | **0**
+|===
+
+== Consequences
+
+* **Positive:** the three-way diff produces precise classification of changes; conflicts are recognisable; the user can recover by deleting one file.
+* **Negative:** the state file *must* be checked into `.gitignore` for collaborative use (a fresh clone has no state — the first sync becomes a "diff against empty" run that may misclassify). The user is told to delete `.bausteinsicht-sync` if its checksum is corrupted.
+* **Followup decision:** ADR-004 picks the resolver strategy used when both sides changed.

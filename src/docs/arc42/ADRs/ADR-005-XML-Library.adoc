@@ -1,0 +1,47 @@
+= ADR-005: `etree` as the XML library
+
+== Status
+
+Accepted (`go.mod` requires `github.com/beevik/etree v1.6.0`; usage in `internal/drawio/`).
+
+== Context
+
+The draw.io file format is XML with a non-trivial structure: `<mxfile>` → `<diagram>` → `<mxGraphModel>` → `<root>` → mixed `<mxCell>` and `<object>` children. Bausteinsicht must:
+
+* Parse and re-serialize without losing user-added attributes / cells.
+* Mutate specific elements (find a cell by id, change its style, add a child).
+* Pretty-print with stable indentation so that draw.io and the user diff cleanly on `git diff`.
+
+Go's `encoding/xml` requires struct mappings, which would force every draw.io feature (a moving target) to be modeled in Go. A DOM-style API is a better fit.
+
+== Decision
+
+Use `etree`, an in-memory DOM library that exposes `*etree.Element`, `SelectElement`, `SetAttr`, `CreateElement`, etc. The draw.io document is wrapped in `internal/drawio/document.go::Document`.
+
+== Alternatives considered
+
+. **`encoding/xml`** (stdlib).
+. **`go-xmldom`** or other niche DOM libs.
+. **String / regex manipulation**.
+
+== Pugh Matrix
+
+Baseline = `encoding/xml`.
+
+[cols="3,1,1,1,1", options="header"]
+|===
+| Quality goal (weight)                       | etree | other DOM | string/regex | encoding/xml (baseline)
+| Stable round-trip of unknown attributes (×3) | +1    | +1        | +1           | -1
+| Easy element lookup / mutation (×3)          | +1    | +1        | -1           | -1
+| Indent control on save (×2)                  | +1    |  0        |  0           | 0
+| External surface / maintenance (×1)          | -1    | -1        | +1           | 0
+| Performance (×1)                             |  0    |  0        | +1           | 0
+| Test coverage in this codebase (×1)          | +1    |  0        | -1           | 0
+| **Weighted total**                            | **+8**| **+5**    | **+1**       | **-9**
+|===
+
+== Consequences
+
+* **Positive:** every draw.io extension that the project does not model is round-tripped untouched (e.g., user mxCells without a `bausteinsicht_id`). Code in `internal/drawio/` is small and direct.
+* **Negative:** etree pretty-prints with spaces; small drift in serializer style would cause noisy git diffs. Fixed by configuring indent to `"  "` (two spaces) explicitly in `SaveDocument`.
+* **Risk:** etree is a single-author library; mitigated by the fact that the API used is small (find/select/attr/save) and could be replaced if needed.
