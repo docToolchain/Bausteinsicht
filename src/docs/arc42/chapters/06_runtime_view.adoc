@@ -1,0 +1,138 @@
+= Runtime View
+
+The runtime view illustrates the most relevant scenarios.
+
+== Scenario 1 — `bausteinsicht init`
+
+[plantuml, rt-init, svg]
+....
+@startuml
+actor User
+participant "cmd init" as cmd
+participant "templates (embed)" as tpl
+participant "model.Save" as ms
+participant "drawio.Save" as ds
+participant "sync.Run" as run
+participant "state.SaveState" as st
+
+User -> cmd: bausteinsicht init
+cmd -> cmd: check 4 target files do not exist
+cmd -> tpl: read SampleModel + DefaultTemplate
+cmd -> ms: write architecture.jsonc (atomic)
+cmd -> ds: write template.drawio (atomic)
+cmd -> cmd: load model + template, NewDocument()
+cmd -> run: initial forward sync (creates pages + metadata + legend)
+cmd -> ds: write architecture.drawio (atomic)
+cmd -> st: write .bausteinsicht-sync (atomic, sha256)
+cmd -> User: list of created files (text|json)
+@enduml
+....
+
+== Scenario 2 — `bausteinsicht sync` (typical)
+
+[plantuml, rt-sync, svg]
+....
+@startuml
+actor User
+participant "cmd sync" as cmd
+participant "model.Load + Validate" as mv
+participant "drawio.Load" as dl
+participant "state.Load" as sl
+participant "sync.Run" as run
+participant "diff" as diff
+participant "ConflictResolver" as cr
+participant "ApplyForward" as af
+participant "ApplyReverse" as ar
+participant "patchops + model.Patch" as pp
+participant "drawio.Save + state.Save" as save
+
+User -> cmd: bausteinsicht sync
+cmd -> mv: load + validate model
+mv --> cmd: ok (or exit 1)
+cmd -> dl: load architecture.drawio
+dl --> cmd: ok (or recreate from template)
+cmd -> sl: load .bausteinsicht-sync
+sl --> cmd: state (or empty)
+cmd -> run: Run(model, doc, state, tmpl, newPageIDs, opts)
+run -> diff: DetectChanges
+run -> cr: Resolve(conflicts) → model wins
+run -> af: ApplyForward
+run -> ar: ApplyReverse (in parallel, conceptually)
+run --> cmd: SyncResult
+cmd -> pp: try patch save (comment-preserving)
+note right: falls back to full Save\nfor structural changes
+cmd -> save: drawio + state (atomic)
+cmd -> User: summary (text|json)
+alt conflicts > 0
+  cmd -> User: exit 1 with warnings on stderr
+else
+  cmd -> User: exit 0
+end
+@enduml
+....
+
+== Scenario 3 — `bausteinsicht watch`
+
+[plantuml, rt-watch, svg]
+....
+@startuml
+participant "fsnotify" as fs
+participant "watcher.loop" as loop
+participant "doSync" as sync
+participant "syncMu / syncing flag" as mu
+
+fs -> loop: write event (architecture.jsonc)
+loop -> loop: debounce 300ms
+loop -> mu: TryLock
+alt syncing == true
+  loop -> loop: drop event (next event will retrigger)
+else
+  loop -> mu: set syncing=true
+  loop -> sync: doSync()
+  sync --> loop: result
+  loop -> mu: set syncing=false
+end
+fs -> loop: rename (atomic save in editor)
+loop -> loop: re-watch with exponential backoff (≤ 2s)
+@enduml
+....
+
+== Scenario 4 — Reverse sync of a label change with comment preservation
+
+[plantuml, rt-reverse, svg]
+....
+@startuml
+participant "ApplyReverse" as ar
+participant "ChangeSet" as cs
+participant "patchops.ReversePatchOps" as ro
+participant "model.PatchValue" as pv
+participant "fs.atomic write" as fw
+
+ar -> cs: build ElementChange{ID=onlineshop.api, Field=title, NewValue="REST API v2"}
+ar -> ro: ReversePatchOps(cs)
+ro --> ar: ([ {Path:[model,onlineshop,children,api,title], Value:"\"REST API v2\""} ], patchable=true)
+ar -> pv: apply PatchOp on raw bytes
+pv -> pv: findValueRange respecting strings + comments
+pv --> ar: patched bytes (comments untouched)
+ar -> fw: write temp + rename
+@enduml
+....
+
+== Scenario 5 — Conflict (model wins)
+
+[plantuml, rt-conflict, svg]
+....
+@startuml
+participant diff
+participant ModelWinsResolver as r
+participant ApplyForward as af
+participant Stderr
+
+diff -> r: [Conflict{el=api, field=title, model="REST API", drawio="API v3", state="REST API v1"}]
+r --> diff: [Resolved{Winner=model, Warning="...→ Keeping model value..."}]
+diff -> diff: drop drawio change for (api,title)
+diff -> af: include forward update for (api,title)
+af -> af: write "REST API" into drawio label (HTML-escaped)
+diff -> Stderr: emit warning lines
+@enduml
+....

@@ -1,0 +1,53 @@
+= ADR-001: JSONC as the model DSL
+
+== Status
+
+Accepted (reflects current implementation in `internal/model/loader.go`).
+
+== Context
+
+Bausteinsicht needs a textual format for the architecture model that is:
+
+* Editable by hand by architects, with comments to explain intent.
+* Reviewable in pull requests (line-based diffs).
+* Parseable in Go without writing a custom parser.
+* Friendly to AI agents (schema-driven, well-known syntax).
+* Compatible with IDE autocompletion through a JSON Schema.
+
+The README's "Related Projects" section explicitly contrasts Bausteinsicht against DSL-first tools (Structurizr, LikeC4) — the project chose to lean on a familiar data format rather than invent yet another DSL.
+
+== Decision
+
+Use **JSONC** — JSON with `// line comments`, `/* block comments */`, and trailing commas. Implementation: `loader.StripJSONC` strips JSONC artefacts before delegating to Go's `encoding/json`. Comments are preserved during writes by routing field updates through `internal/model/patch.go` (byte-range patching that respects strings + comments) and falling back to a full save with the file's preamble re-prepended.
+
+== Alternatives considered
+
+. **YAML** — comment-friendly, indentation-based, broad ecosystem. But: ambiguous types, indentation pitfalls in multi-line strings, no obvious patch tooling that preserves comments at byte level.
+. **Custom DSL (à la Structurizr)** — most expressive; but high adoption cost (custom parser, custom error reporting, no IDE for free).
+. **Pure JSON (no comments)** — simplest; but excludes inline rationale for architectural decisions.
+
+== Pugh Matrix
+
+Quality goals from `chapters/01_introduction_and_goals.adoc`. Scale: -1 (worse), 0 (neutral), +1 (better than baseline). Baseline = pure JSON.
+
+[cols="3,1,1,1,1", options="header"]
+|===
+| Quality goal (weight)              | JSONC | YAML | Custom DSL | Pure JSON (baseline)
+| Comment / rationale support (×3)    | +1    | +1   | +1         | 0
+| Round-trip / patch fidelity (×3)    | +1    | -1   | 0          | 0
+| Familiarity / onboarding (×2)       | +1    |  0   | -1         | 0
+| Tooling: IDE autocomplete via $schema (×2) | +1 | 0 | -1         | 0
+| Parsing simplicity (×1)             |  0    |  0   | -1         | 0
+| Output stability for diff/CI (×2)   | +1    | -1   |  0         | 0
+| **Weighted total**                  | **+12** | **-2** | **-3**   | **0**
+|===
+
+JSONC dominates on every axis except parsing simplicity (where it ties pure JSON because StripJSONC is a small preprocessor).
+
+== Consequences
+
+* **Positive:** comments survive edits; the model is reviewable like code; IDEs already understand JSONC.
+* **Negative:** a small parser surface (`StripJSONC`) is bespoke and must be kept aligned with byte-range patch logic. Edge cases — escaped quotes, nested comments, BOM — are covered by tests but represent ongoing maintenance.
+* **Forced subsequent decisions:**
+  * ADR-006 (embedded resources) ships a sample model so users see comments in action immediately.
+  * The schema URL is referenced from `templates/sample-model.jsonc` to enable editor autocomplete (NFR-010).

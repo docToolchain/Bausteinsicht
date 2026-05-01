@@ -1,0 +1,95 @@
+= Crosscutting Concepts
+
+== Atomic file I/O
+
+Every write goes through a temp-file-then-rename pattern. The temp file lives in the same directory as the destination so the rename is on a single filesystem.
+
+* `internal/model/loader.go::Save`
+* `internal/drawio/document.go::SaveDocument`
+* `internal/sync/state.go::SaveState`
+
+This protects against corruption caused by a crash mid-write or by disk-full scenarios.
+
+== JSONC handling and comment preservation
+
+JSONC support is implemented in two layers:
+
+. **Parsing.** `loader.StripJSONC` converts JSONC to JSON before passing to `encoding/json`. It preserves UTF-8 BOM removal, string-literal awareness, line + block comments, and trailing commas.
+. **Writing.** When only field values change, `internal/sync/patchops.go::ReversePatchOps` produces a list of `(jsonPath, newValue)` patches and `internal/model/patch.go` applies them to the raw byte stream — `findValueRange` walks the JSONC text respecting strings and comments to locate the target value. This means **comments and indentation around the patched value survive untouched**.
+. When structural changes (add/delete) are required, the saver falls back to a full marshal that re-prepends the file's preamble (everything before the first `{`).
+
+CONTRIBUTING.md formalizes this: any new `Element` field MUST come with a comment-preservation E2E test.
+
+== Validation
+
+A single pass (`internal/model/validate.go::ValidateWithWarnings`) covers element ids, kinds, container/child invariants, relationships, and views. The validator distinguishes errors (block sync) from warnings (do not block).
+
+CLI commands run validation **before** any write that could leave the model in an inconsistent state — most notably `sync` runs `Validate` to refuse to write a draw.io file based on an invalid model.
+
+== Conflict policy
+
+Implemented in `internal/sync/conflict.go` as the `ConflictResolver` interface. Only `ModelWinsResolver` is shipped today, but the interface seam is the documented extension point (see ADR-004).
+
+== Layout
+
+`internal/sync/layout.go` provides three modes:
+
+* `layered` (default) — element kinds become tiers in the order they were defined in `specification.elements`. Scoped views render externals top + bottom and the scope-children inside the boundary.
+* `grid` — regular grid placement.
+* `none` — every element at origin (0,0); useful when the user controls all placement manually.
+
+The element-kind order comes from `loader.extractElementOrder`, which uses a streaming JSON decoder so that Go's randomized map iteration does not destroy semantically meaningful order.
+
+== Security
+
+[cols="1,3", options="header"]
+|===
+| SEC code | What it enforces
+| SEC-001  | Path containment for `--model`. Rejects `..` components.
+| SEC-008  | HTML escaping for element labels rendered into draw.io HTML labels and metadata boxes.
+| SEC-013  | Element IDs must match `^[a-zA-Z][a-zA-Z0-9_-]*$`; in particular, no `.` so that dot-paths are unambiguous.
+| SEC-015  | Path containment for `export --output`.
+| SEC-016  | Path containment for `--template`.
+|===
+
+Other defensive properties:
+
+* SHA-256 self-checksum on the sync state (`internal/sync/state.go`).
+* Integrity check rejects tampered or corrupted state with a clear remediation message.
+* Hard limits: 10 MiB model file size; 50 levels of element nesting.
+* No network access at runtime.
+* `make check` includes `gosec` (security linter), `govulncheck` (CVE scanner), `gitleaks` (secret detection).
+
+== Observability
+
+* Structured stdout (text or JSON) is reserved for the **result** of a command.
+* Errors and warnings always go to **stderr**.
+* `--verbose` adds a per-command progress trace on stderr (e.g. `Syncing model: ... 123 elements, 45 relationships, 8 views`).
+* The watcher prints `[HH:MM:SS] Sync triggered by <file>` at each event.
+
+== Embedded resources
+
+`templates/embed.go` uses `//go:embed` to bundle:
+
+* `sample-model.jsonc` — copied verbatim by `init` into `architecture.jsonc`.
+* `default.drawio` — used as the template when none is supplied.
+
+This is what makes `bausteinsicht init` self-sufficient — no asset directory is needed at runtime.
+
+== Test discipline
+
+The repository ships ~400 `Test*` functions across all packages. Notable categories:
+
+* CLI integration tests (`cmd/bausteinsicht/*_test.go`) use temp dirs and exercise full command paths.
+* Sync engine tests (`internal/sync/*_test.go`) cover view-based sync, conflict resolution, lifting, scope boundaries, drill-down navigation.
+* Comment-preservation E2E tests are mandated by CONTRIBUTING.md for every model field.
+* Property-based tests use `pgregory.net/rapid`.
+* Benchmarks at n=10/100/500 elements (`internal/model/bench_test.go`, `internal/sync/bench_test.go`).
+* `make test-race` runs the entire suite with `-race`.
+
+== Cross-platform concerns
+
+* All builds set `CGO_ENABLED=0`.
+* `internal/export/platform_*.go` files give per-OS draw.io binary search paths.
+* Tests run on ubuntu-latest, macos-latest, windows-latest in CI.
+* Atomic rename works on every supported OS because the temp file is created in the destination directory.

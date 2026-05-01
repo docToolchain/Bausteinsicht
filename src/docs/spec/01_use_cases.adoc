@@ -1,0 +1,491 @@
+= Use Cases
+:toc: left
+:toclevels: 2
+:sectnums:
+:icons: font
+
+This document captures the use cases of Bausteinsicht in Cockburn format.
+All use cases were derived from the CLI surface (`cmd/bausteinsicht/`), error messages, and tests.
+
+== Actors
+
+* **Architect** — primary user; edits the JSONC model and the draw.io diagram.
+* **Developer** — runs the CLI in a project, occasionally adds elements through `add element`/`add relationship`.
+* **CI Pipeline** — non-interactive caller that runs `validate`, `sync`, `export*` with `--format json`.
+* **AI Agent / LLM** — uses the documented JSON output to read and modify the model (`.kiro/skills/bausteinsicht/SKILL.md`).
+* **draw.io CLI** — supporting actor invoked by `bausteinsicht export` to render images.
+
+== Business Rules
+
+[cols="1,4", options="header"]
+|===
+| ID | Rule
+
+| BR-001 | Element ID format MUST match `^[a-zA-Z][a-zA-Z0-9_-]*$`. Dot is reserved as the hierarchy separator.
+| BR-002 | A child may only be added under a parent whose kind has `container: true`.
+| BR-003 | Element `kind` and (when set) relationship `kind` MUST exist in `specification`.
+| BR-004 | Two relationships are duplicates only if `from`, `to`, `kind`, and `label` all match.
+| BR-005 | The view filter (`include`/`exclude`/`scope`) defines which elements appear on a page; relationships appear iff both endpoints are visible (after lifting to ancestors).
+| BR-006 | When the same element field is changed in both surfaces since the last sync, the **model value wins** and a warning is emitted.
+| BR-007 | Newly created elements MUST be visually marked (red dashed border) so the human can position them.
+| BR-008 | Empty titles arriving via reverse sync MUST be ignored.
+| BR-009 | Forward sync MUST NOT relayout placed elements unless `--relayout` is given.
+| BR-010 | Reversing a connector in draw.io is treated as an in-place direction swap, not a delete + add — preserves `kind`, `label`, `description`.
+| BR-011 | The model file MUST be ≤ 10 MiB; element nesting MUST be ≤ 50 levels.
+| BR-012 | All file paths from the user (`--model`, `--template`, export `--output`) MUST be free of `..` components.
+| BR-013 | Sync state file MUST verify a self-checksum on load; on mismatch, the user MUST delete it and re-run sync.
+|===
+
+== Use Case Index
+
+* <<UC-001>> Initialize a new project
+* <<UC-002>> Validate the model
+* <<UC-003>> Add an element via CLI
+* <<UC-004>> Add a relationship via CLI
+* <<UC-005>> Synchronize model and diagram
+* <<UC-006>> Watch and continuously sync
+* <<UC-007>> Export view images (PNG / SVG)
+* <<UC-008>> Export element tables (AsciiDoc / Markdown)
+* <<UC-009>> Export view diagrams (PlantUML / Mermaid)
+
+[[UC-001]]
+== UC-001: Initialize a new project
+
+* **Goal:** Scaffold a working architecture model and matching draw.io diagram in an empty directory.
+* **Primary actor:** Architect / Developer.
+* **Trigger:** `bausteinsicht init`.
+* **Preconditions:** None of `architecture.jsonc`, `template.drawio`, `architecture.drawio`, `.bausteinsicht-sync` exist in the current directory.
+* **Postconditions (success):** All four files exist; an initial sync has populated the diagram with the sample model; a metadata/legend box is present so the next sync is a no-op.
+* **Main flow:**
+  . User runs `bausteinsicht init`.
+  . System checks each of the four target files; if any exists it errors out (BR — exit 2).
+  . System writes `architecture.jsonc` from the embedded sample model.
+  . System writes `template.drawio` from the embedded default template.
+  . System loads model and template, runs an initial forward sync, persists `architecture.drawio` and `.bausteinsicht-sync`.
+  . System prints the list of created files and "next steps".
+* **Exceptions:**
+  * Existing file → exit 2.
+  * I/O error during template/sample write → exit 2.
+
+[plantuml, init-flow, svg]
+....
+@startuml
+start
+:User runs `bausteinsicht init`;
+if (Any target file already exists?) then (yes)
+  :Print "file already exists";
+  stop
+else (no)
+  :Write architecture.jsonc (sample model);
+  :Write template.drawio (default template);
+  :Load model + template;
+  :Forward-sync into architecture.drawio
+  + create metadata / legend boxes;
+  :Save .bausteinsicht-sync;
+  :Print created files + next steps;
+  stop
+endif
+@enduml
+....
+
+[[UC-002]]
+== UC-002: Validate the model
+
+* **Goal:** Surface errors and warnings without modifying any file.
+* **Primary actor:** Architect, CI pipeline.
+* **Trigger:** `bausteinsicht validate [--model PATH] [--format text|json]`.
+* **Preconditions:** A model file exists (or auto-detect finds exactly one `*.jsonc`).
+* **Postconditions:** Model is unchanged; report of errors and warnings is printed.
+* **Main flow:**
+  . System resolves model path (`--model` or single `*.jsonc` in cwd).
+  . System loads the model (StripJSONC + unmarshal). On parse error → exit 2.
+  . System runs `ValidateWithWarnings` (BR-001..BR-004 over elements, relationships, views).
+  . If any errors → exit 1; else exit 0 (warnings allowed).
+* **Exceptions:**
+  * No `*.jsonc` or multiple `*.jsonc` and no `--model` → "no .jsonc file found" / "multiple .jsonc files" → exit 2.
+
+[plantuml, validate-flow, svg]
+....
+@startuml
+start
+:Resolve model path;
+if (Path resolved?) then (no)
+  :Print "no .jsonc / multiple .jsonc";
+  stop
+else (yes)
+endif
+:Load + StripJSONC;
+if (Parse OK?) then (no)
+  :Print parse error;
+  :exit 2;
+  stop
+else (yes)
+endif
+:Run ValidateWithWarnings;
+if (Errors > 0?) then (yes)
+  :Print errors + warnings;
+  :exit 1;
+  stop
+else (no)
+  :Print "Model is valid" + warnings;
+  :exit 0;
+  stop
+endif
+@enduml
+....
+
+[[UC-003]]
+== UC-003: Add an element via CLI
+
+* **Goal:** Insert a new element into the model with comments preserved.
+* **Primary actor:** Developer, AI agent.
+* **Trigger:** `bausteinsicht add element --id ID --kind K --title T [--parent P] [--technology TECH] [--description DESC]`.
+* **Preconditions:** Model loadable; ID matches BR-001; `K` exists in spec; if `P` given it resolves and its kind is a container (BR-002); ID does not already exist at that level.
+* **Postconditions:** Element is inserted; JSONC comments and indentation around the insertion point are preserved.
+* **Main flow:**
+  . System loads + validates model.
+  . System validates `--id` regex, `--kind`, `--title` non-empty.
+  . If `--parent` given, system resolves and asserts container kind.
+  . System asserts no duplicate at insertion site.
+  . System inserts via `model.PatchInsert` + `InsertObjectEntry` (preserves comments).
+  . On patch failure, falls back to a full save which still preserves the user preamble before the first `{`.
+  . System prints the new element (text or JSON).
+* **Exceptions:**
+  * Invalid ID regex → "invalid element ID" → exit 1.
+  * Unknown kind → "unknown element kind ...; valid kinds: ..." → exit 1.
+  * Empty title → "title must not be empty" → exit 1.
+  * Parent missing → "parent ... not found" → exit 1.
+  * Parent not a container → kind not allowing children → exit 1.
+  * Duplicate ID → exit 1.
+
+[plantuml, add-element, svg]
+....
+@startuml
+start
+:Load + validate model;
+:Check `--id` matches [a-zA-Z][a-zA-Z0-9_-]*;
+if (Valid?) then (no)
+  :exit 1;
+  stop
+else (yes)
+endif
+:Check kind in specification.elements;
+if (Known?) then (no)
+  :exit 1;
+  stop
+else (yes)
+endif
+if (`--parent` set?) then (yes)
+  :Resolve parent;
+  if (Found?) then (no)
+    :exit 1;
+    stop
+  else (yes)
+  endif
+  if (Parent kind has container=true?) then (no)
+    :exit 1;
+    stop
+  else (yes)
+  endif
+endif
+:Check no duplicate ID at insertion site;
+:PatchInsert `id`: {kind, title, ...} into model/parent.children;
+if (Patch OK?) then (yes)
+  :Done;
+else (no)
+  :Fallback Save (preserves preamble);
+endif
+:Print element (text|json);
+:exit 0;
+stop
+@enduml
+....
+
+[[UC-004]]
+== UC-004: Add a relationship via CLI
+
+* **Goal:** Append a new relationship without losing comments.
+* **Primary actor:** Developer, AI agent.
+* **Trigger:** `bausteinsicht add relationship --from F --to T [--label L] [--kind K] [--description D]`.
+* **Preconditions:** `F` and `T` resolve; `K` (if given) is in `specification.relationships`; the `(from, to, kind, label)` tuple is not already present (BR-004).
+* **Postconditions:** Relationship is appended in place at the end of the JSONC `relationships` array.
+* **Main flow:**
+  . Load + validate model.
+  . Resolve `--from` and `--to`. On miss: "element ... not found" → exit 1.
+  . If `--kind`, validate against `specification.relationships`.
+  . Reject exact duplicate (BR-004).
+  . `PatchInsert` + `AppendArrayEntry` to preserve comments.
+  . Fall back to full save if patch fails.
+
+[plantuml, add-relationship, svg]
+....
+@startuml
+start
+:Load + validate model;
+:Resolve --from;
+if (Found?) then (no)
+  :exit 1;
+  stop
+else (yes)
+endif
+:Resolve --to;
+if (Found?) then (no)
+  :exit 1;
+  stop
+else (yes)
+endif
+if (--kind set?) then (yes)
+  if (Kind in spec?) then (no)
+    :exit 1;
+    stop
+  else (yes)
+  endif
+endif
+if (Duplicate (from,to,kind,label)?) then (yes)
+  :exit 1;
+  stop
+else (no)
+endif
+:AppendArrayEntry on `relationships`;
+:Print relationship (text|json);
+:exit 0;
+stop
+@enduml
+....
+
+[[UC-005]]
+== UC-005: Synchronize model and diagram
+
+* **Goal:** Make model and draw.io agree, in both directions.
+* **Primary actor:** Architect, CI.
+* **Trigger:** `bausteinsicht sync [--relayout] [--format text|json] [--verbose]`.
+* **Preconditions:** Model loadable and valid (validate is run as a pre-flight); template available (default or `--template`).
+* **Postconditions:** Draw.io has one page per view (`view-<viewID>`); orphaned view pages removed; model is updated with reverse changes; sync state is rewritten.
+* **Main flow (success path):**
+  . Resolve and load model; **validate** (sync refuses to run if errors).
+  . Locate `architecture.drawio`; if missing/empty, recreate from template and discard stale state.
+  . Load sync state from `.bausteinsicht-sync`; verify checksum (BR-013).
+  . Ensure a draw.io page exists for every view; remove pages for deleted views; remember newly created page IDs.
+  . `sync.Run` orchestrates: detect changes (three-way), resolve conflicts (model wins, BR-006), apply forward (BR-007, BR-009), apply reverse (BR-008, BR-010), compute warnings.
+  . Save model: try comment-preserving patch save; fall back to full save (only valid for pure field updates per `ReversePatchOps`).
+  . Atomically save draw.io and sync state.
+  . Print summary (text or JSON).
+* **Exit codes:**
+  * `0`: clean run.
+  * `1`: conflicts were resolved (warnings printed) — see BR-006.
+  * `2`: validation/I-O failure.
+
+[plantuml, sync-flow, svg]
+....
+@startuml
+start
+:Resolve + load model;
+:Validate (errors -> exit 1);
+:Locate architecture.drawio;
+if (Missing/empty?) then (yes)
+  :Recreate from template;
+  :Discard stale sync state;
+else (no)
+  :Load drawio;
+endif
+:Load sync state;
+if (Checksum OK?) then (no)
+  :exit 2 ("delete .bausteinsicht-sync and re-run");
+  stop
+else (yes)
+endif
+:Ensure pages for all views;
+:Remove orphan view pages;
+:Detect changes (three-way diff);
+:Resolve conflicts (model wins);
+:Drop draw.io changes that lost;
+:Apply forward (model -> drawio);
+:Apply reverse (drawio -> model);
+:Compute warnings;
+if (Reverse changes patchable?) then (yes)
+  :PatchSave model;
+else (no)
+  :Full Save (preserves preamble);
+endif
+:Save drawio (atomic);
+:Save sync state (atomic, with sha256);
+:Print summary;
+if (Conflicts > 0?) then (yes)
+  :exit 1;
+else (no)
+  :exit 0;
+endif
+stop
+@enduml
+....
+
+[[UC-006]]
+== UC-006: Watch and continuously sync
+
+* **Goal:** Sync automatically while the user edits either surface.
+* **Primary actor:** Architect at the IDE.
+* **Trigger:** `bausteinsicht watch`.
+* **Preconditions:** Model file and `architecture.drawio` exist.
+* **Postconditions:** Process runs until `SIGINT`/`SIGTERM`; periodic `sync` runs occur on each file change.
+* **Main flow:**
+  . Detect model and drawio paths; subscribe to fsnotify events on both.
+  . On event, debounce 300 ms.
+  . Set "syncing" flag (re-entrancy guard); run `doSync`; clear flag.
+  . On atomic-rename file replacement, re-watch the file (exponential backoff up to 2 s).
+* **Exceptions:**
+  * Per-sync errors are logged to stderr; the watcher continues.
+
+[plantuml, watch-flow, svg]
+....
+@startuml
+start
+:Resolve model + drawio;
+:fsnotify.Add(model);
+:fsnotify.Add(drawio);
+repeat
+  :Wait for write/rename event;
+  :Debounce 300 ms;
+  if (Currently syncing?) then (yes)
+    :Skip event;
+  else (no)
+    :Set syncing=true;
+    :doSync();
+    :Set syncing=false;
+  endif
+  if (File missing after rename?) then (yes)
+    :Re-watch with exponential backoff (≤ 2 s);
+  endif
+repeat while (No SIGINT/SIGTERM)
+:Print "Stopped watching";
+stop
+@enduml
+....
+
+[[UC-007]]
+== UC-007: Export view images
+
+* **Goal:** Render view pages to PNG or SVG for embedding in docs.
+* **Primary actor:** Architect, CI.
+* **Trigger:** `bausteinsicht export [--image-format png|svg] [--view ID] [--output DIR] [--scale N]`.
+* **Preconditions:** A draw.io CLI binary is detected (`drawio-export`, `drawio` on PATH, or platform paths).
+* **Postconditions:** One image file per (selected) view in the output directory; filename `architecture-<view>.<ext>`.
+* **Main flow:**
+  . Validate `--image-format` (png|svg) — invalid → exit 2.
+  . Resolve model and load drawio.
+  . Detect draw.io binary; if missing → exit 2 with installation hint.
+  . Create output directory if needed; reject `..` paths (BR-012).
+  . For each (selected) view: locate page `view-<id>`; invoke draw.io export; collect file paths and per-view errors.
+  . Print results; exit 1 if any view export failed (others succeeded).
+
+[plantuml, export-flow, svg]
+....
+@startuml
+start
+:Validate --image-format;
+:Load model + drawio;
+:Detect draw.io CLI;
+if (Found?) then (no)
+  :exit 2;
+  stop
+else (yes)
+endif
+:Resolve --output (reject `..`);
+:Create output dir;
+repeat
+  :Pick next view;
+  :Find page view-<id>;
+  :Call draw.io CLI export;
+  if (OK?) then (yes)
+    :Add to results.files;
+  else (no)
+    :Add to results.errors;
+  endif
+repeat while (More views?)
+:Print results (text|json);
+if (Any error?) then (yes)
+  :exit 1;
+else (no)
+  :exit 0;
+endif
+stop
+@enduml
+....
+
+[[UC-008]]
+== UC-008: Export element tables
+
+* **Goal:** Generate AsciiDoc or Markdown tables of the elements visible on each view (or combined / single view).
+* **Primary actor:** Architect, doc generator.
+* **Trigger:** `bausteinsicht export-table [--view ID] [--table-format adoc|md] [--output DIR] [--combined]`.
+* **Preconditions:** Model loadable.
+* **Postconditions:** Either stdout output or files in output dir; with `--format json` rows are emitted as JSON regardless of `--table-format`.
+* **Main flow:**
+  . Validate `--table-format`.
+  . Load model.
+  . If `--combined`, render one deduplicated table; else if `--view`, one table; else one table per view.
+  . If global `--format json`, emit JSON rows array instead of tables.
+
+[plantuml, export-table, svg]
+....
+@startuml
+start
+:Validate --table-format;
+:Load model;
+if (--format json?) then (yes)
+  :Emit JSON rows array;
+  :exit 0;
+  stop
+else (no)
+endif
+if (--combined?) then (yes)
+  :Format combined table;
+elseif (--view?) then (yes)
+  :Format single view;
+else (no)
+  :Format every view;
+endif
+if (--output set?) then (yes)
+  :Write file(s);
+else (no)
+  :Print to stdout;
+endif
+:exit 0;
+stop
+@enduml
+....
+
+[[UC-009]]
+== UC-009: Export view diagrams (PlantUML / Mermaid)
+
+* **Goal:** Produce text-based diagrams of each view for embedding in arc42 / AsciiDoc.
+* **Primary actor:** Architect, doc generator.
+* **Trigger:** `bausteinsicht export-diagram [--view ID] [--diagram-format plantuml|mermaid] [--output DIR]`.
+* **Preconditions:** Model loadable.
+* **Postconditions:** `*.puml` or `*.mmd` files written, or stdout printed; JSON envelope when `--format json`.
+* **Main flow:**
+  . Validate `--diagram-format`.
+  . Load model.
+  . Detect C4 level (Component if any "component"; Container if any container or scope; otherwise Context) and partition elements relative to scope.
+  . Render in PlantUML C4 (`!include <C4/...>`) or Mermaid.
+
+[plantuml, export-diagram, svg]
+....
+@startuml
+start
+:Validate --diagram-format;
+:Load model;
+repeat
+  :Pick next view;
+  :Resolve view elements + relationships;
+  :Detect C4 level;
+  :Render in plantuml | mermaid;
+  if (--output set?) then (yes)
+    :Write *.puml | *.mmd;
+  else (no)
+    :Print to stdout;
+  endif
+repeat while (More views?)
+:exit 0;
+stop
+@enduml
+....

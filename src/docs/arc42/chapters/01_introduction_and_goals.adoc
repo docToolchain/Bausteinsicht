@@ -1,0 +1,36 @@
+= Introduction and Goals
+
+== Requirements overview
+
+Bausteinsicht is an architecture-as-code CLI: a single Go binary that lets a team define an architecture model in JSONC and keeps a draw.io diagram bidirectionally in sync with that model. The functional and non-functional requirements are listed in `src/docs/PRD/PRD-001.adoc` (FR-NNN, NFR-NNN). The full set of CLI capabilities is documented in `src/docs/spec/02_cli_specification.adoc`.
+
+In one sentence: _the JSONC file is the source of truth for review and CI; draw.io is the source of truth for visual layout; the sync engine reconciles both surfaces_.
+
+== Quality goals
+
+The quality goals were inferred from explicit code constants, the test/benchmark setup, and the security mitigations carrying SEC-NNN comments. They are listed here in priority order — top-most goals trump lower ones when they conflict.
+
+[cols="1,2,4", options="header"]
+|===
+| Priority | Goal | Why we believe this is a top goal
+
+| 1 | **Round-trip fidelity & comment preservation** | The codebase has dedicated patch infrastructure (`internal/model/patch.go`, `internal/sync/patchops.go`) and CONTRIBUTING.md mandates a comment-preservation E2E test for every new field.
+| 2 | **Reliability of file I/O** | Every save (model, draw.io, sync state) uses temp-file-then-rename; the sync state has a SHA-256 self-checksum.
+| 3 | **Security of local file handling** | Path-containment check on every user-provided path (SEC-001/015/016); HTML escaping in labels (SEC-008).
+| 4 | **Cross-platform portability** | `CGO_ENABLED=0` static binaries for 6 OS/arch combinations (Makefile, .goreleaser.yml).
+| 5 | **LLM/automation friendliness** | Stable JSON output on every command (`--format json`), explicit Claude Code skill (`.kiro/skills/bausteinsicht/SKILL.md`).
+| 6 | **Performance at architecture scale** | Benchmarks at n=10/100/500 elements (`bench_test.go`); maximum-depth and file-size limits (50, 10 MiB).
+|===
+
+== Stakeholders
+
+[cols="2,2,4", options="header"]
+|===
+| Role | Expectation | Source
+
+| Architect / tech lead | Edit either surface and trust the round-trip. | README "Jobs to be Done".
+| Developer | One CLI in CI; no Java/Node runtime; deterministic output. | go.mod, Makefile, `.goreleaser.yml`.
+| docToolchain integrator | arc42 ADRs as first-class citizens. | CONTRIBUTING.md "ADRs go in `src/docs/arc42/ADRs/`".
+| AI agent / automation | Machine-readable output for every command. | every `--format json` branch, Claude Code skill.
+| draw.io | Bausteinsicht keeps the file shape valid (`<mxfile>`/`<diagram>`/`<mxGraphModel>`/`<root>`/`<object>`/`<mxCell>`). | `internal/drawio/document.go::LoadDocument` validation.
+|===

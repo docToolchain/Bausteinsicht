@@ -1,0 +1,10 @@
+= Architecture Decisions
+
+The accepted ADRs are kept in `src/docs/arc42/ADRs/`. Each follows the Nygard format and includes a Pugh matrix evaluating the alternatives against quality goals (-1, 0, +1).
+
+* link:../ADRs/ADR-001-DSL-Format.adoc[ADR-001 — JSONC as the model DSL]
+* link:../ADRs/ADR-002-CLI-Framework.adoc[ADR-002 — Cobra as the CLI framework]
+* link:../ADRs/ADR-003-Sync-Strategy.adoc[ADR-003 — Three-way diff with explicit state file]
+* link:../ADRs/ADR-004-Conflict-Policy.adoc[ADR-004 — Default conflict policy: model wins]
+* link:../ADRs/ADR-005-XML-Library.adoc[ADR-005 — `etree` as the XML library]
+* link:../ADRs/ADR-006-Embedded-Templates.adoc[ADR-006 — Embedded sample model and template]

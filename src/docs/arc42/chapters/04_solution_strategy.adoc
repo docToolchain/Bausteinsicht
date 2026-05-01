@@ -1,0 +1,59 @@
+= Solution Strategy
+
+The architecture follows five strategic decisions.
+
+. **JSONC as the source of truth.** Comments and trailing commas are first-class; this lets architects keep prose in the model file and review changes in code review (see ADR-001).
+. **Three-way diff with explicit state file.** A dedicated `.bausteinsicht-sync` file holds last-synced field values and SHA-256 hashes so we can distinguish "user changed it in surface A" from "user changed it in surface B" from "neither side changed it". (see ADR-003).
+. **Comment-preserving JSONC patches.** Field updates emitted by reverse sync are applied as byte-range patches, not as a full re-serialization — so comments survive (`internal/model/patch.go`, `internal/sync/patchops.go`). Structural changes (add/delete) fall back to a full save that preserves the file's preamble before the first `{`.
+. **One Cobra subcommand per use case, with `--format json` everywhere.** The CLI doubles as a stable LLM/automation API (see ADR-002 for the choice of Cobra).
+. **Static binaries with no runtime dependencies.** Go + `CGO_ENABLED=0` + a tiny dependency set delivers a single binary per (OS, arch). Image export shells out to draw.io but is otherwise optional.
+
+[plantuml, c4-container, svg]
+....
+@startuml
+!include <C4/C4_Container>
+
+LAYOUT_WITH_LEGEND()
+
+title Container View — Bausteinsicht CLI
+
+Person(user, "Architect / AI Agent")
+
+System_Boundary(b, "bausteinsicht binary") {
+  Container(cli, "cmd/bausteinsicht", "Go (Cobra)", "Argument parsing, validation, JSON envelope, exit codes.")
+  Container(model, "internal/model",  "Go", "JSONC load, validate, resolve, comment-preserving patch.")
+  Container(sync, "internal/sync",    "Go", "Three-way diff, conflict resolution, forward/reverse sync.")
+  Container(drawio, "internal/drawio","Go", "draw.io XML manipulation (etree). HTML labels, connectors.")
+  Container(layout, "internal/sync/layout", "Go", "Layered/grid/none layout for view pages.")
+  Container(diagram, "internal/diagram", "Go", "PlantUML/Mermaid emitters.")
+  Container(table, "internal/table",  "Go", "AsciiDoc/Markdown emitters.")
+  Container(export, "internal/export","Go", "draw.io binary discovery + exec.")
+  Container(watcher, "internal/watcher","Go", "fsnotify wrapper with debounce + re-watch.")
+  Container(templates, "templates",   "Go embed", "Embedded sample model + default template.")
+}
+
+ContainerDb(jsonc, "architecture.jsonc", "JSONC")
+ContainerDb(drawio_file, "architecture.drawio", "XML")
+ContainerDb(state, ".bausteinsicht-sync", "JSON")
+System_Ext(drawio_cli, "drawio CLI", "Optional")
+
+Rel(user, cli, "runs commands")
+Rel(cli, model, "load / validate / save")
+Rel(cli, sync, "Run()")
+Rel(sync, model, "flatten, resolve")
+Rel(sync, drawio, "read / mutate XML")
+Rel(sync, layout, "compute positions")
+Rel(cli, diagram, "FormatView()")
+Rel(cli, table, "FormatView()")
+Rel(cli, export, "DetectDrawioBinary + Export")
+Rel(cli, watcher, "Start (watch only)")
+Rel(cli, templates, "embedded init payload")
+
+Rel(model, jsonc, "read / write (atomic)")
+Rel(drawio, drawio_file, "read / write (atomic)")
+Rel(sync, state, "read / write (atomic, sha256)")
+Rel(export, drawio_cli, "exec")
+@enduml
+....
+
+The `cmd` package is intentionally thin — every meaningful behaviour is in an `internal/` package and is unit-tested in isolation. The forward and reverse sync passes share the diff and state code through `internal/sync/engine.go::Run`, the single orchestration entry point.

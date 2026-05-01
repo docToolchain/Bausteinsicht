@@ -1,0 +1,22 @@
+= Architecture Constraints
+
+[cols="1,3,3", options="header"]
+|===
+| Type | Constraint | Source
+
+| Technical | Go 1.25.8 is the minimum and only supported toolchain. | `go.mod`.
+| Technical | Static binaries only — `CGO_ENABLED=0` for every cross-build target. | `Makefile`, `.goreleaser.yml`.
+| Technical | Six platform/arch combinations are first-class: linux/darwin/windows × amd64/arm64. | `Makefile`, `.goreleaser.yml`.
+| Technical | Only four runtime dependencies are pinned: `cobra`, `etree`, `fsnotify`, `rapid`. | `go.mod`.
+| Technical | `etree` is the XML library; the project does not depend on the Go standard XML serializer for draw.io files. | `go.mod`, `internal/drawio/document.go`.
+| Technical | The CLI MUST work without network access; image export shells out to a locally installed draw.io CLI. | README "Security", `internal/export/`.
+| Organizational | Documentation language is English. | CONTRIBUTING.md.
+| Organizational | Documentation format is AsciiDoc. | CONTRIBUTING.md.
+| Organizational | ADRs live in `src/docs/arc42/ADRs/` named `ADR-NNN-Title.adoc`. | CONTRIBUTING.md.
+| Organizational | All PRs go through `make check` (vet, staticcheck, gosec, nilaway, govulncheck, race-tests). | Makefile, `.github/workflows/go.yml`.
+| Organizational | Pre-commit hook runs gofmt, vet, golangci-lint, gitleaks. | `scripts/pre-commit`, `make install-hooks`.
+| Organizational | Releases are produced by goreleaser on tag push. | `.goreleaser.yml`, `.github/workflows/release.yml`.
+| Conventions | Tests live next to the code (`*_test.go`). | CONTRIBUTING.md.
+| Conventions | Property-based testing uses `pgregory.net/rapid` where applicable. | go.mod, CONTRIBUTING.md.
+| Conventions | When a new field is added to `Element`, six things MUST be updated (struct, schema, `elementFieldPath`, `applyElementChange`, comment-preservation E2E, roundtrip E2E). | CONTRIBUTING.md "Adding a New Model Field".
+|===

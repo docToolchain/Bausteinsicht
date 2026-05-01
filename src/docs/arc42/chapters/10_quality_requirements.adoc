@@ -1,0 +1,21 @@
+= Quality Requirements
+
+The quality scenarios below are observable in code. They map back to the PRD NFRs (`NFR-001..013`) and to the corresponding tests / constants.
+
+[cols="2,2,4,2", options="header"]
+|===
+| Quality | Scenario | Mechanism | Evidence
+
+| **Round-trip fidelity** | Edit a label in draw.io → reverse-sync → edit the model JSONC → forward-sync. The original comments and indentation in the JSONC remain. | Comment-preserving patch path (`internal/model/patch.go`, `internal/sync/patchops.go`) | `TestSyncPreservesJSONCComments`, CONTRIBUTING.md mandate.
+| **Reliability of writes** | Process is `kill -9`'d while saving the model. The file on disk is either the old version or the new one — never half-written. | Atomic temp+rename in every save. | `loader.Save`, `drawio.SaveDocument`, `state.SaveState`.
+| **State integrity** | An adversary edits `.bausteinsicht-sync` by hand. Next sync run refuses to use it and tells the user how to recover. | SHA-256 self-checksum. | `state.LoadState` checksum branch.
+| **Path containment** | User passes `--model ../../../etc/passwd`. The CLI rejects the path before any read. | `validatePathContainment`. | `TestRootCmd_RejectsModelPathTraversal`, `TestValidatePathContainment`, SEC-001/015/016.
+| **HTML safety** | Element title contains `</b><script>`. The draw.io label and metadata box render the literal text, not the script. | `escapeHTML`. | `internal/drawio/label.go` (SEC-008).
+| **Bounded resource use** | Maliciously deep model with 100 levels of `children`. Loader rejects before consuming the stack. | `MaxElementDepth = 50`, `MaxModelFileSize = 10 MiB`. | `internal/model/resolve.go`, `internal/model/loader.go`.
+| **Cross-platform portability** | Build on linux/darwin/windows × amd64/arm64 yields a runnable static binary in each. | `CGO_ENABLED=0`, no platform-specific code outside `internal/export/`. | `Makefile` targets, `.goreleaser.yml`.
+| **Determinism of output** | `bausteinsicht sync --format json` run twice on the same state yields byte-identical output. | Sorted iteration over maps before emitting; stable JSON keys. | covered indirectly by `TestSyncJSONOutput`, `TestSyncAfterInit`.
+| **LLM ergonomics** | Every command output is parseable JSON when `--format json` is set. | `--format` is a persistent flag; each command has a JSON branch. | every `cmd/bausteinsicht/*.go`.
+| **Performance** | Sync of n=500 elements completes within bench budget. | Engine + diff are linear in element count. | `BenchmarkSyncRun`, `BenchmarkLoadModel`, `BenchmarkFlattenElements`.
+| **Idempotence** | `init` followed by `sync` reports `Already in sync. No changes.`. | Initial forward sync inserts metadata + legend before saving state. | `TestSyncAfterInit`.
+| **Test coverage** | Every public command and engine path has unit + integration coverage; race detector is part of `make check`. | ~400 `Test*` functions; `make test-race`. | `Makefile`.
+|===

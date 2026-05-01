@@ -1,0 +1,31 @@
+= Glossary
+
+[cols="1,4", options="header"]
+|===
+| Term | Definition
+
+| **Element** | A node in the architecture model (`internal/model/types.go::Element`). Has a kind, title, optional description/technology, and may have children if its kind is a container.
+| **Element kind** | A user-defined element category declared in `specification.elements`. Examples: `actor`, `system`, `container`, `component`, `datastore`.
+| **Container kind** | An element kind whose definition has `container: true` — it may host children.
+| **Relationship** | A directed edge between two elements identified by dot-paths (`internal/model/types.go::Relationship`).
+| **Relationship kind** | A user-defined edge category declared in `specification.relationships`. May render as dashed.
+| **Dot path** | The fully qualified id of an element, formed by joining the JSONC keys with `.`. Example: `onlineshop.api.catalog`.
+| **View** | A named selection of elements that becomes one draw.io page (`view-<viewID>`).
+| **Scope** | The element of a view drawn as a boundary swimlane.
+| **Include / Exclude pattern** | A literal id or one of `*`, `**`, `prefix.*`, `prefix.**` used to select / subtract elements in a view.
+| **Forward sync** | Propagation of changes from the JSONC model to the draw.io diagram.
+| **Reverse sync** | Propagation of changes from the draw.io diagram back into the JSONC model.
+| **Three-way diff** | The diff strategy used by the sync engine: it compares model, draw.io, and the last-synced state to classify each change as model-side, drawio-side, or conflict.
+| **Conflict** | A change to the same element field on both surfaces since the last sync.
+| **Resolver** | An implementation of `internal/sync/conflict.go::ConflictResolver` that picks a winner per conflict. Default: `ModelWinsResolver`.
+| **Sync state** | The file `.bausteinsicht-sync` carrying last-synced field values + file hashes + a SHA-256 self-checksum.
+| **JSONC** | JSON with C-style comments (`//` line, `/* */` block) and trailing commas.
+| **PatchOp** | A `(jsonPath, value)` instruction for byte-range patching of JSONC. Comment-preserving.
+| **Lifting** | The diff's behaviour of attaching a connector to the closest visible ancestor when an endpoint is not visible on a view.
+| **Marker style** | The `strokeColor=#FF0000;dashed=1;` style added to newly created elements so the architect can find and place them.
+| **Metadata box** | A draw.io cell `metadata-<viewID>` that shows view title, description, repo URL, model path, sync timestamp, and author.
+| **Legend box** | A draw.io cell `legend-<viewID>` showing the notation and colour for every kind used on the view.
+| **arc42** | The architecture documentation template used in this `arc42/` subtree.
+| **C4** | The four-level architecture model (Context, Container, Component, Code) inspiration for Bausteinsicht's element kinds.
+| **draw.io / diagrams.net** | The visual diagram editor whose XML format Bausteinsicht reads, writes, and renders.
+|===

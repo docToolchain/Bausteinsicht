@@ -1,0 +1,472 @@
+= Acceptance Criteria
+:toc: left
+:toclevels: 2
+:sectnums:
+:icons: font
+
+Gherkin-style scenarios derived from the project's tests (~400 `Test*` functions across `cmd/bausteinsicht/`, `internal/sync/`, `internal/model/`, `internal/drawio/`, `internal/diagram/`, `internal/table/`, `internal/export/`, `internal/watcher/`).
+Each scenario references the use case it satisfies and points to the source test by name.
+
+== Conventions
+
+* `Given` describes pre-state observable from the file system or model.
+* `When` is a single CLI invocation (or sync operation).
+* `Then` describes a single observable post-condition; multiple assertions are split into separate `Then`/`And` clauses.
+* Test names cited in `// test:` comments come from the actual Go test files.
+
+== UC-001 — Initialize project
+
+=== AC-001-01: A fresh directory yields four files
+
+* **Given** an empty directory.
+* **When** I run `bausteinsicht init`.
+* **Then** files `architecture.jsonc`, `template.drawio`, `architecture.drawio`, `.bausteinsicht-sync` exist.
+* **And** the exit code is `0`.
+* `// test: TestInitCreatesFiles, TestInitTemplateFileExists, TestInitDrawioFilesExist`
+
+=== AC-001-02: Refuse to overwrite
+
+* **Given** `architecture.jsonc` already exists in the directory.
+* **When** I run `bausteinsicht init`.
+* **Then** the command exits with code `2` and the message contains `already exists`.
+* `// test: TestInitFailsIfFilesExist`
+
+=== AC-001-03: Initial model validates
+
+* **Given** the directory was scaffolded by `bausteinsicht init`.
+* **When** I run `bausteinsicht validate`.
+* **Then** validation passes (exit `0`, `valid: true`).
+* `// test: TestInitGeneratesValidModel`
+
+=== AC-001-04: Initial drawio is a valid draw.io file
+
+* **Given** the directory was scaffolded by `bausteinsicht init`.
+* **When** I parse `architecture.drawio`.
+* **Then** the file has an `<mxfile>` root with at least one `<diagram>` element.
+* `// test: TestInitGeneratesValidDrawio`
+
+=== AC-001-05: Initial sync state is loadable
+
+* **Given** the directory was scaffolded by `bausteinsicht init`.
+* **When** I load `.bausteinsicht-sync`.
+* **Then** the SHA-256 self-checksum verifies.
+* `// test: TestInitSyncStateValid`
+
+=== AC-001-06: JSON output
+
+* **When** I run `bausteinsicht init --format json`.
+* **Then** stdout is a JSON object with `success: true` and a `files` array of length 4.
+* `// test: TestInitJSONOutput`
+
+== UC-002 — Validate
+
+=== AC-002-01: Valid model exits 0
+
+* **Given** a valid model.
+* **When** I run `bausteinsicht validate`.
+* **Then** the exit code is `0` and the text output is `Model is valid.`.
+
+=== AC-002-02: Unknown kind is reported
+
+* **Given** an element references a kind that is not in `specification.elements`.
+* **When** I run `bausteinsicht validate --format json`.
+* **Then** the JSON has `valid: false`.
+* **And** at least one error has `message` containing `unknown kind`.
+
+=== AC-002-03: Children under a non-container kind are rejected
+
+* **Given** an element of a non-container kind has a `children` map.
+* **When** I run `bausteinsicht validate`.
+* **Then** the validator emits `kind "K" does not allow children (container: false)`.
+
+=== AC-002-04: Patterns in `include` are not flagged as missing IDs
+
+* **Given** a view has `include: ["onlineshop.*"]`.
+* **When** I run `bausteinsicht validate`.
+* **Then** no error is emitted for the pattern (only literal IDs are checked).
+
+=== AC-002-05: Auto-detect picks the only `*.jsonc`
+
+* **Given** the directory contains exactly one `*.jsonc` file.
+* **When** I run `bausteinsicht validate` without `--model`.
+* **Then** that file is loaded.
+
+=== AC-002-06: Auto-detect fails when ambiguous
+
+* **Given** the directory contains two or more `*.jsonc` files.
+* **When** I run `bausteinsicht validate` without `--model`.
+* **Then** the command exits non-zero and the error contains `multiple .jsonc files`.
+
+== UC-003 — Add element
+
+=== AC-003-01: Add a top-level element
+
+* **Given** a valid model that does not contain an element with id `payment`.
+* **When** I run `bausteinsicht add element --id payment --kind system --title "Payment Service"`.
+* **Then** the model now has `model.payment` with `kind: system`, `title: "Payment Service"`.
+* `// test: TestAddElementTopLevel`
+
+=== AC-003-02: Add a nested element
+
+* **Given** the model has `onlineshop` (kind `system`, container).
+* **When** I run `bausteinsicht add element --id api --kind container --title "REST API" --parent onlineshop`.
+* **Then** the model has `model.onlineshop.children.api`.
+* `// test: TestAddElementNested`
+
+=== AC-003-03: Reject invalid IDs
+
+* **Given** the user provides `--id "1bad-id"` (starts with a digit) or `--id "has.dot"`.
+* **When** I run `bausteinsicht add element ... `.
+* **Then** the command exits with code `1` and the message contains `invalid element ID`.
+* `// test: TestAddElementInvalidIDs`
+
+=== AC-003-04: Accept valid IDs
+
+* **Given** IDs matching `[a-zA-Z][a-zA-Z0-9_-]*`.
+* **When** I run `bausteinsicht add element ...`.
+* **Then** the element is added.
+* `// test: TestAddElementValidIDs`
+
+=== AC-003-05: Reject empty title
+
+* **When** I run `bausteinsicht add element --id x --kind system --title ""`.
+* **Then** the command exits non-zero with `title must not be empty`.
+* `// test: TestAddElementEmptyTitle`
+
+=== AC-003-06: Reject unknown kind
+
+* **When** I run `bausteinsicht add element --id x --kind nonsense --title "X"`.
+* **Then** the command exits non-zero with `unknown element kind`.
+* `// test: TestAddElementInvalidKind`
+
+=== AC-003-07: Reject duplicates
+
+* **Given** `model.foo` already exists.
+* **When** I run `bausteinsicht add element --id foo --kind system --title "..."`.
+* **Then** the command exits non-zero.
+* `// test: TestAddElementDuplicateID, TestAddElementDuplicateNestedID`
+
+=== AC-003-08: Reject child under non-container parent
+
+* **Given** the parent's kind has `container: false`.
+* **When** I run `bausteinsicht add element --parent <parent> ...`.
+* **Then** the command exits non-zero.
+* `// test: TestAddElementNonContainerParentRejected`
+
+=== AC-003-09: Comments survive
+
+* **Given** the JSONC model file has line comments around the `model` block.
+* **When** I run `bausteinsicht add element ...`.
+* **Then** every existing comment is preserved verbatim in the saved file.
+* `// test: TestAddElementPreservesComments`
+
+=== AC-003-10: JSON output schema
+
+* **When** I run `bausteinsicht add element --format json ...`.
+* **Then** stdout is `{"id":..., "kind":..., "title":..., "technology":..., "description":...}`.
+* `// test: TestAddElementJSONOutput, TestAddElementJSONOutputIncludesAllFields`
+
+=== AC-003-11: JSON error envelope
+
+* **When** an error is raised in `--format json` mode.
+* **Then** stderr emits `{"error":<msg>,"code":<int>}`.
+* `// test: TestAddElementJSONErrorOutput, TestAddElementTextErrorOutput`
+
+== UC-004 — Add relationship
+
+=== AC-004-01: Add a relationship
+
+* **When** I run `bausteinsicht add relationship --from customer --to onlineshop --kind uses --label "browses"`.
+* **Then** an element of `relationships` is appended.
+* `// test: TestAddRelationshipValid`
+
+=== AC-004-02: Reject missing endpoints
+
+* **Given** `customer` does not exist.
+* **When** I add a relationship from `customer`.
+* **Then** the command exits non-zero with `element "customer" not found`.
+* `// test: TestAddRelationshipNonExistentFrom, TestAddRelationshipNonExistentTo`
+
+=== AC-004-03: Reject unknown kind
+
+* **When** the `--kind` is not in `specification.relationships`.
+* **Then** the command exits non-zero with `unknown relationship kind`.
+* `// test: TestAddRelationshipInvalidKind`
+
+=== AC-004-04: Reject exact duplicates only
+
+* **Given** a relationship `(from, to, kind, label)` exists.
+* **When** I run `add relationship` with the same `(from, to, kind, label)`.
+* **Then** the command rejects the duplicate.
+* **And When** I run `add relationship` with a *different* kind.
+* **Then** the new relationship is accepted.
+* `// test: TestAddRelationshipDuplicateBlocked, TestAddRelationshipDifferentKindAllowed`
+
+=== AC-004-05: Description is persisted
+
+* **When** I add a relationship with `--description "channel A"`.
+* **Then** the saved model contains the description verbatim.
+* `// test: TestAddRelationshipWithDescription`
+
+=== AC-004-06: JSON output
+
+* **When** I run `bausteinsicht add relationship --format json ...`.
+* **Then** stdout is `{"from":..., "to":..., "label":..., "kind":..., "description":...}`.
+* `// test: TestAddRelationshipJSONOutput`
+
+== UC-005 — Sync
+
+=== AC-005-01: Sync after init reports no changes
+
+* **Given** the directory was just scaffolded by `init`.
+* **When** I run `bausteinsicht sync`.
+* **Then** the summary shows `Already in sync. No changes.`.
+* `// test: TestSyncAfterInit`
+
+=== AC-005-02: Detect a model addition and create a new draw.io element
+
+* **Given** the architect added a new element to `architecture.jsonc`.
+* **When** I run `bausteinsicht sync`.
+* **Then** the JSON summary has `forward_added >= 1`.
+* `// test: TestSyncDetectsModelChanges, TestRun_ModelAddedElement`
+
+=== AC-005-03: Reverse-sync a draw.io title change into the model
+
+* **Given** the architect changed an element label in `architecture.drawio`.
+* **When** I run `bausteinsicht sync`.
+* **Then** the JSONC model's `title` is updated to match the new label.
+* `// test: TestRun_DrawioModifiedTitle`
+
+=== AC-005-04: Conflicts are resolved with model-wins
+
+* **Given** the same field changed in both surfaces since the last sync.
+* **When** I run `bausteinsicht sync`.
+* **Then** the model value remains.
+* **And** a warning is printed naming the field, both values, and the last-synced value.
+* **And** the exit code is `1`.
+* `// test: TestRun_ConflictModelWins`
+
+=== AC-005-05: Comments survive a round-trip
+
+* **Given** the JSONC model has comments and trailing commas.
+* **When** I edit a label in draw.io and run `sync`.
+* **Then** every comment in the model is preserved.
+* `// test: TestSyncPreservesJSONCComments`
+
+=== AC-005-06: Concurrent edits in both surfaces
+
+* **Given** changes occurred on both sides since the last sync (no conflicts).
+* **When** I run `bausteinsicht sync`.
+* **Then** both forward and reverse sets are applied and reported.
+* `// test: TestSyncConcurrentModelAndDrawioChanges`
+
+=== AC-005-07: A page that is not a Bausteinsicht view is preserved
+
+* **Given** the user added an extra page in draw.io.
+* **When** I run `bausteinsicht sync`.
+* **Then** that page is left untouched.
+* `// test: TestRun_NonViewPagesPreserved, TestSyncPreservesUserAddedDrawioElement`
+
+=== AC-005-08: Orphan view pages are removed
+
+* **Given** a view present in the previous sync was removed from the model.
+* **When** I run `bausteinsicht sync`.
+* **Then** its `view-<id>` page is removed from the diagram.
+* `// test: TestRun_OrphanedViewPageRemoved, TestSyncRemovesOrphanedViewPages`
+
+=== AC-005-09: Adding a new view does not delete model elements
+
+* **Given** a new `view` is added that filters elements differently.
+* **When** I run `bausteinsicht sync`.
+* **Then** no element is removed from the model just because a previous view excluded it.
+* `// test: TestRun_AddingNewViewDoesNotDeleteElements, TestRun_RenamingViewDoesNotDeleteElements`
+
+=== AC-005-10: New view page is populated on first sync
+
+* **Given** a fresh view was added.
+* **When** I run `bausteinsicht sync`.
+* **Then** the corresponding draw.io page exists and contains the included elements.
+* `// test: TestRun_NewViewPageGetsPopulated`
+
+=== AC-005-11: Missing/empty drawio is rebuilt
+
+* **Given** `architecture.drawio` is missing or contains no `<diagram>`.
+* **When** I run `bausteinsicht sync`.
+* **Then** the file is recreated from the template and the stale state is dropped.
+* `// (cmd/bausteinsicht/sync.go branch — not all paths have a dedicated test name)`
+
+=== AC-005-12: Path traversal in --model is rejected
+
+* **When** I run `bausteinsicht --model ../etc/passwd validate`.
+* **Then** the command exits with an error containing `directory traversal`.
+* `// test: TestRootCmd_RejectsModelPathTraversal, TestValidatePathContainment`
+
+=== AC-005-13: Path traversal in --template is rejected
+
+* **When** I run `bausteinsicht --template ../tpl.drawio sync`.
+* **Then** the command exits with an error containing `directory traversal`.
+* `// test: TestRootCmd_RejectsTemplatePathTraversal`
+
+=== AC-005-14: Template extension is enforced
+
+* **Given** `--template foo.txt` is passed.
+* **Then** the command rejects with `must have a .drawio extension`.
+* `// test: TestRootCmd_RejectsNonDrawioTemplate, TestRootCmd_AcceptsDrawioTemplate, TestRootCmd_AcceptsEmptyTemplate`
+
+=== AC-005-15: Format flag is case-insensitive
+
+* **When** I pass `--format JSON` or `--format Text`.
+* **Then** the format is accepted.
+* `// test: TestRootCmd_AcceptsJsonCaseInsensitive, TestRootCmd_AcceptsTextCaseInsensitive, TestRootCmd_AcceptsJsonLowercase, TestRootCmd_AcceptsTextFormat`
+
+=== AC-005-16: Unknown format is rejected
+
+* **When** I pass `--format yaml`.
+* **Then** the command exits non-zero with `unknown format`.
+* `// test: TestRootCmd_RejectsInvalidFormat`
+
+=== AC-005-17: Sync produces stable JSON summary
+
+* **When** I run `bausteinsicht sync --format json`.
+* **Then** stdout is a JSON object with the eight stable keys (see Data Models §"JSON output schemas").
+* `// test: TestSyncJSONOutput`
+
+=== AC-005-18: Multiple relationships between the same pair are supported
+
+* **Given** two relationships with the same `from`/`to` but different `label` or `kind`.
+* **When** I run `bausteinsicht sync`.
+* **Then** both connectors are rendered separately on each view they belong to.
+* `// test: TestRun_MultipleRelsSamePair`
+
+=== AC-005-19: Warnings about invisible elements
+
+* **Given** an element exists in the model but is excluded from every view.
+* **When** I run `bausteinsicht sync`.
+* **Then** a warning is printed naming the element.
+* `// test: TestRun_WarnsAboutInvisibleElements, TestRun_NoWarningWithoutViews`
+
+=== AC-005-20: Round-trip on every supported field
+
+* **Given** a model with elements and relationships.
+* **When** I forward-sync, edit in draw.io, reverse-sync, and reload.
+* **Then** title/description/technology and label changes are preserved on both sides.
+* `// test: TestRun_FullRoundTrip`
+
+== UC-006 — Watch
+
+=== AC-006-01: Refuse to start without a model file
+
+* **Given** the current directory has no `*.jsonc`.
+* **When** I run `bausteinsicht watch`.
+* **Then** the command exits non-zero.
+* `// test: TestWatchNoModelFile`
+
+=== AC-006-02: Refuse to start without a draw.io file
+
+* **Given** the model exists but `architecture.drawio` does not.
+* **When** I run `bausteinsicht watch`.
+* **Then** the command exits non-zero.
+* `// test: TestWatchMissingDrawioFile`
+
+=== AC-006-03: Watch is registered as a subcommand
+
+* `// test: TestWatchCommandRegistered`
+
+== UC-007 — Export images
+
+=== AC-007-01: Default scale is 1.0
+
+* **When** I look at the parsed flag set of `export`.
+* **Then** `--scale` defaults to `1.0`.
+* `// test: TestExportCmd_DefaultScaleIsOne`
+
+=== AC-007-02: draw.io detection
+
+* **When** the platform binary is missing.
+* **Then** the command exits with code `2` and the message references the draw.io download URL.
+* `// (internal/export.DetectDrawioBinary, internal/export/platform_*.go)`
+
+== UC-008 — Export tables
+
+=== AC-008-01: AsciiDoc and Markdown shapes match the table layouts in the data-models doc.
+
+`// test: see internal/table/table_test.go (AsciiDoc and Markdown formatters tested per row).`
+
+== UC-009 — Export diagrams
+
+=== AC-009-01: PlantUML to stdout
+
+* **When** I run `bausteinsicht export-diagram --diagram-format plantuml`.
+* **Then** stdout starts with `@startuml` and ends with `@enduml`.
+* `// test: TestExportDiagram_PlantUMLToStdout`
+
+=== AC-009-02: Mermaid to stdout
+
+* **When** I run `bausteinsicht export-diagram --diagram-format mermaid`.
+* **Then** stdout is a Mermaid diagram.
+* `// test: TestExportDiagram_MermaidToStdout`
+
+=== AC-009-03: Write to file
+
+* **When** I run `bausteinsicht export-diagram --output dist`.
+* **Then** files `<view>.puml` (or `.mmd`) are created in `dist/`.
+* `// test: TestExportDiagram_WriteToFile, TestExportDiagram_MermaidFile`
+
+=== AC-009-04: Invalid format
+
+* **When** I run `bausteinsicht export-diagram --diagram-format dot`.
+* **Then** the command exits non-zero.
+* `// test: TestExportDiagram_InvalidFormat`
+
+=== AC-009-05: Invalid view
+
+* **When** I run `bausteinsicht export-diagram --view does-not-exist`.
+* **Then** the command exits non-zero.
+* `// test: TestExportDiagram_InvalidView`
+
+== Cross-cutting (forward sync internals)
+
+The following acceptance criteria are tested at the engine level (`internal/sync/forward_*_test.go`) and protect the _semantics_ of the sync output — they are guarantees the CLI relies on.
+
+=== AC-X-01: Element lands on the correct view page
+
+* `// test: TestApplyForward_ElementOnCorrectViewPage`
+
+=== AC-X-02: A relationship is rendered only on a page where both endpoints are visible
+
+* `// test: TestApplyForward_RelationshipOnlyOnPageWithBothEndpoints`
+
+=== AC-X-03: Relationship lifting
+
+* When an endpoint is not on a view but its ancestor is, the connector is lifted to the ancestor.
+* `// test: TestApplyForward_RelationshipLifting, TestApplyForward_RelationshipLiftingDedup, TestApplyForward_DirectRelSuppressesLifted`
+
+=== AC-X-04: Scope boundary is drawn around scope children
+
+* `// test: TestApplyForward_ScopeBoundingBox, TestApplyForward_ScopeBoundaryUpdatedOnModify, TestApplyForward_ConnectorToScopeElement`
+
+=== AC-X-05: Deletes propagate to all view pages
+
+* Deleting an element in the model removes it (and its connectors) from every view page.
+* `// test: TestApplyForward_DeletedElementRemovedFromViewPages, TestApplyForward_DeletedRelationshipRemovedFromViewPages, TestApplyForward_DeleteElementRemovesConnectors`
+
+=== AC-X-06: Drill-down navigation
+
+* Container elements get a drill-down link to the page that scopes them.
+* `// test: TestApplyForward_DrillDownNavigationLinks, TestApplyForward_BackNavigationButton`
+
+=== AC-X-07: Newly included element on an existing page is positioned and connected
+
+* `// test: TestApplyForward_NewlyIncludedElementOnExistingPage, TestApplyForward_NewlyIncludedElementGetsConnectors`
+
+=== AC-X-08: `exclude` removes an element from a page without touching the model
+
+* `// test: TestExcludeRemovesElementFromPage`
+
+=== AC-X-09: No-views fallback puts everything on the first page
+
+* `// test: TestApplyForward_NoViewsFallback`
+
+== Performance budget (informative)
+
+The benchmarks `BenchmarkSyncRun`, `BenchmarkLoadModel`, and `BenchmarkFlattenElements` (in `internal/{sync,model}/bench_test.go`) provide reference numbers at n=10/100/500 elements but do not assert thresholds. They serve as regression guards rather than acceptance criteria.

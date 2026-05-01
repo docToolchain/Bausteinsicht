@@ -1,0 +1,46 @@
+= ADR-002: Cobra as the CLI framework
+
+== Status
+
+Accepted (the project depends on `github.com/spf13/cobra` and uses its idiomatic command tree in `cmd/bausteinsicht/`).
+
+== Context
+
+Bausteinsicht ships eight commands (`init`, `sync`, `validate`, `add element`, `add relationship`, `watch`, `export`, `export-table`, `export-diagram`) plus persistent flags (`--format`, `--model`, `--template`, `--verbose`). The CLI must:
+
+* Validate flags consistently across every subcommand (e.g. format value, path traversal).
+* Emit machine-readable JSON or human-readable text on demand.
+* Provide help and version output by default.
+* Support sub-subcommands (`add element`, `add relationship`).
+
+== Decision
+
+Use **Cobra** with **pflag**. Persistent prerun hooks (`PersistentPreRunE`, `cmd/bausteinsicht/root.go:18-47`) enforce global validation: format normalisation, path containment, template extension. Errors flow back through `ExecuteRoot` which silences cobra's default error printing and emits either text or `{"error":..., "code":...}` on stderr.
+
+== Alternatives considered
+
+. **`flag` (stdlib)** — minimal; baseline.
+. **`urfave/cli`** — also popular; comparable feature set; different idioms.
+. **Hand-rolled argument parser** — more control; major maintenance cost.
+
+== Pugh Matrix
+
+Baseline = `flag`.
+
+[cols="3,1,1,1,1", options="header"]
+|===
+| Quality goal (weight)                  | Cobra | urfave/cli | Hand-rolled | flag (baseline)
+| Subcommand ergonomics (×3)              | +1    | +1         | -1          | 0
+| Help / version out of the box (×2)      | +1    | +1         | -1          | 0
+| Persistent flag validation hook (×3)    | +1    | +1         | -1          | 0
+| Bundle size / external surface (×1)     |  -1   |  -1        | +1          | 0
+| Long-term maintenance (×2)              | +1    |  0         | -1          | 0
+| Existing Go community familiarity (×1)  | +1    |  0         | -1          | 0
+| **Weighted total**                      | **+9**| **+7**     | **-9**      | **0**
+|===
+
+== Consequences
+
+* **Positive:** subcommand grouping (e.g., `add element`/`add relationship`) is natural; persistent flags compose cleanly; help output is consistent and testable.
+* **Negative:** small additional dependency (`cobra` + `pflag` + `mousetrap` indirect — see `go.sum`). Tests must instantiate `NewRootCmd()` rather than hit a global.
+* The `ExecuteRoot` wrapper (`cmd/bausteinsicht/root.go:93-115`) is needed to make Cobra fit the JSON error envelope contract.

@@ -1,0 +1,296 @@
+= Sync Specification
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+
+This document specifies the bidirectional synchronization algorithm.
+Authoritative implementation is in `internal/sync/`.
+
+== Goals
+
+* **Idempotence:** running `sync` twice in a row with no edits in between MUST produce no changes (`Already in sync. No changes.`).
+* **Round-trip fidelity:** edits made on either surface (JSONC model, draw.io diagram) MUST round-trip across a `sync` invocation, subject to the conflict policy.
+* **Comment preservation:** JSONC comments and trailing-comma formatting MUST survive a sync that only changes element fields.
+* **Explainability:** every change MUST be classified (`forward_added`, `reverse_updated`, `metadata_updated`, …) and every conflict MUST be reported with old / new / last-synced values.
+
+== Inputs and outputs
+
+[cols="1,2,4", options="header"]
+|===
+| Surface | File | Role
+
+| Model         | `architecture.jsonc` | Source of element/relationship/view definitions.
+| Diagram       | `architecture.drawio`| Visual surface; carries layout + label edits.
+| State         | `.bausteinsicht-sync`| Last-synced field values + file hashes + integrity checksum.
+| Template      | `template.drawio` (or `--template`) | Element/connector styles.
+|===
+
+== High-level algorithm
+
+`internal/sync/engine.go::Run` (paraphrased):
+
+. **Detect changes** (three-way diff between model, draw.io, and last-synced state) → `ChangeSet`.
+. **Resolve conflicts** with the configured `ConflictResolver` (default `ModelWinsResolver`) → `[]ResolvedConflict`.
+. **Drop draw.io changes that lost** the conflict from the change set.
+. **Apply forward** (model → draw.io) → `ForwardResult`.
+. **Apply reverse** (draw.io → model) → `ReverseResult`.
+. **Compute warnings** (e.g., elements that are visible on no view).
+. Return a `SyncResult` carrying all of the above.
+
+[plantuml, sync-pipeline, svg]
+....
+@startuml
+skinparam handwritten false
+start
+:Load model;
+:Load draw.io document;
+:Load .bausteinsicht-sync state;
+:Detect changes (three-way);
+:ConflictResolver.Resolve();
+note right
+  default: ModelWinsResolver
+  emits a warning per resolved conflict
+end note
+:Drop draw.io changes that lost;
+fork
+  :ApplyForward
+  (model → drawio);
+fork again
+  :ApplyReverse
+  (drawio → model);
+end fork
+:Compute visible-elements warnings;
+:Compose SyncResult;
+stop
+@enduml
+....
+
+== Three-way diff (`internal/sync/diff.go`)
+
+For each element `e` (identified by its dot-path) and field `f ∈ {title, description, technology, kind}`:
+
+* let `M(e,f)` = current value in the model;
+* let `D(e,f)` = current value parsed from draw.io (HTML label parsed by `drawio.ParseLabel`);
+* let `S(e,f)` = value at last sync (from state).
+
+Classification:
+
+[cols="1,1,1,3", options="header"]
+|===
+| `M==S` | `D==S` | Result | Meaning
+
+| yes | yes | (no change)            | both surfaces match the snapshot.
+| no  | yes | model-side change      | propagate model → drawio (`forward_updated`).
+| yes | no  | drawio-side change     | propagate drawio → model (`reverse_updated`).
+| no  | no  | conflict, M ≠ D        | resolved by `ConflictResolver` (BR-006).
+|===
+
+Element addition / deletion is detected by the difference between the union of element ids in `M`, `D`, and `S`. Special handling:
+
+* **Newly created view pages** — elements that are visible *only* on a brand-new page MUST NOT be classified as `Deleted` from draw.io. The diff computes `computeNewPageOnlyElements()` and excludes them.
+* **Cross-view inconsistencies** — different drawio pages may carry slightly different cell content for the same element; the diff resolves to the model value.
+* **Unmanaged drawio elements** — elements added in draw.io that have no `bausteinsicht_id` are ignored (kept on the page; not synced into the model).
+
+For relationships, the matching key is `(from, to, kind, label, index)` where `index` is the position in the model's `relationships` array — used to disambiguate when several relationships share the same `(from, to)` pair.
+
+=== Visible elements / lifting
+
+`computeVisibleElements()` and `computeVisibleRelationships()` define which elements / connectors should appear on at least one page.
+
+* If no views are defined, *all* elements are visible (legacy "single page" mode).
+* If views are defined, the union of all views' resolved element sets is the visibility set.
+* For relationships: if either endpoint is not visible on a view, the diff tries to **lift** the connector to the closest visible ancestor before deciding the relationship is missing. This prevents view-filter changes from being interpreted as relationship deletions.
+
+== Conflict resolution
+
+=== Conflict shape (`internal/sync/conflict.go`)
+
+[source,go]
+----
+type Conflict struct {
+    ElementID     string
+    Field         string  // "title" | "description" | "technology"
+    ModelValue    string
+    DrawioValue   string
+    LastSyncValue string
+}
+----
+
+=== Default policy: model wins
+
+`ModelWinsResolver` (the only implementation) always returns the model value. Each resolution emits a `ResolvedConflict` whose `Warning` reads:
+
+[source]
+----
+Conflict detected for element "<id>":
+  Field: <field>
+  Model value:   "<model>"
+  draw.io value: "<drawio>"
+  Last sync:     "<state>"
+  → Keeping model value. Edit draw.io manually if needed.
+----
+
+When at least one conflict is reported, `bausteinsicht sync` exits with code **1** (success-but-warnings).
+
+`ConflictResolver` is an interface, allowing future "draw.io wins" or "interactive" resolvers; only `ModelWins` is shipped today.
+
+== Forward sync (`internal/sync/forward.go`)
+
+Per-view rendering:
+
+. For every model view `v`, ensure a draw.io page exists with id `view-<v>`.
+. Resolve elements via `model.ResolveView(v)` (`include` ∪ scope, minus `exclude`).
+. **Compute layout** (`internal/sync/layout.go`):
+  ** `layered` — the default. Element kinds are assigned to tiers using the order they appear in `specification.elements`. Actors (or other "external" kinds) are placed at the top, the scope boundary in the middle, the rest at the bottom. Children of the scope are laid out inside the boundary using a BFS placement.
+  ** `grid` — a regular grid.
+  ** `none` — every element at origin (0,0).
+. **Place / update / remove** mxCells:
+  ** New elements get the marker style `strokeColor=#FF0000;dashed=1;`.
+  ** Existing elements: position is preserved unless `--relayout`.
+  ** Deleted elements are removed; their connectors (any cell with matching `source`/`target` cell id) are also removed.
+. **Connectors** are recreated/updated; the canonical id is `rel-<from>-<to>-<index>`.
+. **Metadata box** (`metadata-<viewID>`) and **Legend box** (`legend-<viewID>`) are created or refreshed when `config.metadata` / `config.legend` are not explicitly disabled.
+
+`ForwardResult` (`internal/sync/forward.go:28-37`) reports:
+
+[source,go]
+----
+type ForwardResult struct {
+    ElementsCreated   int
+    ElementsUpdated   int
+    ElementsDeleted   int
+    ConnectorsCreated int
+    ConnectorsUpdated int
+    ConnectorsDeleted int
+    MetadataUpdated   int
+    Warnings          []string
+}
+----
+
+=== Layout invariants
+
+* `layeredLayout` uses the page width derived from the existing draw.io geometry (default A4 landscape, 1169 px) and an element gap of 60.
+* The scope boundary is sized by the bounding box of its children, with a minimum of 400×300.
+* Boundary inner padding is 60.
+* These constants live in `internal/sync/layout.go::layoutConfig`.
+
+== Reverse sync (`internal/sync/reverse.go`)
+
+`ApplyReverse` walks `cs.DrawioElementChanges` and `cs.DrawioRelationshipChanges`:
+
+* **Modified element field** (title / description / technology): updates the model element in place.
+* **Deleted element**: removes the element from the model (only if its absence is consistent across views and not a view-filter side-effect).
+* **Added element**: only happens when an element with a `bausteinsicht_id` was injected through a tool that knows the schema; such elements are added under the appropriate parent.
+* **Empty-title rule (BR-008):** an empty title coming from a draw.io edit is rejected and yields the warning `Element "<id>": ignoring empty title from draw.io`.
+* **Direction swaps (BR-010):** when the change set contains `Deleted(A→B)` and `Added(B→A)` for the same conceptual edge, `applyRelSwap` updates the existing relationship in-place to keep `kind`, `label`, and `description`.
+
+`ReverseResult` (`internal/sync/reverse.go:14-22`) mirrors the forward shape (`ElementsCreated/Updated/Deleted` + `RelationshipsCreated/Updated/Deleted` + `Warnings`).
+
+== Saving
+
+Two save paths in `cmd/bausteinsicht/sync.go::saveModel`:
+
+. **Patch save** — when `ReversePatchOps` (`internal/sync/patchops.go`) determines that all reverse changes are pure field updates, the saver produces a list of `(jsonPath, newValue)` pairs and applies them via `model.PatchValue`. JSONC comments and formatting around each value are preserved.
+. **Full save** — for structural changes (add/delete elements or relationships) the saver falls back to `model.Save`. The user's pre-`{` preamble (banner comments, license header, etc.) is read back and re-prepended.
+
+`internal/sync/patchops.go::elementFieldPath`:
+
+[source]
+----
+("onlineshop.api", "technology") -> ["model", "onlineshop", "children", "api", "technology"]
+----
+
+== State management
+
+State file: `.bausteinsicht-sync` (`internal/sync/state.go`).
+
+[source,go]
+----
+type SyncState struct {
+    Checksum         string                       // self sha256
+    Timestamp        string                       // ISO-8601
+    ModelHash        string
+    DrawioHash       string
+    Elements         map[string]ElementState
+    Relationships    []RelationshipState
+    RenderedElements map[string]bool
+}
+----
+
+* **Self-checksum:** computed by marshaling without `Checksum`, hashing, and storing as `sha256:<hex>`. Mismatch on load = `sync state corrupted (checksum mismatch); delete .bausteinsicht-sync and re-run sync`.
+* **File hashes:** SHA-256 of model and draw.io files. Used to short-circuit "no change" runs and to detect the pathological "drawio file emptied" case.
+* **`RenderedElements`:** records which IDs were actually placed on a draw.io page. Used to disambiguate "deleted in draw.io" from "filtered out by view".
+* **Atomicity:** state is written to a temp file in the same directory and renamed over the destination.
+
+== Edge cases
+
+[cols="1,3", options="header"]
+|===
+| Case | Handling
+
+| The drawio file does not exist or has no `<diagram>`.
+| `cmd/bausteinsicht/sync.go` recreates it from the template, logs `WARNING: Draw.io file not found, recreating from template` (or `... no diagram pages, recreating structure`), and discards the stale sync state.
+
+| The architect deletes a view from the model.
+| `sync` removes the corresponding `view-<id>` page after the diff. Elements that survive on other views remain.
+
+| The architect deletes a model element that was already deleted in draw.io.
+| The diff classifies it as already-applied; no extra action.
+
+| A relationship's source or target is missing on a view.
+| Lifting tries to attach the connector to the closest visible ancestor; if that succeeds, no `Deleted` is recorded.
+
+| The architect renames a view.
+| The old `view-<oldid>` page is removed and a fresh `view-<newid>` page is created. (Visual layout on the old page is **not** carried over.)
+
+| Two relationships share `(from, to)` but differ in `kind` or `label`.
+| Both are valid; matched by `(from, to, kind, label, index)` and rendered as separate connectors with id `rel-<from>-<to>-<i>`.
+
+| The architect reverses a connector in draw.io.
+| Detected as a `Deleted(A→B)` + `Added(B→A)` pair; `applyRelSwap` updates the existing relationship in place to preserve `kind`, `label`, `description`.
+
+| The architect adds a draw.io page without a `bausteinsicht_id` page id (i.e. not `view-*`).
+| `sync` ignores it and leaves it untouched.
+
+| The architect adds an mxCell to a view page without a `bausteinsicht_id`.
+| Forward sync does not touch it. It is treated as user content.
+
+| `--relayout` is passed.
+| Every element on every view page is re-positioned by the layout engine, even those previously moved by hand.
+
+| The model file is empty or `null`.
+| Loader returns `model file is empty or contains a null JSON root`.
+
+| The model file exceeds 10 MiB.
+| Loader returns `file size X exceeds limit of Y bytes`.
+
+| Element nesting exceeds 50.
+| `FlattenElements` returns an error before any sync logic runs.
+
+| The user clears an element title in draw.io (BR-008).
+| The empty title is dropped; warning emitted; no model write.
+|===
+
+== Determinism and threading
+
+* Iteration order over Go maps is randomized; the sync engine sorts ids before emitting changes so that the JSON summary is stable.
+* `bausteinsicht watch` serializes sync runs through a mutex and a `syncing` flag (re-entrancy guard); fsnotify events that arrive while a sync is in progress are dropped (the next event after the sync ends will trigger a re-sync).
+* `make test-race` runs the entire test suite with `-race`; benchmarks are in `internal/sync/bench_test.go`.
+
+== Error envelope
+
+When `--format json` is set, all error returns are emitted to stderr by `cmd/bausteinsicht/root.go::ExecuteRoot`:
+
+[source,json]
+----
+{"error":"<message>","code":1}
+----
+
+The `code` field mirrors the process exit code (1 or 2).
+
+== Extension points
+
+* `ConflictResolver` interface — allows alternative resolution strategies (draw.io wins, interactive, three-way merge).
+* `bausteinsicht_template_version` — versioned template format.
+* `Element.Tags` and `Element.Metadata` — declared in `types.go` but not currently used by the sync engine; reserved for future filters / annotations (see Open Questions).
