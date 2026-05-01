@@ -1,0 +1,20 @@
+== Solution Strategy _(Q-3.4.1)_
+
+* **Text source of truth.** The JSONC model is canonical on conflict.
+  JSONC was chosen over plain JSON to allow author comments to
+  survive saves; the loader strips comments and the saver
+  preserves them.
+* **Diagram as editable projection.** The `architecture.drawio` file
+  carries `bausteinsicht_id` and `bausteinsicht_kind` attributes on
+  managed shapes so they can be correlated back to model elements
+  even after view-prefixing of cell IDs.
+* **Three-way diff against state.** The persisted `.bausteinsicht-sync`
+  file gives us the third leg of a 3-way merge so that "absent on
+  one side" can be classified as deletion vs filtering.
+* **Pure sync function.** `internal/sync/engine.go:Run` takes
+  `(model, doc, lastState, templates, newPageIDs)` and returns a
+  `SyncResult`. All I/O sits in the CLI command (`cmd/bausteinsicht`).
+* **Pluggable conflict resolution.** A `ConflictResolver` interface
+  is in place; v1 ships only `ModelWinsResolver`.
+* **Cross-platform single static binary.** No CGO, no runtime
+  dependency apart from the optional draw.io CLI for image export.

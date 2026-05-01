@@ -1,0 +1,11 @@
+== Architecture Decisions
+
+The repository contains *no* explicit ADR files (see Q-3.9.1).
+The README links to `ADR-001-DSL-Format.adoc` but that file does not
+exist in the tree. The decisions below are *implicit* — inferred
+from code (Q-3.9.2). Open ADRs to be authored by the architect are
+listed in `OPEN_QUESTIONS.adoc`.
+
+include::ADRs/ADR-001-DSL-Format.adoc[]
+include::ADRs/ADR-002-Conflict-Resolution-Strategy.adoc[]
+include::ADRs/ADR-003-Pure-Sync-Function.adoc[]

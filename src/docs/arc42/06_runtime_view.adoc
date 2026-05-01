@@ -1,0 +1,49 @@
+== Runtime View
+
+=== `sync` cycle _(Q-3.6.1)_
+
+. CLI parses flags; `PersistentPreRunE` validates `--format` and
+  rejects `..` in path flags.
+. `model.Load`: read file (≤ 10 MiB), strip JSONC, unmarshal,
+  capture element-kind ordering for layout layers.
+. `model.Validate`: hard fail on errors with exit 1.
+. `drawio.LoadDocument`: parse mxfile XML; if missing or empty
+  (no `<diagram>`), recreate from template and reset state.
+. `sync.LoadState`: read `.bausteinsicht-sync`, verify SHA-256, return
+  empty state for missing or zero-byte files.
+. `drawio.LoadTemplate(FromBytes)`: parse template shapes.
+. Ensure a draw.io page exists for each view; track `newPageIDs`.
+. `sync.RemoveOrphanedViewPages`: drop pages for views removed from
+  the model.
+. `sync.Run` (pure): DetectChanges → ResolveConflicts → ApplyForward
+  → ApplyReverse → collect warnings.
+. Save model — `PatchSave` for simple field changes, full `Save`
+  otherwise.
+. `drawio.SaveDocument` (atomic temp+rename).
+. `sync.BuildState` + `sync.SaveState` (atomic, checksummed).
+. Print summary; exit 1 if conflicts were detected.
+
+=== `watch` cycle _(Q-3.6.2)_
+
+. Auto-detect or use `--model`; verify both files exist.
+. Construct `watcher.Watcher` over the two absolute paths with the
+  default 300 ms debounce.
+. On every write/create event, the callback runs the `sync` pipeline
+  inline (without `--relayout`).
+. `SetSyncing(true)` while running suppresses re-entrant triggers from
+  the watcher's own writes.
+. On rename/remove (atomic editor saves), a `rewatch` goroutine
+  polls the path and re-adds it.
+. Block on SIGINT / SIGTERM; stop watcher; print "Stopped watching."
+
+=== Conflict resolution _(Q-3.6.3)_
+
+. Both sides changed the same `(elementID, field)` since last sync →
+  emit a `Conflict`.
+. `NewModelWinsResolver().Resolve(...)` produces
+  `ResolvedConflict{Winner: "model", Warning: …}` for each.
+. `filterConflictingDrawioChanges` removes the corresponding entries
+  from `DrawioElementChanges` so reverse sync does not overwrite the
+  model with the drawio value.
+. The warning is appended to `SyncResult.Warnings` and printed at the
+  end of the cycle.

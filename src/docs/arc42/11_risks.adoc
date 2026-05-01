@@ -1,0 +1,56 @@
+== Risks and Technical Debt _(Q-5.x)_
+
+=== Documentation drift _(Q-5.1.1)_
+
+`README.adoc` and `docToolchainConfig.groovy` reference numerous
+documents that do not exist in the repository (tutorial, sync spec,
+CLI spec, trust model, security review, ADR-001, context image).
+This question-tree exercise has materialised a first cut of those
+artifacts but the originals never existed.
+
+=== Conflict-resolution policy _(Q-5.2.1)_
+
+Only `ModelWinsResolver` is wired in. The interface anticipates more
+strategies. Risk: silent loss of draw.io-side edits when the same
+field changed in both sources.
+
+=== JSONC stripper edge cases _(Q-5.3.x)_
+
+The hand-rolled `StripJSONC` handles the common cases (BOM, line and
+block comments, escape sequences, trailing commas). Any JSON5-style
+extension (unquoted keys, single-quoted strings, hex numbers) is not
+explicitly supported or tested. See Q-5.3.2 for the open question.
+
+=== Missing JSON Schema _(Q-5.4.1)_
+
+`templates/sample-model.jsonc` references
+`https://raw.githubusercontent.com/docToolchain/Bausteinsicht/main/schema/bausteinsicht.schema.json`
+but no `schema/` directory exists in the repository. IDE autocomplete
+claimed in `README.adoc` will not work without this file being
+published.
+
+=== Operational pitfalls _(Q-5.5.x)_
+
+* Deleting `.bausteinsicht-sync` resets the three-way diff: the next
+  sync will treat all elements as "new" and may overwrite the
+  draw.io.
+* Renaming a view changes its page ID; the old page is removed.
+* `--scale > 1` with `bausteinsicht export` fails silently in
+  GPU-disabled containers (mitigated by post-export file-existence
+  check).
+
+=== Accumulated compatibility code _(Q-4.3.1)_
+
+Several fall-back code paths suggest schema migration debt:
+
+* Sync-state files without `Checksum` skip integrity verification.
+* Sync-state files without `RenderedElements` fall back to
+  "all rendered".
+* Connector IDs without an index suffix parse to index 0.
+* Draw.io label parsing falls back to HTML `ParseLabel` for legacy
+  files lacking sub-cells.
+
+=== Visible TODO/FIXME _(Q-5.7)_
+
+There are zero `TODO`, `FIXME`, `XXX`, or `HACK` markers in the Go
+source — debt is implicit, not annotated.

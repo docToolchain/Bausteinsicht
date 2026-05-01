@@ -1,0 +1,1093 @@
+= Bausteinsicht — Reverse-Engineering Question Tree
+:toc: left
+:toclevels: 3
+
+This document is the result of recursively decomposing five high-level
+questions about the Bausteinsicht codebase into leaves that are either
+answered from code (with evidence) or marked open. It is the source of
+truth for the synthesized PRD, specification, and arc42 artifacts.
+
+== Q-1: What problem does this project solve and for whom?
+
+=== Q-1.1: Who are the intended users?
+
+==== Q-1.1.1: What user roles can be inferred from the code?
+
+Status:: [ANSWERED]
+Answer:: Three user roles are visible in the code surface:
+* **Architect / engineer** — author of the JSONC architecture model and
+  the draw.io diagram. Primary user of `init`, `sync`, `watch`, `add`,
+  `validate`.
+* **LLM / AI agent** — every CLI command supports `--format json` so a
+  machine consumer can drive the tool programmatically.
+* **Documentation reader** — recipient of `export`, `export-table`, and
+  `export-diagram` outputs (PNG/SVG, AsciiDoc/Markdown, PlantUML/Mermaid).
+Evidence::
+* `cmd/bausteinsicht/root.go:50` — global `--format` flag with values
+  `text` and `json`.
+* `README.adoc:55-57` — "Let AI agents modify your architecture — every
+  CLI command supports `--format json` for LLM-driven workflows."
+* `cmd/bausteinsicht/export*.go` — `export`, `export-table`,
+  `export-diagram` commands.
+
+==== Q-1.1.2: Why was this project started? What alternatives existed?
+
+Status:: [OPEN]
+Category:: Business Context
+Ask:: Product Owner / Project Initiator
+Why unanswerable:: The README "Related Projects" section
+(`README.adoc:200-211`) names alternatives (Structurizr, LikeC4,
+Isoflow, C4InterFlow, c4model.com) and asserts a unique contribution
+("bidirectional synchronization between a text model and draw.io
+diagrams"), but the code itself does not document the *motivation* —
+why bidirectional sync with draw.io specifically was the right product
+bet. ADR-001 is referenced from the README but does not exist in the
+repository.
+What would help:: An ADR-001 (currently a dangling reference at
+`README.adoc:211`) or a Problem Statement document.
+
+=== Q-1.2: What jobs-to-be-done does the tool enable?
+
+Status:: [ANSWERED]
+Answer:: Four JTBD statements are explicit in the README and are each
+realised by concrete commands and code paths:
+. *Define architecture in text, get diagrams automatically* — `bausteinsicht sync` performs forward sync (model → draw.io).
+. *Edit diagrams visually, keep the model in sync* — same `sync` command performs reverse sync (draw.io → model).
+. *Navigate multi-level views like a map* — drill-down links from a parent element to a scoped child view, plus a back-navigation button on detail views.
+. *Let AI agents modify your architecture* — `--format json` on every command.
+Evidence::
+* `README.adoc:46-56` — JTBD statements.
+* `internal/sync/engine.go:31-93` — `Run()` executes forward and reverse
+  sync in one cycle.
+* `internal/sync/forward.go:101-107,168-170` — `drillDownLinks` map and
+  `createBackNavButton`.
+* `cmd/bausteinsicht/root.go:50` — `--format` global flag.
+
+== Q-2: What is the specification of this project?
+
+=== Q-2.1: What CLI commands and flags are defined?
+
+==== Q-2.1.1: What are the top-level commands?
+
+Status:: [ANSWERED]
+Answer:: The root command `bausteinsicht` registers eight subcommands:
+`init`, `sync`, `validate`, `add` (with sub-commands `element` and
+`relationship`), `watch`, `export`, `export-table`, `export-diagram`.
+Evidence::
+* `cmd/bausteinsicht/root.go:55-62` — `AddCommand` calls.
+* `cmd/bausteinsicht/add.go:11-14` — `add` registers `element` and
+  `relationship`.
+
+==== Q-2.1.2: What global flags exist on the root command?
+
+Status:: [ANSWERED]
+Answer:: Four persistent flags: `--format` (default `text`, accepts
+`text` or `json`), `--model` (path to `.jsonc` model file), `--template`
+(path to `.drawio` template, must end in `.drawio`), `--verbose`.
+Evidence::
+* `cmd/bausteinsicht/root.go:50-53` — flag declarations.
+* `cmd/bausteinsicht/root.go:18-46` — `PersistentPreRunE` validates
+  `--format`, the `.drawio` extension on `--template`, and rejects
+  `..` traversal in `--model`/`--template` paths.
+
+==== Q-2.1.3: What are the flags and behaviour of `init`?
+
+Status:: [ANSWERED]
+Answer:: `init` takes no command-specific flags. It refuses to run if
+`architecture.jsonc`, `architecture.drawio`, or `template.drawio`
+already exists in the current directory; otherwise it writes embedded
+sample files, runs an initial forward sync, and saves a sync state
+file `.bausteinsicht-sync`. Exit code on conflict is `2`.
+Evidence::
+* `cmd/bausteinsicht/init.go:24-31` — command definition (no flags).
+* `cmd/bausteinsicht/init.go:36-44` — pre-existence check.
+* `cmd/bausteinsicht/init.go:47-103` — write order: model, template,
+  drawio document, state file.
+* `cmd/bausteinsicht/init.go:17-22` — default file names.
+
+==== Q-2.1.4: What are the flags and behaviour of `sync`?
+
+Status:: [ANSWERED]
+Answer:: One additional flag: `--relayout` (clears element positions
+and re-applies auto-layout). Without `--model`, auto-detects a unique
+`*.jsonc` file in the current directory. Derives drawio path
+(`architecture.drawio`) and state path (`.bausteinsicht-sync`) from
+the model directory. Exit codes: `1` on conflict or validation error,
+`2` on file/template/state errors.
+Evidence::
+* `cmd/bausteinsicht/sync.go:20-29` — flag and short/long.
+* `cmd/bausteinsicht/sync.go:38-50` — auto-detect and path derivation.
+* `cmd/bausteinsicht/sync.go:61-66,198-200` — exit code `1` for
+  validation failure or conflicts.
+
+==== Q-2.1.5: What are the flags and behaviour of `validate`?
+
+Status:: [ANSWERED]
+Answer:: No command-specific flags. Loads the model, runs
+`ValidateWithWarnings`, and prints either text or JSON. Exits `1` on
+validation failure, `2` on load errors.
+Evidence::
+* `cmd/bausteinsicht/validate.go:22-31` — definition.
+* `cmd/bausteinsicht/validate.go:33-65` — `runValidate`.
+* `cmd/bausteinsicht/validate.go:88-90,109` — exit code `1`.
+
+==== Q-2.1.6: What are the flags and behaviour of `add element`?
+
+Status:: [ANSWERED]
+Answer:: Required flags: `--id`, `--kind`, `--title`. Optional:
+`--parent`, `--technology`, `--description`. ID must match
+`^[a-zA-Z][a-zA-Z0-9_-]*$` (no dots — dots are hierarchy separators).
+Validates that the kind exists in `specification.elements` and that
+the parent's kind is a container.
+Evidence::
+* `cmd/bausteinsicht/add_element.go:22-41` — flag definitions and
+  required-flag marks.
+* `cmd/bausteinsicht/add_element.go:14-20` — `validIDPattern`.
+* `cmd/bausteinsicht/add_element.go:82-87` — kind existence check.
+* `cmd/bausteinsicht/add_element.go:107-112` — parent must be container.
+
+==== Q-2.1.7: What are the flags and behaviour of `add relationship`?
+
+Status:: [ANSWERED]
+Answer:: Required flags: `--from`, `--to`. Optional: `--label`,
+`--kind`, `--description`. Both endpoints must resolve via dot-notation
+`Resolve`. If `--kind` is given it must be defined in
+`specification.relationships`. Duplicates (same from+to+kind) are
+rejected.
+Evidence::
+* `cmd/bausteinsicht/add_relationship.go:11-29` — flags and required marks.
+* `cmd/bausteinsicht/add_relationship.go:53-74` — endpoint, kind, and
+  duplicate validation.
+
+==== Q-2.1.8: What are the flags and behaviour of `watch`?
+
+Status:: [ANSWERED]
+Answer:: No command-specific flags. Uses inherited `--model` and
+`--template`. Verifies both `model` and `architecture.drawio` exist;
+starts a debounced fsnotify watcher (default 300ms), runs a sync on
+every write/create event, and serializes execution. Blocks on
+`SIGINT`/`SIGTERM`.
+Evidence::
+* `cmd/bausteinsicht/watch.go:19-87` — command and `runWatch`.
+* `internal/watcher/watcher.go:13` — `DefaultDebounce = 300ms`.
+* `internal/watcher/watcher.go:78-131` — debounced loop and serialization.
+
+==== Q-2.1.9: What are the flags and behaviour of `export`?
+
+Status:: [ANSWERED]
+Answer:: Flags: `--image-format` (`png`/`svg`, default `png`),
+`--view`, `--output` (default `.`), `--embed-diagram`, `--scale`
+(default `1.0`; `>1` requires hardware GPU). Auto-detects the draw.io
+CLI binary, exports each view's page (1-based index) to
+`architecture-<view>.<ext>`. Exit code `1` if any export fails, `2`
+on configuration errors.
+Evidence::
+* `cmd/bausteinsicht/export.go:15-28` — flag definitions and defaults.
+* `internal/export/export.go:32-45` — `DetectDrawioBinary` search order.
+* `internal/export/export.go:48-69` — `BuildExportArgs` (note the
+  scale-only-when-`>1` rationale at lines 58-66).
+
+==== Q-2.1.10: What are the flags and behaviour of `export-table`?
+
+Status:: [ANSWERED]
+Answer:: Flags: `--view`, `--table-format` (`adoc`/`md`, default `adoc`),
+`--output`, `--combined`. With `--format json`, emits structured JSON
+rows instead of a table. Default output is stdout; with `--output`,
+writes a file. Combined mode dedupes elements across all views.
+Evidence::
+* `cmd/bausteinsicht/export_table.go:15-29` — flags.
+* `cmd/bausteinsicht/export_table.go:59-61,108-120` — JSON output path.
+* `cmd/bausteinsicht/export_table.go:76-89` — combined / view-specific
+  / all-views branching.
+
+==== Q-2.1.11: What are the flags and behaviour of `export-diagram`?
+
+Status:: [ANSWERED]
+Answer:: Flags: `--view`, `--diagram-format` (`plantuml`/`mermaid`,
+default `plantuml`), `--output`. Renders selected views as text-based
+C4 diagrams. With `--format json`, emits an array of `{view, format,
+source}` entries.
+Evidence::
+* `cmd/bausteinsicht/export_diagram.go:16-29` — flags.
+* `cmd/bausteinsicht/export_diagram.go:84-106` — JSON branch.
+* `internal/diagram/diagram.go:1-61` — `FormatView` produces PlantUML
+  or Mermaid C4.
+
+==== Q-2.1.12: What is the exit-code policy?
+
+Status:: [ANSWERED]
+Answer:: `0` success, `1` for domain errors (validation failure,
+conflicts, missing elements/views, partial export failure), `2` for
+input/configuration errors (file not found, parse error, invalid
+flag value, path traversal).
+Evidence::
+* `cmd/bausteinsicht/root.go:67-76` — `exitError` with `code`.
+* `cmd/bausteinsicht/sync.go:43,55,65,196-200` — examples of `1` vs
+  `2`.
+* `cmd/bausteinsicht/validate.go:88-90,109` — `1` for validation fail.
+* `cmd/bausteinsicht/init.go:39-43` — `2` for pre-existing files.
+
+=== Q-2.2: What is the data model (model file schema)?
+
+==== Q-2.2.1: What are the top-level keys of the model file?
+
+Status:: [ANSWERED]
+Answer:: `$schema`, `config`, `specification`, `model`, `relationships`,
+`views`. Of these, `specification`, `model`, `relationships`, and
+`views` are the canonical content; `$schema` enables IDE autocomplete;
+`config` holds rendering toggles (metadata/legend/author/repo).
+Evidence::
+* `internal/model/types.go:11-23` — `BausteinsichtModel` struct.
+
+==== Q-2.2.2: What fields does an element have?
+
+Status:: [ANSWERED]
+Answer:: `kind` (required), `title` (required), `description`,
+`technology`, `tags`, `children`, `metadata`. `children` is a map of
+nested elements (only valid when the kind has `container: true`).
+Evidence::
+* `internal/model/types.go:41-49` — `Element` struct.
+* `internal/model/validate.go:86-100,107-112` — required-field checks
+  and container constraint.
+
+==== Q-2.2.3: What is the specification block?
+
+Status:: [ANSWERED]
+Answer:: Two maps: `elements` (kind-name → `{notation, description,
+container}`) and `relationships` (kind-name → `{notation, dashed}`).
+The notation string is the key into the draw.io template's shape catalog.
+Evidence::
+* `internal/model/types.go:25-39` — `Specification`, `ElementKind`,
+  `RelationshipKind`.
+
+==== Q-2.2.4: What fields does a relationship have?
+
+Status:: [ANSWERED]
+Answer:: `from` (dot-notation element ID, required), `to` (required),
+`label`, `kind`, `description`.
+Evidence::
+* `internal/model/types.go:51-57` — `Relationship` struct.
+* `internal/model/validate.go:117-164` — required existence checks for
+  `from`/`to`; `kind` must exist in `specification.relationships`.
+
+==== Q-2.2.5: What fields does a view have?
+
+Status:: [ANSWERED]
+Answer:: `title` (required), `scope`, `include`, `exclude`,
+`description`, `layout` (one of `""`, `layered`, `grid`, `none`).
+Evidence::
+* `internal/model/types.go:59-66` — `View` struct.
+* `internal/model/validate.go:167-172,174-186` — `validLayouts` map.
+
+==== Q-2.2.6: What include/exclude patterns are supported?
+
+Status:: [ANSWERED]
+Answer:: Five patterns:
+* `id` — exact match.
+* `prefix.*` — direct children of `prefix` only.
+* `prefix.**` — all descendants (recursive).
+* `*` — all top-level elements (no dot in ID).
+* `**` — all elements.
+Evidence::
+* `internal/model/resolve.go:65-121` — `MatchPattern` doc and switch.
+
+==== Q-2.2.7: What ID character set is enforced?
+
+Status:: [ANSWERED]
+Answer:: For `add element`: `^[a-zA-Z][a-zA-Z0-9_-]*$` — letters,
+digits, hyphen, underscore. Dots are explicitly disallowed (used for
+hierarchy). For reverse-synced elements imported from draw.io, IDs
+are sanitised by lowercasing, replacing spaces with hyphens, and
+stripping `. / \`.
+Evidence::
+* `cmd/bausteinsicht/add_element.go:14-20` — `validIDPattern`.
+* `internal/sync/diff.go:285-294` — `sanitizeID`.
+
+==== Q-2.2.8: Are there resource limits?
+
+Status:: [ANSWERED]
+Answer:: Two hard limits: model file size `10 MiB`, element nesting
+depth `50` levels.
+Evidence::
+* `internal/model/loader.go:13-14` — `MaxModelFileSize = 10 * 1024 *
+  1024`.
+* `internal/model/resolve.go:9-11` — `MaxElementDepth = 50`.
+
+=== Q-2.3: What are the use cases (Cockburn-style)?
+
+==== Q-2.3.1: UC: Initialize an architecture project
+
+Status:: [ANSWERED]
+Primary actor:: Architect.
+Trigger:: User runs `bausteinsicht init` in an empty directory.
+Main success scenario:: System verifies no conflict files exist, writes
+`architecture.jsonc`, `template.drawio`, `architecture.drawio`, and
+`.bausteinsicht-sync`. Prints next-step guidance.
+Failure modes:: At least one default file already exists (exit 2);
+template parse error; sync state write error.
+Evidence:: `cmd/bausteinsicht/init.go:33-128`.
+
+==== Q-2.3.2: UC: Sync model and diagram (one shot)
+
+Status:: [ANSWERED]
+Primary actor:: Architect or LLM agent.
+Trigger:: `bausteinsicht sync`.
+Main success scenario::
+. Auto-detect or use `--model`.
+. Load model → validate → load draw.io → load state → load template.
+. Compute three-way diff (model, draw.io, last-state).
+. Resolve conflicts — model always wins (v1 strategy).
+. Apply forward (model → drawio) and reverse (drawio → model) changes.
+. Save model (comment-preserving patch where possible), drawio, and new state.
+Failure modes:: Validation errors (exit 1); conflicts resolved but
+exit 1; load/save errors (exit 2). If draw.io file is missing or has
+no `<diagram>` elements, it is recreated and state is reset.
+Evidence::
+* `cmd/bausteinsicht/sync.go:31-203`.
+* `internal/sync/engine.go:31-93` — pure pipeline.
+
+==== Q-2.3.3: UC: Continuously sync on save (watch mode)
+
+Status:: [ANSWERED]
+Primary actor:: Architect.
+Trigger:: `bausteinsicht watch`.
+Main success scenario:: Both files exist → fsnotify watcher started →
+on each write/create event, debounce `300ms`, run a sync, print summary
+to stdout.
+Failure modes:: Either input file missing at start (exit 2); transient
+errors during a sync are logged but do not stop the watcher.
+Evidence:: `cmd/bausteinsicht/watch.go:28-184`,
+`internal/watcher/watcher.go:78-173` (re-watch on rename).
+
+==== Q-2.3.4: UC: Validate the model
+
+Status:: [ANSWERED]
+Primary actor:: Architect or CI pipeline.
+Trigger:: `bausteinsicht validate`.
+Main success scenario:: Model loaded; structural rules checked
+(missing kind/title, unknown kind, container constraint, unknown
+relationship kind, duplicate relationships, view layout, view
+scope/include/exclude reference existing elements). Outputs
+`Model is valid.` or a list of errors and warnings.
+Evidence:: `cmd/bausteinsicht/validate.go:33-110`,
+`internal/model/validate.go:31-219`.
+
+==== Q-2.3.5: UC: Add an element via CLI
+
+Status:: [ANSWERED]
+Primary actor:: Architect or LLM agent.
+Trigger:: `bausteinsicht add element --id X --kind Y --title T [--parent P]`.
+Main success scenario:: Validate ID, load model, validate kind, validate
+parent (if any), check duplicates, append element using a
+comment-preserving JSONC patch (fall back to full save).
+Evidence:: `cmd/bausteinsicht/add_element.go:43-164`.
+
+==== Q-2.3.6: UC: Add a relationship via CLI
+
+Status:: [ANSWERED]
+Primary actor:: Architect or LLM agent.
+Trigger:: `bausteinsicht add relationship --from A --to B [--kind K] [--label L]`.
+Main success scenario:: Both endpoints resolve, kind exists if given,
+no duplicate (same from+to+kind). Append to `relationships` array via
+comment-preserving patch.
+Evidence:: `cmd/bausteinsicht/add_relationship.go:31-102`.
+
+==== Q-2.3.7: UC: Export views as raster/vector images
+
+Status:: [ANSWERED]
+Primary actor:: Documentation reader.
+Trigger:: `bausteinsicht export --image-format {png|svg}`.
+Main success scenario:: Detect draw.io CLI; for each view (or single
+view filtered by `--view`), invoke draw.io with `--export --format
+… --page-index N`. Verify that the output file was actually created
+(empty stdout-success exit 0 from draw.io is treated as failure).
+Evidence:: `cmd/bausteinsicht/export.go:36-181`,
+`internal/export/export.go:84-96`.
+
+==== Q-2.3.8: UC: Export views as tables (AsciiDoc/Markdown/JSON)
+
+Status:: [ANSWERED]
+Primary actor:: Documentation reader / LLM agent.
+Trigger:: `bausteinsicht export-table`.
+Main success scenario:: Render columns Element / Kind / Technology /
+Description for each visible element of selected views (or combined,
+deduplicated).
+Evidence:: `cmd/bausteinsicht/export_table.go:31-120`,
+`internal/table/table.go`.
+
+==== Q-2.3.9: UC: Export views as PlantUML or Mermaid C4 diagrams
+
+Status:: [ANSWERED]
+Primary actor:: Documentation reader.
+Trigger:: `bausteinsicht export-diagram --diagram-format {plantuml|mermaid}`.
+Main success scenario:: Detect C4 level (Context/Container/Component)
+from the resolved elements' kinds, partition into in-scope and external
+elements, emit corresponding PlantUML or Mermaid markup.
+Evidence::
+* `cmd/bausteinsicht/export_diagram.go:31-130`.
+* `internal/diagram/diagram.go:23-80`.
+
+== Q-3: What is the architecture of this project? (arc42)
+
+=== Q-3.1: arc42 §1 — Introduction and goals
+
+==== Q-3.1.1: What stated quality goals are explicit in code or docs?
+
+Status:: [PARTIAL]
+Answer:: Quality goals are not enumerated in a single document, but
+several are visible in the README's feature list:
+* Cross-platform (no CGO; Linux/macOS/Windows × amd64/arm64).
+* CLI-first / LLM-friendly (`--format json`).
+* Single-binary distribution.
+* No network access (security-relevant; see Q-4.7).
+Evidence::
+* `README.adoc:138-148` — "Features" bullets.
+* `Makefile:14-48` — cross-platform build targets, `CGO_ENABLED=0`.
+* `README.adoc:194-198` — "Bausteinsicht is a local CLI tool with no
+  network access."
+
+==== Q-3.1.2: What were the quality-goal *priorities*?
+
+Status:: [OPEN]
+Category:: Architecture
+Ask:: Architect / Tech Lead
+Why unanswerable:: Code shows that several qualities exist but says
+nothing about ordering (e.g. "is reliability ahead of performance?").
+
+=== Q-3.2: arc42 §2 — Constraints
+
+==== Q-3.2.1: What technology stack is mandated?
+
+Status:: [ANSWERED]
+Answer::
+* Language: Go `1.25.8`.
+* Direct dependencies: `github.com/beevik/etree v1.6.0` (XML),
+  `github.com/fsnotify/fsnotify v1.9.0` (file watch),
+  `github.com/spf13/cobra v1.10.2` (CLI), `pgregory.net/rapid v1.2.0`
+  (property-based tests).
+* External binary at runtime (only for `export`): the draw.io CLI.
+Evidence::
+* `go.mod:3-13`.
+* `internal/export/export.go:32-45` — draw.io CLI detection.
+
+==== Q-3.2.2: What organisational/process constraints are visible?
+
+Status:: [ANSWERED]
+Answer::
+* English-only documentation, AsciiDoc format, ADRs in
+  `src/docs/arc42/ADRs/` named `ADR-NNN-Name.adoc`.
+* Pre-merge: security review + code review + `make check`.
+* Code style: `gofmt`, no unnecessary abstractions, tests next to code.
+Evidence:: `CONTRIBUTING.md:37-56`.
+
+=== Q-3.3: arc42 §3 — Context and scope
+
+==== Q-3.3.1: What systems/users does Bausteinsicht interact with?
+
+Status:: [ANSWERED]
+Answer::
+* User (human) — runs CLI, edits JSONC and `.drawio` files.
+* LLM/agent — drives CLI with `--format json`.
+* draw.io desktop / web — opens generated `architecture.drawio`.
+* draw.io CLI / `drawio-export` wrapper — invoked by `export` command.
+* File system — only persistence; no network calls anywhere in code.
+Evidence::
+* No `net/http`, `net.Dial`, or socket package imports — verified by
+  the absence of any `net` package in `go.mod`'s direct/indirect deps
+  and the lack of network usage in the codebase.
+* `internal/export/export.go:84-96` — only outbound process call (to
+  draw.io CLI).
+
+=== Q-3.4: arc42 §4 — Solution strategy
+
+==== Q-3.4.1: What is the high-level solution approach?
+
+Status:: [ANSWERED]
+Answer::
+* Source of truth is a JSONC model file. JSONC enables author comments
+  in addition to data.
+* The diagram (`architecture.drawio`, mxfile XML) is a *projection*,
+  not a separate source of truth — but it is also editable.
+* A persisted `.bausteinsicht-sync` state file provides the third leg
+  for three-way diff (model, drawio, last-known).
+* Sync is a *pure function* (`internal/sync/engine.go:Run`) on
+  `(model, doc, lastState, templates)` returning a `SyncResult`. All
+  I/O is at the edges (CLI command).
+* On conflict, the model always wins (v1 strategy, pluggable interface).
+Evidence::
+* `internal/sync/engine.go:21-93` — pure `Run`.
+* `internal/sync/conflict.go:23-55` — `ConflictResolver` interface +
+  `ModelWinsResolver`.
+
+=== Q-3.5: arc42 §5 — Building block view
+
+==== Q-3.5.1: What are the top-level building blocks (Go packages)?
+
+Status:: [ANSWERED]
+Answer::
+* `cmd/bausteinsicht` — CLI surface (Cobra commands, flag wiring).
+* `internal/model` — JSONC model types, loader, save, validation, dot-path
+  resolution, view pattern matching, comment-preserving patches.
+* `internal/drawio` — draw.io XML document/page/element/connector
+  primitives, label parser, template loader.
+* `internal/sync` — bidirectional sync engine (diff, forward, reverse,
+  layout, conflict, metadata, state).
+* `internal/diagram` — PlantUML / Mermaid C4 generators.
+* `internal/table` — AsciiDoc / Markdown / JSON table generators.
+* `internal/export` — draw.io CLI wrapper for image export
+  (platform-specific binary detection).
+* `internal/watcher` — fsnotify-based file watcher with debounce.
+* `templates` — embedded sample model and default `.drawio` template.
+Evidence:: `internal/`, `cmd/`, `templates/` directory listings;
+package doc strings (e.g., `internal/sync/doc.go:1-3`,
+`internal/drawio/document.go:1-2`, `internal/watcher/watcher.go:1-2`).
+
+==== Q-3.5.2: What is the dependency direction?
+
+Status:: [ANSWERED]
+Answer:: `cmd` → all `internal/*` packages. Inside `internal/`:
+* `sync` depends on `model` and `drawio`.
+* `diagram`, `table` depend on `model`.
+* `watcher`, `export` are leaf packages (no internal deps beyond stdlib
+  and external libs).
+* `model` and `drawio` are leaf packages with no Bausteinsicht-internal
+  dependencies.
+Evidence:: import statements in each package's primary file (e.g.
+`internal/sync/engine.go:7-10`, `internal/diagram/diagram.go:7-9`).
+
+=== Q-3.6: arc42 §6 — Runtime view
+
+==== Q-3.6.1: What is the runtime sequence of `sync`?
+
+Status:: [ANSWERED]
+Answer::
+. CLI parses flags, validates `--format` and path containment.
+. `model.Load` → strip JSONC comments → unmarshal → extract element
+  ordering for layout layers.
+. `model.Validate` → list of errors; non-empty fails fast.
+. `drawio.LoadDocument` (or recreate from template if missing/empty).
+. `sync.LoadState` (verifies SHA-256 checksum; missing/zero-length →
+  empty).
+. `drawio.LoadTemplate(FromBytes)` for shape styles.
+. Ensure a draw.io page exists for every view; track newly added pages.
+. `sync.RemoveOrphanedViewPages` deletes pages for deleted views.
+. `sync.Run`:
+  - `DetectChanges` — three-way diff into a `ChangeSet`.
+  - Conflict resolution (model wins) → drop conflicting drawio changes.
+  - `ApplyForward` (model → drawio).
+  - `ApplyReverse` (drawio → model).
+  - Collect warnings (invisible elements, conflict warnings).
+. Save model (`PatchSave` if simple field change; full `Save` otherwise).
+. `drawio.SaveDocument` (atomic temp + rename).
+. `sync.BuildState` + `sync.SaveState` (atomic, checksummed).
+. Print summary; non-zero exit if conflicts.
+Evidence::
+* `cmd/bausteinsicht/sync.go:31-203`.
+* `internal/sync/engine.go:21-93` — phases enumerated in the doc comment.
+* `internal/model/loader.go:17-46`,`156-230` — JSONC stripping.
+* `internal/sync/state.go:46-93` — checksum verification.
+
+==== Q-3.6.2: What is the runtime sequence of `watch`?
+
+Status:: [ANSWERED]
+Answer:: Watch starts an fsnotify watcher on `architecture.jsonc` and
+`architecture.drawio`; on each write/create the callback debounces
+`300ms`, then runs the same sync pipeline as `sync` (without
+`--relayout`). The `syncing` flag suppresses re-entrant events caused
+by sync's own writes. Atomic-rename writes (delete-then-create from
+editors) trigger a `rewatch` goroutine that polls for the file and
+re-adds it.
+Evidence::
+* `cmd/bausteinsicht/watch.go:28-87,89-184`.
+* `internal/watcher/watcher.go:64-76,90-131,133-173`.
+
+==== Q-3.6.3: How is conflict resolution implemented at runtime?
+
+Status:: [ANSWERED]
+Answer:: A `Conflict` is recorded only when *both* sides changed the
+same `(elementID, field)` triple since the last sync. The
+`ModelWinsResolver` produces a `ResolvedConflict{Winner: "model",
+Warning: …}` for each. Conflicting draw.io-side changes are then
+filtered out of `DrawioElementChanges` before reverse sync is applied.
+Evidence::
+* `internal/sync/diff.go:518-526,652-663` — `checkElemConflict`.
+* `internal/sync/conflict.go:23-55` — `ModelWinsResolver`.
+* `internal/sync/engine.go:46-56,124-153` — filter step.
+
+=== Q-3.7: arc42 §7 — Deployment view
+
+==== Q-3.7.1: How is the binary built and shipped?
+
+Status:: [ANSWERED]
+Answer:: Statically linked Go binary (`CGO_ENABLED=0`) built with
+`go build` directly or via `make build_<os>_<arch>`. Six target
+matrices: linux/darwin/windows × amd64/arm64. Release artifacts are
+tar.gz (Unix) or zip (Windows) produced by GoReleaser.
+Evidence::
+* `Makefile:14-48` — explicit per-platform build recipes.
+* `.goreleaser.yml:7-28` — goos, goarch, archive formats, `-ldflags
+  '-s -w -X main.version={{.Version}}'`.
+
+==== Q-3.7.2: What CI runs on every PR?
+
+Status:: [ANSWERED]
+Answer:: `Go CI` workflow runs on `ubuntu-latest`, `windows-latest`,
+`macos-latest`: `go build ./...` and `go test ./...`; plus a
+`golangci-lint` job on Linux only.
+Evidence:: `.github/workflows/go.yml:1-30`.
+
+=== Q-3.8: arc42 §8 — Cross-cutting concepts
+
+==== Q-3.8.1: How are JSONC comments preserved across saves?
+
+Status:: [ANSWERED]
+Answer:: Two paths:
+* `PatchSave` (`internal/model/patch.go`) replaces only the JSON values
+  for a list of `(path, value)` operations, leaving comments and key
+  ordering intact. Used when the reverse sync produces simple
+  field-modifications (`bsync.ReversePatchOps` returns `patchable=true`).
+* If patching fails or the change is structural, `model.Save` falls
+  back to a full re-marshal that preserves the file's *preamble*
+  (everything before the root `{`) — capturing top-of-file comments.
+Evidence::
+* `internal/model/patch.go:9-50`.
+* `internal/model/loader.go:101-138,232-245` — preamble preservation.
+* `cmd/bausteinsicht/sync.go:243-265` — Patch-then-fallback policy.
+
+==== Q-3.8.2: How is the persisted sync state protected?
+
+Status:: [ANSWERED]
+Answer:: `SyncState` is JSON with a SHA-256 checksum. On save, the
+state is marshalled twice — once without checksum to compute the hash,
+once with it included. On load, the checksum is recomputed and a
+mismatch returns a corruption error directing the user to delete
+`.bausteinsicht-sync` and re-sync. A zero-byte file is treated as
+"no state" (e.g. interrupted write).
+Evidence:: `internal/sync/state.go:46-132`.
+
+==== Q-3.8.3: How are file writes made durable?
+
+Status:: [ANSWERED]
+Answer:: All persistent files (`*.jsonc`, `*.drawio`, sync state) use
+`os.CreateTemp` in the destination directory + `os.Rename` after a
+successful write. This avoids TOCTOU races and partial writes.
+Evidence::
+* `internal/model/loader.go:118-137`.
+* `internal/drawio/document.go:55-79`.
+* `internal/sync/state.go:96-132`.
+
+==== Q-3.8.4: How are draw.io elements correlated with model elements?
+
+Status:: [ANSWERED]
+Answer:: Each draw.io `<object>` carries `bausteinsicht_id`
+(canonical model dot-path) and `bausteinsicht_kind` attributes.
+When views are used, the *cell* `id` is scoped (`<viewID>--<elemID>`)
+to allow the same element to appear on multiple pages, while the
+`bausteinsicht_id` remains canonical.
+Evidence::
+* `internal/sync/diff.go:203-236` — extraction.
+* `internal/sync/diff.go:296-314` — `stripScopedPrefix` and
+  `resolveCellID`.
+
+==== Q-3.8.5: How are unmanaged user-drawn shapes handled?
+
+Status:: [ANSWERED]
+Answer:: A `<object>` without `bausteinsicht_id` that wraps a vertex
+mxCell is treated as an "added element" by reverse sync. The element
+ID is derived from the label text via `sanitizeID` (lowercase, dashes,
+strip `. / \`). Navigation buttons (`nav-back-…`), metadata, and legend
+boxes are excluded.
+Evidence:: `internal/sync/diff.go:241-294`.
+
+==== Q-3.8.6: How is auto-layout produced?
+
+Status:: [ANSWERED]
+Answer:: `internal/sync/layout.go` computes element positions on a
+fresh page using A4-landscape dimensions (`pageWidth=1169`,
+`elementGap=60`, `padding=60`). The layer order for "layered" layout
+is taken from the user's order of element kinds in
+`specification.elements` — captured by streaming JSON tokens at load
+time (`extractElementOrder` in `loader.go`). Three explicit layouts:
+`layered`, `grid`, `none` (and empty default).
+Evidence::
+* `internal/sync/layout.go:12-50`.
+* `internal/model/loader.go:43,51-99` — element-order extraction.
+* `internal/model/validate.go:167-172` — `validLayouts`.
+
+==== Q-3.8.7: How does multi-view drill-down navigation work?
+
+Status:: [ANSWERED]
+Answer:: For each view that has a `scope`, the scoped element is
+endowed with a draw.io `link` attribute of the form
+`data:page/id,view-<viewID>`. Detail-view pages get a back-navigation
+button (`nav-back-…`) added by `createBackNavButton`. These are
+ignored by reverse sync.
+Evidence::
+* `internal/sync/forward.go:101-107,160-170`.
+
+=== Q-3.9: arc42 §9 — Architecture decisions
+
+==== Q-3.9.1: What ADRs exist in the repository?
+
+Status:: [ANSWERED]
+Answer:: None. README references `src/docs/arc42/ADRs/ADR-001-DSL-Format.adoc`
+but that file does not exist in the repo, and `CONTRIBUTING.md`
+prescribes the directory but it is empty.
+Evidence:: `find . -name "ADR-*.adoc"` returns no results
+(verified during exploration). README dangling link at `README.adoc:211`.
+
+==== Q-3.9.2: What design decisions are *implicitly* made in code?
+
+Status:: [ANSWERED]
+Answer:: At least the following are inferable:
+* JSONC over plain JSON — to keep author comments (`StripJSONC`).
+* Model wins on conflict — explicit in `ModelWinsResolver`, called out
+  as "v1 default strategy" with an interface for future strategies.
+* draw.io as the visual frontend (rather than e.g. Mermaid live).
+* Cobra as the CLI framework.
+* Cross-platform Go build with `CGO_ENABLED=0` (no platform-specific
+  shared libs at runtime).
+* Sync as a pure function — separate from I/O.
+Evidence::
+* `internal/model/loader.go:155-227` — JSONC stripping.
+* `internal/sync/conflict.go:21-33` — comment "v1 default strategy".
+* `internal/sync/engine.go:21-23` — "pure function — no file I/O".
+* `Makefile:22` — `CGO_ENABLED=0`.
+
+=== Q-3.10: arc42 §10 — Quality requirements
+
+==== Q-3.10.1: Where are quality requirements expressed in code?
+
+Status:: [ANSWERED]
+Answer::
+* *Performance*: benchmark suites in `internal/model/bench_test.go` and
+  `internal/sync/bench_test.go` (target unspecified).
+* *Reliability*: atomic temp+rename writes; SHA-256 checksum on sync
+  state; depth/size limits.
+* *Portability*: cross-compiled binaries; platform-specific draw.io
+  detection (`internal/export/platform_*.go`).
+* *Maintainability*: `make check` aggregates `go vet`, staticcheck,
+  gosec, nilaway, govulncheck, race-tested unit tests; pre-commit hook
+  runs gofmt + vet + golangci-lint + gitleaks.
+Evidence::
+* `Makefile:51-91` — checks pipeline.
+* `scripts/pre-commit:1-32` — pre-commit hook.
+
+==== Q-3.10.2: Are there explicit performance targets (e.g., N elements)?
+
+Status:: [OPEN]
+Category:: NFR / Quality Goal
+Ask:: Architect
+Why unanswerable:: Benchmarks exist but no SLO or threshold is asserted
+in code or CI.
+
+=== Q-3.11: arc42 §11 — Risks and technical debt
+
+(See Q-5 below for full decomposition.)
+
+=== Q-3.12: arc42 §12 — Glossary
+
+==== Q-3.12.1: Which domain terms appear in the code with definitions?
+
+Status:: [ANSWERED]
+Answer::
+* **Element** — node in the model tree (`Element` struct).
+* **Kind** — category of element/relationship, defined in
+  `specification`. Notation maps to a draw.io shape.
+* **View** — projection (`include`/`exclude`/`scope`/`layout`) of the
+  model rendered onto a single draw.io page.
+* **Scope** — element used as the bounding-box parent of a detail view;
+  also used for drill-down link target.
+* **Sync state** — `.bausteinsicht-sync` JSON file capturing the last
+  agreed state of model and diagram.
+* **Forward sync** — model → drawio direction.
+* **Reverse sync** — drawio → model direction.
+* **Conflict** — same field changed on both sides since last sync.
+* **Lifted relationship** — connector drawn between ancestors when
+  the original endpoint is not visible on the view (`isLiftedRelationship`).
+Evidence::
+* `internal/model/types.go`, `internal/sync/diff.go:765-793`,
+  `internal/sync/state.go:17-42`, `internal/sync/forward.go:101-107`.
+
+== Q-4: What quality goals drive the design? (ISO 25010)
+
+=== Q-4.1: Functional suitability
+
+==== Q-4.1.1: Functional completeness — are advertised features present?
+
+Status:: [ANSWERED]
+Answer:: All eight features in `README.adoc:138-148` map to working
+code:
+* Bidirectional sync — `internal/sync/engine.go`.
+* Watch mode — `internal/watcher/`, `cmd/.../watch.go`.
+* Multi-view — `m.Views`, view pages.
+* Scope/bounding boxes — `createScopeBoundary` in
+  `internal/sync/forward.go`.
+* Relationship lifting — `liftEndpoint` / `isLiftedRelationship` in
+  `internal/sync/diff.go`.
+* CLI-first / `--format json` — `root.go:50`.
+* JSON Schema — referenced via `$schema`, but the schema file itself
+  is not in the repo (see Q-5.4.1).
+* Cross-platform binaries — `Makefile`.
+
+=== Q-4.2: Performance efficiency
+
+==== Q-4.2.1: What perf-sensitive code paths exist?
+
+Status:: [ANSWERED]
+Answer:: Two: `model.Load`/`StripJSONC` and `sync.DetectChanges` — both
+have benchmarks (`internal/model/bench_test.go`,
+`internal/sync/bench_test.go`).
+
+==== Q-4.2.2: Are there latency budgets?
+
+Status:: [OPEN]
+Category:: NFR
+Ask:: Architect
+Why unanswerable:: No `t.Fatal(...ns/op)` or threshold gates in CI.
+
+=== Q-4.3: Compatibility
+
+==== Q-4.3.1: What backward-compatibility concessions exist?
+
+Status:: [ANSWERED]
+Answer::
+* Sync-state files without a `Checksum` field load successfully (silent
+  skip of integrity check) — comment at `internal/sync/state.go:71-72`.
+* Sync-state files without `RenderedElements` fall back to "all
+  elements were rendered" — comment at `internal/sync/diff.go:502-506`.
+* Connector IDs without an index suffix (`rel-<from>-<to>`) parse to
+  index `0` — `parseConnectorIndex` in `internal/sync/diff.go:412-427`.
+* `ReadElementFields` falls back to `ParseLabel` for legacy draw.io
+  files without sub-cell labels — `internal/sync/diff.go:212-214`.
+
+=== Q-4.4: Usability
+
+==== Q-4.4.1: How are CLI errors reported?
+
+Status:: [ANSWERED]
+Answer:: Plain text or JSON depending on `--format`. JSON form is
+`{"error": "...", "code": N}`. Errors are prefixed `ERROR:` /
+`WARNING:` in text mode and routed to stderr; JSON output goes to
+stdout, summaries to stderr in `--format json` mode (so machine
+consumers get clean JSON).
+Evidence:: `cmd/bausteinsicht/root.go:91-115`,
+`cmd/bausteinsicht/sync.go:117-181`.
+
+==== Q-4.4.2: What in-tool guidance is given?
+
+Status:: [ANSWERED]
+Answer::
+* `init` prints "Next steps" with three numbered items.
+* `validate` warns when the model is empty or specification has no
+  kinds (warnings, not errors).
+* Sync prints a per-direction summary (e.g. "Forward (model →
+  draw.io): 3 added…") and warnings for invisible elements.
+Evidence::
+* `cmd/bausteinsicht/init.go:120-125`,
+  `internal/model/validate.go:46-62`,
+  `cmd/bausteinsicht/sync.go:274-294`.
+
+=== Q-4.5: Reliability
+
+==== Q-4.5.1: What recovery behaviours exist?
+
+Status:: [ANSWERED]
+Answer::
+* Missing or empty draw.io file → recreate from template, reset state.
+* Corrupt sync state (checksum mismatch) → fail loudly with a
+  remediation hint.
+* Watch mode: on file-rename (atomic write by editors), the watcher
+  polls and re-adds the path.
+* Sync detects orphaned managed elements (`bausteinsicht_id` not in
+  current model) and removes them from the page.
+Evidence::
+* `cmd/bausteinsicht/sync.go:73-86`,
+* `internal/sync/state.go:81-84`,
+* `internal/watcher/watcher.go:96-99,133-173`,
+* `internal/sync/forward.go:84-88`.
+
+=== Q-4.6: Maintainability
+
+==== Q-4.6.1: How well-tested is the code?
+
+Status:: [ANSWERED]
+Answer:: Each Go source file has a sibling `_test.go` (often multiple).
+Property-based tests use `pgregory.net/rapid`. `make test-race`
+enforces the race detector.
+Evidence:: file listings of `internal/*` show `*_test.go` peers;
+`go.mod:8` lists `pgregory.net/rapid`.
+
+==== Q-4.6.2: Which static-analysis tools are mandated?
+
+Status:: [ANSWERED]
+Answer:: `go vet`, `staticcheck`, `gosec`, `nilaway`, `govulncheck`,
+plus a meta-linter `golangci-lint`. `make check` aggregates them with
+`test-race`.
+Evidence:: `Makefile:62-100`.
+
+=== Q-4.7: Security
+
+==== Q-4.7.1: What attack surfaces are guarded against in code?
+
+Status:: [ANSWERED]
+Answer::
+* **SEC-001 / SEC-016** — Path-containment validation rejects `..`
+  components in `--model`, `--template`, and `--output`.
+  (`cmd/bausteinsicht/root.go:78-89`,
+  `cmd/.../export.go:46-50`,
+  `cmd/.../export_table.go:39-43`,
+  `cmd/.../export_diagram.go:37-41`.)
+* **SEC-008** — Robust HTML-label parser handles `>` inside quoted
+  attribute values. (`internal/drawio/label.go:158`).
+* **SEC-013** — `sanitizeID` strips `. / \` from imported titles to
+  prevent dot-notation hierarchy injection
+  (`internal/sync/diff.go:285-294`).
+* **SEC-015** — `SafeViewKey` strips directory components from view
+  keys before using them in filenames (`internal/export/export.go:71-76`).
+* Model-file size cap (10 MiB) and depth cap (50). The 10 MiB cap
+  prevents DoS via huge models (`internal/model/loader.go:13-23`).
+* No network calls anywhere; the only outbound process invocation is
+  the local draw.io CLI (and only on `export`).
+Evidence:: as above.
+
+==== Q-4.7.2: Where are detailed security-review findings tracked?
+
+Status:: [OPEN]
+Category:: Security
+Ask:: Security Reviewer
+Why unanswerable:: README references
+`src/docs/security/2026-03-01-security-review.adoc`
+(`README.adoc:198`) but that file does not exist in the repository.
+The codebase only carries terse `SEC-NNN` markers next to fixes;
+the catalogue (mapping of IDs to issues, severity, status) is not
+present.
+
+=== Q-4.8: Portability
+
+==== Q-4.8.1: How is platform-specific behaviour isolated?
+
+Status:: [ANSWERED]
+Answer:: Build-tag-separated platform files in `internal/export/`:
+`platform_darwin.go`, `platform_linux.go`, `platform_windows.go`,
+each providing `platformDrawioPaths()`. Linux additionally tries a
+`drawio-export` wrapper first (devcontainer).
+Evidence:: `internal/export/export.go:25-45`,
+file listing of `internal/export/`.
+
+== Q-5: What risks and technical debt exist?
+
+=== Q-5.1: Documentation drift
+
+==== Q-5.1.1: Are advertised documents present in the repo?
+
+Status:: [ANSWERED]
+Answer:: No. README links and `docToolchainConfig.groovy` reference
+files that do not exist:
+* `src/docs/spec/06_tutorial.adoc` (referenced from `README.adoc:47,136,191`).
+* `src/docs/spec/05_sync_specification.adoc` (`README.adoc:50,190`).
+* `src/docs/spec/02_cli_specification.adoc` (`README.adoc:188`).
+* `src/docs/spec/03_data_models.adoc` (`README.adoc:189`).
+* `src/docs/spec/07_trust_model.adoc` (`README.adoc:196`).
+* `src/docs/manual/user-manual.adoc` (`README.adoc:53,56,187`).
+* `src/docs/security/2026-03-01-security-review.adoc` (`README.adoc:198`).
+* `src/docs/arc42/ADRs/ADR-001-DSL-Format.adoc` (`README.adoc:211`).
+* `src/docs/images/arc42/architecture-context.png` (`README.adoc:7`).
+Evidence:: `find src/docs` showed only `PRD/`, `arc42/`, `spec/`
+directories created during this exercise; previously empty.
+
+=== Q-5.2: Conflict-resolution policy
+
+==== Q-5.2.1: What is the long-term plan for conflict strategies?
+
+Status:: [ANSWERED]
+Answer:: An interface `ConflictResolver` is defined for "future
+extension (interactive, merge strategies)" but only `ModelWinsResolver`
+is implemented and wired in. Risk: silent overwrite of user edits in
+draw.io when both sides change.
+Evidence:: `internal/sync/conflict.go:21-33`,
+`internal/sync/engine.go:48-49`.
+
+=== Q-5.3: Edge-case fragility (`StripJSONC`)
+
+==== Q-5.3.1: What edge cases does the JSONC stripper handle?
+
+Status:: [ANSWERED]
+Answer:: Handles UTF-8 BOM, `//` and `/* */` comments inside string
+literals, escape sequences inside strings, indentation cleanup before
+own-line comments, trailing commas before `]`/`}`.
+Evidence:: `internal/model/loader.go:157-230`.
+
+==== Q-5.3.2: Are there known JSONC edge cases not handled?
+
+Status:: [OPEN]
+Category:: Risk / Robustness
+Ask:: Maintainer
+Why unanswerable:: Code is hand-rolled; no test fixtures or comments
+indicate what it intentionally does *not* support (e.g. JSON5
+unquoted keys, single-quoted strings, hex numbers).
+
+=== Q-5.4: Schema availability
+
+==== Q-5.4.1: Where is the JSON Schema located?
+
+Status:: [OPEN]
+Category:: Risk / Documentation
+Ask:: Maintainer
+Why unanswerable:: `templates/sample-model.jsonc:2` and
+`CONTRIBUTING.md:21` reference `bausteinsicht.schema.json` at
+`https://raw.githubusercontent.com/docToolchain/Bausteinsicht/main/schema/bausteinsicht.schema.json`,
+but no `schema/` directory and no `*.schema.json` file exists in this
+repository. IDE autocomplete claimed in README will not work without
+this file being published.
+
+=== Q-5.5: Operational risks
+
+==== Q-5.5.1: What can silently break a project's history?
+
+Status:: [ANSWERED]
+Answer::
+* Deleting `.bausteinsicht-sync` resets the three-way diff to first-sync.
+* Renaming a view changes its page ID (`view-<viewID>`) — the old page
+  is detected as orphaned and removed (intentional, but destructive).
+* `--relayout` clears managed elements from each view page so the
+  layout engine re-positions everything.
+Evidence:: `internal/sync/engine.go:99-122`,
+`internal/sync/forward.go:135-137`,
+`cmd/bausteinsicht/sync.go:27,143`.
+
+==== Q-5.5.2: What environmental dependency can fail silently?
+
+Status:: [ANSWERED]
+Answer:: The draw.io CLI export. With `--scale > 1` on headless
+containers (where the GPU is disabled), the GPU process crashes and
+draw.io exits 0 with no output. Mitigation: `BuildExportArgs` only
+passes `--scale` when `>1` (a partial mitigation; users who set
+`--scale 2` still hit it). Additionally, post-export the file
+existence is verified.
+Evidence:: `internal/export/export.go:58-69,84-96`.
+
+=== Q-5.6: Naming/encoding inconsistencies
+
+==== Q-5.6.1: How is the boundary kind derived for scope elements?
+
+Status:: [ANSWERED]
+Answer:: Scope elements are rendered with a derived kind suffix
+`_boundary` (e.g. `system_boundary`); kind comparison is intentionally
+skipped on the draw.io side because of this difference.
+Evidence:: `internal/sync/diff.go:513-516,523-525`.
+
+=== Q-5.7: What technical debt is explicitly admitted in code?
+
+Status:: [ANSWERED]
+Answer:: There are no `TODO`, `FIXME`, `XXX`, or `HACK` markers in the
+Go source (verified by grep). However:
+* The `ConflictResolver` interface anticipates v2 strategies but ships
+  with a single implementation (Q-5.2.1).
+* Several backward-compat fall-backs (Q-4.3.1) suggest accumulated
+  schema migration debt in the sync state and draw.io label formats.
+* Empty `src/docs/` tree relative to advertised docs (Q-5.1.1).
+* Missing JSON Schema file (Q-5.4.1).
+* Missing ADR-001 (Q-3.9.1).
+Evidence:: `grep -r 'TODO\\|FIXME\\|HACK' --include='*.go' .` is empty.
+

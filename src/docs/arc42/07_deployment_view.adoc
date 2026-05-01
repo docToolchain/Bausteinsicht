@@ -1,0 +1,35 @@
+== Deployment View
+
+=== Build _(Q-3.7.1)_
+
+* `make build` — current platform.
+* `make build_<os>_<arch>` — six matrices: linux/darwin/windows ×
+  amd64/arm64.
+* `CGO_ENABLED=0` for all release builds.
+* `.goreleaser.yml` defines the release pipeline:
+  - `-ldflags '-s -w -X main.version={{.Version}}'`.
+  - `tar.gz` archives on Unix, `zip` on Windows.
+  - Changelog grouped by Conventional Commit prefix
+    (`feat`, `fix`, `security`, `perf`, `refactor`).
+
+=== Distribution
+
+* GitHub Releases.
+* `go install github.com/docToolchain/Bausteinsicht/cmd/bausteinsicht@latest`.
+* Build from source via `make build`.
+
+=== CI _(Q-3.7.2)_
+
+`.github/workflows/go.yml`:
+
+* `build-and-test` — `ubuntu-latest`, `windows-latest`, `macos-latest`;
+  `go build ./...` + `go test ./...`.
+* `lint` — `golangci-lint` on Linux only.
+
+=== Runtime environment
+
+* OS: any of Linux, macOS, Windows on amd64 or arm64.
+* Disk only — no network.
+* Optional: a draw.io CLI on PATH for `export`. The devcontainer
+  bundles a `drawio-export` wrapper that adds `xvfb` and
+  `--no-sandbox`.

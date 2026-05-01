@@ -1,0 +1,16 @@
+= Bausteinsicht — Architecture Documentation (arc42)
+:toc: left
+:toclevels: 2
+
+include::01_introduction_and_goals.adoc[]
+include::02_constraints.adoc[]
+include::03_context_and_scope.adoc[]
+include::04_solution_strategy.adoc[]
+include::05_building_block_view.adoc[]
+include::06_runtime_view.adoc[]
+include::07_deployment_view.adoc[]
+include::08_crosscutting_concepts.adoc[]
+include::09_architecture_decisions.adoc[]
+include::10_quality_requirements.adoc[]
+include::11_risks.adoc[]
+include::12_glossary.adoc[]

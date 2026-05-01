@@ -1,0 +1,19 @@
+== Glossary _(Q-3.12.1)_
+
+[options="header"]
+|===
+| Term | Meaning
+| Element | A node in the model tree (`internal/model/types.go:Element`).
+| Kind | A category of element/relationship defined in `specification`. The `notation` of a kind is the key into the draw.io template's shape catalogue.
+| Container | An element kind with `container: true`, allowed to have children.
+| Relationship | A directed edge between two elements; may carry a kind, label, and description.
+| View | A projection of the model rendered to a single draw.io page; selected via `include`/`exclude` patterns and optionally a `scope`.
+| Scope | An element rendered as a bounding box in a detail view; also the drill-down link target from a parent view.
+| Sync state | The `.bausteinsicht-sync` file capturing the last agreed state of model and diagram (with SHA-256 checksum).
+| Forward sync | Direction model → drawio.
+| Reverse sync | Direction drawio → model.
+| Conflict | Same field of the same element changed on both sides since the last sync.
+| Lifted relationship | A connector drawn between ancestor elements when the original endpoint is not visible on the current view.
+| Managed shape | A draw.io `<object>` that carries `bausteinsicht_id` and is owned by the sync engine.
+| Unmanaged shape | A draw.io shape without `bausteinsicht_id` — picked up by reverse sync as a new element via label sanitisation.
+|===

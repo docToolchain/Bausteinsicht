@@ -1,0 +1,95 @@
+= Sync Specification
+:toc: left
+
+This document describes how a single sync cycle is executed.
+
+== Inputs _(Q-3.6.1)_
+
+* The model — JSONC file, parsed into `BausteinsichtModel`.
+* The draw.io document — `architecture.drawio` (mxfile XML), parsed
+  into a `Document` of pages.
+* The last sync state — `.bausteinsicht-sync` JSON, with checksum.
+* The template — `template.drawio` if `--template` is passed,
+  otherwise the embedded default.
+* `newPageIDs` — set of `view-<id>` page IDs created during this
+  invocation but not yet populated.
+
+== Pure pipeline _(Q-3.4.1, Q-3.6.1)_
+
+`internal/sync/engine.go:Run` is a pure function — no file I/O. It
+runs the following sequence:
+
+. **DetectChanges** — three-way diff over elements and relationships
+  comparing model, draw.io, and last state.
+. **Resolve conflicts** — `ModelWinsResolver` maps each `Conflict` to
+  a `ResolvedConflict{Winner: "model"}`. Conflicting draw.io changes
+  are then dropped from `DrawioElementChanges`.
+. **ApplyForward** — apply model-side changes to the draw.io document,
+  per view page.
+. **ApplyReverse** — apply draw.io-side changes to the model.
+. **Collect warnings** — invisible elements (in model but in no view),
+  draw.io page misses, conflict warnings.
+
+== Three-way diff details _(Q-3.6.3, Q-4.3.1)_
+
+For each element ID present in any of model/drawio/last-state,
+`detectElementChanges` computes:
+
+* **Model-side**: Added if in model but not in last; Deleted if in
+  last but not in model; Modified per field if last and current differ.
+* **Drawio-side**: Same logic against the drawio snapshot. Deletion
+  is only emitted if (a) the element should be visible on at least
+  one view page (`computeVisibleElements`), and (b) the element was
+  actually rendered previously (`RenderedElements`), and (c) the
+  element is not expected only on a newly created page.
+* **Conflicts**: `(modelVal != lastVal) && (drawioVal != lastVal)` for
+  the same field. `kind` is excluded because scope-boundary kinds
+  (e.g. `system_boundary`) are intentionally derived from the model
+  kind.
+
+For relationships, the same logic applies with two extra filters
+(`internal/sync/diff.go:710-738`):
+
+* Lifted connectors (parent endpoints standing in for unrendered child
+  endpoints) are never reported as added or deleted relationships.
+* Direction-swap pairs (Deleted A→B + Added B→A) are merged into a
+  single in-place reverse update so kind/label/description survive.
+
+== Forward sync _(Q-3.8.6, Q-3.8.7)_
+
+`ApplyForward` operates per view page:
+
+. Build drill-down link map: `view.scope → "data:page/id,view-<id>"`.
+. For each view: resolve elements via `ResolveView`; if `--relayout`,
+  clear managed shapes; create scope boundary if applicable.
+. **populateNewPage** — place any resolved element not already on the
+  page using the layout engine.
+. **applyChangesToPage** — apply per-element field updates and
+  add/delete operations from the change set.
+. **populateConnectors** — create connectors for relationships whose
+  endpoints are both present.
+. **reconcileViewPage** — remove elements no longer in the resolved
+  view (e.g. after `exclude` changes).
+. **applyDrillDownLinks** — set `link` attributes on scope-source
+  elements.
+. **createBackNavButton** — on detail views (those with `scope`), add
+  a navigation button.
+. **Metadata + legend** — render per-view metadata box and legend
+  unless disabled in `config`.
+
+== Reverse sync
+
+`ApplyReverse` consumes the `DrawioElementChanges` and
+`DrawioRelationshipChanges` from the change set (already pruned for
+model-wins conflicts and lifted relationships), and updates the model
+in place. After reverse sync, the model is saved either by
+`PatchSave` (comment-preserving) or full `Save` (preamble-preserving).
+
+== Outputs
+
+* Updated draw.io document on disk (atomic).
+* Updated model file on disk (atomic, comment-preserving where
+  possible).
+* New sync state on disk (atomic, checksummed).
+* `SyncResult` returned to the caller: counts per direction, conflicts,
+  warnings.

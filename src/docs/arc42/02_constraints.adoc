@@ -1,0 +1,21 @@
+== Constraints
+
+=== Technical _(Q-3.2.1)_
+
+* Language: Go `1.25.8` (per `go.mod`).
+* Direct dependencies are intentionally few:
+  - `github.com/beevik/etree` for draw.io XML.
+  - `github.com/fsnotify/fsnotify` for file watching.
+  - `github.com/spf13/cobra` for the CLI.
+  - `pgregory.net/rapid` for property-based tests.
+* `CGO_ENABLED=0` for all release builds.
+* Runtime external dependency: only the local draw.io CLI, only for
+  `export` (image rendering).
+
+=== Conventions _(Q-3.2.2)_
+
+* English-only documentation, AsciiDoc format.
+* ADRs in `src/docs/arc42/ADRs/` named `ADR-NNN-Name.adoc`.
+* Pre-merge: security review + code review + `make check`.
+* Code style: `gofmt`; tests next to the code; no unnecessary
+  abstractions.

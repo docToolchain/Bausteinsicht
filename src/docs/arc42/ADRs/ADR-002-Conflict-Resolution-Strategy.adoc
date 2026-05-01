@@ -1,0 +1,53 @@
+=== ADR-002: Model wins on conflict (v1 strategy)
+
+[NOTE]
+====
+Reverse-engineered from code (Q-3.9.2, Q-5.2.1).
+====
+
+==== Status
+
+Implicit (in force as v1 default). The `ConflictResolver` interface
+in `internal/sync/conflict.go:21-33` anticipates additional
+strategies but only `ModelWinsResolver` is wired in.
+
+==== Context
+
+The model and the diagram are both editable. When the same field
+of the same element changes on both sides between two syncs, the
+tool must pick one. The team must trade off:
+
+* User trust ("don't silently overwrite my edits in draw.io").
+* Determinism in CI ("the model is the input I review in PR").
+* Merge complexity (interactive, three-way merge, etc.).
+
+==== Decision
+
+For v1, the model always wins. A warning is printed for every
+resolved conflict, naming the field, the model value, the draw.io
+value, and the last-sync value. The `ConflictResolver` interface
+keeps the door open for future strategies (e.g. "drawio wins",
+"interactive prompt").
+
+==== Consequences
+
+. Determinism: CI/test runs are repeatable.
+. Risk: a draw.io edit on the same field as a model edit is silently
+  discarded with only a warning to indicate it.
+. Conflict count is surfaced as a non-zero exit (1) so CI can fail
+  the build until the human reconciles.
+
+==== Pugh Matrix
+
+[options="header"]
+|===
+| Criterion (weight)         | Model wins | Drawio wins | Interactive | Three-way merge
+| Determinism in CI (3)      | + 3        | + 3         | -3          | + 3
+| User trust on visual edits (2) | -2     | + 2         | + 2         | + 2
+| Implementation effort (-2)  | -2       | -2          | -6          | -6
+| Reviewability of model (3)  | + 3      | -3          | + 3         | + 3
+| **Total**                   | **2**    | **0**       | **-4**      | **2**
+|===
+
+The matrix shows model-wins and three-way merge tied; v1 chose
+model-wins for the lower implementation cost.

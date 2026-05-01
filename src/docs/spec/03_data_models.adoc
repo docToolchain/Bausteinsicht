@@ -1,0 +1,137 @@
+= Data Models
+:toc: left
+
+The Bausteinsicht model file is JSONC (JSON with comments). The loader
+strips comments before unmarshalling, so any standard JSON parser
+sees a clean document — but the *raw* file retains author comments,
+key ordering, and a top-of-file preamble across saves.
+
+== Top-level shape _(Q-2.2.1)_
+
+[source,jsonc]
+----
+{
+  "$schema": "...",        // optional; enables IDE autocomplete
+  "config":   { ... },     // optional
+  "specification": { ... },// required: kinds
+  "model":    { ... },     // required: element tree
+  "relationships": [ ... ],// required: array
+  "views":    { ... }      // required: map of views
+}
+----
+
+Implemented by `BausteinsichtModel` in `internal/model/types.go:11-23`.
+
+== `config` _(Q-2.2.1)_
+
+[options="header"]
+|===
+| Field | Type | Default | Effect
+| `metadata` | bool | true | Render the per-view metadata box.
+| `legend`   | bool | true | Render the per-view legend.
+| `author`   | string | (none) | Shown in metadata box.
+| `repo`     | string | (none) | Shown in metadata box.
+|===
+
+== `specification` _(Q-2.2.3)_
+
+Two maps:
+
+* `elements` — kind name → `{ notation, description, container }`.
+  `container: true` allows children. `notation` is the key into the
+  draw.io template's shape catalogue.
+* `relationships` — kind name → `{ notation, dashed }`. `dashed`
+  toggles a dashed connector style.
+
+The *order* of `specification.elements` is meaningful: the layout
+engine uses it to assign layered-view rows. The order is captured by
+streaming JSON tokens at load time
+(`extractElementOrder` in `internal/model/loader.go:51-99`).
+
+== Element _(Q-2.2.2)_
+
+[options="header"]
+|===
+| Field | Type | Required | Notes
+| `kind`        | string | yes | Must exist in `specification.elements`.
+| `title`       | string | yes | Non-empty.
+| `description` | string | no  | (Optional)
+| `technology`  | string | no  | (Optional)
+| `tags`        | []string | no | Reserved for future use; loaded but not currently rendered.
+| `children`    | map<id, Element> | no | Allowed only if the kind has `container: true`.
+| `metadata`    | map<string, string> | no | Free-form annotations.
+|===
+
+Element IDs:
+
+* Top-level keys and child keys must be valid identifiers when added
+  via `add element`: `^[a-zA-Z][a-zA-Z0-9_-]*$`. _(Q-2.2.7)_
+* Full paths use dot-notation: `onlineshop.api.catalog`.
+* Maximum nesting depth: `50` (`MaxElementDepth`). _(Q-2.2.8)_
+* Maximum file size: `10 MiB` (`MaxModelFileSize`). _(Q-2.2.8)_
+
+== Relationship _(Q-2.2.4)_
+
+[options="header"]
+|===
+| Field | Type | Required | Notes
+| `from` | string | yes | Dot-notation element ID; must resolve.
+| `to`   | string | yes | Dot-notation element ID; must resolve.
+| `label`| string | no  | Free text.
+| `kind` | string | no  | Must exist in `specification.relationships` if set.
+| `description` | string | no | (Optional)
+|===
+
+Multiple relationships between the same pair are allowed if they
+differ in `kind` or `label`. Fully duplicate tuples are rejected by
+validation. _(see `internal/model/validate.go:117-164`)_
+
+== View _(Q-2.2.5, Q-2.2.6)_
+
+[options="header"]
+|===
+| Field | Type | Required | Notes
+| `title`       | string | yes | Non-empty; becomes the draw.io page name.
+| `scope`       | string | no  | Element ID rendered as a bounding box and the drill-down target for parent views.
+| `include`     | []string | no | Element IDs or patterns (see below).
+| `exclude`     | []string | no | Same pattern syntax as `include`.
+| `description` | string | no  | Shown in metadata box.
+| `layout`      | string | no  | One of `""` (default), `layered`, `grid`, `none`.
+|===
+
+Pattern syntax for `include`/`exclude`:
+
+[options="header"]
+|===
+| Pattern | Meaning
+| `id` | Exact match.
+| `prefix.*` | Direct children of `prefix` (one level).
+| `prefix.**` | All descendants of `prefix` (recursive).
+| `*` | All top-level elements (no dot).
+| `**` | All elements.
+|===
+
+== Sync state file (`.bausteinsicht-sync`) _(Q-3.8.2)_
+
+[source,json]
+----
+{
+  "checksum":  "sha256:…",
+  "timestamp": "RFC3339",
+  "model_hash":  "sha256:…",
+  "drawio_hash": "sha256:…",
+  "elements": {
+    "<id>": { "title": "...", "description": "...", "technology": "...", "kind": "..." }
+  },
+  "relationships": [
+    { "from": "...", "to": "...", "index": 0, "label": "...", "kind": "..." }
+  ],
+  "rendered_elements": { "<id>": true }
+}
+----
+
+The `checksum` covers the canonical marshalling of the state with the
+checksum field cleared. A mismatch produces a corruption error.
+Backwards compatibility: states without `checksum` skip the integrity
+check; states without `rendered_elements` fall back to "all elements
+were rendered".

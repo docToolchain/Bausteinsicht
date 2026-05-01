@@ -1,0 +1,36 @@
+== Quality Requirements
+
+=== Where each ISO 25010 dimension is realised _(Q-4.x)_
+
+[options="header"]
+|===
+| Quality | Realisation in code
+| Functional suitability | All eight feature bullets from `README.adoc` map to working code paths (Q-4.1.1).
+| Performance efficiency | Benchmarks in `internal/model/bench_test.go` and `internal/sync/bench_test.go`. No SLOs in CI (Q-4.2.2 is `[OPEN]`).
+| Compatibility | Backward-compatible loader paths for legacy state files and legacy draw.io label formats (Q-4.3.1).
+| Usability | Text/JSON dual output; verbose stderr with structured prefixes; "next steps" hints from `init` (Q-4.4.1, Q-4.4.2).
+| Reliability | Atomic writes, sync-state checksum, watcher rewatch on rename, orphan reconciliation (Q-4.5.1).
+| Maintainability | Sibling `_test.go` for every source file; property-based tests via `pgregory.net/rapid`; `make check` aggregates `go vet`, staticcheck, gosec, nilaway, govulncheck, `test-race` (Q-4.6.1, Q-4.6.2).
+| Security | Path-containment, ID/key sanitisation, label-parser hardening, file-size and depth caps; no network calls (Q-4.7.1).
+| Portability | Per-platform draw.io detection in `internal/export/platform_*.go`; statically-linked builds for six matrices (Q-4.8.1).
+|===
+
+=== Quality scenarios
+
+. *Atomic concurrent edit.* User edits `architecture.drawio` in
+  draw.io while `bausteinsicht watch` is running. The watcher absorbs
+  the editor's atomic-rename save, polls the path back into the
+  watch set, and triggers a sync. Result: no missed event, no
+  duplicate sync.
+. *Corrupted state file.* `.bausteinsicht-sync` is truncated by an
+  external process. Next sync detects checksum mismatch and refuses,
+  pointing the user at the remediation. Alternatively, a zero-byte
+  state is treated as missing and triggers a clean re-sync.
+. *Orphaned managed shape.* A view is removed from the model.
+  `RemoveOrphanedViewPages` deletes the corresponding draw.io page;
+  `reconcileOrphanedElements` removes managed shapes whose
+  `bausteinsicht_id` is no longer in the model.
+. *Headless export at 1×.* `bausteinsicht export --image-format png`
+  in a container without GPU works because `BuildExportArgs` does
+  not pass `--scale` for the default value of 1.0. At `--scale 2`
+  the user must have hardware GPU acceleration.

@@ -1,0 +1,51 @@
+== Building Block View
+
+=== Level 1: Packages _(Q-3.5.1, Q-3.5.2)_
+
+[options="header"]
+|===
+| Package | Responsibility | Depends on
+| `cmd/bausteinsicht` | CLI surface (Cobra), flag wiring, exit codes, JSON/text formatting. | All `internal/*` and `templates`.
+| `internal/model` | JSONC types, loader/saver, validation, dot-path resolution, view pattern matching, comment-preserving patches. | (stdlib)
+| `internal/drawio` | mxfile XML primitives: Document, Page, element, connector, label parser, template loader. | `etree`
+| `internal/sync` | Three-way diff, forward/reverse application, conflict resolution, layout, metadata, persisted state. | `model`, `drawio`
+| `internal/diagram` | PlantUML / Mermaid C4 generators. | `model`
+| `internal/table` | AsciiDoc / Markdown / JSON table generators. | `model`
+| `internal/export` | draw.io CLI binary detection (per platform) and process invocation. | (stdlib)
+| `internal/watcher` | fsnotify-based file watcher with debounce and rewatch. | `fsnotify`
+| `templates` | Embedded sample model and default `.drawio` template. | (none — `embed`)
+|===
+
+Dependency direction is acyclic: `cmd` is the only consumer of
+`internal/*`. Within `internal/`, `sync` is the only multi-package
+consumer (it imports `model` and `drawio`).
+
+=== Level 2: Selected internals
+
+==== `internal/sync` (the engine)
+
+* `engine.go` — `Run`, `RemoveOrphanedViewPages`,
+  conflict-filtering helper.
+* `diff.go` — `DetectChanges` and the visibility / lifted-relationship
+  / unmanaged-element detection helpers.
+* `forward.go` — `ApplyForward`, `populateNewPage`, `populateConnectors`,
+  `reconcileViewPage`, `applyDrillDownLinks`, `createBackNavButton`.
+* `reverse.go` — `ApplyReverse`, direction-swap detection.
+* `layout.go` — auto-layout for fresh pages.
+* `metadata.go` — per-view metadata + legend boxes.
+* `state.go` — `SyncState`, `LoadState`, `SaveState`, `BuildState`,
+  SHA-256 checksum.
+* `conflict.go` — `Conflict`, `ConflictResolver` interface,
+  `ModelWinsResolver`.
+* `patchops.go` — translation from reverse changes to JSONC patch ops.
+
+==== `internal/model`
+
+* `types.go` — `BausteinsichtModel`, `Element`, `Relationship`, `View`.
+* `loader.go` — `Load`, `Save`, `AutoDetect`, `StripJSONC`,
+  `extractElementOrder`, preamble preservation.
+* `validate.go` — element / relationship / view checks.
+* `resolve.go` — `Resolve`, `FlattenElements`, `MatchPattern`,
+  `ResolveView`.
+* `patch.go` — comment-preserving `PatchSave`, `PatchInsert`,
+  `InsertObjectEntry`, `AppendArrayEntry`.
