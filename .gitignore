@@ -40,3 +40,10 @@ Simon-Brown-Demo/
 
 # draw.io backup files
 .$*.bkp
+
+# MCP tool data
+.playwright-mcp/
+.serena/
+
+# Test reports
+report.html
