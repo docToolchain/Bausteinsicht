@@ -6,12 +6,12 @@
 |===
 | Quality | Realisation in code
 | Functional suitability | All eight feature bullets from `README.adoc` map to working code paths (Q-4.1.1).
-| Performance efficiency | Benchmarks in `internal/model/bench_test.go` and `internal/sync/bench_test.go`. No SLOs in CI (Q-4.2.2 is `[OPEN]`).
+| Performance efficiency | Benchmarks in `internal/model/bench_test.go` and `internal/sync/bench_test.go`. Performance budget (startup <10 ms, sync <100 ms for ≤200 elements, binary 10–15 MB, zero runtime deps) tracked in chapter 07 _(team answer, Q-3.10.2)_; not enforced as a CI gate.
 | Compatibility | Backward-compatible loader paths for legacy state files and legacy draw.io label formats (Q-4.3.1).
 | Usability | Text/JSON dual output; verbose stderr with structured prefixes; "next steps" hints from `init` (Q-4.4.1, Q-4.4.2).
 | Reliability | Atomic writes, sync-state checksum, watcher rewatch on rename, orphan reconciliation (Q-4.5.1).
 | Maintainability | Sibling `_test.go` for every source file; property-based tests via `pgregory.net/rapid`; `make check` aggregates `go vet`, staticcheck, gosec, nilaway, govulncheck, `test-race` (Q-4.6.1, Q-4.6.2).
-| Security | Path-containment, ID/key sanitisation, label-parser hardening, file-size and depth caps; no network calls (Q-4.7.1).
+| Security | Path-containment, ID/key sanitisation, label-parser hardening, file-size and depth caps; no network calls (Q-4.7.1). Threat model and review at `src/docs/security/2026-03-01-security-review.adoc` _(team answer, Q-4.7.2)_; see "Threat model" below.
 | Portability | Per-platform draw.io detection in `internal/export/platform_*.go`; statically-linked builds for six matrices (Q-4.8.1).
 |===
 
@@ -34,3 +34,29 @@
   in a container without GPU works because `BuildExportArgs` does
   not pass `--scale` for the default value of 1.0. At `--scale 2`
   the user must have hardware GPU acceleration.
+
+=== Threat model _(Q-4.7.2, team answer)_
+
+A formal security review was conducted on 2026-03-01 and updated
+2026-03-30. The full report lives at
+`src/docs/security/2026-03-01-security-review.adoc`; the trust model
+is documented at `src/docs/spec/07_trust_model.adoc`. _(team answer)_
+
+==== Trust boundaries _(team answer)_
+
+[options="header"]
+|===
+| # | Zone                                  | Trust level    | Notes
+| 1 | CLI flags                             | **Fully trusted** | Whatever the operator passes is intended.
+| 2 | Model and template files (`*.jsonc`, `*.drawio`) | **Semi-trusted** | Shared in Git repos; parsed and validated; **not** sandboxed. Path-containment, size cap (10 MiB), depth cap (50), ID/key sanitisation. _(team answer)_
+| 3 | Agent / CI environments               | **Untrusted**     | The caller is responsible for sandboxing. Bausteinsicht itself makes no network calls and never escalates privileges. _(team answer)_
+|===
+
+==== Properties enforced by the design _(team answer)_
+
+* No network exposure anywhere in the binary.
+* `SEC-NNN` markers in the source map directly to findings of the
+  2026-03-01 review (e.g. `SEC-001`, `SEC-008`, `SEC-013`,
+  `SEC-015`, `SEC-016`).
+* The boundary between zones 2 and 3 is the operator's responsibility
+  — Bausteinsicht is not a multi-tenant service.

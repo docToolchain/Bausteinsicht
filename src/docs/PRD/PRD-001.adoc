@@ -14,8 +14,19 @@ generally pick one side: a text DSL with read-only rendering
 (Structurizr, LikeC4) or a visual editor with no text round-trip
 (Isoflow, draw.io itself). Bausteinsicht lets both authoring modes
 coexist by treating the text model and the draw.io diagram as two
-projections of the same architecture, kept in sync. _(Q-1.2;
-motivation framing — Q-1.1.2 is `[OPEN]`.)_
+projections of the same architecture, kept in sync. _(Q-1.2)_
+
+=== Why a new tool? _(Q-1.1.2, team answer)_
+
+Existing architecture-as-code tools — Structurizr, LikeC4, Isoflow,
+c4model.com, C4InterFlow — do not support draw.io, the most widely
+used free diagramming tool. Bausteinsicht's core differentiator is
+**bidirectional synchronization with the tool architects already
+use**, rather than forcing adoption of a proprietary editor. ADR-001
+evaluated 6 DSL options against this brief; JSONC scored highest
+(+20) because no parser is needed, bidirectional sync is trivial,
+IDE support is universal via JSON Schema, the format is LLM-native,
+and JSONC permits inline comments. _(team answer)_
 
 == Users and JTBD
 
@@ -69,8 +80,20 @@ Jobs-to-be-Done (each realised by one or more commands): _(Q-1.2)_
   _(Q-3.3.1)_
 * Conflict resolution strategies beyond *model wins*. The interface
   exists; only one resolver ships. _(Q-5.2.1)_
+* **Multi-user / team collaboration.** Bausteinsicht assumes one
+  author at a time. Teams collaborate through standard Git workflows
+  (branches, PRs, merges); there is no built-in concurrent editing,
+  CRDT, or OT mechanism. _(Q-5.5.3, team answer)_
 
 == Quality attributes the design optimises for
+
+The arc42 quality goals, in priority order _(Q-3.1.2, team answer)_:
+
+. **Learnability** — users productive in 30 minutes.
+. **IDE Support** — autocompletion via JSON Schema without plugins.
+. **LLM Friendliness** — JSON readable/writable by AI.
+
+Implicit qualities below the top three:
 
 * Cross-platform single static binary (`CGO_ENABLED=0`, six target
   matrices). _(Q-3.7.1)_
@@ -78,8 +101,6 @@ Jobs-to-be-Done (each realised by one or more commands): _(Q-1.2)_
   state, BOM-tolerant JSONC stripper). _(Q-3.8.2, Q-3.8.3, Q-5.3.1)_
 * Reviewable code base (`make check` aggregates `go vet`, staticcheck,
   gosec, nilaway, govulncheck, race-tested unit tests). _(Q-4.6.2)_
-
-Priorities between these attributes are `[OPEN]` _(Q-3.1.2)_.
 
 == Risks
 

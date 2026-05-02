@@ -7,9 +7,23 @@ model and a draw.io diagram in sync, in both directions. The text
 model is the source of truth on conflict; the draw.io file is an
 editable visual projection.
 
-=== Quality goals (inferred from code)
+=== Quality goals — top three (priority order) _(Q-3.1.2, team answer)_
 
-The README's feature bullets enumerate four implicit goals (Q-3.1.1):
+The arc42 quality goals that drive all design decisions, in priority
+order:
+
+[options="header"]
+|===
+| # | Goal | Concrete target
+| 1 | **Learnability** | A new user is productive in 30 minutes (clone → first useful sync). _(team answer)_
+| 2 | **IDE Support** | Autocompletion and validation work in any editor that consumes JSON Schema, without plugins. _(team answer)_
+| 3 | **LLM Friendliness** | The model file is readable and writable by AI agents using stock JSON tooling. _(team answer)_
+|===
+
+=== Implicit qualities (inferred from code)
+
+Below the top-three priorities, the README's feature bullets
+enumerate four implicit goals (Q-3.1.1):
 
 . *Cross-platform single-binary distribution* — six target matrices,
   `CGO_ENABLED=0`.
@@ -18,12 +32,6 @@ The README's feature bullets enumerate four implicit goals (Q-3.1.1):
   the local draw.io CLI on `export`.
 . *Robust file handling* — atomic temp+rename writes, SHA-256-protected
   state, BOM-tolerant JSONC stripper, depth/size caps.
-
-[NOTE]
-====
-Priorities between these goals are not stated in code or
-documentation. See `OPEN_QUESTIONS.adoc` (Q-3.1.2).
-====
 
 === Stakeholders
 
