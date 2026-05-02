@@ -32,19 +32,18 @@ Evidence::
 
 ==== Q-1.1.2: Why was this project started? What alternatives existed?
 
-Status:: [OPEN]
-Category:: Business Context
-Ask:: Product Owner / Project Initiator
-Why unanswerable:: The README "Related Projects" section
-(`README.adoc:200-211`) names alternatives (Structurizr, LikeC4,
-Isoflow, C4InterFlow, c4model.com) and asserts a unique contribution
-("bidirectional synchronization between a text model and draw.io
-diagrams"), but the code itself does not document the *motivation* —
-why bidirectional sync with draw.io specifically was the right product
-bet. ADR-001 is referenced from the README but does not exist in the
-repository.
-What would help:: An ADR-001 (currently a dangling reference at
-`README.adoc:211`) or a Problem Statement document.
+Status:: [ANSWERED]
+Answer:: _(team answer)_ Existing architecture-as-code tools
+(Structurizr, LikeC4, Isoflow, c4model.com, C4InterFlow) do not
+support draw.io — the most widely used free diagramming tool.
+Bausteinsicht's core differentiator is bidirectional synchronization
+with the tool architects already use, rather than forcing adoption of
+a proprietary editor. ADR-001 evaluated 6 DSL options; JSONC scored
++20 (highest) because: no parser needed, bidirectional sync trivial,
+universal IDE support via JSON Schema, LLM-native, comments via JSONC.
+Evidence:: Team answer recorded 2026-05-02; reflected in
+`src/docs/arc42/ADRs/ADR-001-DSL-Format.adoc` (Pugh Matrix) and
+`src/docs/PRD/PRD-001.adoc` (Problem section).
 
 === Q-1.2: What jobs-to-be-done does the tool enable?
 
@@ -448,11 +447,15 @@ Evidence::
 
 ==== Q-3.1.2: What were the quality-goal *priorities*?
 
-Status:: [OPEN]
-Category:: Architecture
-Ask:: Architect / Tech Lead
-Why unanswerable:: Code shows that several qualities exist but says
-nothing about ordering (e.g. "is reliability ahead of performance?").
+Status:: [ANSWERED]
+Answer:: _(team answer)_ The arc42 quality goals, in priority order:
+. **Learnability** — users productive in 30 minutes.
+. **IDE Support** — autocompletion via JSON Schema without plugins.
+. **LLM Friendliness** — JSON readable/writable by AI.
+These three drive all design decisions (above performance,
+portability, and reliability, which remain implicit qualities).
+Evidence:: Team answer recorded 2026-05-02; reflected in
+`src/docs/arc42/01_introduction_and_goals.adoc`.
 
 === Q-3.2: arc42 §2 — Constraints
 
@@ -775,11 +778,15 @@ Evidence::
 
 ==== Q-3.10.2: Are there explicit performance targets (e.g., N elements)?
 
-Status:: [OPEN]
-Category:: NFR / Quality Goal
-Ask:: Architect
-Why unanswerable:: Benchmarks exist but no SLO or threshold is asserted
-in code or CI.
+Status:: [ANSWERED]
+Answer:: _(team answer)_ Yes:
+* **Startup**: <10 ms (native Go binary).
+* **Sync**: <100 ms for models with up to 200 elements (in-memory
+  XML/JSON processing).
+* **Binary size**: 10–15 MB.
+* **Runtime dependencies**: zero.
+Evidence:: Team answer recorded 2026-05-02; reflected in
+`src/docs/arc42/07_deployment_view.adoc` (performance budget).
 
 === Q-3.11: arc42 §11 — Risks and technical debt
 
@@ -953,15 +960,19 @@ Evidence:: as above.
 
 ==== Q-4.7.2: Where are detailed security-review findings tracked?
 
-Status:: [OPEN]
-Category:: Security
-Ask:: Security Reviewer
-Why unanswerable:: README references
-`src/docs/security/2026-03-01-security-review.adoc`
-(`README.adoc:198`) but that file does not exist in the repository.
-The codebase only carries terse `SEC-NNN` markers next to fixes;
-the catalogue (mapping of IDs to issues, severity, status) is not
-present.
+Status:: [ANSWERED]
+Answer:: _(team answer)_ A security review was conducted 2026-03-01
+(updated 2026-03-30) and lives at
+`src/docs/security/2026-03-01-security-review.adoc`. The trust model
+is at `src/docs/spec/07_trust_model.adoc`. Three trust boundaries:
+. CLI flags — fully trusted.
+. Model/template files — semi-trusted (shared Git repos, parsed and
+  validated, not sandboxed).
+. Agent / CI environments — untrusted; the caller must sandbox.
+There is no network exposure. `SEC-NNN` markers in the code reference
+findings from this review.
+Evidence:: Team answer recorded 2026-05-02; reflected in
+`src/docs/arc42/10_quality_requirements.adoc` (threat model).
 
 === Q-4.8: Portability
 
@@ -1020,26 +1031,27 @@ Evidence:: `internal/model/loader.go:157-230`.
 
 ==== Q-5.3.2: Are there known JSONC edge cases not handled?
 
-Status:: [OPEN]
-Category:: Risk / Robustness
-Ask:: Maintainer
-Why unanswerable:: Code is hand-rolled; no test fixtures or comments
-indicate what it intentionally does *not* support (e.g. JSON5
-unquoted keys, single-quoted strings, hex numbers).
+Status:: [ANSWERED]
+Answer:: _(team answer)_ `StripJSONC` handles single-line (`//`) and
+multi-line (`/* */`) comments but **not nested block comments**. It
+does not support JSON5 extensions (unquoted keys, single-quoted
+strings, hex numbers). The accepted subset is standard JSONC as used
+by VS Code.
+Evidence:: Team answer recorded 2026-05-02.
 
 === Q-5.4: Schema availability
 
 ==== Q-5.4.1: Where is the JSON Schema located?
 
-Status:: [OPEN]
-Category:: Risk / Documentation
-Ask:: Maintainer
-Why unanswerable:: `templates/sample-model.jsonc:2` and
-`CONTRIBUTING.md:21` reference `bausteinsicht.schema.json` at
-`https://raw.githubusercontent.com/docToolchain/Bausteinsicht/main/schema/bausteinsicht.schema.json`,
-but no `schema/` directory and no `*.schema.json` file exists in this
-repository. IDE autocomplete claimed in README will not work without
-this file being published.
+Status:: [ANSWERED]
+Answer:: _(team answer)_ At `schema/bausteinsicht.schema.json` on the
+`main` branch of `github.com/docToolchain/Bausteinsicht`. It is
+referenced from JSONC models via the `$schema` URL
+`https://raw.githubusercontent.com/docToolchain/Bausteinsicht/main/schema/bausteinsicht.schema.json`.
+IDEs download it once for autocompletion and validation. There is no
+CI step that verifies schema↔struct agreement; sync is maintained
+through code review.
+Evidence:: Team answer recorded 2026-05-02.
 
 === Q-5.5: Operational risks
 
@@ -1066,6 +1078,16 @@ passes `--scale` when `>1` (a partial mitigation; users who set
 `--scale 2` still hit it). Additionally, post-export the file
 existence is verified.
 Evidence:: `internal/export/export.go:58-69,84-96`.
+
+==== Q-5.5.3: Is multi-user / team collaboration in scope?
+
+Status:: [ANSWERED]
+Answer:: _(team answer)_ Not in v1. Bausteinsicht assumes a single
+author at a time. Collaboration happens through standard Git
+workflows; there is no built-in concurrent editing, CRDT, or OT
+mechanism.
+Evidence:: Team answer recorded 2026-05-02; reflected in
+`src/docs/PRD/PRD-001.adoc` ("Out of scope" section).
 
 === Q-5.6: Naming/encoding inconsistencies
 

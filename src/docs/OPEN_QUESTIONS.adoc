@@ -6,78 +6,10 @@ This document collects every leaf marked `[OPEN]` in
 cannot answer it, and what would help. Items are grouped by
 *Category*, then by *Ask role*.
 
-== Business Context
-
-=== Ask: Product Owner / Project Initiator
-
-==== Q-1.1.2: Why was this project started? What alternatives existed?
-
-Why unanswerable:: README's "Related Projects" section names
-alternatives (Structurizr, LikeC4, Isoflow, c4model.com, C4InterFlow)
-and asserts a unique selling point (bidirectional sync with draw.io)
-but the codebase contains no record of the *motivation* — why this
-problem was worth solving with a new tool.
-What would help::
-* An ADR-001 (currently a dangling reference at `README.adoc:211`).
-* Or a Problem Statement document in `src/docs/`.
-
-== Architecture
-
-=== Ask: Architect / Tech Lead
-
-==== Q-3.1.2: What were the priorities between the implicit quality goals?
-
-Why unanswerable:: Code shows that several qualities exist
-(cross-platform, LLM-friendly, no network, robust file handling) but
-says nothing about *ordering*. Is reliability ahead of performance?
-Is portability ahead of LLM-friendliness?
-What would help:: A Quality Tree (arc42 §10) with weighted leaves,
-or an architect's note on tradeoffs they would and would not make.
-
-==== Q-3.10.2: Are there explicit performance targets (e.g., model
-size, sync latency)?
-
-Why unanswerable:: Benchmark suites exist
-(`internal/{model,sync}/bench_test.go`) but no SLO or threshold is
-asserted in CI.
-What would help:: A "performance budget" entry in the spec (e.g.
-"sync of a 1000-element model finishes within 1 s") and a CI gate
-that fails on regression.
-
-== Risk / Robustness
-
-=== Ask: Maintainer
-
-==== Q-5.3.2: Are there known JSONC edge cases not handled?
-
-Why unanswerable:: `StripJSONC` is hand-rolled. There are no test
-fixtures or comments stating what is *intentionally* unsupported
-(e.g. JSON5 unquoted keys, single-quoted strings, hex numbers).
-What would help:: An entry in `03_data_models.adoc` listing the
-exact JSONC subset accepted, plus negative test fixtures.
-
-==== Q-5.4.1: Where is the JSON Schema located?
-
-Why unanswerable:: `templates/sample-model.jsonc:2` and
-`CONTRIBUTING.md:21` reference
-`https://raw.githubusercontent.com/docToolchain/Bausteinsicht/main/schema/bausteinsicht.schema.json`,
-but no `schema/` directory exists in the repository. IDE autocomplete
-advertised in `README.adoc` will not work without this file being
-shipped.
-What would help:: Publishing the schema file at the referenced URL,
-ideally generated from the Go types so it stays in sync.
-
-== Security
-
-=== Ask: Security Reviewer
-
-==== Q-4.7.2: Where are detailed security-review findings tracked?
-
-Why unanswerable:: The codebase carries `SEC-NNN` markers next to
-mitigations (`SEC-001`, `SEC-008`, `SEC-013`, `SEC-015`, `SEC-016`)
-but the catalogue mapping IDs to issue, severity, and status is not
-present. README references
-`src/docs/security/2026-03-01-security-review.adoc`
-(`README.adoc:198`) — that file does not exist.
-What would help:: Publishing the security review document and a
-SEC-ID index.
+[NOTE]
+====
+As of 2026-05-02, all previously open leaves have been answered by
+the team. See `QUESTION_TREE.adoc` for the answers (search for
+`(team answer)`). This file is intentionally empty until a new open
+question is recorded.
+====

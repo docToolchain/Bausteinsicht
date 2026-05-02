@@ -33,3 +33,21 @@
 * Optional: a draw.io CLI on PATH for `export`. The devcontainer
   bundles a `drawio-export` wrapper that adds `xvfb` and
   `--no-sandbox`.
+
+=== Performance budget _(Q-3.10.2, team answer)_
+
+Explicit performance targets confirmed by the team on 2026-05-02:
+
+[options="header"]
+|===
+| Dimension              | Target                                    | Rationale
+| Startup time           | < 10 ms                                    | Native Go binary, no VM warm-up. _(team answer)_
+| Sync latency           | < 100 ms for models with up to 200 elements | All XML/JSON processing in memory. _(team answer)_
+| Binary size            | 10–15 MB                                  | Statically linked Go binary; size-stripped via `-ldflags '-s -w'`. _(team answer)_
+| Runtime dependencies   | 0                                          | Single binary; only the optional draw.io CLI is needed for `export`. _(team answer)_
+|===
+
+These budgets are upheld today by the existing benchmarks
+(`internal/model/bench_test.go`, `internal/sync/bench_test.go`).
+They are not enforced as CI gates — regression detection is a
+maintainer responsibility on PR review.

@@ -2,13 +2,15 @@
 
 [NOTE]
 ====
-This ADR was reverse-engineered from code (Q-3.9.2) — no
-authored ADR exists in the repository at the time of writing.
+This ADR was originally reverse-engineered from code (Q-3.9.2). The
+decision rationale and Pugh Matrix below were confirmed by the team
+on 2026-05-02 _(team answer, Q-1.1.2)_.
 ====
 
 ==== Status
 
-Implicit (in force). No formal acceptance record.
+Accepted. The team confirmed JSONC was selected over five alternatives
+after a Pugh Matrix evaluation _(team answer)_.
 
 ==== Context
 
@@ -18,39 +20,57 @@ explanatory comments next to elements ("// External systems",
 comments. The team also wants schema-driven IDE autocomplete and
 machine consumability.
 
+The single biggest product constraint, set by the team, was
+**bidirectional synchronization with draw.io** — the most widely
+used free diagramming tool. None of the existing architecture-as-code
+DSLs (Structurizr DSL, LikeC4 DSL, etc.) support draw.io as a
+front-end, so the format choice had to make round-tripping with the
+draw.io XML representation cheap. _(team answer, Q-1.1.2)_
+
 ==== Decision
 
 Use JSON-with-comments (JSONC) as the on-disk format. Implement a
-hand-rolled `StripJSONC` that removes line and block comments and
+small `StripJSONC` pass that removes line and block comments and
 trailing commas before unmarshalling. Preserve comments and key
 ordering across saves via `PatchSave` for simple field updates and
 preamble preservation for full-file rewrites. Reference a JSON
 Schema via `$schema`.
 
+==== Pugh Matrix — six DSL options evaluated _(team answer)_
+
+The team evaluated six DSL options against the criteria below.
+JSONC scored **+20** (highest). Plain JSON came second; YAML and the
+custom-DSL options trailed.
+
+[options="header"]
+|===
+| Criterion (weight)              | JSONC | Plain JSON | YAML | TOML | Custom DSL | XML
+| No parser needed (3)            | + 3   | + 3        | + 1  | + 1  | -3         | + 1
+| Bidirectional sync trivial (3)  | + 3   | + 3        | -1   | -1   | -3         |  0
+| IDE support via JSON Schema (3) | + 3   | + 3        |  0   | -1   | -3         | -1
+| LLM-native (3)                  | + 3   | + 3        | -1   | -1   | -3         | -3
+| Comments preserved (2)          | + 2   | -2         | + 2  | + 2  | + 2        | + 2
+| Diff readability (2)            | + 2   | + 2        | + 2  | + 2  | + 2        | -2
+| Roundtrip stability (2)         | + 2   | + 2        | -2   | -2   | + 2        | + 2
+| Implementation effort (2)       | + 2   | + 2        |  0   |  0   | -4         | -2
+| **Total**                       | **+20** | **+16** | **+1** | **0** | **-10** | **-3**
+|===
+
+JSONC won on the dimensions that matter most: it requires no custom
+parser (it is JSON with a stripping pre-pass), it round-trips
+trivially with draw.io's XML, IDEs already support JSON Schema, LLM
+agents can read and write it natively, and comments are preserved.
+
 ==== Consequences
 
 . Authors can keep comments alive across CLI edits and reverse-sync
   updates of common fields.
-. The hand-rolled parser is a maintenance liability — there is no
-  shared library being shadowed, and JSON5-style extensions
-  (unquoted keys, single-quoted strings) are not supported.
-. The schema URL is referenced from `templates/sample-model.jsonc` but
-  no schema file is shipped in the repo (see Q-5.4.1).
-
-==== Pugh Matrix (alternatives considered)
-
-[options="header"]
-|===
-| Criterion (weight)         | JSONC | Plain JSON | YAML | Custom DSL (Structurizr-like)
-| Comments preserved (3)     | + 3   | -3         | + 3  | + 3
-| IDE / Schema tooling (2)   |  0    | + 2        |  0   | -2
-| LLM-friendly write surface (3) | + 3 | + 3      | -3   | -3
-| Diff readability (2)       | + 2   | + 2        | + 2  | + 2
-| Roundtrip stability (3)    | + 3   | + 3        | -3   | + 3
-| Implementation effort (-2) | -2    | 0          | -2   | -6
-| **Total**                  | **9** | **7**      | **-3** | **-3**
-|===
-
-(Scores are author-applied based on observed code; see Q-1.1.2 for the
-unanswered question of why JSONC was preferred over plain JSON in
-practice.)
+. The JSONC stripper is small and hand-rolled; JSON5 extensions
+  (unquoted keys, single-quoted strings, hex numbers) are not
+  supported. Nested block comments are not supported either. The
+  accepted subset is the same as VS Code's JSONC. _(team answer,
+  Q-5.3.2)_
+. The schema is shipped at
+  `schema/bausteinsicht.schema.json` on the `main` branch and
+  referenced via the raw GitHub URL from `$schema`. IDEs download it
+  once. _(team answer, Q-5.4.1)_
