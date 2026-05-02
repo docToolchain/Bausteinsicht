@@ -46,6 +46,25 @@ Triggered by `.github/workflows/release.yml` on a `v*` git tag.
 
 The full local quality gate is `make check` (`vet`, `staticcheck`, `gosec`, `nilaway`, `govulncheck`, race-tests). The pre-commit hook (`scripts/pre-commit`) additionally enforces `gofmt`, `golangci-lint`, and `gitleaks` on staged content.
 
+== Performance budgets
+
+Operational targets for the released binary (team answer — OQ-050):
+
+[cols="3,2,4", options="header"]
+|===
+| Budget | Target | Notes
+
+| **Startup time** | < 10 ms | Wall-clock time from process start to the first command's `Run` callback. Validated against the static-binary build; cgo-disabled, no dynamic linker work.
+| **Sync latency** | < 100 ms for ~200 elements | End-to-end forward+reverse sync on a typical model (`internal/sync/bench_test.go` covers n=10/100/500). The 200-element point sits inside the linear region.
+| **Binary size** | 10–15 MiB | Configured via `ldflags: -s -w`. Drift outside this range should trigger investigation of a new dependency.
+|===
+
+Scale ceilings (team answer — OQ-051):
+
+* **Model file size:** 10 MiB hard limit (`MaxModelFileSize`).
+* **Nesting depth:** 50 levels (`MaxElementDepth`).
+* **Element count:** several thousand elements remain feasible — the limiting factor is the file-size and depth caps, not algorithmic complexity.
+
 == Development environment
 
 `.devcontainer/devcontainer.json` provides a reproducible container with Go, all the analysis tools, and the headless draw.io CLI for image-export tests. Contributors who do not use the devcontainer can install the toolchain manually with `make install-tools`.

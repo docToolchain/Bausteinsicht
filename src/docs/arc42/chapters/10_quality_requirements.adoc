@@ -19,3 +19,22 @@ The quality scenarios below are observable in code. They map back to the PRD NFR
 | **Idempotence** | `init` followed by `sync` reports `Already in sync. No changes.`. | Initial forward sync inserts metadata + legend before saving state. | `TestSyncAfterInit`.
 | **Test coverage** | Every public command and engine path has unit + integration coverage; race detector is part of `make check`. | ~400 `Test*` functions; `make test-race`. | `Makefile`.
 |===
+
+== Threat model
+
+Bausteinsicht is a **local CLI** with no network exposure (team answer — OQ-053). The threat model recognises three trust boundaries:
+
+[cols="1,2,4", options="header"]
+|===
+| Trust level | Source | Mitigation in code
+
+| **Fully trusted** | CLI flags supplied directly by the operator (`--model`, `--template`, `--output`, …). | Validated for path containment (`validatePathContainment`, SEC-001/015/016) but otherwise honoured as authoritative.
+| **Semi-trusted** | Model files (`*.jsonc`), template files (`template.drawio`), and the working `architecture.drawio`. These typically come from a shared Git repository — a teammate's commit is trusted but not infallible. | Bounded by `MaxModelFileSize = 10 MiB`, `MaxElementDepth = 50`; HTML in labels is escaped (SEC-008); the sync state has a SHA-256 self-checksum (SEC-013/014).
+| **Untrusted** | The agent or CI environment that invokes the CLI on behalf of an unknown caller (e.g., an LLM agent acting on a user-supplied repo, a generic build runner). | The CLI does not sandbox itself — the **caller** must run the binary in a sandbox if the input repository is untrusted. This is documented as a deployment expectation (team answer — OQ-053).
+|===
+
+Out-of-scope threats:
+
+* Network attackers (the CLI never opens a socket).
+* Multi-user concurrency (PRD — team answer OQ-042: single workstation, Git-based collaboration).
+* Diagram accessibility / colour contrast (team answer — OQ-052).

@@ -1,0 +1,49 @@
+= ADR-007: Bespoke layout engine
+
+== Status
+
+Accepted (rationale provided by the team — OQ-022). Implementation lives in `internal/sync/layout.go`.
+
+== Context
+
+Forward sync needs to assign positions to elements that have no manual placement yet (newly added, or after `--relayout`). The layout has to be deterministic, fast, and produce diagrams that read like C4-style architecture pictures: actors at the top, scope-children inside their boundary, infrastructure at the bottom.
+
+A second hard constraint comes from ADR-005 and the deployment view: the binary is statically linked (`CGO_ENABLED=0`) and ships as a single file with no native dependencies. Pulling in Graphviz, dagre, or d3-hierarchy would either reintroduce a runtime dependency or require embedding a JavaScript engine.
+
+== Decision
+
+Implement a small, bespoke layout engine inside `internal/sync/layout.go` that supports three modes — `layered` (default), `grid`, and `none` — and nothing else. The engine takes the resolved view, assigns tier indices using the order in which element kinds are declared in `specification.elements`, and lays elements out left-to-right within each tier (team answer — OQ-033: actors at top, scope-children inside, others at bottom, ordered by kind).
+
+== Alternatives considered
+
+Four options were evaluated (team answer — OQ-022):
+
+. **Layered (bespoke)** — the chosen option.
+. **Grid (bespoke)** — also implemented; selected per-view via `layout: "grid"`.
+. **Force-directed (external library)** — a Go port of d3-force or dagre.
+. **External library (Graphviz / dagre via WASM / dot)** — call out to a layout binary or embed one.
+
+== Pugh Matrix
+
+Baseline = external library (Graphviz / dagre). Scale: -1 (worse), 0 (neutral), +1 (better than baseline).
+
+[cols="3,1,1,1,1", options="header"]
+|===
+| Quality goal (weight)                            | Layered (bespoke) | Grid (bespoke) | Force-directed | External lib (baseline)
+| Preserves static-binary property (×3)            | +1                | +1             | -1             | -1
+| Determinism of output (×3)                       | +1                | +1             | -1             |  0
+| Fits C4-style diagrams (×3)                      | +1                | 0              |  0             |  0
+| Implementation complexity (×2)                   | +1                | +1             | -1             | -1
+| Predictable performance (×2)                     | +1                | +1             |  0             |  0
+| Cross-platform reliability (×2)                  | +1                | +1             |  0             | -1
+| Layout flexibility / fancy graphs (×1)           | -1                | -1             | +1             | +1
+| **Weighted total**                               | **+14**           | **+10**        | **-7**         | **-9**
+|===
+
+== Consequences
+
+* **Positive:** the binary stays self-contained — no Graphviz, no Node, no native dependency. Output is byte-stable, which keeps `git diff` clean and CI deterministic. The layered mode honours the kind-order declared in `specification.elements`, giving the architect a direct lever to reshape diagrams without changing per-element positions.
+* **Negative:** unusual layouts (force-directed, hierarchical with crossing minimisation, etc.) are not available. The engine is intentionally limited to layered/grid/none — sufficient for C4-style pictures (team answer).
+* **Forced subsequent decisions:**
+  * `none` is offered for views the architect wants to lay out manually in draw.io (ADR-005 etree round-trip preserves their positions).
+  * Future fancier layouts (e.g., circular, nested-grid) would need either a new bespoke mode or a deliberate revisit of the static-binary constraint.

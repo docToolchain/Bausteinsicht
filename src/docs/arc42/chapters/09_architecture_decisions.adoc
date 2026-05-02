@@ -8,3 +8,4 @@ The accepted ADRs are kept in `src/docs/arc42/ADRs/`. Each follows the Nygard fo
 * link:../ADRs/ADR-004-Conflict-Policy.adoc[ADR-004 — Default conflict policy: model wins]
 * link:../ADRs/ADR-005-XML-Library.adoc[ADR-005 — `etree` as the XML library]
 * link:../ADRs/ADR-006-Embedded-Templates.adoc[ADR-006 — Embedded sample model and template]
+* link:../ADRs/ADR-007-Layout-Engine.adoc[ADR-007 — Bespoke layout engine] _(team answer)_

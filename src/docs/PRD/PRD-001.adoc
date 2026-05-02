@@ -18,6 +18,12 @@ Both surfaces remain authoritative for a defined set of edits, and changes flow 
 
 The product is C4-inspired but not limited to four fixed levels — element kinds and relationship kinds are user-defined in the model's `specification` block (templates/sample-model.jsonc, README.adoc).
 
+== Product status and ownership
+
+* **Maturity:** Long-term open-source product (team answer). Bausteinsicht ships releases, has CI on three OSes, and is a member of the docToolchain ecosystem — it is not an experiment or short-lived incubation.
+* **Maintainership:** The project is maintained by the docToolchain community; the primary maintainer is the docToolchain creator (team answer).
+* **Competitive context:** Bausteinsicht's distinctive position vs. Structurizr DSL, LikeC4, and PlantUML C4 is the bidirectional draw.io round-trip with comment-preserving JSONC patches — see `arc42/ADRs/ADR-001-DSL-Format.adoc`.
+
 == Problem Statement
 
 Architecture-as-code tooling today forces a tradeoff:
@@ -29,12 +35,23 @@ Bausteinsicht resolves the tradeoff: a JSONC source of truth, comment-preserving
 
 == Target Audience
 
-Derived from CLI affordances, embedded skill (`.kiro/skills/bausteinsicht/SKILL.md`), example model (`examples/online-shop/architecture.jsonc`), and README workflows:
+Bausteinsicht is run by **all three** of the following persona types in production (team answer — OQ-011):
 
-* **Software architects and tech leads** maintaining living architecture documentation across multiple C4 levels.
+* **Humans** — interactive use on a workstation, including `watch` mode for real-time editing.
+* **CI** — non-interactive runs that validate the model and detect sync drift in pipelines.
+* **LLM agents** — driven by the embedded Claude Code skill (`.kiro/skills/bausteinsicht/SKILL.md`) and `--format json` on every command.
+
+The concrete personas, derived from CLI affordances, embedded skill, example model (`examples/online-shop/architecture.jsonc`), and README workflows:
+
+* **Software architects and tech leads** maintaining living architecture documentation across multiple C4 levels (primary persona — team answer).
 * **Platform / DevOps engineers** who want architecture diagrams in CI alongside code (single CLI binary, no Java/Node runtime — go.mod, Makefile).
 * **arc42 / docToolchain users** — the project lives under `github.com/docToolchain` and the README and CONTRIBUTING.md reference arc42 ADRs as a documentation target.
 * **AI/LLM-driven workflows** — every command has a documented JSON output mode (`--format json`, root.go:50) and there is an explicit `bausteinsicht` Claude Code skill (`.kiro/skills/bausteinsicht/SKILL.md`) that exposes the CLI to agents.
+
+=== Collaboration scope
+
+* **Single workstation, Git-based collaboration** — multi-user real-time editing is **out of scope for v1** (team answer — OQ-042). Teams collaborate by committing the JSONC model and the `.bausteinsicht-sync` state to Git.
+* **Generic downstream integrations** — the JSON-everywhere CLI is designed to plug into arbitrary CI/CD pipelines and doc generators. No specific enterprise vendor integration (Backstage, Confluence, …) is planned for v1 (team answer — OQ-010).
 
 == Functional Requirements
 
@@ -254,11 +271,16 @@ Derived from CLI affordances, embedded skill (`.kiro/skills/bausteinsicht/SKILL.
 
 == Success Metrics
 
-Not directly observable in code. See OQ entries.
+The success metrics that matter for v1 (team answer — OQ-003):
 
-* **Adoption:** GitHub stars / release downloads (.goreleaser.yml).
-* **Round-trip fidelity:** zero loss of JSONC comments after a draw.io edit (CONTRIBUTING.md mandates a comment-preservation E2E test for every new field).
-* **Sync latency:** watch-mode debounce of 300 ms is the implicit upper bound on perceived editor latency (`internal/watcher/watcher.go`).
+* **Adoption by architects who use draw.io** — the round-trip with draw.io is the differentiating capability; uptake by that audience is the primary signal of fit.
+* **Round-trip fidelity** — zero loss of JSONC comments after a draw.io edit. CONTRIBUTING.md mandates a comment-preservation E2E test for every new field.
+* **Successful use in AI-assisted architecture maintenance workflows** — the Claude Code skill plus `--format json` on every command exists precisely so LLM agents can be measured against this metric.
+
+Supporting indicators observable from the build / release infrastructure:
+
+* GitHub stars and release downloads (`.goreleaser.yml`).
+* Sync latency — watch-mode debounce of 300 ms is the implicit upper bound on perceived editor latency (`internal/watcher/watcher.go`).
 
 == Future Considerations
 
