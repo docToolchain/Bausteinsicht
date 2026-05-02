@@ -1,0 +1,121 @@
+= Quality Requirements
+
+_(Q-4, OQ-7 team answer, OQ-8 team answer)_
+
+== Quality tree
+
+[plantuml,quality-tree,svg]
+....
+@startsalt
+{
+{T
++ Quality
+++ Functional Suitability
++++ Bidirectional correctness
++++ Validation completeness
+++ Performance Efficiency
++++ Cold-start < 10 ms
++++ Sync < 100 ms (200 elements)
++++ Binary 10–15 MB
+++ Compatibility / Portability
++++ linux/darwin/windows × amd64/arm64
++++ Backward-compatible sync state
+++ Usability
++++ JSON Schema autocompletion
++++ JSON Schema-driven IDE feedback
+++ Reliability
++++ Atomic writes (TOCTOU-safe)
++++ Sync-state checksum
++++ Document-structure validation
+++ Security
++++ Local-only (no network)
++++ Path-traversal rejection
++++ make check (gosec, nilaway, govulncheck)
+++ Maintainability
++++ Colocated tests, ~404 tests
++++ Six-step new-field checklist
++++ Property-based label round-trip
+}
+}
+@endsalt
+....
+
+== Quality scenarios
+
+[cols="1,1,3", options="header"]
+|===
+| ID | Quality | Scenario
+
+| Q-PERF-1
+| Performance
+| User runs `bausteinsicht sync` on a 200-element model on a recent
+laptop. Sync completes in < 100 ms. _(OQ-8 team answer; benchmarks in
+`internal/sync/bench_test.go`.)_
+
+| Q-PERF-2
+| Performance
+| Cold start of `bausteinsicht --version` returns in < 10 ms.
+_(OQ-8 team answer; pure Go binary, no startup work in
+`cmd/bausteinsicht/main.go`.)_
+
+| Q-FUNC-1
+| Bidirectional correctness
+| User changes the same field in both the model and draw.io. After
+sync, the model's value persists in both files; a warning is reported.
+_(`internal/sync/conflict.go:36-55`,
+test `TestSyncConcurrentModelAndDrawioChanges`.)_
+
+| Q-FUNC-2
+| Validation completeness
+| User runs `validate` on a model with an invalid include pattern
+("trailing dot"). The command exits with code 2 and points to the
+failing path.
+_(test `TestSyncAbortsOnInvalidIncludePattern`, #176.)_
+
+| Q-USAB-1
+| Usability
+| User opens `architecture.jsonc` in VS Code. Autocompletion suggests
+all valid keys and validates types in real time.
+_(`templates/sample-model.jsonc:2`, OQ-10 team answer.)_
+
+| Q-RELI-1
+| Reliability
+| `.bausteinsicht-sync` is corrupted. Next `sync` refuses to run with
+"checksum mismatch", asking the user to delete the file.
+_(`internal/sync/state.go:71-84`.)_
+
+| Q-RELI-2
+| Reliability
+| `architecture.drawio` is empty. Next `sync` rebuilds a valid
+document.
+_(test `TestSyncRecoversEmptyMxfile`.)_
+
+| Q-SEC-1
+| Security
+| `--model ../../etc/passwd` is rejected before any I/O happens.
+_(`cmd/bausteinsicht/root.go:78-89`, SEC-001/016.)_
+
+| Q-SEC-2
+| Security
+| Bausteinsicht never opens a network socket — verified by code review
+and the absence of any `net/http` server import.
+_(`README.adoc:194-196`; OQ-7 team answer.)_
+
+| Q-MAINT-1
+| Maintainability
+| A new contributor adds a field to `Element`. The six-step checklist
+in `CONTRIBUTING.md:9-22` ensures struct, schema, patchops, reverse
+sync, comment-preservation test, and roundtrip test are all updated.
+
+| Q-PORT-1
+| Portability
+| A user on Windows arm64 downloads `bausteinsicht_windows_arm64.zip`
+and runs it. Same behaviour as on Linux amd64.
+_(`Makefile:21-46`, `.goreleaser.yml`.)_
+|===
+
+== Performance budget acceptance
+
+The `make bench` target runs the existing benchmarks. There is no
+automated regression check today; CI ties the budget to manual review
+_(OQ-8, OQ-9 team answers)_.

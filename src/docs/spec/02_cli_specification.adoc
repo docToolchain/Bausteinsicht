@@ -1,0 +1,225 @@
+= CLI Specification
+:toc: left
+:toclevels: 2
+:doctype: article
+
+Sources: `cmd/bausteinsicht/root.go`, `cmd/bausteinsicht/*.go`,
+QUESTION_TREE.adoc Q-2.1, Q-2.3.
+
+== Invocation
+
+[source,text]
+----
+bausteinsicht [global flags] <command> [command flags]
+----
+
+== Global flags
+
+_(Q-2.3.2; `cmd/bausteinsicht/root.go:50-53`)_
+
+[cols="1,1,3", options="header"]
+|===
+| Flag | Default | Meaning
+
+| `--format`
+| `text`
+| Output format: `text` or `json`. Validated in PersistentPreRunE
+_(`root.go:18-26`)_.
+
+| `--model`
+| _empty_
+| Path to model file (`.jsonc`). Auto-detected if empty.
+Path-traversal sequences (`..`) are rejected (SEC-001 /
+`root.go:33-44`).
+
+| `--template`
+| _empty_
+| Path to draw.io template. Must end with `.drawio`. Path-traversal
+rejected (SEC-016 / `root.go:27-44`).
+
+| `--verbose`
+| `false`
+| Send extra detail to stderr (suppressed for `--format json`).
+|===
+
+== Exit codes
+
+_(Q-2.3.1; `cmd/bausteinsicht/root.go:67-76`)_
+
+[cols="1,3", options="header"]
+|===
+| Code | Meaning
+
+| 0
+| Success. Conflicts may have been resolved (model wins) and surface
+as warnings, but the cycle completed.
+
+| 1
+| Validation or precondition failure (e.g. invalid ID, unknown kind,
+missing endpoint).
+
+| 2
+| Configuration / I/O error (missing model, parse failure, file
+already exists, invalid `--format`, path traversal).
+|===
+
+NOTE: Earlier skill files claimed `1 = conflicts resolved`. The code
+does not encode this — see `arc42/chapters/11_risks.adoc` Risk-S-1.
+
+== Output format
+
+* `text` (default): human-readable lines.
+* `json`: a single object printed to stdout for success, or
+`{"error": "...", "code": N}` to stderr on failure
+_(`root.go:93-115`)_.
+
+== Commands
+
+=== `init`
+
+_(Q-2.1.1, UC-1)_
+
+* Required flags: none.
+* Side effects: creates `architecture.jsonc`, `template.drawio`,
+`architecture.drawio`, `.bausteinsicht-sync` in the current directory
+with file mode `0600`.
+* Refuses to overwrite — exit code 2 if any default file exists
+_(`init.go:38-46`)_.
+
+=== `sync`
+
+_(Q-2.1.2, UC-2)_
+
+* Flags:
++
+[cols="1,1,3", options="header"]
+|===
+| Flag | Default | Meaning
+| `--relayout` | `false` | Clear and re-apply auto-layout to all view
+pages _(`sync.go:24-29`, `forward.go:135-137`)_.
+|===
+* Side effects: rewrites `architecture.drawio` and
+`.bausteinsicht-sync`. Model file may be modified by reverse-sync
+changes.
+
+=== `validate`
+
+_(Q-2.1.3, UC-3)_
+
+* No flags beyond the global ones.
+* Read-only.
+* Always prints both errors and warnings _(`validate.go:37-60`)_.
+
+=== `add element`
+
+_(Q-2.1.4, UC-4a)_
+
+[cols="1,1,3", options="header"]
+|===
+| Flag | Required | Meaning
+| `--id` | yes | Element identifier; regexp `^[a-zA-Z][a-zA-Z0-9_-]*$`
+_(no dots — they are hierarchy separators)_
+_(`add_element.go:13-17`)_.
+| `--kind` | yes | Must be defined in `specification.elements`.
+| `--title` | yes | Display title.
+| `--parent` | no | Dot-notation parent path; parent must be a
+container kind.
+| `--technology` | no | Free-form text.
+| `--description` | no | Free-form text.
+|===
+
+=== `add relationship`
+
+_(Q-2.1.5, UC-4b)_
+
+[cols="1,1,3", options="header"]
+|===
+| Flag | Required | Meaning
+| `--from` | yes | Existing element (dot-notation).
+| `--to` | yes | Existing element (dot-notation).
+| `--label` | no | Free-form label.
+| `--kind` | no | Must be defined in `specification.relationships` if
+provided.
+| `--description` | no | Free-form text.
+|===
+
+Duplicates are detected by the tuple `(from, to, kind, label)` —
+multiple relationships between the same pair are allowed when they
+differ in `kind` or `label` _(`internal/model/validate.go:120-162`)_.
+
+=== `watch`
+
+_(Q-2.1.6, UC-5)_
+
+* No flags beyond the global ones.
+* Requires both the model file and `architecture.drawio` to exist
+upfront _(`watch.go:46-52`)_.
+* Debounce: 300 ms _(`internal/watcher/watcher.go:13`)_.
+* Exits cleanly on SIGINT/SIGTERM _(`watch.go`)_.
+
+=== `export`
+
+_(Q-2.1.7, UC-6a)_
+
+[cols="1,1,3", options="header"]
+|===
+| Flag | Default | Meaning
+| `--image-format` | `png` | `png` or `svg`.
+| `--view` | _empty_ | Export only this view.
+| `--output` | `.` | Output directory (path traversal rejected).
+| `--embed-diagram` | `false` | Embed draw.io XML in the image.
+| `--scale` | `1.0` | Scale factor. Values > 1 require a hardware
+GPU; in headless containers they may fail silently
+_(`internal/export/export.go:56-66`)_.
+|===
+
+Output filename pattern: `architecture-<safe-view-key>.<ext>`
+_(`internal/export/export.go:79-81`)_.
+
+=== `export-table`
+
+_(Q-2.1.8, UC-6b)_
+
+[cols="1,1,3", options="header"]
+|===
+| Flag | Default | Meaning
+| `--view` | _empty_ | Export only this view.
+| `--table-format` | `adoc` | `adoc` or `md`.
+| `--output` | _empty_ | Output dir (default stdout).
+| `--combined` | `false` | Deduplicate elements across all views.
+|===
+
+JSON format (`--format json`) yields a structured array of rows
+_(`cmd/bausteinsicht/export_table.go:55-58`)_.
+
+=== `export-diagram`
+
+_(Q-2.1.9, UC-6c)_
+
+[cols="1,1,3", options="header"]
+|===
+| Flag | Default | Meaning
+| `--view` | _empty_ | Export only this view.
+| `--diagram-format` | `plantuml` | `plantuml` or `mermaid`.
+| `--output` | _empty_ | Output dir (default stdout).
+|===
+
+PlantUML output uses C4-PlantUML stdlib `<C4/...>` includes that
+resolve locally without network access
+_(`internal/diagram/diagram.go:19-21`)_.
+
+== Auto-detection
+
+If `--model` is empty, the CLI scans the working directory for `*.jsonc`
+files and selects the unique match. Zero or multiple files → exit code 2
+_(`internal/model/loader.go:140-153`)_.
+
+== JSON error envelope
+
+[source,json]
+----
+{"error": "<message>", "code": <exit code>}
+----
+
+Printed to *stderr* — stdout is left clean for piped consumption
+_(`root.go:105-110`)_.

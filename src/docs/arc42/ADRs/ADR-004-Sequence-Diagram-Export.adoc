@@ -1,0 +1,75 @@
+= ADR-004: Sequence Diagram Export
+:doctype: article
+
+* *Status*: *Rejected*
+* *Date*: reverse-engineered (2026-Q2)
+* *Source*: OQ-4 team answer (ADR list); QUESTION_TREE.adoc Q-2.1.9.
+
+[NOTE]
+====
+This ADR was reverse-engineered from code. The team's
+authoritative ADR records the rejection but the original rationale
+text is not present in this working tree. The narrative below is
+inferred from the data model (no temporal/dynamic concepts) and from
+the existing `internal/diagram` package.
+====
+
+== Context
+
+Architects sometimes want sequence diagrams to depict runtime
+interactions between containers/components, in addition to the
+structural views Bausteinsicht renders.
+
+`internal/diagram/diagram.go` already supports two structural diagram
+formats (PlantUML C4 and Mermaid C4) for views. A natural question:
+should the same package generate sequence diagrams as well?
+
+== Decision
+
+*Reject* sequence diagram export from the model.
+
+== Rationale (inferred)
+
+. *No temporal information in the model.* `Element` and `Relationship`
+  have no `step`, `order`, `trigger`, or `actor` semantics
+  _(`internal/model/types.go:41-57`)_. Generating a sequence diagram
+  would require either fabricating an ordering or extending the model
+  with new fields whose semantics are not yet validated by users.
+. *Out-of-scope per OQ-2.* Future considerations focus on As-Is/To-Be
+  modelling and validation — both structural concerns.
+. *Existing alternatives.* Users who need sequence diagrams can author
+  them directly in PlantUML or draw.io; the model continues to
+  describe building blocks.
+. *Risk of inconsistent meaning.* "Relationship: customer → shop.api"
+  conveys "customer uses shop.api"; turning it into a numbered message
+  in a sequence diagram would force a reading the model never
+  intended.
+
+== Pugh matrix (weighted, -1/0/+1)
+
+[cols="2,1,^1,^1,^1", options="header"]
+|===
+| Criterion | Weight | Reject | Add to existing diagram pkg | Provide new "scenarios" model
+
+| Stay within scope of v1          | 4 | +1 |  0 | -1
+| Avoid model-semantics drift      | 4 | +1 | -1 |  0
+| Implementation effort            | 3 | +1 |  0 | -1
+| User value (vs alternatives)     | 2 |  0 | +1 | +1
+| Maintenance cost                 | 2 | +1 |  0 | -1
+
+| *Total (weighted)*               |   | *+12* | *-2* | *-7*
+|===
+
+== Consequences
+
+* `internal/diagram` continues to render structural views only
+  (PlantUML/Mermaid C4) _(`internal/diagram/diagram.go:11-60`)_.
+* Sequence diagrams remain a hand-authored artefact outside the
+  model.
+* If user demand emerges, a `"scenarios"` top-level block could be
+  introduced as a separate proposal; today, it is not.
+
+== Related
+
+* link:ADR-001-DSL-Format.adoc[ADR-001]
+* link:../../spec/03_data_models.adoc[Data Models]

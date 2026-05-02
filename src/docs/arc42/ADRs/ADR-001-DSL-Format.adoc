@@ -1,0 +1,85 @@
+= ADR-001: Choice of DSL Format
+:doctype: article
+
+* *Status*: Accepted
+* *Date*: reverse-engineered (2026-Q2)
+* *Source*: OQ-5, OQ-6 team answers; reverse-engineered from
+`internal/model/loader.go:155-227`, `templates/sample-model.jsonc`,
+QUESTION_TREE.adoc Q-3.9.2 / Q-3.9.3.
+
+== Context
+
+Bausteinsicht needs a textual representation of architecture models
+that can be:
+
+* edited by hand and by LLM agents,
+* parsed cheaply with little custom tooling,
+* synchronised bidirectionally with draw.io,
+* validated and auto-completed by IDEs without plugins.
+
+Six candidates were evaluated _(OQ-5 team answer)_:
+
+. *JSON + JSONC + Schema* — JSON with comments and trailing commas, IDE
+  support via JSON Schema.
+. *TypeScript* — express the model as TypeScript code.
+. *Custom DSL* — design a textual DSL parser of our own.
+. *Structurizr DSL* — adopt the existing Structurizr DSL.
+. *LikeC4 DSL* — adopt the LikeC4 DSL.
+. *PlantUML C4* — model lives in PlantUML.
+
+== Decision
+
+*JSONC + JSON Schema* (option 1).
+
+== Rationale
+
+_(OQ-5 team answer)_
+
+. *No parser to write.* `encoding/json` plus a small JSONC stripper
+  _(`internal/model/loader.go:155-227`)_ is all the parsing the
+  product needs.
+. *Bidirectional sync is trivial with JSON.* Every value has a stable
+  path; comment-preserving patches operate on raw bytes
+  _(`internal/model/patch.go`)_.
+. *Universal IDE support via JSON Schema.* `templates/sample-model.jsonc:2`
+  pins `$schema`; VS Code, JetBrains, and Neovim all auto-complete and
+  validate without a plugin.
+. *LLM-native.* LLMs generate JSON more reliably than any other format.
+. *Comments via JSONC.* Mitigates JSON's main complaint.
+
+The trade-off (lower compactness than a custom DSL) is outweighed by
+tooling, sync, and LLM integration advantages.
+
+== Pugh matrix (weighted, -1/0/+1)
+
+[cols="2,1,^1,^1,^1,^1,^1,^1", options="header"]
+|===
+| Criterion | Weight | JSONC | TypeScript | Custom DSL | Structurizr | LikeC4 | PlantUML
+
+| Sync round-trip simplicity        | 5 | +1 |  0 | -1 | -1 | -1 | -1
+| LLM-friendliness (write reliably) | 4 | +1 |  0 |  0 |  0 |  0 | -1
+| IDE support without plugins       | 4 | +1 | +1 | -1 |  0 |  0 |  0
+| No parser to maintain             | 3 | +1 | -1 | -1 | +1 | +1 | +1
+| Compactness / readability         | 2 |  0 |  0 | +1 | +1 | +1 | +1
+| Comments + version-control fit    | 2 | +1 | +1 |  0 | +1 | +1 |  0
+| Tooling / linter ecosystem        | 1 | +1 | +1 | -1 |  0 |  0 |  0
+
+| *Total (weighted)*                |   | *+20* | *+5* | *-9* | *+5* | *+5* | *-3*
+|===
+
+JSONC scored +20 (highest) — confirmed by OQ-5 team answer.
+
+== Consequences
+
+* The team writes and maintains a small JSONC stripper instead of an
+  external parser dependency.
+* The schema is the single source of validation truth and must be kept
+  in sync with the Go `Element` struct
+  _(see link:../chapters/11_risks.adoc[Risk-D-3])_.
+* Bidirectional sync is implemented as a three-way diff (no CRDTs).
+
+== Related
+
+* link:../../spec/03_data_models.adoc[Data Models]
+* link:../../spec/05_sync_specification.adoc[Sync Specification]
+* link:ADR-002-Implementation-Language.adoc[ADR-002]

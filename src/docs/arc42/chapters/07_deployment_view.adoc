@@ -1,0 +1,92 @@
+= Deployment View
+
+_(Q-3.7)_
+
+== Distribution model
+
+* Single statically linked Go binary per OS/arch.
+* Built with `CGO_ENABLED=0` for portability.
+* Released by Goreleaser on a `v*` tag _(`.github/workflows/release.yml:1-26`)_.
+* Artefacts: `.tar.gz` for linux/macOS, `.zip` for windows, plus
+  `checksums.txt` _(`.goreleaser.yml:14-39`)_.
+
+== Supported platforms
+
+[cols="1,1,3", options="header"]
+|===
+| OS | Arch | CI / build evidence
+| Linux | amd64, arm64 | `Makefile:24-30`, `.goreleaser.yml:20-25`
+| macOS (darwin) | amd64, arm64 | `Makefile:32-38`, CI on `macos-latest`
+| Windows | amd64, arm64 | `Makefile:40-46`, CI on `windows-latest`
+|===
+
+== Where Bausteinsicht runs
+
+[plantuml,deployment,svg]
+....
+@startuml
+node "Developer Workstation" as devbox {
+  artifact "bausteinsicht (binary)"
+  artifact "architecture.jsonc"
+  artifact "architecture.drawio"
+  artifact ".bausteinsicht-sync"
+  component "draw.io desktop" as drawio
+}
+
+node "Devcontainer (optional)" as dc {
+  artifact "bausteinsicht (binary)"
+  component "draw.io headless\n(drawio-export wrapper)" as drawioCli
+  component "Outbound firewall" as fw
+}
+
+node "GitHub Actions" as ci {
+  artifact "release.yml: goreleaser"
+  artifact "go.yml: build + test + lint (3 OSes)"
+  artifact "gh-pages.yml: dtcw generateSite"
+}
+
+devbox -[hidden]down- dc
+dc -[hidden]down- ci
+@enduml
+....
+
+== Devcontainer
+
+The `.devcontainer/` provides a reproducible environment with Go,
+analysis tools, draw.io headless, and Claude Code preinstalled
+_(`README.adoc:151-165`)_.
+
+* `init-firewall.sh` locks down outbound traffic to a whitelist
+  (enables safe `claude --dangerously-skip-permissions`)
+  _(`.devcontainer/init-firewall.sh:1-30`)_.
+* `firewall-log.sh`, `firewall-motd.sh`, `ulogd-firewall.conf` round
+  out the security posture.
+
+== Performance budget
+
+_(OQ-8 team answer)_
+
+[cols="1,1", options="header"]
+|===
+| Metric | Target
+
+| Cold-start time | < 10 ms
+| Sync time (≤ 200 elements) | < 100 ms
+| Binary size | 10–15 MB
+| Runtime dependencies | 0
+|===
+
+These targets are not currently asserted by automated benchmarks but
+the underlying micro-benchmarks exist
+(`internal/sync/bench_test.go`, `internal/model/bench_test.go`).
+
+== Operational considerations
+
+* No server, no port, no daemon — single-shot CLI plus optional
+  `watch` foreground process.
+* Files are written via `os.CreateTemp` + `os.Rename` for atomicity
+  on every supported file system.
+* The sync state is local and per-clone _(OQ-3 team answer)_.
+* draw.io GPU caveat: `--scale > 1` requires a hardware GPU; in
+  headless containers the export silently fails and is caught by an
+  output-file existence check _(`internal/export/export.go:56-66, 90-94`)_.

@@ -1,0 +1,80 @@
+= ADR-002: Choice of Implementation Language
+:doctype: article
+
+* *Status*: Accepted
+* *Date*: reverse-engineered (2026-Q2)
+* *Source*: reverse-engineered from `go.mod`, `Makefile`,
+`.goreleaser.yml`; QUESTION_TREE.adoc Q-3.2.1; OQ-8 team answer.
+
+[NOTE]
+====
+This ADR was reverse-engineered from code. The team did not provide a
+specific narrative for OQ-5 about implementation language; the
+rationale below is inferred from build configuration, dependency
+choices, and the team's performance budget (OQ-8).
+====
+
+== Context
+
+The CLI must:
+
+* Produce a single static binary across linux, darwin, windows on
+  amd64 and arm64 with no runtime dependencies _(`Makefile:21-46`,
+  `.goreleaser.yml:14-25`)_.
+* Achieve cold-start time < 10 ms and sync time < 100 ms for ≤ 200
+  elements _(OQ-8 team answer)_.
+* Integrate with draw.io XML parsing without bundling a JVM, Node, or
+  Python runtime.
+
+Candidates considered: *Go*, *Rust*, *TypeScript (Node)*, *Java
+(GraalVM native)*, *Python*.
+
+== Decision
+
+*Go (>= 1.25)*.
+
+== Rationale
+
+. *Single static binary, no runtime deps.* `CGO_ENABLED=0` produces a
+  fully static executable per OS/arch _(`Makefile:23-46`,
+  `.goreleaser.yml:18-19`)_.
+. *Cross-compilation for free.* Six target binaries built from one
+  developer machine without docker or QEMU
+  _(`Makefile:21-46`).
+. *Fast cold start.* Native binary, no VM warm-up — meets the
+  10 ms budget _(OQ-8)_.
+. *Strong CLI/XML/file-watching ecosystem.* `spf13/cobra`,
+  `beevik/etree`, `fsnotify/fsnotify` are mature with small APIs.
+. *Mature security tooling.* `gosec`, `govulncheck`, `nilaway`,
+  `staticcheck` are first-class for Go _(`Makefile:60-90`)_.
+
+== Pugh matrix (weighted, -1/0/+1)
+
+[cols="2,1,^1,^1,^1,^1,^1", options="header"]
+|===
+| Criterion | Weight | Go | Rust | Node TS | GraalVM | Python
+
+| Single static binary             | 5 | +1 | +1 |  0 | +1 | -1
+| Cross-compile ease               | 4 | +1 |  0 | +1 | -1 | +1
+| Cold-start latency budget        | 4 | +1 | +1 | -1 |  0 | -1
+| Ecosystem (CLI, XML, fsnotify)   | 3 | +1 | +1 | +1 |  0 |  0
+| Security tooling (vuln, sast)    | 2 | +1 | +1 |  0 |  0 |  0
+| Build infra simplicity           | 2 | +1 |  0 |  0 | -1 | +1
+| Team familiarity (assumed)       | 1 | +1 |  0 |  0 |  0 |  0
+
+| *Total (weighted)*               |   | *+21* | *+13* | *+0* | *-2* | *-3*
+|===
+
+== Consequences
+
+* Toolchain pin: Go 1.25.8 _(`go.mod:3`)_.
+* Direct dependencies kept to four
+  _(`go.mod:5-9`)_.
+* Release pipeline uses Goreleaser
+  _(`.github/workflows/release.yml:1-26`)_.
+
+== Related
+
+* link:ADR-001-DSL-Format.adoc[ADR-001]
+* link:../chapters/02_constraints.adoc[Constraints]
+* link:../chapters/07_deployment_view.adoc[Deployment View]

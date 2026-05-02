@@ -1,0 +1,252 @@
+= Data Models
+:toc: left
+:toclevels: 2
+:doctype: article
+
+Sources: `internal/model/types.go`, `internal/model/validate.go`,
+`internal/model/resolve.go`, QUESTION_TREE.adoc Q-2.2.
+
+== File format
+
+The model file is *JSONC* — JSON with single-line comments, block
+comments, trailing commas, and an optional UTF-8 BOM
+_(`internal/model/loader.go:155-227`)_.
+
+Why JSONC instead of YAML or a custom DSL: see
+link:../arc42/ADRs/ADR-001-DSL-Format.adoc[ADR-001].
+
+== Top-level structure
+
+_(Q-2.2.1; `internal/model/types.go:11-23`)_
+
+[source,jsonc]
+----
+{
+  "$schema": "...",                // optional, enables IDE completion
+  "config":         { ... },        // optional
+  "specification":  { ... },        // required
+  "model":          { ... },        // map of root elements
+  "relationships":  [ ... ],        // array
+  "views":          { ... }         // map keyed by view ID
+}
+----
+
+[cols="1,1,3", options="header"]
+|===
+| Field | Type | Notes
+| `$schema` | string | URL of the JSON Schema, used by IDEs
+_(`templates/sample-model.jsonc:2`)_.
+| `config` | `Config` | metadata/legend toggles, repo, author.
+| `specification` | `Specification` | declares element kinds and
+relationship kinds.
+| `model` | `map[string]Element` | named root elements.
+| `relationships` | `[]Relationship` | inter-element edges.
+| `views` | `map[string]View` | one diagram page per entry.
+|===
+
+The `BausteinsichtModel` struct also carries a derived
+`ElementOrder` field (not serialised) used by the layout engine to
+assign layers in the order kinds were defined
+_(`internal/model/loader.go:43-99`)_.
+
+== Specification
+
+_(Q-2.2.2; `internal/model/types.go:25-39`)_
+
+[source,jsonc]
+----
+"specification": {
+  "elements": {
+    "actor":     { "notation": "Actor" },
+    "system":    { "notation": "Software System", "container": true },
+    "container": { "notation": "Container",        "container": true }
+  },
+  "relationships": {
+    "uses":   { "notation": "uses" },
+    "calls":  { "notation": "calls", "dashed": true }
+  }
+}
+----
+
+* `notation` — display name (used in the legend).
+* `description` — optional free-form description.
+* `container: true` allows the kind to have `children`
+  _(`internal/model/validate.go:95-100`)_.
+* `dashed: true` (relationship kind) renders the connector dashed.
+
+== Element
+
+_(Q-2.2.2; `internal/model/types.go:41-49`)_
+
+[cols="1,1,3", options="header"]
+|===
+| Field | Type | Notes
+| `kind` | string | required; must be in `specification.elements`
+_(`validate.go:86-94`)_.
+| `title` | string | required.
+| `description` | string | optional.
+| `technology` | string | optional.
+| `tags` | `[]string` | optional.
+| `children` | `map[string]Element` | only allowed when the kind has
+`container: true`.
+| `metadata` | `map[string]string` | free-form key/value pairs.
+|===
+
+=== Element IDs
+
+_(Q-2.2.3, SEC-013)_
+
+* IDs must match the regexp `^[a-zA-Z][a-zA-Z0-9_-]*$`
+  _(`cmd/bausteinsicht/add_element.go:13-17`)_.
+* Dots are *not* allowed inside an ID — the dot is the hierarchy
+  separator (`webshop.api.auth`).
+
+=== Hierarchy depth
+
+_(Q-2.2.5; `internal/model/resolve.go:9-11`,
+`internal/model/validate.go:78-83`)_
+
+* Maximum nesting depth: *50*. Enforced both at validation time and at
+reverse-sync time _(`internal/sync/reverse.go:10-11`)_.
+
+== Relationship
+
+_(`internal/model/types.go:51-57`)_
+
+[source,jsonc]
+----
+{ "from": "customer", "to": "shop.api", "kind": "uses", "label": "HTTPS" }
+----
+
+[cols="1,1,3", options="header"]
+|===
+| Field | Type | Notes
+| `from` | string | dot-notation path; must resolve.
+| `to` | string | dot-notation path; must resolve.
+| `kind` | string | optional; must be in
+`specification.relationships` when present.
+| `label` | string | optional, free-form.
+| `description` | string | optional.
+|===
+
+Duplicates are detected by `(from, to, kind, label)`
+_(`internal/model/validate.go:120-162`)_.
+
+== View
+
+_(Q-2.2.4, Q-2.2.7; `internal/model/types.go:59-66`)_
+
+[source,jsonc]
+----
+"context": {
+  "title":   "System Context",
+  "scope":   "shop",                 // optional - drawn as a boundary
+  "include": ["customer", "shop.*"], // glob patterns
+  "exclude": ["shop.legacy.*"],
+  "layout":  "layered"               // "layered" (default) | "grid" | "none"
+}
+----
+
+=== Pattern syntax
+
+_(Q-2.2.4; `internal/model/resolve.go:65-121`)_
+
+[cols="1,3", options="header"]
+|===
+| Pattern | Matches
+| `id` | exact element by full dot-notation path.
+| `prefix.*` | direct children of `prefix` only.
+| `prefix.**` | all descendants of `prefix`, recursively.
+| `*` | top-level elements (no dots in ID).
+| `**` | every element in the model.
+|===
+
+Resolution order: includes are unioned, then excludes are subtracted
+_(`resolve.go:125-154`)_.
+
+=== Layouts
+
+_(`internal/sync/layout.go:42-60`,
+`internal/model/validate.go:167-172`)_
+
+[cols="1,3", options="header"]
+|===
+| Value | Behaviour
+| `""` (default) | Same as `layered`.
+| `layered` | Horizontal rows grouped by element kind, ordered by
+the kind's position in `specification.elements`. Within a row,
+elements are sorted alphabetically.
+| `grid` | Wrapped grid by alphabetical order.
+| `none` | No automatic positioning — leaves new elements at default
+coordinates.
+|===
+
+== Config
+
+_(`internal/model/types.go:3-9`,
+`internal/sync/metadata.go:110-137`)_
+
+[source,jsonc]
+----
+"config": {
+  "metadata": true,                  // show metadata box per page (default true)
+  "legend":   true,                  // show legend box per page (default true)
+  "author":   "Architecture Guild",
+  "repo":     "github.com/.../my-architecture"
+}
+----
+
+== Sync state
+
+_(Q-3.8.2; `internal/sync/state.go:17-25`)_
+
+The sync state file `.bausteinsicht-sync` is JSON, persisted next to
+the model. It contains:
+
+* `timestamp` — RFC 3339 UTC.
+* `model_hash`, `drawio_hash` — sha256 fingerprints.
+* `elements` — last-synced element snapshots.
+* `relationships` — last-synced relationship snapshots (with index).
+* `rendered_elements` — set of elements actually present on draw.io
+pages (for accurate deletion detection, #240).
+* `checksum` — sha256 of the canonical JSON; corruption forces user
+intervention _(`state.go:71-92`)_.
+
+== Limits
+
+_(Q-2.2.5, Q-2.2.6, Q-4.2.2)_
+
+[cols="1,1,3", options="header"]
+|===
+| Limit | Value | Source
+| Max model file size | 10 MB | `internal/model/loader.go:13-14`.
+| Max element nesting depth | 50 | `internal/model/resolve.go:9-11`.
+| Max sync time | < 100 ms for 200 elements (target) | OQ-8 team
+answer.
+| Watch debounce | 300 ms | `internal/watcher/watcher.go:13`.
+|===
+
+== draw.io join keys
+
+_(Q-3.4.2; `internal/drawio/element.go:12,53,174-196`)_
+
+Each rendered draw.io `<object>` carries:
+
+* `bausteinsicht_id` — the canonical element ID (dot-notation).
+* `bausteinsicht_kind` — the kind string from `specification.elements`.
+
+These are the join keys that the sync engine uses to relate diagram
+shapes to model elements.
+
+== JSON Schema
+
+_(OQ-10 team answer)_
+
+The schema is published at
+`https://raw.githubusercontent.com/docToolchain/Bausteinsicht/main/schema/bausteinsicht.schema.json`
+and referenced via `$schema` in every generated model. IDEs download
+it once for autocompletion and validation.
+
+NOTE: There is currently no CI step asserting that the schema and the
+Go `Element` struct agree. Sync is maintained through manual code
+review per `CONTRIBUTING.md` _(OQ-9 team answer)_.

@@ -1,0 +1,74 @@
+= ADR-003: Risk Classification using Vibe-Coding Risk Radar
+:doctype: article
+
+* *Status*: Accepted
+* *Date*: reverse-engineered (2026-Q2)
+* *Source*: OQ-4 team answer (ADR list); QUESTION_TREE.adoc Q-5;
+  `.claude/settings.json` lists the
+  `risk-radar-skills@vibe-coding-risk-radar` plugin.
+
+[NOTE]
+====
+This ADR was reverse-engineered from code (the `.claude/settings.json`
+plugin entry) and the team's confirmation in OQ-4. The narrative is
+inferred; details such as the exact taxonomy may differ in the team's
+authoritative ADR text.
+====
+
+== Context
+
+Risks captured during reviews need to be:
+
+* expressed in a vocabulary the team already shares,
+* tractable for AI-assisted code review (the project enables
+  `risk-radar-skills@vibe-coding-risk-radar` in
+  `.claude/settings.json`),
+* aligned with the docToolchain ecosystem so risks can be aggregated
+  across projects.
+
+Candidates: *Vibe-Coding Risk Radar*, *OWASP Risk Rating*,
+*CVSS-only*, *FAIR (Factor Analysis of Information Risk)*,
+*ad-hoc free text*.
+
+== Decision
+
+*Vibe-Coding Risk Radar* — adopt the same taxonomy used by the
+team's other tooling.
+
+== Rationale
+
+. *Already wired in.* `.claude/settings.json` enables the
+  `risk-radar-skills@vibe-coding-risk-radar` plugin — risks identified
+  during AI-assisted code review use the same vocabulary.
+. *Aligned with docToolchain.* Bausteinsicht is part of the
+  docToolchain ecosystem; reusing the taxonomy means risks can be
+  aggregated across projects.
+. *Lightweight.* No certification overhead, no quantitative model to
+  parameterise — fits a small CLI's needs.
+
+== Pugh matrix (weighted, -1/0/+1)
+
+[cols="2,1,^1,^1,^1,^1,^1", options="header"]
+|===
+| Criterion | Weight | Vibe Radar | OWASP | CVSS-only | FAIR | Ad-hoc
+
+| Tool integration (Claude/Kiro)   | 4 | +1 |  0 | -1 |  0 | -1
+| Cross-project consistency        | 3 | +1 | +1 |  0 | +1 | -1
+| Lightweight to apply             | 3 | +1 |  0 |  0 | -1 | +1
+| Suited to non-web app risks      | 3 | +1 | -1 | -1 |  0 |  0
+| Quantitative rigor               | 1 |  0 | +1 | +1 | +1 | -1
+
+| *Total (weighted)*               |   | *+13* | *+1* | *-4* | *+1* | *-5*
+|===
+
+== Consequences
+
+* Risks in `arc42/chapters/11_risks.adoc` use the radar's L/M/H
+  severity scale and a short prefix (`Risk-E-*` for external,
+  `Risk-S-*` for sync, `Risk-D-*` for documentation).
+* New contributors should consult the radar plugin descriptions when
+  adding risks.
+
+== Related
+
+* link:../chapters/11_risks.adoc[Risks and Technical Debt]

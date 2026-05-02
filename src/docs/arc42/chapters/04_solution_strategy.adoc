@@ -1,0 +1,70 @@
+= Solution Strategy
+
+_(Q-3.4)_
+
+== Strategic decisions
+
+[cols="1,3", options="header"]
+|===
+| Decision | Rationale
+
+| *DSL: JSONC*
+| Universal IDE support via JSON Schema, no parser to write,
+LLM-friendly. See link:../ADRs/ADR-001-DSL-Format.adoc[ADR-001]
+_(OQ-5 team answer)_.
+
+| *Implementation language: Go*
+| Single static binary, fast startup, cross-compilation for free,
+zero runtime dependencies. See
+link:../ADRs/ADR-002-Implementation-Language.adoc[ADR-002].
+
+| *Visual frontend: draw.io*
+| Most-used free diagramming tool; bidirectional sync with the tool
+architects already use is the product's differentiator. See
+link:../ADRs/ADR-001-DSL-Format.adoc[ADR-001] (context) and
+OQ-6 team answer.
+
+| *Sync model: three-way diff against a stored state*
+| Enables true bidirectional sync without journaling or CRDTs. The
+state file `.bausteinsicht-sync` is sha256-checksummed.
+See link:../../spec/05_sync_specification.adoc[Sync Specification].
+
+| *Conflict policy: model wins (v1)*
+| Deterministic and predictable. The `ConflictResolver` interface
+keeps room for future strategies _(`internal/sync/conflict.go:21-25`)_.
+
+| *Layout engine: deterministic, no GraphViz dependency*
+| Layered/grid/none algorithms, sorted within tier, no third-party
+graph layouter. See
+link:../ADRs/ADR-005-Auto-Layout-Engine.adoc[ADR-005].
+
+| *Risk classification: Vibe-Coding Risk Radar*
+| Aligns with the team's existing risk taxonomy. See
+link:../ADRs/ADR-003-Risk-Classification.adoc[ADR-003].
+|===
+
+== Top-down summary
+
+. Read `architecture.jsonc` and `architecture.drawio`; load the last
+  sync state.
+. Compute a *ChangeSet* by three-way diff
+  _(`internal/sync/diff.go:181-198`)_.
+. *Resolve conflicts* (model wins; future-proof interface)
+  _(`internal/sync/conflict.go:36-55`)_.
+. *Apply forward* (model → draw.io), per view
+  _(`internal/sync/forward.go:44-66`)_.
+. *Apply reverse* (draw.io → model)
+  _(`internal/sync/reverse.go:24-54`)_.
+. *Write* the new state with sha256 checksum
+  _(`internal/sync/state.go:96-132`)_.
+
+== How quality goals are achieved
+
+* *Bidirectional correctness* — three-way diff + sha256 state +
+  visibility-aware deletion detection (#167, #240) +
+  ~404 unit/integration tests + property test on label round-trip.
+* *Predictability for LLM agents* — `--format json` on every command;
+  stable exit codes; deterministic outputs (sorted, alphabetical
+  defaults).
+* *Zero-friction install* — single Go binary, embedded templates
+  (`templates/embed.go`), Goreleaser-driven release pipeline.

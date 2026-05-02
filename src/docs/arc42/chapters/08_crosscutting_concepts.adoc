@@ -1,0 +1,143 @@
+= Cross-cutting Concepts
+
+_(Q-3.8)_
+
+== Atomic file I/O
+
+Every file the tool writes (model save, draw.io save, sync state) goes
+through the same template:
+
+. `os.CreateTemp(dir, "<prefix>-*")` — random temp name in the
+  destination directory (defends against TOCTOU).
+. Write payload, then `Close`.
+. `os.Rename(tmp, dest)` — atomic on all supported filesystems.
+. On any failure, remove the temp file before returning.
+
+References:
+`internal/drawio/document.go:55-79`,
+`internal/sync/state.go:96-132`,
+`internal/model/loader.go:118-138`,
+`internal/model/patch.go:31-50`.
+
+== Comment-preserving JSONC
+
+Two layers preserve user formatting:
+
+. *Whole-file save* — `Save` reads the existing file, captures
+  everything before the first `{` as a "preamble" of comments and
+  blank lines, and prepends it to the marshalled JSON
+  _(`internal/model/loader.go:101-138, 232-245`)_.
+. *Surgical patches* — `PatchSave` and `PatchInsert` operate on the
+  raw bytes; only the targeted value is replaced, so comments,
+  whitespace, and key order are untouched
+  _(`internal/model/patch.go:9-95`).
+  This is what the `add element` and `add relationship` commands use.
+
+The contributor checklist explicitly requires a comment-preservation
+test for every new field _(`CONTRIBUTING.md:13-19`)_.
+
+== Conflict resolution
+
+* Strategy: `ModelWinsResolver` (v1).
+* Mechanic: matching draw.io changes are filtered out of the change
+  set so reverse cannot overwrite the model
+  _(`internal/sync/engine.go:50-56`)_.
+* Reporting: a `ResolvedConflict` records all four values and is
+  surfaced as a warning. Exit code stays 0
+  _(`internal/sync/conflict.go:36-55`)_.
+* Extension: alternative resolvers can be registered through the
+  `ConflictResolver` interface
+  _(`internal/sync/conflict.go:21-25`)_.
+
+== Determinism
+
+* Layered layout sorts kinds by `specification.elements` order, then
+  alphabetically within tier (`internal/sync/layout.go:62-80`).
+* Legend kinds are sorted before rendering
+  (`internal/sync/metadata.go:155-159`).
+* New elements imported from draw.io get the alphabetically first
+  kind from `specification.elements` (`internal/sync/reverse.go:340-351`).
+* Validation iterates relationships in their array order; duplicate
+  detection records the first occurrence's index
+  (`internal/model/validate.go:120-162`).
+
+== Security controls
+
+[cols="1,3", options="header"]
+|===
+| Marker | Control
+
+| SEC-001 / SEC-016
+| Reject `..` segments in `--model`, `--template`, and `--output`
+paths _(`cmd/bausteinsicht/root.go:78-89`,
+`cmd/bausteinsicht/export.go:46-50`)_.
+
+| SEC-008
+| Robust HTML attribute parsing — `>` inside quoted attribute values
+does not break label extraction _(`internal/drawio/label.go:158`)_.
+
+| SEC-013
+| Element-ID syntax restricted; `sanitizeID` strips `.`, `/`, `\`
+to prevent IDs that escape the dot-notation hierarchy
+_(`internal/sync/diff.go:285-294`)_.
+
+| SEC-015
+| `SafeViewKey` strips directory components before composing export
+filenames _(`internal/export/export.go:71-76`)_.
+
+| Atomic + 0600
+| Newly created files use mode `0600`
+_(`cmd/bausteinsicht/init.go:46-54`)_.
+|===
+
+The full SEC-NNN catalogue is the team's security review (2026-03-01,
+updated 2026-03-30) — link to be added once the document is republished
+_(OQ-7 team answer)_.
+
+== Error handling and exit codes
+
+* A custom `*exitError` carries an exit code through the cobra layers
+  _(`cmd/bausteinsicht/root.go:67-76`)_.
+* The root command serialises errors as
+  `{"error": ..., "code": ...}` for `--format json` or as plain text
+  otherwise _(`root.go:93-115`)_.
+* `SilenceUsage` and `SilenceErrors` keep the output free of cobra's
+  default formatting.
+
+== Watch-mode concurrency
+
+* fsnotify produces events that are debounced to 300 ms
+  _(`internal/watcher/watcher.go:13`).
+* `syncMu` ensures only one `OnChange` callback runs at a time.
+* Atomic-rename writes are explicitly handled
+  _(test `TestAtomicRenameTriggersCallback`).
+
+== Logging / verbose output
+
+* `--verbose` writes diagnostics to stderr.
+* Verbose output is *suppressed* when `--format json` is in effect, so
+  stdout remains a clean JSON document for piped consumption
+  _(tests `TestSync_Verbose_*`, `TestValidate_Verbose_*`).
+
+== JSON Schema integration
+
+* `$schema` attribute embedded in the bootstrap model
+  _(`templates/sample-model.jsonc:2`).
+* IDEs download
+  `https://raw.githubusercontent.com/docToolchain/Bausteinsicht/main/schema/bausteinsicht.schema.json`
+  once and provide autocompletion + validation.
+* The schema is maintained in the same GitHub repo at `schema/`
+  but is not included in this working tree _(OQ-9, OQ-10 team answers)_.
+
+== Adding a new model field — checklist
+
+_(CONTRIBUTING.md, derived requirement)_
+
+. Add the struct field in `internal/model/types.go`.
+. Update `bausteinsicht.schema.json`.
+. Update `elementFieldPath` in `internal/sync/patchops.go` (enables
+  comment-preserving patch save).
+. Update `applyElementChange` in `internal/sync/reverse.go`
+  (enables draw.io → model mapping).
+. Add a comment-preservation E2E test.
+. Add a roundtrip E2E test.

@@ -1,0 +1,81 @@
+= Context and Scope
+
+_(Q-3.3)_
+
+== Business / domain context
+
+[plantuml,c4-context,svg]
+....
+@startuml
+!include <C4/C4_Context>
+
+LAYOUT_WITH_LEGEND()
+
+Person(architect, "Software Architect", "Designs and edits the model")
+Person(developer, "Developer", "Consults diagrams; uses `add` from CLI")
+Person(agent, "LLM Agent", "Reads/writes via --format json")
+
+System(bs, "Bausteinsicht", "Architecture-as-code CLI with bidirectional draw.io sync")
+
+System_Ext(drawio, "draw.io desktop / CLI", "Visual editor and headless export")
+System_Ext(fs, "File System", "architecture.jsonc, architecture.drawio, .bausteinsicht-sync")
+System_Ext(git, "Git", "Version control for the model and diagram files")
+System_Ext(ci, "CI / GitHub Pages", "dtcw generateSite publishes the docs")
+
+Rel(architect, bs, "Runs CLI; edits jsonc")
+Rel(developer, bs, "Runs `add`, `validate`, `sync`")
+Rel(agent, bs, "Runs CLI with --format json")
+Rel(architect, drawio, "Edits diagram visually")
+Rel(bs, fs, "Reads/writes")
+Rel(architect, git, "Commits jsonc + drawio")
+Rel(bs, drawio, "Invokes drawio CLI for `export` only")
+Rel(ci, bs, "Runs `validate` and `export*` in pipelines")
+@enduml
+....
+
+== Technical context
+
+* *Inputs*: model `*.jsonc`, draw.io `*.drawio`, sync state
+  `.bausteinsicht-sync`, optional `template.drawio`.
+* *Outputs*: same files (mutated atomically) plus exports
+  (PNG/SVG/PUML/MMD/ADOC/MD).
+* *External processes*: only the draw.io CLI, only when the user runs
+  `bausteinsicht export` _(`internal/export/export.go:32-45`)_.
+* *Network*: none. Bausteinsicht does not open sockets, make HTTP
+  calls, or rely on TLS _(OQ-7 team answer; `README.adoc:194-196`)_.
+
+== Trust boundaries
+
+_(OQ-7 team answer)_
+
+[cols="1,3", options="header"]
+|===
+| Boundary | Notes
+
+| *Fully trusted* — CLI flags
+| The user types them directly; behaviour mirrors `cat`/`jq`/`sed`. No
+sandboxing.
+
+| *Semi-trusted* — model and template files
+| May come from a shared Git repository. Parsed and validated, but the
+process is not sandboxed. `LoadDocument` validates structural
+integrity before any modification _(`internal/drawio/document.go:30-49`)_.
+
+| *Untrusted* — agent / CI environment
+| Standard sandboxing (container, restricted directory, read-only
+mounts) is the caller's responsibility. SEC-001 / SEC-016 reject
+`..` in paths supplied via `--model`, `--template`, `--output`
+_(`cmd/bausteinsicht/root.go:78-89`,
+`cmd/bausteinsicht/export.go:46-50`)_.
+|===
+
+== Out of scope
+
+_(OQ-2 + OQ-3 team answers)_
+
+* Multi-user real-time editing.
+* Server / web UI.
+* As-Is/To-Be modelling, custom validation rules, polished PNG/SVG
+  pipeline integrations, CI gating actions, Structurizr/LikeC4
+  importers — these are *planned future considerations* but not
+  delivered in v1.
