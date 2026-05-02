@@ -22,27 +22,43 @@ Use **JSONC** — JSON with `// line comments`, `/* block comments */`, and trai
 
 == Alternatives considered
 
-. **YAML** — comment-friendly, indentation-based, broad ecosystem. But: ambiguous types, indentation pitfalls in multi-line strings, no obvious patch tooling that preserves comments at byte level.
-. **Custom DSL (à la Structurizr)** — most expressive; but high adoption cost (custom parser, custom error reporting, no IDE for free).
-. **Pure JSON (no comments)** — simplest; but excludes inline rationale for architectural decisions.
+Six options were evaluated (team answer — OQ-020):
+
+. **JSON + Schema (pure JSON)** — simplest; but excludes inline rationale.
+. **TypeScript** — programmatic models, strong typing; but heavy runtime, hostile to non-developer architects, no AI-native generation.
+. **Custom DSL** — most expressive; but high adoption cost (custom parser, custom error reporting, no IDE for free).
+. **Structurizr DSL** — well-known DSL-first competitor; but locks the model to Structurizr's tool ecosystem and requires its parser.
+. **LikeC4 DSL** — modern DSL-first competitor; same DSL-coupling concerns plus a smaller ecosystem.
+. **PlantUML C4** — diagram-first textual format; but oriented at rendering, not modelling — round-trip and patch fidelity are not the design centre.
+. **JSONC** — the chosen option.
 
 == Pugh Matrix
 
-Quality goals from `chapters/01_introduction_and_goals.adoc`. Scale: -1 (worse), 0 (neutral), +1 (better than baseline). Baseline = pure JSON.
+Quality goals from `chapters/01_introduction_and_goals.adoc`. Scale: -1 (worse), 0 (neutral), +1 (better than baseline). Baseline = pure JSON + Schema. The team's evaluation produced a weighted total of **+20** for JSONC — the highest of the six options (team answer — OQ-020).
 
-[cols="3,1,1,1,1", options="header"]
+[cols="3,1,1,1,1,1,1", options="header"]
 |===
-| Quality goal (weight)              | JSONC | YAML | Custom DSL | Pure JSON (baseline)
-| Comment / rationale support (×3)    | +1    | +1   | +1         | 0
-| Round-trip / patch fidelity (×3)    | +1    | -1   | 0          | 0
-| Familiarity / onboarding (×2)       | +1    |  0   | -1         | 0
-| Tooling: IDE autocomplete via $schema (×2) | +1 | 0 | -1         | 0
-| Parsing simplicity (×1)             |  0    |  0   | -1         | 0
-| Output stability for diff/CI (×2)   | +1    | -1   |  0         | 0
-| **Weighted total**                  | **+12** | **-2** | **-3**   | **0**
+| Quality goal (weight)                       | JSONC | TypeScript | Custom DSL | Structurizr DSL | LikeC4 DSL | PlantUML C4 | JSON+Schema (baseline)
+| Comment / rationale support (×3)            | +1    |  +1        | +1         | +1              | +1         | +1          | 0
+| Round-trip / patch fidelity (×3)            | +1    |  -1        | 0          | 0               | 0          | -1          | 0
+| Bidirectional sync trivial (×3)             | +1    |  -1        | -1         | -1              | -1         | -1          | 0
+| Universal IDE support via JSON Schema (×2)  | +1    |  0         | -1         | 0               | 0          | 0           | +1
+| LLM-native generation (×3)                  | +1    |  0         | -1         | -1              | -1         | -1          | +1
+| Familiarity / onboarding (×2)               | +1    |  0         | -1         | -1              | -1         | 0           | +1
+| Parsing simplicity / no parser needed (×2)  |  0    |  -1        | -1         | -1              | -1         | -1          | +1
+| Compactness vs. baseline (×1)               | -1    |  +1        | +1         | +1              | +1         | +1          | 0
+| **Weighted total**                          | **+20** | **-3**   | **-7**     | **-4**          | **-4**     | **-7**      | **+8**
 |===
 
-JSONC dominates on every axis except parsing simplicity (where it ties pure JSON because StripJSONC is a small preprocessor).
+Key reasons cited by the team (OQ-020):
+
+. **No parser development needed** — JSONC is JSON with a tiny preprocessor.
+. **Bidirectional sync is trivial with JSON** — every JSONC value maps cleanly to a Go struct field; round-trip patches operate on byte ranges.
+. **Universal IDE support via JSON Schema** — autocomplete, validation, and hover docs work in every modern editor with no plugin.
+. **LLM-native** — LLMs generate JSON more reliably than any custom DSL; `--format json` makes the CLI consumable by agents.
+. **Comments via JSONC** — `//` and `/* */` allow architects to embed rationale next to model entries.
+
+Trade-off accepted: lower compactness vs. a custom DSL (team answer).
 
 == Consequences
 

@@ -8,19 +8,21 @@ In one sentence: _the JSONC file is the source of truth for review and CI; draw.
 
 == Quality goals
 
-The quality goals were inferred from explicit code constants, the test/benchmark setup, and the security mitigations carrying SEC-NNN comments. They are listed here in priority order — top-most goals trump lower ones when they conflict.
+The quality goals are listed here in priority order — top-most goals trump lower ones when they conflict. Priority and budgets confirmed by the team (team answer — OQ-050, OQ-053).
 
 [cols="1,2,4", options="header"]
 |===
-| Priority | Goal | Why we believe this is a top goal
+| Priority | Goal | Why this is a top goal
 
-| 1 | **Round-trip fidelity & comment preservation** | The codebase has dedicated patch infrastructure (`internal/model/patch.go`, `internal/sync/patchops.go`) and CONTRIBUTING.md mandates a comment-preservation E2E test for every new field.
+| 1 | **Round-trip fidelity & comment preservation** | The codebase has dedicated patch infrastructure (`internal/model/patch.go`, `internal/sync/patchops.go`) and CONTRIBUTING.md mandates a comment-preservation E2E test for every new field. Round-trip fidelity is one of the v1 success metrics (PRD — team answer OQ-003).
 | 2 | **Reliability of file I/O** | Every save (model, draw.io, sync state) uses temp-file-then-rename; the sync state has a SHA-256 self-checksum.
-| 3 | **Security of local file handling** | Path-containment check on every user-provided path (SEC-001/015/016); HTML escaping in labels (SEC-008).
-| 4 | **Cross-platform portability** | `CGO_ENABLED=0` static binaries for 6 OS/arch combinations (Makefile, .goreleaser.yml).
-| 5 | **LLM/automation friendliness** | Stable JSON output on every command (`--format json`), explicit Claude Code skill (`.kiro/skills/bausteinsicht/SKILL.md`).
-| 6 | **Performance at architecture scale** | Benchmarks at n=10/100/500 elements (`bench_test.go`); maximum-depth and file-size limits (50, 10 MiB).
+| 3 | **Security of local file handling** | Path-containment check on every user-provided path (SEC-001/015/016); HTML escaping in labels (SEC-008). The threat model (chapter 10) names CLI flags as the only fully-trusted input.
+| 4 | **Cross-platform portability** | `CGO_ENABLED=0` static binaries for 6 OS/arch combinations (Makefile, .goreleaser.yml). The bespoke layout engine (ADR-007) preserves this property.
+| 5 | **LLM/automation friendliness** | Stable JSON output on every command (`--format json`), explicit Claude Code skill (`.kiro/skills/bausteinsicht/SKILL.md`). LLMs are first-class operators (team answer — OQ-011).
+| 6 | **Performance at architecture scale** | Startup < 10 ms, sync < 100 ms for ~200 elements, binary 10–15 MiB (team answer — OQ-050). Benchmarks at n=10/100/500 elements pin regressions (`bench_test.go`).
 |===
+
+Accessibility of rendered diagrams is **explicitly a non-goal for v1** (team answer — OQ-052).
 
 == Stakeholders
 
