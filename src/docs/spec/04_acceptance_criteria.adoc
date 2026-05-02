@@ -1,0 +1,322 @@
+= Acceptance Criteria
+:toc: left
+:toclevels: 2
+:doctype: article
+
+Gherkin-style scenarios derived from the test suite. Each scenario
+references the underlying test name (in `*_test.go`) and the use case
+ID from `01_use_cases.adoc`.
+
+== UC-1 (`init`)
+
+[source,gherkin]
+----
+Feature: Initialize a new project (UC-1)
+
+  Scenario: Fresh directory
+    Given an empty working directory
+    When the user runs "bausteinsicht init"
+    Then "architecture.jsonc", "template.drawio", "architecture.drawio"
+         and ".bausteinsicht-sync" are created
+    And the model file is valid
+    And the draw.io file parses
+    # Tests: TestInitCreatesFiles, TestInitGeneratesValidModel,
+    # TestInitGeneratesValidDrawio, TestInitSyncStateValid
+
+  Scenario: Refuse to overwrite
+    Given "architecture.jsonc" already exists
+    When the user runs "bausteinsicht init"
+    Then the command exits with code 2
+    # Test: TestInitFailsIfFilesExist
+
+  Scenario: JSON output
+    When the user runs "bausteinsicht init --format json"
+    Then stdout contains a JSON object with the created file paths
+    # Test: TestInitJSONOutput
+----
+
+== UC-2 (`sync`)
+
+[source,gherkin]
+----
+Feature: Bidirectional synchronisation (UC-2)
+
+  Scenario: After init, the very next sync is idempotent
+    Given a project freshly created by "init"
+    When the user runs "bausteinsicht sync"
+    Then no changes are reported
+    # Test: TestSyncAfterInit
+
+  Scenario: Model changes propagate forward
+    Given a synced project
+    When the user edits a title in "architecture.jsonc"
+    And runs "bausteinsicht sync"
+    Then the corresponding draw.io shape's label is updated
+    # Tests: TestSyncDetectsModelChanges, TestApplyForward_UpdatedTitle
+
+  Scenario: draw.io edits propagate back to the model
+    Given a synced project
+    When the user changes a label in "architecture.drawio"
+    And runs "bausteinsicht sync"
+    Then the title in the JSONC model is updated
+    # Tests: TestApplyReverse_TitleUpdate, TestApplyReverse_DescriptionUpdate,
+    #        TestApplyReverse_TechnologyUpdate
+
+  Scenario: User-added draw.io element is preserved
+    Given a synced project
+    When the user adds a shape in draw.io with a custom bausteinsicht_id
+         that is not in the model
+    And runs "bausteinsicht sync"
+    Then the shape remains in the diagram
+    # Test: TestSyncPreservesUserAddedDrawioElement
+
+  Scenario: Conflicts resolve in favour of the model
+    Given the same field has been changed in both the model and draw.io
+    When the user runs "bausteinsicht sync"
+    Then the model value wins
+    And a conflict warning is reported
+    And the exit code is 0
+    # Tests: TestSyncConcurrentModelAndDrawioChanges,
+    #        TestConflictResolverInterface
+
+  Scenario: Validation errors abort the sync
+    Given an invalid include pattern in a view
+    When the user runs "bausteinsicht sync"
+    Then the command exits with code 2 and no files are touched
+    # Tests: TestSyncAbortsOnInvalidIncludePattern,
+    #        TestSyncAbortsOnInvalidExcludePattern
+
+  Scenario: A deleted draw.io file is recreated from the template
+    Given the model exists but "architecture.drawio" was removed
+    When the user runs "bausteinsicht sync"
+    Then "architecture.drawio" is recreated
+    # Tests: TestSyncRecreatesDeletedDrawioFile,
+    #        TestSyncRecreatesDeletedDrawioFileWithCustomTemplate
+
+  Scenario: An empty mxfile is recovered
+    Given "architecture.drawio" is an empty mxfile
+    When the user runs "bausteinsicht sync"
+    Then a valid document is rebuilt
+    # Test: TestSyncRecoversEmptyMxfile
+
+  Scenario: Orphan view pages are removed
+    Given a draw.io page "view-old" exists for a view that no longer
+         appears in the model
+    When the user runs "bausteinsicht sync"
+    Then "view-old" is removed
+    And pages whose IDs do not start with "view-" are kept
+    # Test: TestSyncRemovesOrphanedViewPages
+
+  Scenario: Comments in JSONC survive a roundtrip
+    Given the model file contains line and block comments
+    When the user runs "bausteinsicht sync" multiple times
+    Then the comments are still present
+    # Test: TestSyncPreservesJSONCComments
+
+  Scenario: Verbose output goes to stderr
+    Given "--verbose" is set
+    When the user runs "bausteinsicht sync"
+    Then progress lines appear on stderr (text format only)
+    # Tests: TestSync_Verbose_PrintsSyncDetails,
+    #        TestSync_Verbose_NotShownWithoutFlag,
+    #        TestSync_Verbose_SuppressedWithJSONFormat
+----
+
+== UC-3 (`validate`)
+
+[source,gherkin]
+----
+Feature: Validate the model (UC-3)
+
+  Scenario: Auto-detect a single .jsonc
+    Given exactly one .jsonc file in the working directory
+    When the user runs "bausteinsicht validate"
+    Then the file is validated
+    # Test: TestValidate_AutoDetect
+
+  Scenario: Empty model produces a warning, not an error
+    Given a model with no elements
+    When the user runs "bausteinsicht validate"
+    Then exit code is 0
+    And a warning "model is empty" is printed
+    # Tests: TestValidate_EmptyJSON_WarnsButPasses,
+    #        TestValidate_EmptyJSON_JSONFormat_IncludesWarnings
+
+  Scenario: Missing required field
+    Given an element without "title"
+    When the user runs "bausteinsicht validate"
+    Then a validation error is reported and exit code is 2
+    # Test: TestValidate_InvalidModel_MissingTitle
+----
+
+== UC-4a (`add element`)
+
+[source,gherkin]
+----
+Feature: Add a new element (UC-4a)
+
+  Scenario: Top-level element
+    Given a valid model
+    When the user runs "bausteinsicht add element --id api --kind container --title 'API'"
+    Then the JSONC file contains the new element
+    # Test: TestAddElementTopLevel
+
+  Scenario: Nested element under a container parent
+    Given a system with container=true
+    When "add element --parent shop --id api --kind container --title 'API'"
+    Then "shop.children.api" appears in the JSONC
+    # Test: TestAddElementNested
+
+  Scenario: Reject duplicate ID
+    # Test: TestAddElementDuplicateID, TestAddElementDuplicateNestedID
+
+  Scenario: Reject parent that is not a container
+    # Test: TestAddElementNonContainerParentRejected
+
+  Scenario: Reject invalid IDs
+    Given an ID containing dots, spaces, or starting with a digit
+    Then the command exits with code 1
+    # Tests: TestAddElementInvalidIDs, TestAddElementValidIDs
+
+  Scenario: Comments are preserved
+    Given a JSONC file with comments
+    When an element is added
+    Then no comment is lost
+    # Test: TestAddElementPreservesComments
+----
+
+== UC-4b (`add relationship`)
+
+[source,gherkin]
+----
+Feature: Add a relationship (UC-4b)
+
+  Scenario: Both endpoints exist
+    # Test: TestAddRelationshipValid
+
+  Scenario: Reject if "from" or "to" does not resolve
+    # Tests: TestAddRelationshipNonExistentFrom,
+    #        TestAddRelationshipNonExistentTo
+
+  Scenario: Reject duplicate
+    Given a relationship (from, to, kind, label) already exists
+    Then "add relationship" with identical values exits with code 1
+    # Test: TestAddRelationshipDuplicateBlocked
+
+  Scenario: Allow same pair with different kind
+    # Test: TestAddRelationshipDifferentKindAllowed
+
+  Scenario: Reject unknown kind
+    # Test: TestAddRelationshipInvalidKind
+----
+
+== UC-5 (`watch`)
+
+[source,gherkin]
+----
+Feature: Watch mode (UC-5)
+
+  Scenario: Refuse to start without both files
+    # Tests: TestWatchNoModelFile, TestWatchMissingDrawioFile
+
+  Scenario: An atomic file replace triggers a sync
+    Given the watcher is running
+    When the model file is replaced via temp + rename
+    Then the onChange callback fires
+    # Test: TestAtomicRenameTriggersCallback
+----
+
+== UC-6 (`export*`)
+
+[source,gherkin]
+----
+Feature: Image and text export (UC-6a, UC-6b, UC-6c)
+
+  Scenario: Default --scale=1 omits the --scale flag to draw.io
+    # Tests: TestExportCmd_DefaultScaleIsOne,
+    #        TestBuildExportArgs_ScaleOneNotIncluded
+
+  Scenario: --scale > 1 is propagated to draw.io
+    # Test: TestBuildExportArgs
+
+  Scenario: --embed-diagram propagates the flag
+    # Test: TestBuildExportArgs_WithoutEmbed
+
+  Scenario: Input file is the last positional argument
+    # Test: TestBuildExportArgs_InputFileIsLastArg
+----
+
+== Sync engine — internal acceptance
+
+These tests anchor the sync engine and protect against regressions
+called out in `arc42/chapters/05_building_blocks.adoc`.
+
+[source,gherkin]
+----
+Feature: Forward sync (model -> drawio)
+
+  Scenario: New element gets a red dashed marker until the user repositions it
+    # Test: TestApplyForward_NewElementVisualMarker
+
+  Scenario: A relationship is rendered only on pages that contain both endpoints
+    # Test: TestApplyForward_RelationshipOnlyOnPageWithBothEndpoints
+
+  Scenario: A relationship is "lifted" to a parent when the endpoint is not on a view
+    # Tests: TestApplyForward_RelationshipLifting,
+    #        TestApplyForward_RelationshipLiftingDedup,
+    #        TestApplyForward_DirectRelSuppressesLifted
+
+  Scenario: A drill-down link is added to elements that are scope of another view
+    # Test: TestApplyForward_DrillDownNavigationLinks
+
+  Scenario: A back-navigation button is added on detail (scoped) views
+    # Test: TestApplyForward_BackNavigationButton
+
+  Scenario: Layered layout groups by kind in the order of specification.elements
+    # Tests: TestComputeLayout_Layered_GroupsByKind,
+    #        TestComputeLayout_Layered_AlphabeticWithinTier,
+    #        TestComputeLayout_Layered_RowWrapping,
+    #        TestComputeLayout_Layered_ScopeAware,
+    #        TestComputeLayout_Layered_Deterministic
+----
+
+[source,gherkin]
+----
+Feature: Reverse sync (drawio -> model)
+
+  Scenario: Empty title from draw.io is ignored
+    # Test: TestApplyReverse_EmptyTitleSkipped
+
+  Scenario: A new shape from draw.io becomes a top-level element
+    # Tests: TestApplyReverse_NewElementFromDrawio,
+    #        TestApplyReverse_NewElementGetsDefaultKind,
+    #        TestApplyReverse_NewElementWarningMentionsKind
+
+  Scenario: A shape that collides with an existing nested ID is skipped
+    # Tests: TestApplyReverse_NewElementCollidingIDSkipped,
+    #        TestApplyReverse_AddedNestedElementSkipped
+
+  Scenario: Deleting an element removes orphan relationships and view refs
+    # Tests: TestApplyReverse_DeletedElementCleansOrphanedRelationships,
+    #        TestApplyReverse_DeletedElementCleansNestedRelationships,
+    #        TestApplyReverse_DeleteElementCleansViewIncludes
+
+  Scenario: Connector direction swap preserves metadata
+    # Test: TestApplyReverse_SwapConnectorDirectionPreservesMetadata
+----
+
+[source,gherkin]
+----
+Feature: Sync state file integrity
+
+  Scenario: Tampered state file is rejected
+    Given a .bausteinsicht-sync whose contents have been edited
+    When sync is run
+    Then sync errors with "checksum mismatch" and asks the user to delete
+    # Reference: internal/sync/state.go:71-84
+
+  Scenario: Missing state behaves as first sync
+    Given .bausteinsicht-sync does not exist
+    Then sync proceeds without errors
+    # Test: TestBuildState_CorrectSnapshot, TestComputeHash_*
+----

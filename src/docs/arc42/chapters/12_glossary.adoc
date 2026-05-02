@@ -1,0 +1,97 @@
+= Glossary
+
+_(Q-3.12)_
+
+[cols="1,3", options="header"]
+|===
+| Term | Definition
+
+| *Bausteinsicht*
+| German compound: "Baustein" (building block) + "Sicht" (view).
+The product name reflects its purpose: structural building blocks
+plus multi-level views.
+
+| *Model*
+| Tree of named *elements* declared in the JSONC file. Each element
+has a `kind`, `title`, optional `technology` and `description`, and
+optional `children`. Element IDs are dot-paths
+_(`src/site/assets/llms.txt:7-9`,
+`internal/model/types.go:41-49`)_.
+
+| *Specification*
+| The `specification` block in the JSONC file. Declares which element
+kinds and relationship kinds exist and how they map to template
+shapes _(`internal/model/types.go:25-39`)_.
+
+| *Element kind*
+| A named shape category (e.g. `actor`, `system`, `container`)
+declared in `specification.elements`. May be marked
+`container: true` to allow nested children.
+
+| *Relationship kind*
+| A named edge category (e.g. `uses`, `calls`) declared in
+`specification.relationships`. May be marked `dashed: true`.
+
+| *View*
+| One diagram page. Selects elements via `include`/`exclude` patterns,
+optionally with a `scope` element drawn as a bounding box, and a
+`layout` (`layered`, `grid`, or `none`)
+_(`internal/model/types.go:59-66`)_.
+
+| *Sync*
+| The diff-and-apply operation that reconciles the JSONC model and
+the draw.io XML against `.bausteinsicht-sync`. Model wins on conflict
+_(`internal/sync/engine.go:31-93`)_.
+
+| *Sync state*
+| `.bausteinsicht-sync`. JSON file storing the last-synced
+elements/relationships/hashes plus a sha256 integrity checksum
+_(`internal/sync/state.go:17-25`)_.
+
+| *Forward sync*
+| Model → draw.io application of changes
+_(`internal/sync/forward.go`)_.
+
+| *Reverse sync*
+| draw.io → Model application of changes
+_(`internal/sync/reverse.go`)_.
+
+| *Lifting (relationship)*
+| When a relationship endpoint is not visible on a view, the
+connector is drawn against the nearest visible ancestor instead
+_(tests `TestApplyForward_RelationshipLifting*`)_.
+
+| *Drill-down*
+| A clickable link on an element whose detail view exists.
+Implemented by setting an `mxCell` `link` to
+`data:page/id,view-<viewID>` _(`internal/sync/forward.go:100-107`)_.
+
+| *Scope*
+| The element drawn as a bounding box on a view. Children of the
+scope element are rendered inside the box
+_(`internal/sync/forward.go:139-144`)_.
+
+| *bausteinsicht_id / bausteinsicht_kind*
+| Custom XML attributes that link a draw.io `<object>` back to its
+model element _(`internal/drawio/element.go:12,53`)_.
+
+| *Template (.drawio)*
+| A draw.io file whose shapes act as styling presets for each
+`kind`. `bausteinsicht init` writes the embedded `default.drawio`
+_(`templates/embed.go:1-9`)_.
+
+| *JSONC*
+| JSON with single-line comments, block comments, and trailing
+commas (with optional UTF-8 BOM)
+_(`internal/model/loader.go:155-227`)_.
+
+| *Pugh matrix*
+| Decision matrix used by ADRs in this project. Rows = options,
+columns = weighted criteria, scores in `{-1, 0, +1}`. The total per
+option is the weighted sum. _(`CONTRIBUTING.md`, OQ-4 team answer.)_
+
+| *C4 model*
+| Simon Brown's four-level abstraction (Context, Container,
+Component, Code). Bausteinsicht is C4-inspired but not limited to
+four fixed levels _(`README.adoc:206`)_.
+|===

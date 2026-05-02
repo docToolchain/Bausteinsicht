@@ -1,154 +1,77 @@
-= Bausteinsicht — Open Questions (Phase 1 hand-off)
+= Bausteinsicht — Open Questions
 :toc: left
-:toclevels: 2
 
-This document collects every `[OPEN]` leaf from
-link:QUESTION_TREE.adoc[QUESTION_TREE.adoc]. Each entry records what is
-missing from the code so the right person on the team can answer it
-before Phase 2 starts.
+[NOTE]
+====
+*All Phase 1 open questions have been answered* by the team. Their
+responses have been folded into the Phase 2 documentation (PRD,
+specifications, arc42, ADRs).
 
-Group order: by *Ask role*, then by *Category*.
+This file is intentionally empty for now and serves as the future
+landing page for any new open questions raised during Phase 2 review
+or subsequent iterations.
+====
 
-== Ask: Product Owner
+== Resolution log
 
-=== Category: Stakeholder Context
+[cols="1,3,2", options="header"]
+|===
+| ID | Question | Where the answer landed
 
-==== OQ-1 — Who are the concrete user personas / target market segments?
+| OQ-1
+| Concrete user personas / target market segments
+| link:PRD/PRD-001.adoc#_3_target_users_personas[PRD §3],
+link:arc42/chapters/01_introduction_and_goals.adoc[arc42 §1]
 
-Source question:: Q-1.2.2
-Why unanswerable from code:: No PRD, persona document, or stakeholder
-analysis is in the repository.
-`docToolchainConfig.groovy:32` references `PRD/PRD-001-Bausteinsicht.adoc`,
-which does not exist.
-What we need:: Named personas (e.g. "platform architect at a 50-person
-SaaS team"), their primary goals, frequency of use, and the secondary
-audiences (LLM agents are a hint but not a "user").
+| OQ-2
+| Next-12-months roadmap
+| link:PRD/PRD-001.adoc#_6_out_of_scope_v1_planned_future_considerations[PRD §6]
 
-=== Category: Future Direction
+| OQ-3
+| Multi-user collaboration in scope?
+| link:PRD/PRD-001.adoc#_7_non_goals[PRD §7]
 
-==== OQ-2 — What is the next-12-months product roadmap?
+| OQ-4
+| Are ADRs maintained, and where?
+| link:arc42/chapters/09_architecture_decisions.adoc[arc42 §9],
+link:arc42/ADRs/[`arc42/ADRs/`]
 
-Source question:: Q-5.5.1
-Why unanswerable from code:: No roadmap, milestone, or open-issue
-digest is committed. Only structural hint is the
-`ConflictResolver` interface (intended for future strategies).
-What we need:: Prioritized feature list, time horizon, and any
-deprecation plans.
+| OQ-5
+| Why JSONC?
+| link:arc42/ADRs/ADR-001-DSL-Format.adoc[ADR-001]
 
-=== Category: Quality Goals
+| OQ-6
+| Why draw.io?
+| link:arc42/ADRs/ADR-001-DSL-Format.adoc[ADR-001] (context),
+link:PRD/PRD-001.adoc[PRD §1, §3]
 
-==== OQ-3 — Is multi-user / team collaboration in scope?
+| OQ-7
+| Threat model and trust boundaries
+| link:arc42/chapters/03_context_and_scope.adoc#_trust_boundaries[arc42 §3]
 
-Source question:: Q-5.5.3
-Why unanswerable from code:: Sync is single-machine, single-user
-(`.bausteinsicht-sync` is local). Whether merging two engineers' edits
-is a goal — and how — is not stated anywhere.
-What we need:: Position statement: "Bausteinsicht assumes one author at
-a time" vs. "Bausteinsicht must support concurrent editing via Git
-merge of `.jsonc` and `.drawio`". This affects state-file design and
-diff strategy.
+| OQ-8
+| Performance goals / budgets
+| link:arc42/chapters/07_deployment_view.adoc#_performance_budget[arc42 §7],
+link:arc42/chapters/10_quality_requirements.adoc[arc42 §10],
+link:PRD/PRD-001.adoc#_8_success_criteria[PRD §8]
 
-== Ask: Architect
+| OQ-9
+| Schema / code / skill sync
+| link:arc42/chapters/11_risks.adoc[arc42 §11 — Risk-D-3],
+link:arc42/chapters/08_crosscutting_concepts.adoc[arc42 §8]
 
-=== Category: Design Rationale
+| OQ-10
+| Where is the JSON Schema maintained?
+| link:spec/03_data_models.adoc#_json_schema[Data Models §JSON Schema]
 
-==== OQ-4 — Are ADRs maintained, and where?
+| OQ-11
+| Where is the user manual / spec?
+| link:spec/[`src/docs/spec/`] —
+01_use_cases, 02_cli_specification, 03_data_models,
+04_acceptance_criteria, 05_sync_specification
+|===
 
-Source question:: Q-3.9.1
-Why unanswerable from code:: README links to
-`src/docs/arc42/ADRs/ADR-001-DSL-Format.adoc`, which is not in the
-working tree. CONTRIBUTING.md says ADRs go to
-`src/docs/arc42/ADRs/`, but the directory is empty.
-What we need:: Either the historical ADRs themselves or a confirmation
-that they are intentionally absent so we can start an ADR log.
+== Outstanding (none)
 
-==== OQ-5 — Why JSONC instead of YAML/TOML/a custom DSL?
-
-Source question:: Q-3.9.2
-Why unanswerable from code:: No ADR; loader implementation
-(`internal/model/loader.go:155-227`) shows JSONC is non-trivial to
-parse, but the rationale (e.g. "we picked JSONC because LLMs handle it
-better than YAML") is not captured.
-What we need:: An ADR documenting the trade-off vs. YAML, TOML,
-HCL, Structurizr DSL, etc.
-
-==== OQ-6 — Why draw.io as the visual frontend?
-
-Source question:: Q-3.9.3
-Why unanswerable from code:: README mentions draw.io as a feature; no
-ADR records the analysis vs. Structurizr web renderer, LikeC4 preview,
-Mermaid live, etc.
-What we need:: An ADR with the alternatives considered and the
-decisive criteria.
-
-=== Category: Quality Goals
-
-==== OQ-7 — What threat model and trust boundaries are assumed?
-
-Source question:: Q-4.6.1
-Why unanswerable from code:: README links to
-`src/docs/spec/07_trust_model.adoc` and a security review at
-`src/docs/security/2026-03-01-security-review.adoc`; neither file is
-present. The `SEC-NNN` markers in code refer to a numbered catalogue
-whose source is not committed.
-What we need:: The trust model document (or pointer), the security
-review report, and the SEC-finding catalogue keyed to the markers in
-code.
-
-==== OQ-8 — Are there explicit performance goals or budgets?
-
-Source question:: Q-4.2.1
-Why unanswerable from code:: Benchmarks exist
-(`internal/sync/bench_test.go`, `internal/model/bench_test.go`) but no
-target numbers, e.g. "sync of a 500-element model in <1 s on a laptop".
-What we need:: Concrete SLOs to prove the benchmarks are sufficient.
-
-=== Category: Future Direction
-
-==== OQ-9 — How are JSON Schema, code, and skill files kept in sync?
-
-Source question:: Q-5.5.2
-Why unanswerable from code:: CONTRIBUTING.md mentions
-`bausteinsicht.schema.json`, but the schema is not in this repository
-(it lives at `schema/...` on `main`). There is no CI step asserting
-that the schema and `Element` struct agree.
-What we need:: A pointer to the schema's home, a versioning policy
-(e.g. semver-tied to the binary), and ideally a CI check.
-
-== Ask: Developer
-
-=== Category: Domain Knowledge
-
-==== OQ-10 — Where is the JSON Schema (`bausteinsicht.schema.json`) maintained?
-
-Source question:: Q-4.4.2
-Why unanswerable from code:: The `$schema` URL points to
-`schema/bausteinsicht.schema.json` on `main`, but the file is not
-checked in here. CONTRIBUTING.md tells contributors to update it as
-part of adding a new field.
-What we need:: The path/repository where the schema is owned, and the
-change procedure.
-
-==== OQ-11 — Where is the documented user manual and spec?
-
-Source question:: Q-4.4.3
-Why unanswerable from code:: README links to
-`src/docs/manual/user-manual.adoc`, `src/docs/spec/02_cli_specification.adoc`,
-`src/docs/spec/03_data_models.adoc`, `src/docs/spec/05_sync_specification.adoc`,
-`src/docs/spec/06_tutorial.adoc`, and `src/docs/spec/07_trust_model.adoc`.
-None of these files exist in the current working tree
-(`src/docs/` was empty before this exercise). The `gh-pages.yml`
-workflow runs `dtcw generateSite` expecting these files.
-What we need:: Either the missing AsciiDoc sources or a confirmation
-that they were deliberately removed (so we can start fresh in Phase 2).
-
-== Status overview
-
-* Open questions total: 11
-* By role: Product Owner (3), Architect (6), Developer (2)
-* By category: Design Rationale (3), Quality Goals (3), Stakeholder
-  Context (1), Domain Knowledge (2), Future Direction (2)
-
-The next phase cannot proceed safely without OQ-7 (threat model) and
-OQ-11 (manual/spec) — both encode contractual behavior of the tool. The
-remainder unblock specific design and product decisions.
+No questions are currently outstanding. Add new entries here as Phase 2
+review surfaces gaps.

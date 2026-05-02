@@ -1,0 +1,32 @@
+= Architecture Decisions
+
+_(Q-3.9, OQ-4 team answer)_
+
+ADRs follow the Nygard format and use a *weighted Pugh matrix* with
+scores in `{-1, 0, +1}` for alternative evaluation. They live under
+`src/docs/arc42/ADRs/`.
+
+[cols="1,2,1", options="header"]
+|===
+| ID | Title | Status
+
+| link:../ADRs/ADR-001-DSL-Format.adoc[ADR-001]
+| Choice of DSL Format
+| Accepted
+
+| link:../ADRs/ADR-002-Implementation-Language.adoc[ADR-002]
+| Choice of Implementation Language
+| Accepted
+
+| link:../ADRs/ADR-003-Risk-Classification.adoc[ADR-003]
+| Risk Classification using Vibe-Coding Risk Radar
+| Accepted
+
+| link:../ADRs/ADR-004-Sequence-Diagram-Export.adoc[ADR-004]
+| Sequence Diagram Export
+| Rejected
+
+| link:../ADRs/ADR-005-Auto-Layout-Engine.adoc[ADR-005]
+| Auto-Layout Engine for New Diagram Pages
+| Accepted
+|===

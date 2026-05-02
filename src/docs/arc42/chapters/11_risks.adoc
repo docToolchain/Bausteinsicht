@@ -1,0 +1,119 @@
+= Risks and Technical Debt
+
+_(Q-5)_
+
+Risks classified using the Vibe-Coding Risk Radar
+(see link:../ADRs/ADR-003-Risk-Classification.adoc[ADR-003]).
+Severity scale: *L* (low), *M* (medium), *H* (high).
+
+== External-tool dependency risks
+
+[cols="1,1,3", options="header"]
+|===
+| ID | Severity | Description / mitigation
+
+| Risk-E-1
+| M
+| *draw.io schema drift.* `LoadDocument` validates structural
+prerequisites (`<mxfile>`, `<diagram>`, `<mxGraphModel>`, `<root>`),
+but does not version-check draw.io itself. A future structural change
+could break parsing silently.
+Mitigation: integration tests against the embedded template.
+_(`internal/drawio/document.go:30-49`)_
+
+| Risk-E-2
+| L
+| *draw.io CLI missing.* `export` returns a friendly error including
+the download URL. Forward sync does not need the CLI.
+_(`internal/export/export.go:32-45`)_
+
+| Risk-E-3
+| M
+| *Headless `--scale > 1` failure.* GPU disabled in headless containers
+crashes draw.io's GPU process with exit 9, returning exit 0 with no
+output file. Mitigated by the post-export existence check
+_(`internal/export/export.go:56-66, 90-94`)_.
+|===
+
+== Sync correctness risks
+
+[cols="1,1,3", options="header"]
+|===
+| ID | Severity | Description / mitigation
+
+| Risk-S-1
+| M
+| *Stale `.bausteinsicht-sync` after manual edits.* A sha256 integrity
+check forces user intervention on tampering. For "missing state",
+reverse sync uses the flat model to avoid spurious top-level
+recreation (#307); forward `reconcileOrphanedElements` removes orphans
+(#110).
+_(`internal/sync/state.go:71-92`,
+`internal/sync/reverse.go:174-194`,
+`internal/sync/forward.go:84-87`)_
+
+| Risk-S-2
+| L
+| *False deletions on first render of a new view page.* `Run` is told
+the set of `newPageIDs` so DetectChanges can suppress "deleted from
+drawio" for elements that have not yet been rendered (#184/#188/#189).
+_(`internal/sync/engine.go:42-44`)_
+
+| Risk-S-3
+| L
+| *Connector lifting / view filter masking real deletions.*
+`computeVisibleRelationships` builds the set of relationships visible
+in any view; reverse sync uses this to avoid treating filter-induced
+absences as user deletions (#167).
+_(`internal/sync/diff.go:96-120`)_
+
+| Risk-S-4
+| L
+| *Element added to model but invisible in any view.* After sync,
+warns "Element X exists in the model but is not visible in any view"
+(#183). _(`internal/sync/engine.go:66-83`)_
+|===
+
+== Documentation and communication debt
+
+[cols="1,1,3", options="header"]
+|===
+| ID | Severity | Description / mitigation
+
+| Risk-D-1
+| L
+| *Skill files disagree with code on exit codes.* SKILL.md states
+"`1=conflicts resolved`", but the code uses 1 = validation/precondition
+failure, 2 = config/I/O error, and conflicts surface as warnings inside
+exit 0. Risk: LLM agents using the skill may misinterpret outcomes.
+Mitigation: align skill files in the next docs sweep.
+_(`.claude/skills/bausteinsicht/SKILL.md:65-66`,
+`cmd/bausteinsicht/root.go:67-76`)_
+
+| Risk-D-2
+| L
+| *Go version skew.* README requires Go 1.25+, `go.mod` declares
+1.25.8, `CONTRIBUTING.md` says 1.24+. Risk: contributor confusion.
+Action: update `CONTRIBUTING.md`.
+_(`go.mod:3`, `README.adoc:79`, `CONTRIBUTING.md:11`)_
+
+| Risk-D-3
+| L
+| *No CI assertion that JSON Schema and Go `Element` agree.*
+Manual code review is the current safety net.
+_(OQ-9 team answer.)_
+|===
+
+== Technical debt encoded in TODOs / comments
+
+* No `TODO`/`FIXME`/`XXX`/`HACK` markers anywhere in the Go source.
+  Markers in code are limited to issue numbers (`#NNN`) and
+  `SEC-NNN` security findings _(grep across the tree)_.
+
+== Open future-direction risks
+
+* *No automated regression on performance budgets* — benchmarks exist
+  but no SLO assertion in CI _(Risk-D-3)_.
+* *No CI check on JSON Schema vs. struct* _(Risk-D-3)_.
+* *Multi-user collaboration unsupported by design.* Mitigation: rely
+  on Git workflows _(OQ-3 team answer)_.

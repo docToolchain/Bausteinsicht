@@ -1,0 +1,74 @@
+= Introduction and Goals
+
+== Requirements overview
+
+Bausteinsicht is an architecture-as-code CLI: a single JSONC file is
+the source of truth for an architecture model; draw.io is the visual
+editor; the two are reconciled bidirectionally on every `sync` cycle
+_(Q-1.1.1, Q-3.1.1; `README.adoc:3-7`)_.
+
+See link:../../PRD/PRD-001.adoc[PRD-001] for the product framing
+and link:../../spec/01_use_cases.adoc[Use Cases] for the contracted
+behaviours.
+
+== Quality goals
+
+The top three quality goals (priority order):
+
+[cols="1,1,3", options="header"]
+|===
+| # | Goal | Why it matters
+
+| 1
+| *Bidirectional correctness* — model and diagram stay consistent
+across edits in either direction.
+| The product's reason to exist. Failing this turns the tool into yet
+another one-way generator.
+_(Q-2.1.2, OQ-6 team answer)_
+
+| 2
+| *Predictability for LLM agents* — every command supports
+`--format json` with a stable schema; outputs are deterministic.
+| LLM agents are first-class users
+_(Q-1.2.1, OQ-1 team answer; `cmd/bausteinsicht/root.go:50`)_.
+
+| 3
+| *Zero-friction install and start* — a single static binary
+(< 15 MB), Go-only, no runtime deps; sub-100 ms cold-start sync for
+≤ 200 elements.
+| Architects must not need a Java/Node toolchain to publish or query
+their architecture.
+_(OQ-8 team answer, Q-3.2.1)_
+|===
+
+Secondary goals: cross-platform support
+(linux/darwin/windows × amd64/arm64), security (no network,
+path-containment), maintainability (colocated tests, six-step
+"add a new field" checklist) — see chapter 10.
+
+== Stakeholders
+
+_(OQ-1 team answer)_
+
+[cols="1,1,3", options="header"]
+|===
+| Role | Cardinality | Expectations
+| Software Architect | Few per team | Maintains the model;
+edits diagrams visually for layout decisions; reviews ADRs.
+| Developer | Many per team | Consults diagrams;
+adds elements/relationships via `bausteinsicht add` from the terminal.
+| LLM Agent | Per developer | Reads and modifies the model with
+`--format json`; relies on stable exit codes and the JSON Schema.
+| Documentation Pipeline (CI) | One per team | Runs `export*` in
+gh-pages-style workflows _(`.github/workflows/gh-pages.yml`)_.
+| Maintainers (docToolchain) | Few | Curate the JSON Schema, ADRs,
+and the security review _(OQ-7 team answer)_.
+|===
+
+== Document conventions
+
+* All claims are tagged with the supporting Question ID from
+link:../../QUESTION_TREE.adoc[QUESTION_TREE.adoc].
+* Code references use `path/to/file.go:NN-MM`.
+* Team-provided rationale (where not inferable from code) is marked
+`(team answer)`.

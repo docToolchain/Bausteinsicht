@@ -1,0 +1,86 @@
+= ADR-005: Auto-Layout Engine for New Diagram Pages
+:doctype: article
+
+* *Status*: Accepted
+* *Date*: reverse-engineered (2026-Q2)
+* *Source*: reverse-engineered from `internal/sync/layout.go`,
+QUESTION_TREE.adoc Q-2.2.7; OQ-4 team answer (ADR list).
+
+[NOTE]
+====
+This ADR was reverse-engineered from code (`internal/sync/layout.go`).
+The team confirms its existence in the ADR list (OQ-4); the rationale
+is inferred from the implementation choices and the project's
+performance/portability constraints.
+====
+
+== Context
+
+When forward sync places elements on a fresh page, the placement
+must be:
+
+* deterministic (same model → same positions),
+* readable (kinds form recognisable rows; alphabetic order within tier),
+* portable (no system-installed graph layouter),
+* fast (sync budget is < 100 ms for 200 elements, OQ-8).
+
+Candidates: *Custom layered/grid algorithm in pure Go*, *GraphViz
+(dot) shell-out*, *ELK.js / d3-dag (Node)*, *Dagre (JS)*, *Cytoscape*.
+
+== Decision
+
+*Custom layered/grid algorithm in pure Go*. Three layouts are
+exposed: `layered` (default), `grid`, and `none`
+_(`internal/sync/layout.go:42-60`,
+`internal/model/validate.go:167-172`)_.
+
+== Rationale
+
+. *Zero runtime dependencies.* Bausteinsicht ships as a single static
+  binary; depending on GraphViz or a JS engine would break the
+  zero-dependency guarantee from PRD-001 §8.
+. *Determinism is a hard requirement.* The layered algorithm groups by
+  kind (in `specification.elements` order), then sorts alphabetically
+  within tier _(`internal/sync/layout.go:62-80`,
+  test `TestComputeLayout_Layered_Deterministic`)_.
+. *Fast.* No subprocess fork, no JSON marshal/parse, no temp files.
+. *Tractable.* The product currently supports up to a few hundred
+  elements per view; advanced graph layouters bring complexity that
+  is not yet justified.
+. *User-controllable.* Users who dislike auto-layout can set
+  `"layout": "none"` or simply move shapes in draw.io — reverse sync
+  preserves positions.
+
+== Pugh matrix (weighted, -1/0/+1)
+
+[cols="2,1,^1,^1,^1,^1", options="header"]
+|===
+| Criterion | Weight | Custom Go | GraphViz | ELK.js | Dagre
+
+| Zero runtime dependency          | 5 | +1 | -1 | -1 | -1
+| Cross-platform (linux/mac/win)   | 4 | +1 |  0 | -1 | -1
+| Cold-start latency               | 3 | +1 | -1 | -1 | -1
+| Determinism / testability        | 3 | +1 |  0 |  0 |  0
+| Layout aesthetics for C4 views   | 2 |  0 | +1 | +1 | +1
+| Implementation effort            | 2 | -1 | +1 |  0 |  0
+
+| *Total (weighted)*               |   | *+15* | *-2* | *-9* | *-9*
+|===
+
+== Consequences
+
+* Three layout strategies are supported; users opt out via
+  `"layout": "none"` _(`internal/model/validate.go:167-172`)_.
+* New elements get a red dashed border so the user can spot and
+  reposition them _(`internal/sync/forward.go:13-15`,
+  test `TestApplyForward_NewElementVisualMarker`)_.
+* Reverse sync preserves user-edited positions; the layout engine is
+  invoked only when (a) a page is brand new, or (b) `--relayout` is
+  passed _(`internal/sync/forward.go:135-137`)_.
+* If a future view contains thousands of elements, the algorithm may
+  need revision (open consideration, not a current limit).
+
+== Related
+
+* link:../../spec/05_sync_specification.adoc[Sync Specification]
+* link:../chapters/06_runtime_view.adoc[Runtime View]

@@ -1,0 +1,220 @@
+= Sync Specification
+:toc: left
+:toclevels: 2
+:doctype: article
+
+Specification of the bidirectional synchronisation cycle between the
+JSONC model and the draw.io diagram. Sources: `internal/sync/*.go`,
+QUESTION_TREE.adoc Q-3.4, Q-3.6, Q-3.8, Q-5.2.
+
+== Inputs
+
+* The model file (`*.jsonc`).
+* The draw.io file (`architecture.drawio`).
+* The last sync state (`.bausteinsicht-sync`) — empty on first run.
+* Optional draw.io template for new pages.
+
+== Output
+
+* Updated draw.io file (atomic write).
+* Updated model file when reverse changes apply.
+* New sync state with sha256 integrity checksum
+  _(`internal/sync/state.go:96-132`)_.
+
+== Pipeline
+
+[plantuml,sync-pipeline,svg]
+....
+@startuml
+start
+:Load model;
+:Validate model;
+note right
+  Aborts the cycle on invalid
+  include/exclude patterns,
+  unknown kinds, etc. (#176)
+end note
+:Load draw.io document;
+:Load sync state (or empty);
+:DetectChanges (3-way diff);
+note right
+  Computes ChangeSet:
+  - ModelElementChanges
+  - ModelRelationshipChanges
+  - DrawioElementChanges
+  - DrawioRelationshipChanges
+  - Conflicts
+end note
+:Resolve conflicts (model wins);
+:Drop conflicting drawio changes;
+:ApplyForward (per view, or single page);
+:ApplyReverse (in-memory model mutation);
+:Compute "invisible elements" warnings;
+:Aggregate warnings;
+:Save drawio (atomic);
+:Save sync state (atomic, sha256);
+stop
+@enduml
+....
+
+== DetectChanges (three-way diff)
+
+_(`internal/sync/diff.go:176-198`)_
+
+For each side (model and draw.io), compare against the last sync
+state to produce additions, modifications, and deletions of elements
+and relationships. When the same field has been changed on both sides,
+emit a `Conflict`.
+
+Sub-routines:
+
+* `extractDrawioElements` — walks every page, reads child sub-cells
+  first and falls back to label HTML for backward compatibility
+  _(`diff.go:200-236`)_.
+* `detectUnmanagedDrawioElements` — shapes added in draw.io with no
+  `bausteinsicht_id` are imported as new elements
+  _(`diff.go:238-283`, #196)_.
+* `computeVisibleElements` / `computeVisibleRelationships` — protect
+  against false deletions when an element/relationship is filtered out
+  by view include/exclude rather than removed
+  _(`diff.go:67-134`, #167)_.
+* `computeNewPageOnlyElements` — protects against false deletions on
+  the first sync that creates a view page
+  _(`diff.go:136-174`, #184/#188/#189)_.
+
+== Conflict resolution
+
+_(`internal/sync/conflict.go:21-55`)_
+
+* Strategy: `ModelWinsResolver`. The model value always wins.
+* Reason: deterministic and predictable for v1
+  _(link:../arc42/ADRs/ADR-001-DSL-Format.adoc[ADR-001] context)_.
+* Mechanics:
+  . The conflicting `DrawioElementChange` is filtered out
+    of the change set _(`engine.go:50-56`)_.
+  . A `ResolvedConflict` is appended to `SyncResult.Conflicts` with a
+    human-readable warning that records all four values (model, drawio,
+    last-sync, decision).
+  . The exit code remains 0 — conflicts are *warnings*, not errors.
+* Extensibility: `ConflictResolver` is an interface; alternative
+  resolvers (interactive, three-way merge) are explicitly anticipated
+  but not implemented in v1
+  _(`internal/sync/conflict.go:21-25`)_.
+
+== ApplyForward (model → draw.io)
+
+_(`internal/sync/forward.go:44-66`)_
+
+For each view (or, when no view is defined, the single page):
+
+. Resolve the view's element set
+  (`include` minus `exclude`, plus `scope`).
+. Optionally `--relayout` clears the page first.
+. Create the scope boundary if `scope` is set.
+. `populateNewPage` places new elements using the layered/grid/none
+  layout engine _(`internal/sync/layout.go:42-60`)_.
+. Apply the change set to the page.
+. Populate connectors for relationships whose endpoints are both on
+  the page.
+. Reconcile orphans — remove elements no longer in the resolved view
+  _(#102)_.
+. Apply drill-down links _(#198)_.
+. Create the back-navigation button on detail (scoped) views
+  _(#198)_.
+. Render metadata + legend boxes if enabled in `config`
+  _(#233; `internal/sync/metadata.go`)_.
+
+=== Relationship lifting
+
+If a relationship's endpoint is not present on a view but an ancestor
+is, the connector is "lifted" to that ancestor
+_(`forward.go`, tests `TestApplyForward_RelationshipLifting*`)_. This
+preserves the visual continuity of edges across abstraction levels.
+
+=== New element marker
+
+A new element placed by forward sync gets a red dashed border
+(`strokeColor=#FF0000;dashed=1;`) so the user can easily reposition it
+_(`internal/sync/forward.go:13-15`,
+test `TestApplyForward_NewElementVisualMarker`)_.
+
+== ApplyReverse (draw.io → model)
+
+_(`internal/sync/reverse.go:24-54`)_
+
+* Element title/description/technology updates use `modifyElement`,
+  which walks the dot-notation path through nested children
+  _(`reverse.go:268-300`)_.
+* Element deletions also clean orphan relationships and stale view
+  include/exclude references _(`reverse.go:153-170`, #266)_.
+* Element additions: shapes lacking a model entry become *top-level*
+  elements with the alphabetically first kind from
+  `specification.elements` (deterministic), and a warning instructs
+  the user to assign a meaningful kind/ID
+  _(`reverse.go:174-194`, #307, #240)_.
+* Empty-title updates from draw.io are ignored to prevent accidental
+  data loss _(`reverse.go:121-127`, #150)_.
+* Relationship direction swaps (`Deleted a→b` + `Added b→a`) are
+  detected and applied in-place to preserve `kind`, `label`, and
+  `description` _(`reverse.go:65-117`, #185)_.
+
+== Sync state
+
+_(`internal/sync/state.go:17-43, 96-132`)_
+
+[source,jsonc]
+----
+{
+  "checksum": "sha256:...",
+  "timestamp": "2026-04-30T12:00:00Z",
+  "model_hash":  "sha256:...",
+  "drawio_hash": "sha256:...",
+  "elements":     { "<id>": { "kind", "title", "description", "technology" } },
+  "relationships": [ { "from", "to", "index", "label", "kind" } ],
+  "rendered_elements": { "<id>": true }
+}
+----
+
+* Atomic write via `os.CreateTemp` + `os.Rename`.
+* sha256 integrity checksum verified on load — corruption forces user
+  intervention with the message
+  `"sync state corrupted (checksum mismatch); delete .bausteinsicht-sync and re-run sync"`.
+* Missing or zero-byte state is treated as first sync.
+* `rendered_elements` lets deletion detection distinguish
+  "user removed the shape" from "view filter never rendered it"
+  _(#240)_.
+
+== View page lifecycle
+
+_(`internal/sync/engine.go:99-122`)_
+
+* New view → a new page with id `view-<viewID>` is created.
+* Removed view → its `view-<viewID>` page is dropped.
+* Pages without the `view-` prefix (e.g. user-managed default-template
+  pages) are preserved.
+
+== Metadata and legend boxes
+
+_(`internal/sync/metadata.go:25-107`)_
+
+Each view page can carry an info box (title, description, source
+file, sync timestamp, repo, author) and a legend box derived from the
+kinds actually used. Both are toggled by `config.metadata` /
+`config.legend` (default true).
+
+== Watch mode
+
+_(`internal/watcher/watcher.go`)_
+
+* fsnotify watcher on the model and the draw.io file.
+* 300 ms debounce.
+* Sync execution is serialised by a mutex (`syncMu`).
+* The watcher correctly handles atomic-rename writes (e.g. by editors
+  that write to a temp file and rename) — see test
+  `TestAtomicRenameTriggersCallback`.
+
+== Idempotence
+
+A second sync immediately after a first sync produces no changes
+(test `TestSyncAfterInit`), provided no external edit occurred between
+runs. This is a hard requirement: sync is the developer's "save" button.

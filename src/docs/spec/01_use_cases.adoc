@@ -1,0 +1,273 @@
+= Use Cases — Bausteinsicht CLI
+:toc: left
+:toclevels: 2
+:doctype: article
+
+Cockburn-format use cases for every Bausteinsicht command. Sources are
+indicated next to each claim. PlantUML activity diagrams are embedded
+inline.
+
+== Actors
+
+* *Architect* — primary author of the model.
+* *Developer* — secondary author, mostly via `add` commands.
+* *LLM Agent* — uses `--format json` to read and modify the model
+  _(OQ-1 team answer)_.
+* *File system* — `architecture.jsonc`, `architecture.drawio`,
+  `.bausteinsicht-sync`, `template.drawio`.
+* *draw.io CLI* — invoked only by `export` _(`internal/export/export.go:32-45`)_.
+
+== UC-1 — Initialize a project (`init`)
+
+[cols="1,3", options="header"]
+|===
+| Field | Value
+| Goal | Bootstrap a new architecture project with a working sample.
+| Primary actor | Architect
+| Trigger | `bausteinsicht init`
+| Preconditions | The current directory does not already contain
+`architecture.jsonc`, `architecture.drawio`, or `template.drawio`.
+| Main success scenario |
+1. CLI verifies that none of the three default files exist
+   _(`cmd/bausteinsicht/init.go:38-46`)_.
+2. CLI writes the embedded `sample-model.jsonc` and `default.drawio`
+   to disk with mode `0600`
+   _(`cmd/bausteinsicht/init.go:48-54`, `templates/embed.go:1-9`)_.
+3. CLI runs an initial sync to produce `architecture.drawio` and
+   `.bausteinsicht-sync`.
+4. CLI reports the created files to stdout (text or JSON).
+| Postconditions | A valid model + diagram + state triple is on disk.
+| Exceptions | Any pre-existing default file → exit code 2 with message
+"file %q already exists" _(`cmd/bausteinsicht/init.go:42-46`)_.
+|===
+
+[plantuml,init-flow,svg]
+....
+@startuml
+start
+:User runs `bausteinsicht init`;
+if (any default file exists?) then (yes)
+  :exit code 2;
+  stop
+endif
+:Write sample-model.jsonc (0600);
+:Write default.drawio (0600);
+:Run initial sync to produce architecture.drawio + .bausteinsicht-sync;
+:Report files (text or JSON);
+stop
+@enduml
+....
+
+== UC-2 — Bidirectional synchronisation (`sync`)
+
+[cols="1,3", options="header"]
+|===
+| Field | Value
+| Goal | Reconcile model and diagram in both directions in one cycle.
+| Primary actor | Architect or Developer
+| Trigger | `bausteinsicht sync` (optionally `--relayout`)
+| Preconditions | A `*.jsonc` model file exists in the working directory
+or is supplied via `--model`.
+| Main success scenario |
+1. Auto-detect the model file (single `*.jsonc`)
+   _(`internal/model/loader.go:140-153`)_.
+2. Derive `architecture.drawio` and `.bausteinsicht-sync` paths from
+   the model directory _(`cmd/bausteinsicht/sync.go:42-49`)_.
+3. Load and validate the model; abort if validation fails
+   _(`cmd/bausteinsicht/sync.go:50-62`)_.
+4. Load draw.io document and last sync state.
+5. `sync.Run` performs DetectChanges → resolve conflicts (model wins)
+   → ApplyForward → ApplyReverse → warnings
+   _(`internal/sync/engine.go:31-93`)_.
+6. Save updated draw.io and sync state atomically.
+7. Report counts and warnings (text or JSON).
+| Postconditions | Model and draw.io are consistent; new
+`.bausteinsicht-sync` written with sha256 checksum.
+| Exceptions |
+* No model file → exit code 2.
+* Validation errors → exit code 2.
+* Conflict on a field → model wins, warning logged
+  _(`internal/sync/conflict.go:36-55`)_.
+|===
+
+[plantuml,sync-flow,svg]
+....
+@startuml
+start
+:Auto-detect *.jsonc;
+:Load + validate model;
+if (validation fails?) then (yes)
+  :exit code 2;
+  stop
+endif
+:Load draw.io document;
+:Load last sync state (if any);
+:DetectChanges (3-way diff);
+:Resolve conflicts (model wins);
+:Drop conflicting drawio changes;
+:ApplyForward (model -> drawio, per view);
+:ApplyReverse (drawio -> model);
+:Compute "invisible element" warnings;
+:Save drawio (atomic);
+:Save sync state (atomic, sha256);
+:Report;
+stop
+@enduml
+....
+
+== UC-3 — Validate the model (`validate`)
+
+[cols="1,3", options="header"]
+|===
+| Field | Value
+| Goal | Report errors and warnings without modifying any file.
+| Primary actor | Architect, Developer, LLM Agent (CI usage).
+| Trigger | `bausteinsicht validate`
+| Preconditions | Model file exists or is supplied.
+| Main success scenario |
+1. Load model.
+2. `model.ValidateWithWarnings` checks element kinds, container/leaf
+   semantics, dot-path resolution of relationships and view scope/
+   include/exclude, duplicate relationships, nesting depth, view
+   layout, and ID format
+   _(`internal/model/validate.go:37-219`)_.
+3. Print errors+warnings (text or JSON).
+| Postconditions | None — read-only.
+| Exceptions | Any error → exit code 2 with the failing path and reason.
+|===
+
+== UC-4a — Add an element (`add element`)
+
+[cols="1,3", options="header"]
+|===
+| Field | Value
+| Goal | Append a new element to the model with comments preserved.
+| Primary actor | Developer, LLM Agent.
+| Trigger | `bausteinsicht add element --id X --kind K --title T [--parent P]
+[--technology Tech] [--description D]`
+| Preconditions |
+* `--id`, `--kind`, `--title` provided.
+* `--id` matches `^[a-zA-Z][a-zA-Z0-9_-]*$`
+  _(`cmd/bausteinsicht/add_element.go:13-17`)_.
+* `--kind` is defined in `specification.elements`.
+* If `--parent`, the parent element exists and its kind has
+  `container: true` _(see test `TestAddElementNonContainerParentRejected`)_.
+| Main success scenario |
+1. Validate ID, kind, parent.
+2. Use `PatchInsert` to append the element to the JSONC, preserving
+   comments _(`internal/model/patch.go:53-95`)_.
+3. Report the inserted element (text or JSON).
+| Postconditions | `architecture.jsonc` updated atomically.
+| Exceptions | Duplicate ID, invalid ID, unknown kind, non-container
+parent, parent not found → exit code 1.
+|===
+
+== UC-4b — Add a relationship (`add relationship`)
+
+[cols="1,3", options="header"]
+|===
+| Field | Value
+| Goal | Append a new relationship between existing elements.
+| Primary actor | Developer, LLM Agent.
+| Trigger | `bausteinsicht add relationship --from X --to Y [--label L]
+[--kind K] [--description D]`
+| Preconditions | Both endpoints resolve via `model.Resolve`; kind, if
+provided, is in `specification.relationships`
+_(`cmd/bausteinsicht/add_relationship.go:51-58`)_.
+| Main success scenario |
+1. Validate endpoints and kind.
+2. Use `PatchInsert` to append to the `relationships` array,
+   preserving comments _(test `TestAppendArrayEntry_PreservesComments`)_.
+3. Report the inserted relationship (text or JSON).
+| Postconditions | `architecture.jsonc` updated atomically.
+| Exceptions | Endpoint missing, unknown kind, exact duplicate
+(`from+to+kind+label`) → exit code 1
+_(`internal/model/validate.go:120-162`)_.
+|===
+
+== UC-5 — Watch for changes (`watch`)
+
+[cols="1,3", options="header"]
+|===
+| Field | Value
+| Goal | Continuously sync model and diagram on file changes.
+| Primary actor | Architect during a working session.
+| Trigger | `bausteinsicht watch`
+| Preconditions | Both the model and `architecture.drawio` exist
+_(`cmd/bausteinsicht/watch.go:46-52`)_.
+| Main success scenario |
+1. Set up an fsnotify watcher on both files
+   _(`internal/watcher/watcher.go:31-49`)_.
+2. On a write event, debounce 300 ms _(`watcher.go:13`)_.
+3. Run a sync cycle under a mutex
+   _(`watcher.go:25-26`)_.
+4. Repeat until SIGINT / SIGTERM.
+| Postconditions | Both files remain consistent for as long as the
+watcher runs.
+| Exceptions | Missing model or drawio file → exit code 2 before the
+watcher starts.
+|===
+
+== UC-6a — Export views to PNG/SVG (`export`)
+
+[cols="1,3", options="header"]
+|===
+| Field | Value
+| Goal | Render diagram pages as image files.
+| Primary actor | Architect, Developer, CI pipeline.
+| Trigger | `bausteinsicht export [--image-format png\|svg]
+[--view K] [--output DIR] [--embed-diagram] [--scale F]`
+| Preconditions | The draw.io CLI is on `PATH` or installed in a
+platform-native location _(`internal/export/export.go:32-45`)_.
+| Main success scenario |
+1. Auto-detect the draw.io binary
+   (`drawio-export`, `drawio`, then platform paths).
+2. For each view (or the single `--view`), build args and run the CLI
+   _(`internal/export/export.go:48-69, 84-95`)_.
+3. Verify each output file was created
+   _(`internal/export/export.go:90-94`)_.
+4. Report files (text or JSON).
+| Exceptions | Binary missing → friendly error including download URL.
+GPU disabled with `--scale > 1` → silent draw.io failure caught by
+output-file check _(`internal/export/export.go:56-66`)_.
+|===
+
+== UC-6b — Export view as a table (`export-table`)
+
+[cols="1,3", options="header"]
+|===
+| Field | Value
+| Goal | Produce an AsciiDoc or Markdown table of view elements.
+| Primary actor | Documentation pipeline, Developer.
+| Trigger | `bausteinsicht export-table [--view K] [--table-format adoc\|md]
+[--output DIR] [--combined]`
+| Main success scenario | Resolve view, render columns
+(Element, Kind, Technology, Description) via `internal/table/table.go`
+to stdout or a file _(`cmd/bausteinsicht/export_table.go:14-58`)_.
+|===
+
+== UC-6c — Export view as PlantUML/Mermaid (`export-diagram`)
+
+[cols="1,3", options="header"]
+|===
+| Field | Value
+| Goal | Produce a text-based C4 diagram suitable for inclusion in
+documentation pipelines.
+| Primary actor | Documentation pipeline, Developer.
+| Trigger | `bausteinsicht export-diagram [--view K]
+[--diagram-format plantuml\|mermaid] [--output DIR]`
+| Main success scenario | Resolve view, detect C4 level, separate
+scope/external elements, filter relationships, write PlantUML
+(C4-PlantUML stdlib include) or Mermaid C4 syntax
+_(`internal/diagram/diagram.go:22-60`)_.
+|===
+
+== Cross-cutting concerns
+
+* *Output format flag* — every command honours `--format text|json`
+  _(`cmd/bausteinsicht/root.go:18-26`)_.
+* *Path containment* — `--model`, `--template`, `--output` are
+  rejected if they contain `..` _(SEC-001/SEC-016, `root.go:78-89`)_.
+* *Atomic writes* — every saved artefact uses `os.CreateTemp` +
+  `os.Rename` _(`document.go:55-79`, `state.go:96-132`,
+  `loader.go:118-138`)_.

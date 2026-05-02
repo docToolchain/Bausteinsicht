@@ -1,0 +1,154 @@
+= Building Block View
+
+_(Q-3.5)_
+
+== Level 1 — Container view
+
+[plantuml,c4-container,svg]
+....
+@startuml
+!include <C4/C4_Container>
+
+LAYOUT_WITH_LEGEND()
+
+Person(user, "Architect / Developer / LLM Agent")
+System_Ext(drawioCli, "draw.io CLI", "Headless export")
+System_Ext(fs, "File System")
+
+System_Boundary(bs, "Bausteinsicht") {
+  Container(cli, "cmd/bausteinsicht", "Go binary (cobra)", "Parses flags, orchestrates I/O")
+  Container(model, "internal/model", "Go package", "JSONC load/save/patch, validate, resolve")
+  Container(drawio, "internal/drawio", "Go package", "etree-based mxfile read/write, templates")
+  Container(sync, "internal/sync", "Go package", "Diff, conflict, forward/reverse, layout, metadata, state")
+  Container(watcher, "internal/watcher", "Go package", "fsnotify with debounce")
+  Container(export, "internal/export", "Go package", "Invokes draw.io CLI")
+  Container(diagram, "internal/diagram", "Go package", "PlantUML / Mermaid C4 export")
+  Container(table, "internal/table", "Go package", "AsciiDoc / Markdown table export")
+  Container(tpl, "templates", "Go package (embed)", "Embedded sample model and template")
+}
+
+Rel(user, cli, "Runs commands")
+Rel(cli, model, "load/validate/save")
+Rel(cli, sync, "Run cycle")
+Rel(cli, drawio, "Load/save document")
+Rel(cli, watcher, "Watch files")
+Rel(cli, export, "Run image export")
+Rel(cli, diagram, "Render diagram text")
+Rel(cli, table, "Render table")
+Rel(cli, tpl, "Bootstrap default files")
+Rel(sync, model, "Resolve, flatten, validate")
+Rel(sync, drawio, "Mutate XML")
+Rel(diagram, model, "Resolve view")
+Rel(table, model, "Resolve view")
+Rel(export, drawioCli, "exec draw.io")
+Rel(model, fs, "read/write")
+Rel(drawio, fs, "read/write")
+Rel(sync, fs, "write .bausteinsicht-sync")
+@enduml
+....
+
+== Level 1 responsibilities
+
+[cols="1,3", options="header"]
+|===
+| Container | Responsibility / key entry points
+
+| `cmd/bausteinsicht`
+| Cobra root + one file per command. Wires `--format`, `--model`,
+`--template`, `--verbose`. Validates path containment (SEC-001/016).
+Entry: `NewRootCmd` _(`cmd/bausteinsicht/root.go:13-65`)_.
+
+| `internal/model`
+| `Load`/`Save`/`PatchSave`/`PatchInsert` on JSONC,
+`ValidateWithWarnings`, `Resolve`, `FlattenElements`,
+`MatchPattern`, `ResolveView`. JSONC stripping handles BOM,
+`//`/`/* */`, trailing commas
+_(`internal/model/loader.go:155-227`)_.
+
+| `internal/drawio`
+| `LoadDocument`/`SaveDocument`/`NewDocument`, `Page` API,
+`TemplateSet` parsing, element/connector/label CRUD, `ParseLabel`
+and `GenerateLabel` (round-trip property-tested).
+
+| `internal/sync`
+| `Run` (`engine.go`), `DetectChanges` (`diff.go`),
+`ApplyForward`/`ApplyReverse`, `ConflictResolver` /
+`ModelWinsResolver` (`conflict.go`), layout engine (`layout.go`),
+metadata/legend boxes (`metadata.go`), `SyncState` persistence
+(`state.go`), patch helpers (`patchops.go`).
+
+| `internal/watcher`
+| `Watcher` with 300 ms debounce, mutex-serialised `OnChange`.
+
+| `internal/export`
+| `DetectDrawioBinary`, `BuildExportArgs`, `ExportPage`,
+`SafeViewKey`, `OutputFileName`. `platform_*.go` for OS-specific
+draw.io install paths.
+
+| `internal/diagram`
+| `FormatView` for PlantUML and Mermaid C4 output, with C4 level
+auto-detection and view-aware relationship filtering.
+
+| `internal/table`
+| Render view elements as AsciiDoc or Markdown tables.
+
+| `templates`
+| `go:embed` of `default.drawio` and `sample-model.jsonc` for `init`.
+|===
+
+== Level 2 — `internal/sync` internals
+
+[plantuml,sync-internals,svg]
+....
+@startuml
+package "internal/sync" {
+  [engine.Run] --> [diff.DetectChanges]
+  [engine.Run] --> [conflict.ModelWinsResolver]
+  [engine.Run] --> [forward.ApplyForward]
+  [engine.Run] --> [reverse.ApplyReverse]
+  [engine.Run] --> [computeVisibleElements / Relationships]
+  [forward.ApplyForward] --> [layout.computeLayout]
+  [forward.ApplyForward] --> [metadata.createMetadata / createLegend]
+  [forward.ApplyForward] --> [populateNewPage / Connectors / drillDown]
+  [diff.DetectChanges] --> [state.LoadState]
+  [engine.Run] -down-> [state.SaveState]
+}
+@enduml
+....
+
+[cols="1,3", options="header"]
+|===
+| Sub-block | Code anchor
+
+| `engine.Run`
+| `internal/sync/engine.go:31-93`
+
+| `DetectChanges`
+| `internal/sync/diff.go:181-198`
+
+| `ApplyForward`
+| `internal/sync/forward.go:44-66`
+
+| `ApplyReverse`
+| `internal/sync/reverse.go:24-54`
+
+| `ModelWinsResolver`
+| `internal/sync/conflict.go:27-55`
+
+| `Layout`
+| `internal/sync/layout.go:42-60`
+
+| `Metadata`
+| `internal/sync/metadata.go:25-107`
+
+| `SyncState`
+| `internal/sync/state.go:17-43, 96-132`
+|===
+
+== Dependency direction
+
+* `cmd/` depends on every `internal/*` package and `templates`.
+* `sync → {model, drawio}`.
+* `diagram, table → model`.
+* `drawio → etree` only.
+* No internal-package import cycles.
