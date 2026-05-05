@@ -10,8 +10,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-
-	"github.com/docToolchain/Bausteinsicht/internal/model"
 )
 
 type Server struct {
