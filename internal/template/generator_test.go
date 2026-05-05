@@ -26,8 +26,14 @@ func TestGenerateTemplateXML(t *testing.T) {
 	if !strings.Contains(result, "<?xml") {
 		t.Error("expected XML declaration")
 	}
+	if !strings.Contains(result, "<mxfile") {
+		t.Error("expected mxfile root element")
+	}
+	if !strings.Contains(result, "<diagram") {
+		t.Error("expected diagram element")
+	}
 	if !strings.Contains(result, "<mxGraphModel") {
-		t.Error("expected mxGraphModel root element")
+		t.Error("expected mxGraphModel element")
 	}
 	if !strings.Contains(result, "</mxGraphModel>") {
 		t.Error("expected mxGraphModel closing tag")
@@ -55,9 +61,17 @@ func TestGenerateTemplateCanParse(t *testing.T) {
 		t.Fatalf("generated XML is not valid: %v", err)
 	}
 
-	root := doc.SelectElement("mxGraphModel")
-	if root == nil {
-		t.Error("expected mxGraphModel element in parsed XML")
+	mxfile := doc.Root()
+	if mxfile == nil || mxfile.Tag != "mxfile" {
+		t.Error("expected mxfile as root element")
+	}
+	diagram := mxfile.SelectElement("diagram")
+	if diagram == nil {
+		t.Error("expected diagram element in mxfile")
+	}
+	graphModel := diagram.SelectElement("mxGraphModel")
+	if graphModel == nil {
+		t.Error("expected mxGraphModel element in diagram")
 	}
 }
 
@@ -198,7 +212,9 @@ func TestGenerateTemplateMultipleKinds(t *testing.T) {
 	}
 
 	// Count mxCell elements
-	graphModel := doc.SelectElement("mxGraphModel")
+	mxfile := doc.Root()
+	diagram := mxfile.SelectElement("diagram")
+	graphModel := diagram.SelectElement("mxGraphModel")
 	if graphModel == nil {
 		t.Fatal("expected mxGraphModel element")
 	}

@@ -30,12 +30,23 @@ func NewGenerator(spec model.Specification, style string) *Generator {
 	}
 }
 
-// Generate produces the draw.io template XML.
+// Generate produces the draw.io template XML as a complete mxfile.
 func (g *Generator) Generate() string {
 	doc := etree.NewDocument()
 	doc.CreateProcInst("xml", `version="1.0" encoding="UTF-8"`)
 
-	root := doc.CreateElement("mxGraphModel")
+	mxfile := doc.CreateElement("mxfile")
+	mxfile.CreateAttr("host", "app.diagrams.net")
+	mxfile.CreateAttr("modified", "2026-01-01T00:00:00.000Z")
+	mxfile.CreateAttr("agent", "Bausteinsicht")
+	mxfile.CreateAttr("version", "1.0")
+	mxfile.CreateAttr("type", "device")
+
+	diagram := mxfile.CreateElement("diagram")
+	diagram.CreateAttr("id", "1")
+	diagram.CreateAttr("name", "Template")
+
+	root := diagram.CreateElement("mxGraphModel")
 	root.CreateAttr("dx", "0")
 	root.CreateAttr("dy", "0")
 	root.CreateAttr("grid", "1")

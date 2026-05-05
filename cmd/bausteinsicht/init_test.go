@@ -237,3 +237,61 @@ func TestInitSyncStateValid(t *testing.T) {
 		t.Error("sync state missing elements")
 	}
 }
+
+func TestInitGenerateTemplate(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
+
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"init", "--generate-template"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("init with --generate-template failed: %v", err)
+	}
+
+	// Template should be generated from spec and contain mxGraphModel
+	data, err := os.ReadFile(defaultTemplFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := string(data)
+	if !strings.Contains(content, "<mxGraphModel") {
+		t.Error("generated template missing mxGraphModel element")
+	}
+	if !strings.Contains(content, "fillColor=") {
+		t.Error("generated template missing color styling")
+	}
+}
+
+func TestInitGenerateTemplateContainsAllKinds(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
+
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"init", "--generate-template"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("init with --generate-template failed: %v", err)
+	}
+
+	// Load the generated template and verify it contains kind elements
+	data, err := os.ReadFile(defaultTemplFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := string(data)
+
+	// The default model should have certain kinds
+	expectedKinds := []string{"actor", "system", "container"}
+	for _, kind := range expectedKinds {
+		if !strings.Contains(content, "["+kind+"]") {
+			t.Errorf("generated template missing kind %q", kind)
+		}
+	}
+}

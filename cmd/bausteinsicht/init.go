@@ -10,6 +10,7 @@ import (
 	"github.com/docToolchain/Bausteinsicht/internal/drawio"
 	"github.com/docToolchain/Bausteinsicht/internal/model"
 	bsync "github.com/docToolchain/Bausteinsicht/internal/sync"
+	"github.com/docToolchain/Bausteinsicht/internal/template"
 	"github.com/docToolchain/Bausteinsicht/templates"
 	"github.com/spf13/cobra"
 )
@@ -22,16 +23,19 @@ const (
 )
 
 func newInitCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Initialize a new architecture project",
 		Long:  "Creates a sample model, template, and initial draw.io diagram in the current directory.",
 		RunE:  runInit,
 	}
+	cmd.Flags().Bool("generate-template", false, "Generate template from spec instead of using default")
+	return cmd
 }
 
 func runInit(cmd *cobra.Command, _ []string) error {
 	format, _ := cmd.Flags().GetString("format")
+	generateTemplate, _ := cmd.Flags().GetBool("generate-template")
 
 	// Check if files already exist.
 	for _, name := range []string{defaultModelFile, defaultDrawioFile, defaultTemplFile} {
@@ -48,19 +52,29 @@ func runInit(cmd *cobra.Command, _ []string) error {
 		return exitWithCode(fmt.Errorf("writing %s: %w", defaultModelFile, err), 2)
 	}
 
-	// Write template.
-	if err := os.WriteFile(defaultTemplFile, templates.DefaultTemplate, 0600); err != nil {
-		return exitWithCode(fmt.Errorf("writing %s: %w", defaultTemplFile, err), 2)
-	}
-
 	// Load model for sync.
 	m, err := model.Load(defaultModelFile)
 	if err != nil {
 		return exitWithCode(fmt.Errorf("loading model: %w", err), 2)
 	}
 
+	// Generate or use default template.
+	var templateBytes []byte
+	if generateTemplate {
+		gen := template.NewGenerator(m.Specification, "default")
+		templateXML := gen.Generate()
+		templateBytes = []byte(templateXML)
+	} else {
+		templateBytes = templates.DefaultTemplate
+	}
+
+	// Write template.
+	if err := os.WriteFile(defaultTemplFile, templateBytes, 0600); err != nil {
+		return exitWithCode(fmt.Errorf("writing %s: %w", defaultTemplFile, err), 2)
+	}
+
 	// Load template.
-	tmpl, err := drawio.LoadTemplateFromBytes(templates.DefaultTemplate)
+	tmpl, err := drawio.LoadTemplateFromBytes(templateBytes)
 	if err != nil {
 		return exitWithCode(fmt.Errorf("loading template: %w", err), 2)
 	}
