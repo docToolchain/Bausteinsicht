@@ -22,13 +22,22 @@ A Language Server Protocol (LSP) server in Go that brings Bausteinsicht diagnost
 
 **Test:** Unit tests for LSP message handling
 
-### Phase 1b: Diagnostics (Validation)
-- [ ] Map `bausteinsicht validate --format json` output to LSP Diagnostics
-- [ ] Display errors/warnings inline in editor
-- [ ] Support: unknown kinds, duplicate IDs, broken relationships, syntax errors
+### Phase 1b: Diagnostics (Validation) ✅ COMPLETE
+- [x] Map `bausteinsicht validate --format json` output to LSP Diagnostics
+- [x] Display errors/warnings inline in editor
+- [x] Support: unknown kinds, duplicate IDs, broken relationships, syntax errors
+- [x] Unit tests for diagnostic mapping
 
 **Files:**
 - `internal/lsp/diagnostics.go` — validation → diagnostics mapping
+- `internal/lsp/diagnostics_test.go` — comprehensive test suite
+
+**Test Coverage** (All passing ✓):
+- ConvertValidateOutput: maps errors & warnings to LSP Diagnostics
+- FindLineInDocument: resolves JSON path to line numbers
+- DiagnosticRange: calculates range for error highlights
+- DiagnosticSeverityMapping: Error (1) vs Warning (2) classification
+- EmptyValidateOutput: valid models produce no diagnostics
 
 **Output:** Red/yellow underlines in architecture.jsonc for validation errors
 
