@@ -715,12 +715,16 @@ func resolveIncludes(src, baseDir string, visited map[string]bool) (string, []st
 			cleanedPath := filepath.Clean(includePath)
 			fullPath := filepath.Join(baseDir, cleanedPath)
 			absFullPath, _ := filepath.Abs(fullPath)
-			// Verify that the resolved path is within baseDir (prevent path traversal)
-			if !strings.HasPrefix(absFullPath+string(filepath.Separator), absDirBase+string(filepath.Separator)) && absFullPath != absDirBase {
+
+			// Verify that the resolved path is within baseDir (prevent path traversal).
+			// Use filepath.Rel to check if the path escapes the base directory via .. sequences.
+			relPath, err := filepath.Rel(absDirBase, absFullPath)
+			if err != nil || strings.HasPrefix(relPath, "..") {
 				warnings = append(warnings, "!include: path traversal rejected: "+includePath)
 				out.WriteByte('\n')
 				continue
 			}
+
 			if visited[absFullPath] {
 				warnings = append(warnings, "!include: circular include ignored: "+includePath)
 				out.WriteByte('\n')
