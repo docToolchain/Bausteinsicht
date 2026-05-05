@@ -91,7 +91,9 @@ func (g *Generator) Generate() string {
 
 	doc.Indent(2)
 	var buf bytes.Buffer
-	doc.WriteTo(&buf)
+	if _, err := doc.WriteTo(&buf); err != nil {
+		return ""
+	}
 	return buf.String()
 }
 

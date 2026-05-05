@@ -136,7 +136,7 @@ func TestGenerateTemplate_AutoDetectModel(t *testing.T) {
 	if err := os.Chdir(modelDir); err != nil {
 		t.Fatalf("failed to change directory: %v", err)
 	}
-	defer os.Chdir(oldDir)
+	defer func() { _ = os.Chdir(oldDir) }()
 
 	_, err := executeRootCmd("generate-template", "--output", outPath)
 	if err != nil {
