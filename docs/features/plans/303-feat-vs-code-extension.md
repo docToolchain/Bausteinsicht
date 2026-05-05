@@ -62,19 +62,31 @@ A Language Server Protocol (LSP) server in Go that brings Bausteinsicht diagnost
 
 **Output:** Clickable links above element definitions showing kind, status, and view count
 
-### Phase 2: VS Code Extension (TypeScript/Minimal)
-- [ ] Extension manifest (`package.json`)
-- [ ] LSP client setup (spawn server process)
-- [ ] Command palette: sync, validate, health, watch toggle
-- [ ] Status bar: watch mode status, last sync time
-- [ ] Webview for diagram preview (future phase)
+### Phase 2: VS Code Extension (TypeScript/Minimal) 🚧 IN PROGRESS
+- [x] Extension manifest (`package.json`)
+- [x] LSP client setup (spawn server process)
+- [x] Command palette: sync, validate, health, watch toggle
+- [x] Status bar: watch mode status indicator
+- [ ] Integration tests for VS Code extension
+- [ ] Publish to VS Code Marketplace (future)
 
 **Files:**
-- `vscode-extension/package.json` — manifest
-- `vscode-extension/src/extension.ts` — entry point, LSP client
-- `vscode-extension/src/commands.ts` — CLI command wrappers
+- `vscode-extension/package.json` — manifest with commands, config
+- `vscode-extension/tsconfig.json` — TypeScript configuration
+- `vscode-extension/src/extension.ts` — entry point, LSP client, commands
+- `vscode-extension/.eslintrc.json` — code quality rules
+- `vscode-extension/README.md` — installation & usage
 
-**Not in MVP:** CodeLens actions, diagram preview, snippets
+**Features:**
+- Auto-activate on `architecture.jsonc` files
+- LSP client spawns `bausteinsicht-lsp` process
+- Displays diagnostics inline (Phase 1b)
+- Shows CodeLens with metadata (Phase 1c)
+- Status bar shows connection & watch mode status
+- Commands for sync, validate, health check, watch toggle
+- Settings: server path, debug mode, draw.io URL
+
+**Not in MVP:** Diagram preview, code snippets, advanced IDE integrations
 
 ## Architecture
 
