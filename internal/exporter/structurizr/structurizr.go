@@ -10,9 +10,15 @@ import (
 )
 
 // Export converts m to a Structurizr DSL workspace string.
+//
+// Variable names prefer the leaf key (e.g. "webApp") and fall back to the
+// full dot-path-with-underscores ("orderSystem_webApp") only when the leaf
+// key is ambiguous across the whole model. This ensures a clean roundtrip:
+// re-importing the output reconstructs the same dot-paths.
 func Export(m *model.BausteinsichtModel) string {
 	flat, _ := model.FlattenElements(m)
-	e := &exporter{m: m, flat: flat}
+	varMap := buildVarMap(flat)
+	e := &exporter{m: m, flat: flat, varMap: varMap}
 
 	var b strings.Builder
 	b.WriteString("workspace {\n")
@@ -21,15 +27,15 @@ func Export(m *model.BausteinsichtModel) string {
 	// Write root elements (sorted for deterministic output).
 	for _, key := range sortedKeys(m.Model) {
 		elem := m.Model[key]
-		e.writeElement(&b, key, key, elem, "        ")
+		e.writeElement(&b, key, elem, "        ")
 	}
 
 	// Write global relationships.
 	if len(m.Relationships) > 0 {
 		b.WriteString("\n")
 		for _, r := range m.Relationships {
-			fromVar := dotToVar(r.From)
-			toVar := dotToVar(r.To)
+			fromVar := varMap[r.From]
+			toVar := varMap[r.To]
 			if r.Label != "" {
 				fmt.Fprintf(&b, "        %s -> %s \"%s\"\n", fromVar, toVar, escDQ(r.Label))
 			} else {
@@ -48,14 +54,16 @@ func Export(m *model.BausteinsichtModel) string {
 }
 
 type exporter struct {
-	m    *model.BausteinsichtModel
-	flat map[string]*model.Element
+	m      *model.BausteinsichtModel
+	flat   map[string]*model.Element
+	varMap map[string]string // dot-path → Structurizr variable name
 }
 
 // writeElement writes one element (and recursively its children) to b.
-// dotPath is the full dot-separated path (e.g. "orderSystem.webApp"),
-// varName is the Structurizr variable (dotPath with dots→underscores).
-func (e *exporter) writeElement(b *strings.Builder, dotPath, varName string, elem model.Element, indent string) {
+// dotPath is the full dot-separated path (e.g. "orderSystem.webApp").
+// The variable name is looked up from e.varMap.
+func (e *exporter) writeElement(b *strings.Builder, dotPath string, elem model.Element, indent string) {
+	varName := e.varMap[dotPath]
 	kind := toStructurizrKind(elem.Kind)
 	desc := escDQ(elem.Description)
 	tech := escDQ(elem.Technology)
@@ -67,7 +75,6 @@ func (e *exporter) writeElement(b *strings.Builder, dotPath, varName string, ele
 	hasChildren := len(elem.Children) > 0
 
 	if hasChildren {
-		// Write opening with block.
 		if tech != "" {
 			fmt.Fprintf(b, "%s%s = %s \"%s\" \"%s\" \"%s\" {\n", indent, varName, kind, title, tech, desc)
 		} else if desc != "" {
@@ -75,12 +82,10 @@ func (e *exporter) writeElement(b *strings.Builder, dotPath, varName string, ele
 		} else {
 			fmt.Fprintf(b, "%s%s = %s \"%s\" {\n", indent, varName, kind, title)
 		}
-		// Children.
 		for _, childKey := range sortedKeys(elem.Children) {
 			childElem := elem.Children[childKey]
 			childDotPath := dotPath + "." + childKey
-			childVar := dotToVar(childDotPath)
-			e.writeElement(b, childDotPath, childVar, childElem, indent+"    ")
+			e.writeElement(b, childDotPath, childElem, indent+"    ")
 		}
 		fmt.Fprintf(b, "%s}\n", indent)
 	} else {
@@ -114,7 +119,10 @@ func (e *exporter) writeOneView(b *strings.Builder, key string, v model.View, in
 	if viewType == "landscape" || v.Scope == "" {
 		fmt.Fprintf(b, "%slandscape \"%s\" \"%s\" {\n", indent, key, title)
 	} else {
-		scopeVar := dotToVar(v.Scope)
+		scopeVar := e.varMap[v.Scope]
+		if scopeVar == "" {
+			scopeVar = dotToVar(v.Scope)
+		}
 		fmt.Fprintf(b, "%s%s %s \"%s\" \"%s\" {\n", indent, viewType, scopeVar, key, title)
 	}
 	fmt.Fprintf(b, "%s    include *\n", indent)
@@ -166,6 +174,29 @@ func isContainerKind(kind string) bool {
 		return true
 	}
 	return false
+}
+
+// buildVarMap assigns a Structurizr variable name to every element dot-path.
+// Leaf keys are used when globally unique; otherwise the full
+// dot-path-with-underscores is used to avoid collisions.
+func buildVarMap(flat map[string]*model.Element) map[string]string {
+	leafCount := make(map[string]int, len(flat))
+	for id := range flat {
+		parts := strings.Split(id, ".")
+		leafCount[parts[len(parts)-1]]++
+	}
+
+	varMap := make(map[string]string, len(flat))
+	for id := range flat {
+		parts := strings.Split(id, ".")
+		leaf := parts[len(parts)-1]
+		if leafCount[leaf] == 1 {
+			varMap[id] = leaf
+		} else {
+			varMap[id] = dotToVar(id)
+		}
+	}
+	return varMap
 }
 
 // dotToVar converts a dot-path to a valid Structurizr variable name.
