@@ -197,7 +197,7 @@ func TestNonArchitectureFile(t *testing.T) {
 
 	lenses := GenerateCodeLens(doc)
 
-	if lenses != nil && len(lenses) > 0 {
+	if len(lenses) > 0 {
 		t.Errorf("expected no CodeLens for non-architecture file, got %d", len(lenses))
 	}
 }
