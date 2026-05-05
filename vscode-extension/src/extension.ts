@@ -5,10 +5,8 @@ import {
 	ServerOptions,
 	TransportKind,
 } from 'vscode-languageclient/node';
-import * as path from 'path';
 
 let client: LanguageClient;
-let serverProcess: any;
 let statusBarItem: vscode.StatusBarItem;
 let watchModeActive = false;
 
