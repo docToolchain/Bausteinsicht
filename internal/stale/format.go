@@ -13,19 +13,19 @@ func FormatText(result DetectionResult) string {
 	}
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Stale Elements (%d found, %d total)\n", len(result.StaleElements), result.TotalElements))
+	fmt.Fprintf(&sb, "Stale Elements (%d found, %d total)\n", len(result.StaleElements), result.TotalElements)
 	sb.WriteString("==================================================\n\n")
 
 	for _, elem := range result.StaleElements {
 		// Element header
-		sb.WriteString(fmt.Sprintf("%-20s [%s]   Last changed: %d days ago\n",
-			elem.ID, elem.Kind, elem.DaysSinceModified))
+		fmt.Fprintf(&sb, "%-20s [%s]   Last changed: %d days ago\n",
+			elem.ID, elem.Kind, elem.DaysSinceModified)
 
 		// Status and ADR
 		if elem.MissingStatus {
 			sb.WriteString("                     No lifecycle status set\n")
 		} else {
-			sb.WriteString(fmt.Sprintf("                     Status set\n"))
+			sb.WriteString("                     Status set\n")
 		}
 
 		if elem.MissingADR {
@@ -35,10 +35,10 @@ func FormatText(result DetectionResult) string {
 		// Risk assessment
 		riskIcon := riskIcon(elem.Risk)
 		if elem.IncomingRelCount > 0 {
-			sb.WriteString(fmt.Sprintf("                     %s Has %d incoming relationships — may still be active\n",
-				riskIcon, elem.IncomingRelCount))
+			fmt.Fprintf(&sb, "                     %s Has %d incoming relationships — may still be active\n",
+				riskIcon, elem.IncomingRelCount)
 		} else {
-			sb.WriteString(fmt.Sprintf("                     %s No incoming relationships — safe to archive\n", riskIcon))
+			fmt.Fprintf(&sb, "                     %s No incoming relationships — safe to archive\n", riskIcon)
 		}
 
 		sb.WriteString("\n")
@@ -49,8 +49,8 @@ func FormatText(result DetectionResult) string {
 	mediumRiskCount := countByRisk(result.StaleElements, RiskMedium)
 	lowRiskCount := countByRisk(result.StaleElements, RiskLow)
 
-	sb.WriteString(fmt.Sprintf("Risk summary: %d high, %d medium, %d low\n\n",
-		highRiskCount, mediumRiskCount, lowRiskCount))
+	fmt.Fprintf(&sb, "Risk summary: %d high, %d medium, %d low\n\n",
+		highRiskCount, mediumRiskCount, lowRiskCount)
 
 	// Recommendations
 	sb.WriteString("Suggested actions:\n")
