@@ -64,7 +64,8 @@ func ValidateDocument(doc *Document, workDir string) []Diagnostic {
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
-		// Command failed, but we might still get useful output
+		// Command failed, but we might still get useful output from stdout/stderr
+		_ = err
 	}
 
 	// Parse JSON output

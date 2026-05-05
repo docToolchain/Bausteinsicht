@@ -317,17 +317,6 @@ func (s *Server) isModelFile(filename string) bool {
 	return strings.HasSuffix(filename, "architecture.jsonc")
 }
 
-func (s *Server) loadModel() (*model.BausteinsichtModel, error) {
-	if s.modelPath == "" {
-		detected, err := model.AutoDetect(s.workDir)
-		if err != nil {
-			return nil, err
-		}
-		s.modelPath = detected
-	}
-	return model.Load(s.modelPath)
-}
-
 func URIToPath(uri string) string {
 	// Remove file:// prefix
 	if strings.HasPrefix(uri, "file://") {
