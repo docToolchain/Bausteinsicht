@@ -51,6 +51,7 @@ type Config struct {
 type BausteinsichtModel struct {
 	Schema        string             `json:"$schema,omitempty"`
 	Config        Config             `json:"config,omitempty"`
+	Meta          map[string]interface{} `json:"meta,omitempty"` // Project metadata (staleDetection config, etc.)
 	Specification Specification      `json:"specification"`
 	Model         map[string]Element `json:"model"`
 	Relationships []Relationship     `json:"relationships"`
@@ -133,8 +134,8 @@ type Element struct {
 	Description string             `json:"description,omitempty"`
 	Technology  string             `json:"technology,omitempty"`
 	Tags        []string           `json:"tags,omitempty"`
-	Status      string             `json:"status,omitempty"`
-	Decisions   []string           `json:"decisions,omitempty"`
+	Status      string             `json:"status,omitempty"` // e.g., "deployed", "deprecated", "archived"
+	Decisions   []string           `json:"decisions,omitempty"` // ADR IDs linked to this element
 	Children    map[string]Element `json:"children,omitempty"`
 	Metadata    map[string]string  `json:"metadata,omitempty"`
 }
