@@ -21,17 +21,8 @@ type HTMLNode struct {
 	Stroke      string `json:"stroke"`
 }
 
-// HTMLEdge is a wrapper around relEntry for JSON serialization with proper field tags.
-type HTMLEdge struct {
-	From  string `json:"from"`
-	To    string `json:"to"`
-	Label string `json:"label,omitempty"`
-}
-
-// newHTMLEdge converts a relEntry to HTMLEdge.
-func newHTMLEdge(r relEntry) HTMLEdge {
-	return HTMLEdge{From: r.From, To: r.To, Label: r.Label}
-}
+// HTMLEdge is a type alias for relEntry used in HTML diagram output.
+type HTMLEdge = relEntry
 
 // HTMLDiagramData is the data structure embedded in the HTML output.
 type HTMLDiagramData struct {
@@ -101,10 +92,10 @@ func RenderHTML(m *model.BausteinsichtModel, viewKey string) (string, error) {
 		}
 	}
 
-	// Build edge list
+	// Build edge list from relationships
 	edges := make([]HTMLEdge, len(rels))
 	for i, r := range rels {
-		edges[i] = newHTMLEdge(r)
+		edges[i] = HTMLEdge(r)
 	}
 
 	// Create diagram data
