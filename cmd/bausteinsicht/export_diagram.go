@@ -16,13 +16,13 @@ import (
 func newExportDiagramCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "export-diagram",
-		Short: "Export views as PlantUML C4 or Mermaid C4 diagrams",
-		Long:  "Exports architecture views as text-based C4 diagrams (PlantUML or Mermaid).",
+		Short: "Export views as C4 diagrams (PlantUML, Mermaid, DOT, D2, HTML5)",
+		Long:  "Exports architecture views as text-based C4 diagrams (PlantUML, Mermaid, DOT, D2) or interactive HTML5 viewer.",
 		RunE:  runExportDiagram,
 	}
 
 	cmd.Flags().String("view", "", "Export only this view (by key)")
-	cmd.Flags().String("diagram-format", "plantuml", "Diagram format: plantuml or mermaid")
+	cmd.Flags().String("diagram-format", "plantuml", "Diagram format: plantuml, mermaid, dot, d2, or html")
 	cmd.Flags().String("output", "", "Output directory (default: stdout)")
 
 	return cmd
@@ -53,19 +53,6 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 		return exitWithCode(fmt.Errorf("loading model: %w", err), 2)
 	}
 
-	var f diagram.Format
-	var ext string
-	switch diagramFormat {
-	case "plantuml":
-		f = diagram.PlantUML
-		ext = "puml"
-	case "mermaid":
-		f = diagram.Mermaid
-		ext = "mmd"
-	default:
-		return exitWithCode(fmt.Errorf("unknown diagram format %q: valid values are \"plantuml\" and \"mermaid\"", diagramFormat), 2)
-	}
-
 	// Determine which views to export.
 	views := make(map[string]model.View)
 	if viewKey != "" {
@@ -76,6 +63,25 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 		views[viewKey] = v
 	} else {
 		views = m.Views
+	}
+
+	// Handle new export formats (DOT, D2, HTML)
+	switch diagramFormat {
+	case "dot", "d2", "html":
+		return handleNewFormats(cmd, m, views, diagramFormat, outputDir, viewKey)
+	}
+
+	var f diagram.Format
+	var ext string
+	switch diagramFormat {
+	case "plantuml":
+		f = diagram.PlantUML
+		ext = "puml"
+	case "mermaid":
+		f = diagram.Mermaid
+		ext = "mmd"
+	default:
+		return exitWithCode(fmt.Errorf("unknown diagram format %q: valid values are \"plantuml\", \"mermaid\", \"dot\", \"d2\", or \"html\"", diagramFormat), 2)
 	}
 
 	format, _ := cmd.Flags().GetString("format")
@@ -121,6 +127,104 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 		}
 		outPath := filepath.Join(outputDir, export.SafeViewKey(key)+"."+ext)
 		if err := os.WriteFile(outPath, []byte(result), 0600); err != nil { //nolint:gosec // output files are non-sensitive documentation
+			return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
+		}
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", outPath)
+	}
+
+	return nil
+}
+
+func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map[string]model.View, format, outputDir, viewKey string) error {
+	var renderFunc func(*model.BausteinsichtModel, string) (string, error)
+	var ext string
+
+	switch format {
+	case "dot":
+		renderFunc = diagram.RenderDOT
+		ext = "dot"
+	case "d2":
+		renderFunc = diagram.RenderD2
+		ext = "d2"
+	case "html":
+		renderFunc = diagram.RenderHTML
+		ext = "html"
+	default:
+		return exitWithCode(fmt.Errorf("unsupported format: %s", format), 2)
+	}
+
+	// For HTML, create a single file containing all views
+	if format == "html" {
+		// When exporting to HTML, we need to handle multiple views in a single file
+		if viewKey != "" {
+			// Single view HTML export
+			result, err := renderFunc(m, viewKey)
+			if err != nil {
+				return exitWithCode(err, 1)
+			}
+
+			if outputDir == "" {
+				_, _ = fmt.Fprint(cmd.OutOrStdout(), result)
+				return nil
+			}
+
+			if err := os.MkdirAll(outputDir, 0750); err != nil {
+				return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
+			}
+
+			outPath := filepath.Join(outputDir, export.SafeViewKey(viewKey)+".html")
+			if err := os.WriteFile(outPath, []byte(result), 0600); err != nil {
+				return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
+			}
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", outPath)
+			return nil
+		}
+
+		// Multiple views: export each as separate HTML file
+		keys := sortedKeys(views)
+		for _, key := range keys {
+			result, err := renderFunc(m, key)
+			if err != nil {
+				return exitWithCode(err, 1)
+			}
+
+			if outputDir == "" {
+				_, _ = fmt.Fprint(cmd.OutOrStdout(), result)
+				continue
+			}
+
+			if err := os.MkdirAll(outputDir, 0750); err != nil {
+				return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
+			}
+
+			outPath := filepath.Join(outputDir, export.SafeViewKey(key)+".html")
+			if err := os.WriteFile(outPath, []byte(result), 0600); err != nil {
+				return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
+			}
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", outPath)
+		}
+		return nil
+	}
+
+	// For DOT and D2: export each view separately
+	keys := sortedKeys(views)
+	for _, key := range keys {
+		result, err := renderFunc(m, key)
+		if err != nil {
+			return exitWithCode(err, 1)
+		}
+
+		if outputDir == "" {
+			_, _ = fmt.Fprint(cmd.OutOrStdout(), result)
+			continue
+		}
+
+		if err := os.MkdirAll(outputDir, 0750); err != nil {
+			return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
+		}
+
+		outPath := filepath.Join(outputDir, "architecture-"+export.SafeViewKey(key)+"."+ext)
+		if err := os.WriteFile(outPath, []byte(result), 0600); err != nil {
 			return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
 		}
 		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", outPath)

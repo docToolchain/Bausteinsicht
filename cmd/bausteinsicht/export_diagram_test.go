@@ -106,9 +106,48 @@ func TestExportDiagram_MermaidFile(t *testing.T) {
 
 func TestExportDiagram_InvalidFormat(t *testing.T) {
 	modelPath := writeExportDiagramModel(t)
-	_, err := executeRootCmd("export-diagram", "--model", modelPath, "--diagram-format", "dot")
+	_, err := executeRootCmd("export-diagram", "--model", modelPath, "--diagram-format", "invalid")
 	if err == nil {
 		t.Error("expected error for invalid format")
+	}
+}
+
+func TestExportDiagram_DOTFormat(t *testing.T) {
+	modelPath := writeExportDiagramModel(t)
+	out, err := executeRootCmd("export-diagram", "--model", modelPath, "--view", "context", "--diagram-format", "dot")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "digraph") {
+		t.Error("expected 'digraph' in DOT output")
+	}
+	if !strings.Contains(out, "rankdir=LR") {
+		t.Error("expected 'rankdir=LR' in DOT output")
+	}
+}
+
+func TestExportDiagram_D2Format(t *testing.T) {
+	modelPath := writeExportDiagramModel(t)
+	out, err := executeRootCmd("export-diagram", "--model", modelPath, "--view", "context", "--diagram-format", "d2")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "direction: right") {
+		t.Error("expected 'direction: right' in D2 output")
+	}
+}
+
+func TestExportDiagram_HTMLFormat(t *testing.T) {
+	modelPath := writeExportDiagramModel(t)
+	out, err := executeRootCmd("export-diagram", "--model", modelPath, "--view", "context", "--diagram-format", "html")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "<!DOCTYPE html>") {
+		t.Error("expected HTML5 doctype")
+	}
+	if !strings.Contains(out, "DIAGRAM_DATA") {
+		t.Error("expected embedded diagram data")
 	}
 }
 
