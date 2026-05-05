@@ -169,7 +169,7 @@ func TestImport_PathTraversalRejected(t *testing.T) {
 	if err := os.WriteFile(sensitiveFile, []byte("SECRET"), 0600); err != nil {
 		t.Fatalf("failed to create sensitive file: %v", err)
 	}
-	defer os.Remove(sensitiveFile)
+	defer func() { _ = os.Remove(sensitiveFile) }()
 
 	// Create main DSL file with path traversal attempt
 	mainFile := filepath.Join(tmpDir, "main.dsl")
