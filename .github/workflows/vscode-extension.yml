@@ -1,0 +1,75 @@
+name: VS Code Extension CI
+
+on:
+  push:
+    branches: [main, 303-feat-vs-code-extension]
+    paths:
+      - 'vscode-extension/**'
+      - '.github/workflows/vscode-extension.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'vscode-extension/**'
+
+permissions: {}
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - uses: actions/setup-node@60edb5dd545a775178fbb3ce5d1f5c01c53acb2e # v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: 'vscode-extension/package-lock.json'
+
+      - name: Install dependencies
+        working-directory: ./vscode-extension
+        run: npm ci
+
+      - name: Build TypeScript
+        working-directory: ./vscode-extension
+        run: npm run build
+
+      - name: Lint
+        working-directory: ./vscode-extension
+        run: npm run lint
+
+      - name: Package extension
+        working-directory: ./vscode-extension
+        run: npm run package
+
+      - name: Upload .vsix artifact
+        uses: actions/upload-artifact@6f51b1e991ecc7156d32602f8c7146b3c31b7a8a # v4
+        with:
+          name: bausteinsicht.vsix
+          path: vscode-extension/bausteinsicht-*.vsix
+          if-no-files-found: error
+
+  test-integration:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - uses: actions/setup-node@60edb5dd545a775178fbb3ce5d1f5c01c53acb2e # v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: 'vscode-extension/package-lock.json'
+
+      - name: Install dependencies
+        working-directory: ./vscode-extension
+        run: npm ci
+
+      - name: Install xvfb (for headless testing)
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
+      - name: Run integration tests
+        working-directory: ./vscode-extension
+        run: xvfb-run -a npm test
