@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/docToolchain/Bausteinsicht/internal/model"
@@ -92,10 +93,20 @@ func runStale(cmd *cobra.Command, _ []string) error {
 		}
 	}
 
-	// TODO: Implement --mark-drawio functionality
-	if markDrawio {
-		if _, err := fmt.Fprintf(cmd.ErrOrStderr(), "Note: --mark-drawio is not yet implemented\n"); err != nil {
-			return err
+	// Mark stale elements in draw.io if requested
+	if markDrawio && len(result.StaleElements) > 0 {
+		// Try to find and mark draw.io diagram
+		drawioPath := filepath.Join(filepath.Dir(absModelPath), "architecture.drawio")
+		if _, err := os.Stat(drawioPath); err == nil {
+			if err := stale.MarkInDrawio(result.StaleElements, drawioPath); err != nil {
+				if _, err := fmt.Fprintf(cmd.ErrOrStderr(), "Warning: Failed to mark draw.io: %v\n", err); err != nil {
+					return err
+				}
+			} else {
+				if _, err := fmt.Fprintf(cmd.ErrOrStderr(), "Marked %d stale elements in draw.io\n", len(result.StaleElements)); err != nil {
+					return err
+				}
+			}
 		}
 	}
 
