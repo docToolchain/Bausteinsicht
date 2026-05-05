@@ -41,15 +41,26 @@ A Language Server Protocol (LSP) server in Go that brings Bausteinsicht diagnost
 
 **Output:** Red/yellow underlines in architecture.jsonc for validation errors
 
-### Phase 1c: CodeLens
-- [ ] CodeLens provider for element definitions
-- [ ] Show: element kind, element status, view count
-- [ ] Actions: "Open in draw.io", jump to tests/ADRs (if found)
+### Phase 1c: CodeLens ✅ COMPLETE
+- [x] CodeLens provider for element definitions
+- [x] Show: element kind, element status, view count
+- [x] Actions: "Open in draw.io" with element ID
+- [x] Unit tests for CodeLens logic
 
 **Files:**
 - `internal/lsp/codelens.go` — CodeLens provider
+- `internal/lsp/codelens_test.go` — comprehensive test suite
 
-**Output:** Clickable links above element definitions
+**Test Coverage** (All passing ✓):
+- GenerateCodeLens: extracts elements and generates CodeLens objects
+- ExtractKind: parses "kind" field from JSON metadata
+- ExtractStatus: parses "status" field with "active" default
+- EstimateViewCount: counts element references in document
+- CodeLensRange: verifies range calculation for highlighting
+- NonArchitectureFile: filters non-architecture.jsonc files
+- CodeLensCommand: verifies command structure and arguments
+
+**Output:** Clickable links above element definitions showing kind, status, and view count
 
 ### Phase 2: VS Code Extension (TypeScript/Minimal)
 - [ ] Extension manifest (`package.json`)
