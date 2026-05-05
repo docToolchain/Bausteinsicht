@@ -1,5 +1,44 @@
 package model
 
+// Element lifecycle status values
+const (
+	StatusProposed      = "proposed"
+	StatusDesign        = "design"
+	StatusImplementing  = "implementation"
+	StatusDeployed      = "deployed"
+	StatusDeprecated    = "deprecated"
+	StatusArchived      = "archived"
+)
+
+var ValidStatuses = []string{
+	StatusProposed,
+	StatusDesign,
+	StatusImplementing,
+	StatusDeployed,
+	StatusDeprecated,
+	StatusArchived,
+}
+
+// StatusColor returns the draw.io badge color for a given status
+func StatusColor(status string) string {
+	switch status {
+	case StatusProposed:
+		return "#fff2cc" // yellow
+	case StatusDesign:
+		return "#dae8fc" // blue
+	case StatusImplementing:
+		return "#ffe6cc" // orange
+	case StatusDeployed:
+		return "#d5e8d4" // green
+	case StatusDeprecated:
+		return "#f8cecc" // red
+	case StatusArchived:
+		return "#f5f5f5" // grey
+	default:
+		return "#ffffff" // white
+	}
+}
+
 // Config holds top-level configuration for diagram generation.
 type Config struct {
 	Metadata *bool  `json:"metadata,omitempty"`
@@ -94,6 +133,8 @@ type Element struct {
 	Description string             `json:"description,omitempty"`
 	Technology  string             `json:"technology,omitempty"`
 	Tags        []string           `json:"tags,omitempty"`
+	Status      string             `json:"status,omitempty"`
+	Decisions   []string           `json:"decisions,omitempty"`
 	Children    map[string]Element `json:"children,omitempty"`
 	Metadata    map[string]string  `json:"metadata,omitempty"`
 }
