@@ -130,21 +130,31 @@ func outputStatusJSON(cmd *cobra.Command, result statusResult) error {
 }
 
 func outputStatusText(cmd *cobra.Command, result statusResult) error {
-	fmt.Fprintf(cmd.OutOrStdout(), "Element Lifecycle Status\n")
-	fmt.Fprintf(cmd.OutOrStdout(), "==================================================\n\n")
+	if _, err := fmt.Fprintf(cmd.OutOrStdout(), "Element Lifecycle Status\n"); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(cmd.OutOrStdout(), "==================================================\n\n"); err != nil {
+		return err
+	}
 
 	// Print summary
 	for _, status := range append(model.ValidStatuses, "unset") {
 		count := result.Summary[status]
-		fmt.Fprintf(cmd.OutOrStdout(), "%s (%d):\n", status, count)
+		if _, err := fmt.Fprintf(cmd.OutOrStdout(), "%s (%d):\n", status, count); err != nil {
+			return err
+		}
 
 		// Print elements for this status
 		for _, elem := range result.Elements {
 			if elem.Status == status {
-				fmt.Fprintf(cmd.OutOrStdout(), "  %-20s [%-12s] %q\n", elem.ID, elem.Kind, elem.Title)
+				if _, err := fmt.Fprintf(cmd.OutOrStdout(), "  %-20s [%-12s] %q\n", elem.ID, elem.Kind, elem.Title); err != nil {
+					return err
+				}
 			}
 		}
-		fmt.Fprintf(cmd.OutOrStdout(), "\n")
+		if _, err := fmt.Fprintf(cmd.OutOrStdout(), "\n"); err != nil {
+			return err
+		}
 	}
 
 	return nil

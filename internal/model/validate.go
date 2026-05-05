@@ -359,7 +359,7 @@ func validateLifecycleStatus(m *BausteinsichtModel) []ValidationWarning {
 			if !hasSuccessor {
 				warnings = append(warnings, ValidationWarning{
 					Path:    "model." + id,
-					Message: fmt.Sprintf("deprecated element has no deployed successor of the same kind; consider linking to a replacement"),
+					Message: "deprecated element has no deployed successor of the same kind; consider linking to a replacement",
 				})
 			}
 		}
