@@ -21,9 +21,11 @@ func executeImportCmd(args ...string) (string, error) {
 
 // absDSL returns the absolute path to a testdata DSL file (avoids .. in paths
 // which the security validator rejects).
+//
+// IMPORTANT: This helper assumes tests run with working directory in cmd/bausteinsicht/.
+// Tests must be run with: go test ./cmd/bausteinsicht or make test
 func absDSL(t *testing.T, parts ...string) string {
 	t.Helper()
-	// The test runs in cmd/bausteinsicht/, so we resolve relative to the repo root.
 	rel := filepath.Join(parts...)
 	abs, err := filepath.Abs(filepath.Join("..", "..", rel))
 	if err != nil {

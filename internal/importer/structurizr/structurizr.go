@@ -702,6 +702,7 @@ func Import(path string) (*importer.ImportResult, error) {
 func resolveIncludes(src, baseDir string, visited map[string]bool) (string, []string) {
 	var warnings []string
 	var out strings.Builder
+	absDirBase, _ := filepath.Abs(baseDir)
 	for _, line := range strings.Split(src, "\n") {
 		trimmed := strings.TrimSpace(line)
 		if strings.HasPrefix(trimmed, "!include ") {
@@ -711,13 +712,20 @@ func resolveIncludes(src, baseDir string, visited map[string]bool) (string, []st
 				out.WriteByte('\n')
 				continue
 			}
-			fullPath := filepath.Join(baseDir, includePath)
-			if visited[fullPath] {
+			cleanedPath := filepath.Clean(includePath)
+			fullPath := filepath.Join(baseDir, cleanedPath)
+			absFullPath, _ := filepath.Abs(fullPath)
+			if !strings.HasPrefix(absFullPath, absDirBase+string(filepath.Separator)) && absFullPath != absDirBase {
+				warnings = append(warnings, "!include: path traversal rejected: "+includePath)
+				out.WriteByte('\n')
+				continue
+			}
+			if visited[absFullPath] {
 				warnings = append(warnings, "!include: circular include ignored: "+includePath)
 				out.WriteByte('\n')
 				continue
 			}
-			data, err := os.ReadFile(fullPath)
+			data, err := os.ReadFile(absFullPath)
 			if err != nil {
 				warnings = append(warnings, fmt.Sprintf("!include: cannot read %s: %v", includePath, err))
 				out.WriteByte('\n')
@@ -727,8 +735,8 @@ func resolveIncludes(src, baseDir string, visited map[string]bool) (string, []st
 			for k, v := range visited {
 				newVisited[k] = v
 			}
-			newVisited[fullPath] = true
-			included, w := resolveIncludes(string(data), filepath.Dir(fullPath), newVisited)
+			newVisited[absFullPath] = true
+			included, w := resolveIncludes(string(data), filepath.Dir(absFullPath), newVisited)
 			warnings = append(warnings, w...)
 			out.WriteString(included)
 			out.WriteByte('\n')

@@ -121,6 +121,7 @@ func (e *exporter) writeOneView(b *strings.Builder, key string, v model.View, in
 	} else {
 		scopeVar := e.varMap[v.Scope]
 		if scopeVar == "" {
+			// Scope exists in flat map (verified by detectViewType), use its variable name
 			scopeVar = dotToVar(v.Scope)
 		}
 		fmt.Fprintf(b, "%s%s %s \"%s\" \"%s\" {\n", indent, viewType, scopeVar, key, title)
