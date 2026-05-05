@@ -40,3 +40,5 @@ Simon-Brown-Demo/
 
 # draw.io backup files
 .$*.bkp
+/bausteinsicht-lsp
+/bausteinsicht-lsp.exe
