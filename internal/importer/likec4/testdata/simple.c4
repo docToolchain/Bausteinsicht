@@ -1,0 +1,47 @@
+specification {
+  element person
+  element system
+  element container
+  element component
+}
+
+model {
+  user = person "Customer" {
+    description "End user of the platform"
+    -> frontend "Uses" "HTTPS"
+  }
+
+  myPlatform = system "My Platform" {
+    frontend = container "Frontend" {
+      technology "TypeScript"
+      description "React SPA"
+
+      searchComp = component "Search Component" {
+        technology "TypeScript"
+      }
+    }
+
+    api = container "API Gateway" {
+      technology "Go"
+    }
+
+    db = container "Database" {
+      technology "PostgreSQL"
+    }
+  }
+
+  frontend -> api "Calls" "REST"
+  api -> db "Reads/Writes"
+}
+
+views {
+  view index of myPlatform {
+    title "System Context"
+    include *
+  }
+
+  view containers of myPlatform {
+    title "Container View"
+    include *
+  }
+}
