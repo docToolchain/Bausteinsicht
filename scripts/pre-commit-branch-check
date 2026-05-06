@@ -1,0 +1,30 @@
+#!/bin/bash
+# Pre-commit hook: Warn if branch is not up-to-date with main
+
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+if [ "$CURRENT_BRANCH" = "main" ]; then
+  exit 0
+fi
+
+git fetch origin 2>/dev/null || true
+
+# Check if branch is behind main
+BEHIND=$(git rev-list --count HEAD..origin/main)
+
+if [ $BEHIND -gt 0 ]; then
+  echo ""
+  echo "⚠️  WARNING: Your branch is $BEHIND commit(s) behind origin/main"
+  echo ""
+  echo "Before creating a PR, please rebase:"
+  echo "  git rebase origin/main"
+  echo "  git push --force-with-lease"
+  echo ""
+  read -p "Continue anyway? (y/n) " -n 1 -r
+  echo
+  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    exit 1
+  fi
+fi
+
+exit 0
