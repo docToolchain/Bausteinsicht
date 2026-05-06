@@ -137,7 +137,9 @@ See the link:src/docs/spec/06_tutorial.adoc[Getting Started Tutorial] for a step
 
 == Features
 
-* **Bidirectional sync** — model → diagram and diagram → model
+=== Core Architecture
+
+* **Bidirectional sync** — model ↔ diagram and diagram → model in real-time
 * **Watch mode** — `bausteinsicht watch` for continuous sync on save
 * **Multi-view** — multiple diagram pages from one model (context, container, component views)
 * **Scope & bounding boxes** — visual boundaries around parent elements
@@ -145,6 +147,29 @@ See the link:src/docs/spec/06_tutorial.adoc[Getting Started Tutorial] for a step
 * **CLI-first** — all commands support `--format json` for LLM/AI agent workflows
 * **JSON Schema** — IDE autocompletion without plugins
 * **Cross-platform** — native binaries for Linux, macOS, and Windows (amd64 + arm64)
+
+=== Export & Import
+
+* **Mermaid C4 diagrams** — export to `architecture.md` with automatic C4 level detection
+* **Structurizr DSL** — import from and export to Structurizr DSL format
+* **LikeC4 DSL** — import LikeC4 DSL files into Bausteinsicht model
+* **Draw.io export** — PNG, SVG via draw.io CLI headless export
+* **Table export** — CSV and Markdown formats for spreadsheet integration
+
+=== Architecture Analysis
+
+* **Element search** — find elements and relationships by name or pattern
+* **Snapshots** — version architecture over time with save/restore/diff commands
+* **Architecture changelog** — track changes from git history with detailed diffs
+* **As-Is/To-Be comparison** — compare current vs. target architecture states
+* **Validation & linting** — check model consistency and apply custom constraints
+
+=== Developer Experience
+
+* **Language Server Protocol (LSP)** — VS Code and other editor support with autocompletion
+* **Validation constraints** — define and enforce architecture rules
+* **Tag-based view filtering** — organize elements by tags with batch styling
+* **Multi-level views** — zoom-based navigation from context → container → component
 
 == Development
 
