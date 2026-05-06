@@ -496,6 +496,90 @@
       "to": "bausteinsicht.drawio.document",
       "label": "reads diagram pages",
       "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.diagram",
+      "to": "bausteinsicht.model",
+      "label": "reads model for export",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.diagram.mermaid_c4",
+      "to": "bausteinsicht.model.types",
+      "label": "renders elements",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.diagram.markdown",
+      "to": "bausteinsicht.diagram.mermaid_c4",
+      "label": "wraps diagrams",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.importer",
+      "to": "bausteinsicht.model",
+      "label": "populates model",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.importer.structurizr",
+      "to": "bausteinsicht.model.types",
+      "label": "creates elements",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.importer.likec4",
+      "to": "bausteinsicht.model.types",
+      "label": "creates elements",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.exporter.structurizr",
+      "to": "bausteinsicht.model",
+      "label": "reads model",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.search",
+      "to": "bausteinsicht.model",
+      "label": "searches elements",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.search",
+      "to": "bausteinsicht.model.resolve",
+      "label": "resolves patterns",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.table",
+      "to": "bausteinsicht.model",
+      "label": "reads model",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.table",
+      "to": "bausteinsicht.diagram",
+      "label": "optionally uses diagrams",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.constraints",
+      "to": "bausteinsicht.model",
+      "label": "validates model",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.constraints",
+      "to": "bausteinsicht.model.validate",
+      "label": "extends validation",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.lsp",
+      "to": "bausteinsicht.model",
+      "label": "indexes for completion",
+      "kind": "uses"
     }
   ],
   "views": {
@@ -553,6 +637,46 @@
         "bausteinsicht.watcher"
       ],
       "description": "Internal components of the bidirectional sync engine and its key dependencies"
+    },
+    "diagram-components": {
+      "title": "Diagram Package Components",
+      "scope": "bausteinsicht.diagram",
+      "include": [
+        "bausteinsicht.diagram.*",
+        "bausteinsicht.model",
+        "bausteinsicht.cli"
+      ],
+      "description": "Text-based diagram export components (Mermaid C4, PlantUML) and markdown wrapping"
+    },
+    "importer-components": {
+      "title": "Importer Package Components",
+      "scope": "bausteinsicht.importer",
+      "include": [
+        "bausteinsicht.importer.*",
+        "bausteinsicht.model",
+        "bausteinsicht.cli"
+      ],
+      "description": "Import components for Structurizr DSL and LikeC4 format conversion to Bausteinsicht model"
+    },
+    "exporter-components": {
+      "title": "Exporter Package Components",
+      "scope": "bausteinsicht.exporter",
+      "include": [
+        "bausteinsicht.exporter.*",
+        "bausteinsicht.model",
+        "bausteinsicht.cli"
+      ],
+      "description": "Export components for converting Bausteinsicht model to external formats (Structurizr DSL)"
+    },
+    "search-components": {
+      "title": "Search Package Components",
+      "scope": "bausteinsicht.search",
+      "include": [
+        "bausteinsicht.search",
+        "bausteinsicht.model",
+        "bausteinsicht.cli"
+      ],
+      "description": "Element and relationship search with pattern matching and filtering"
     }
   }
 }
