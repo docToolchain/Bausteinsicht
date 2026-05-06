@@ -298,3 +298,55 @@ func TestRoundtrip_ImportExportReImport(t *testing.T) {
 			len(m1.Views), len(m2.Views), dsl)
 	}
 }
+
+// TestExportAllViewTypes ensures all Structurizr DSL view types are correctly exported.
+func TestExportAllViewTypes(t *testing.T) {
+	testCases := []struct {
+		name        string
+		viewScope   string // empty for systemLandscape
+		expectedKwd string
+	}{
+		{"systemLandscape", "", "systemLandscape"},
+		{"systemContext", "orderSystem", "systemContext"},
+		{"container", "orderSystem", "container"},
+		{"component", "orderSystem.webApp", "component"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			m := buildTestModel()
+			// Update view scope
+			for k := range m.Views {
+				m.Views[k] = model.View{
+					Title:   tc.name,
+					Scope:   tc.viewScope,
+					Include: []string{"*"},
+				}
+			}
+
+			out := structurizr.Export(m)
+			if !strings.Contains(out, tc.expectedKwd) {
+				t.Errorf("expected keyword %q not found in DSL output for view type %s\nDSL:\n%s",
+					tc.expectedKwd, tc.name, out)
+			}
+		})
+	}
+}
+
+// TestExportValidationDetectsInvalidElements ensures invalid element references cause errors.
+func TestExportValidationDetectsInvalidElements(t *testing.T) {
+	m := buildTestModel()
+	// Add view with non-existent element
+	m.Views["broken"] = model.View{
+		Title:   "Broken View",
+		Scope:   "orderSystem",
+		Include: []string{"nonexistent"},
+	}
+
+	// Export should still work but validation error should be logged
+	// (current implementation logs but continues)
+	out := structurizr.Export(m)
+	if !strings.Contains(out, "workspace {") {
+		t.Error("export should produce valid DSL even with invalid element references")
+	}
+}

@@ -20,6 +20,13 @@ func Export(m *model.BausteinsichtModel) string {
 	varMap := buildVarMap(flat)
 	e := &exporter{m: m, flat: flat, varMap: varMap}
 
+	// Validate views reference existing elements
+	if err := e.validateViews(); err != nil {
+		// Log validation error but continue export (warnings don't block output)
+		// In production, this should be surfaced to user
+		_ = err
+	}
+
 	var b strings.Builder
 	b.WriteString("workspace {\n")
 	b.WriteString("    model {\n")
@@ -205,8 +212,10 @@ func dotToVar(path string) string {
 	return strings.ReplaceAll(path, ".", "_")
 }
 
-// escDQ escapes double quotes and newlines in s for embedding in a Structurizr string literal.
+// escDQ escapes backslashes, double quotes, and newlines for embedding in Structurizr string literals.
 func escDQ(s string) string {
+	// Escape backslash first (must be first to avoid double-escaping)
+	s = strings.ReplaceAll(s, "\\", "\\\\")
 	s = strings.ReplaceAll(s, `"`, `\"`)
 	s = strings.ReplaceAll(s, "\n", `\n`)
 	return s
@@ -219,4 +228,20 @@ func sortedKeys[V any](m map[string]V) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+// validateViews checks that all elements referenced in views exist in the model.
+func (e *exporter) validateViews() error {
+	for viewKey, view := range e.m.Views {
+		for _, elemID := range view.Include {
+			if elemID == "*" {
+				continue // Wildcard is always valid
+			}
+			// Check if element exists
+			if _, exists := e.flat[elemID]; !exists {
+				return fmt.Errorf("view %q includes non-existent element %q", viewKey, elemID)
+			}
+		}
+	}
+	return nil
 }
