@@ -1,0 +1,10 @@
+.git
+.gitignore
+node_modules
+src
+tsconfig.json
+.eslintrc.json
+README.md
+package-lock.json
+**/*.test.ts
+**/*.map

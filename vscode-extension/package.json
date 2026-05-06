@@ -1,0 +1,119 @@
+{
+  "name": "bausteinsicht",
+  "displayName": "Bausteinsicht",
+  "description": "Architecture-as-Code with real-time VS Code integration via Language Server Protocol",
+  "version": "0.1.0",
+  "publisher": "docToolchain",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/docToolchain/Bausteinsicht.git"
+  },
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Visualization",
+    "Linters"
+  ],
+  "keywords": [
+    "architecture",
+    "c4",
+    "diagram",
+    "draw.io",
+    "lsp",
+    "validation"
+  ],
+  "activationEvents": [
+    "onLanguage:jsonc",
+    "workspaceContains:**/*architecture*.jsonc"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "bausteinsicht.sync",
+        "title": "Bausteinsicht: Sync Model"
+      },
+      {
+        "command": "bausteinsicht.validate",
+        "title": "Bausteinsicht: Validate"
+      },
+      {
+        "command": "bausteinsicht.health",
+        "title": "Bausteinsicht: Health Check"
+      },
+      {
+        "command": "bausteinsicht.watchToggle",
+        "title": "Bausteinsicht: Toggle Watch Mode"
+      },
+      {
+        "command": "bausteinsicht.openInDrawio",
+        "title": "Bausteinsicht: Open in draw.io"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "bausteinsicht.sync"
+        },
+        {
+          "command": "bausteinsicht.validate"
+        },
+        {
+          "command": "bausteinsicht.health"
+        },
+        {
+          "command": "bausteinsicht.watchToggle"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Bausteinsicht",
+      "properties": {
+        "bausteinsicht.serverPath": {
+          "type": "string",
+          "default": "bausteinsicht-lsp",
+          "description": "Path to the bausteinsicht-lsp executable"
+        },
+        "bausteinsicht.debug": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable debug logging for LSP server"
+        },
+        "bausteinsicht.drawioUrl": {
+          "type": "string",
+          "default": "https://app.diagrams.net",
+          "description": "URL for draw.io web application"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run build",
+    "test": "node ./dist/test/runTest.js",
+    "test:watch": "tsc -watch -p ./ --listFiles",
+    "lint": "eslint src --ext ts",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/glob": "^8.1.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^20.10.0",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0",
+    "@vscode/test-electron": "^2.5.2",
+    "@vscode/vsce": "^3.9.1",
+    "eslint": "^8.54.0",
+    "mocha": "^11.7.5",
+    "typescript": "^5.3.3",
+    "vscode-test": "^1.6.1"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  }
+}

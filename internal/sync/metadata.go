@@ -13,13 +13,13 @@ import (
 )
 
 const (
-	metadataPrefix    = "metadata-"
-	legendPrefix      = "legend-"
-	infoBoxGap        = 80.0
-	metadataX         = 40.0
-	metadataWidth     = 500.0
-	legendWidthRatio  = 0.30
-	legendGap         = 60.0
+	metadataPrefix   = "metadata-"
+	legendPrefix     = "legend-"
+	infoBoxGap       = 80.0
+	metadataX        = 40.0
+	metadataWidth    = 500.0
+	legendWidthRatio = 0.30
+	legendGap        = 60.0
 )
 
 // createMetadata creates or updates a metadata info box on the view page.

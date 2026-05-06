@@ -5,6 +5,7 @@ DIST := dist
         build_darwin_amd64 build_darwin_arm64 \
         build_windows_amd64 build_windows_arm64 \
         schema-generate schema-validate \
+        build-extension package-extension \
         test test-race bench vet staticcheck gosec nilaway govulncheck \
         gitleaks golangci-lint check clean install-tools install-hooks
 
@@ -62,6 +63,14 @@ schema-validate: build
 		echo "❌ Schema is out of date. Run 'make schema-generate' and commit."; \
 		exit 1; \
 	fi
+
+# VS Code Extension — Build VSIX package with all dependencies
+build-extension:
+	cd vscode-extension && npm install
+
+package-extension: build-extension
+	cd vscode-extension && npm run build && npm run package
+	@echo "→ vscode-extension/bausteinsicht-0.1.0.vsix"
 
 # Run all tests
 test:

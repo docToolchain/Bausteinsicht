@@ -4,8 +4,8 @@ package model
 type Config struct {
 	Metadata *bool  `json:"metadata,omitempty"`
 	Legend   *bool  `json:"legend,omitempty"`
-	Author string `json:"author,omitempty"`
-	Repo   string `json:"repo,omitempty"`
+	Author   string `json:"author,omitempty"`
+	Repo     string `json:"repo,omitempty"`
 }
 
 // BausteinsichtModel is the top-level model file
