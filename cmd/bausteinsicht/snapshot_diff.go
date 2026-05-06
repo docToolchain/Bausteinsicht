@@ -218,30 +218,30 @@ func formatDiffText(diffs *ModelDiff) string {
 	}
 
 	if len(diffs.RemovedElements) > 0 {
-		sb.WriteString(fmt.Sprintf("Removed Elements (%d):\n", len(diffs.RemovedElements)))
+		fmt.Fprintf(&sb, "Removed Elements (%d):\n", len(diffs.RemovedElements))
 		for _, id := range diffs.RemovedElements {
-			sb.WriteString(fmt.Sprintf("  - %s\n", id))
+			fmt.Fprintf(&sb, "  - %s\n", id)
 		}
 		sb.WriteString("\n")
 	}
 
 	if len(diffs.ChangedElements) > 0 {
-		sb.WriteString(fmt.Sprintf("Changed Elements (%d):\n", len(diffs.ChangedElements)))
+		fmt.Fprintf(&sb, "Changed Elements (%d):\n", len(diffs.ChangedElements))
 		for id, changes := range diffs.ChangedElements {
-			sb.WriteString(fmt.Sprintf("  ~ %s\n", id))
+			fmt.Fprintf(&sb, "  ~ %s\n", id)
 			for _, change := range changes {
-				sb.WriteString(fmt.Sprintf("      %s\n", change))
+				fmt.Fprintf(&sb, "      %s\n", change)
 			}
 		}
 		sb.WriteString("\n")
 	}
 
 	if len(diffs.AddedRelationships) > 0 {
-		sb.WriteString(fmt.Sprintf("Added Relationships (%d):\n", len(diffs.AddedRelationships)))
+		fmt.Fprintf(&sb, "Added Relationships (%d):\n", len(diffs.AddedRelationships))
 		for _, rel := range diffs.AddedRelationships {
-			sb.WriteString(fmt.Sprintf("  + %s → %s", rel.From, rel.To))
+			fmt.Fprintf(&sb, "  + %s → %s", rel.From, rel.To)
 			if rel.Label != "" {
-				sb.WriteString(fmt.Sprintf(" (%s)", rel.Label))
+				fmt.Fprintf(&sb, " (%s)", rel.Label)
 			}
 			sb.WriteString("\n")
 		}
@@ -249,11 +249,11 @@ func formatDiffText(diffs *ModelDiff) string {
 	}
 
 	if len(diffs.RemovedRelationships) > 0 {
-		sb.WriteString(fmt.Sprintf("Removed Relationships (%d):\n", len(diffs.RemovedRelationships)))
+		fmt.Fprintf(&sb, "Removed Relationships (%d):\n", len(diffs.RemovedRelationships))
 		for _, rel := range diffs.RemovedRelationships {
-			sb.WriteString(fmt.Sprintf("  - %s → %s", rel.From, rel.To))
+			fmt.Fprintf(&sb, "  - %s → %s", rel.From, rel.To)
 			if rel.Label != "" {
-				sb.WriteString(fmt.Sprintf(" (%s)", rel.Label))
+				fmt.Fprintf(&sb, " (%s)", rel.Label)
 			}
 			sb.WriteString("\n")
 		}
