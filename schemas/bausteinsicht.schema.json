@@ -190,10 +190,33 @@
         },
         "relationships": {
           "type": "object"
+        },
+        "tags": {
+          "items": {
+            "$ref": "#/definitions/TagDefinition"
+          },
+          "type": "array"
         }
       },
       "required": [
         "elements"
+      ],
+      "type": "object"
+    },
+    "TagDefinition": {
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "style": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "id"
       ],
       "type": "object"
     }
