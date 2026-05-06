@@ -22,19 +22,19 @@ func RenderMarkdown(cl *Changelog) string {
 			cl.From.Date.Format("2006-01-02"),
 			cl.To.Date.Format("2006-01-02"))
 	}
-	sb.WriteString(fmt.Sprintf("## %s\n\n", dateRange))
+	fmt.Fprintf(&sb, "## %s\n\n", dateRange)
 
 	// Added elements
 	if cl.Elements.CountAdded() > 0 {
-		sb.WriteString(fmt.Sprintf("### Added (%d elements)\n", cl.Elements.CountAdded()))
+		fmt.Fprintf(&sb, "### Added (%d elements)\n", cl.Elements.CountAdded())
 		for _, change := range cl.Elements.Added {
 			if change.ToBe != nil {
 				desc := ""
 				if change.ToBe.Description != "" {
 					desc = fmt.Sprintf(" _{%s}_", change.ToBe.Description)
 				}
-				sb.WriteString(fmt.Sprintf("- **%s** `[%s]` — %s%s\n",
-					change.ID, change.ToBe.Kind, change.ToBe.Title, desc))
+				fmt.Fprintf(&sb, "- **%s** `[%s]` — %s%s\n",
+					change.ID, change.ToBe.Kind, change.ToBe.Title, desc)
 			}
 		}
 		sb.WriteString("\n")
@@ -42,15 +42,15 @@ func RenderMarkdown(cl *Changelog) string {
 
 	// Removed elements
 	if cl.Elements.CountRemoved() > 0 {
-		sb.WriteString(fmt.Sprintf("### Removed (%d elements)\n", cl.Elements.CountRemoved()))
+		fmt.Fprintf(&sb, "### Removed (%d elements)\n", cl.Elements.CountRemoved())
 		for _, change := range cl.Elements.Removed {
 			if change.AsIs != nil {
 				desc := ""
 				if change.AsIs.Description != "" {
 					desc = fmt.Sprintf(" _{%s}_", change.AsIs.Description)
 				}
-				sb.WriteString(fmt.Sprintf("- ~~**%s**~~ `[%s]` — %s%s\n",
-					change.ID, change.AsIs.Kind, change.AsIs.Title, desc))
+				fmt.Fprintf(&sb, "- ~~**%s**~~ `[%s]` — %s%s\n",
+					change.ID, change.AsIs.Kind, change.AsIs.Title, desc)
 			}
 		}
 		sb.WriteString("\n")
@@ -58,10 +58,10 @@ func RenderMarkdown(cl *Changelog) string {
 
 	// Changed elements
 	if cl.Elements.CountChanged() > 0 {
-		sb.WriteString(fmt.Sprintf("### Changed (%d elements)\n", cl.Elements.CountChanged()))
+		fmt.Fprintf(&sb, "### Changed (%d elements)\n", cl.Elements.CountChanged())
 		for _, change := range cl.Elements.Changed {
 			if change.AsIs != nil && change.ToBe != nil {
-				sb.WriteString(fmt.Sprintf("- **%s** — ", change.ID))
+				fmt.Fprintf(&sb, "- **%s** — ", change.ID)
 				changes := renderElementChanges(*change.AsIs, *change.ToBe)
 				sb.WriteString(changes)
 				sb.WriteString("\n")
@@ -72,26 +72,26 @@ func RenderMarkdown(cl *Changelog) string {
 
 	// Added relationships
 	if cl.Relationships.CountAddedRelationships() > 0 {
-		sb.WriteString(fmt.Sprintf("### New Relationships (%d)\n", cl.Relationships.CountAddedRelationships()))
+		fmt.Fprintf(&sb, "### New Relationships (%d)\n", cl.Relationships.CountAddedRelationships())
 		for _, change := range cl.Relationships.Added {
 			label := ""
 			if change.ToBe != nil && change.ToBe.Label != "" {
 				label = fmt.Sprintf(" (%s)", change.ToBe.Label)
 			}
-			sb.WriteString(fmt.Sprintf("- %s → %s%s\n", change.From, change.To, label))
+			fmt.Fprintf(&sb, "- %s → %s%s\n", change.From, change.To, label)
 		}
 		sb.WriteString("\n")
 	}
 
 	// Removed relationships
 	if cl.Relationships.CountRemovedRelationships() > 0 {
-		sb.WriteString(fmt.Sprintf("### Removed Relationships (%d)\n", cl.Relationships.CountRemovedRelationships()))
+		fmt.Fprintf(&sb, "### Removed Relationships (%d)\n", cl.Relationships.CountRemovedRelationships())
 		for _, change := range cl.Relationships.Removed {
 			label := ""
 			if change.AsIs != nil && change.AsIs.Label != "" {
 				label = fmt.Sprintf(" (%s)", change.AsIs.Label)
 			}
-			sb.WriteString(fmt.Sprintf("- ~~%s → %s~~%s\n", change.From, change.To, label))
+			fmt.Fprintf(&sb, "- ~~%s → %s~~%s\n", change.From, change.To, label)
 		}
 		sb.WriteString("\n")
 	}
@@ -119,19 +119,19 @@ func RenderAsciiDoc(cl *Changelog) string {
 			cl.From.Date.Format("2006-01-02"),
 			cl.To.Date.Format("2006-01-02"))
 	}
-	sb.WriteString(fmt.Sprintf("== %s\n\n", dateRange))
+	fmt.Fprintf(&sb, "== %s\n\n", dateRange)
 
 	// Added elements
 	if cl.Elements.CountAdded() > 0 {
-		sb.WriteString(fmt.Sprintf("=== Added (%d elements)\n", cl.Elements.CountAdded()))
+		fmt.Fprintf(&sb, "=== Added (%d elements)\n", cl.Elements.CountAdded())
 		for _, change := range cl.Elements.Added {
 			if change.ToBe != nil {
 				desc := ""
 				if change.ToBe.Description != "" {
 					desc = fmt.Sprintf(": %s", change.ToBe.Description)
 				}
-				sb.WriteString(fmt.Sprintf("* *%s* `[%s]` – %s%s\n",
-					change.ID, change.ToBe.Kind, change.ToBe.Title, desc))
+				fmt.Fprintf(&sb, "* *%s* `[%s]` – %s%s\n",
+					change.ID, change.ToBe.Kind, change.ToBe.Title, desc)
 			}
 		}
 		sb.WriteString("\n")
@@ -139,15 +139,15 @@ func RenderAsciiDoc(cl *Changelog) string {
 
 	// Removed elements
 	if cl.Elements.CountRemoved() > 0 {
-		sb.WriteString(fmt.Sprintf("=== Removed (%d elements)\n", cl.Elements.CountRemoved()))
+		fmt.Fprintf(&sb, "=== Removed (%d elements)\n", cl.Elements.CountRemoved())
 		for _, change := range cl.Elements.Removed {
 			if change.AsIs != nil {
 				desc := ""
 				if change.AsIs.Description != "" {
 					desc = fmt.Sprintf(": %s", change.AsIs.Description)
 				}
-				sb.WriteString(fmt.Sprintf("* [line-through]#*%s* `[%s]` – %s#%s\n",
-					change.ID, change.AsIs.Kind, change.AsIs.Title, desc))
+				fmt.Fprintf(&sb, "* [line-through]#*%s* `[%s]` – %s#%s\n",
+					change.ID, change.AsIs.Kind, change.AsIs.Title, desc)
 			}
 		}
 		sb.WriteString("\n")
@@ -155,10 +155,10 @@ func RenderAsciiDoc(cl *Changelog) string {
 
 	// Changed elements
 	if cl.Elements.CountChanged() > 0 {
-		sb.WriteString(fmt.Sprintf("=== Changed (%d elements)\n", cl.Elements.CountChanged()))
+		fmt.Fprintf(&sb, "=== Changed (%d elements)\n", cl.Elements.CountChanged())
 		for _, change := range cl.Elements.Changed {
 			if change.AsIs != nil && change.ToBe != nil {
-				sb.WriteString(fmt.Sprintf("* *%s* – ", change.ID))
+				fmt.Fprintf(&sb, "* *%s* – ", change.ID)
 				changes := renderElementChanges(*change.AsIs, *change.ToBe)
 				sb.WriteString(changes)
 				sb.WriteString("\n")
@@ -169,26 +169,26 @@ func RenderAsciiDoc(cl *Changelog) string {
 
 	// Added relationships
 	if cl.Relationships.CountAddedRelationships() > 0 {
-		sb.WriteString(fmt.Sprintf("=== New Relationships (%d)\n", cl.Relationships.CountAddedRelationships()))
+		fmt.Fprintf(&sb, "=== New Relationships (%d)\n", cl.Relationships.CountAddedRelationships())
 		for _, change := range cl.Relationships.Added {
 			label := ""
 			if change.ToBe != nil && change.ToBe.Label != "" {
 				label = fmt.Sprintf(" (%s)", change.ToBe.Label)
 			}
-			sb.WriteString(fmt.Sprintf("* %s → %s%s\n", change.From, change.To, label))
+			fmt.Fprintf(&sb, "* %s → %s%s\n", change.From, change.To, label)
 		}
 		sb.WriteString("\n")
 	}
 
 	// Removed relationships
 	if cl.Relationships.CountRemovedRelationships() > 0 {
-		sb.WriteString(fmt.Sprintf("=== Removed Relationships (%d)\n", cl.Relationships.CountRemovedRelationships()))
+		fmt.Fprintf(&sb, "=== Removed Relationships (%d)\n", cl.Relationships.CountRemovedRelationships())
 		for _, change := range cl.Relationships.Removed {
 			label := ""
 			if change.AsIs != nil && change.AsIs.Label != "" {
 				label = fmt.Sprintf(" (%s)", change.AsIs.Label)
 			}
-			sb.WriteString(fmt.Sprintf("* [line-through]#%s → %s#%s\n", change.From, change.To, label))
+			fmt.Fprintf(&sb, "* [line-through]#%s → %s#%s\n", change.From, change.To, label)
 		}
 		sb.WriteString("\n")
 	}
@@ -216,19 +216,19 @@ func renderElementChanges(asIs, toBe model.Element) string {
 	var sb strings.Builder
 
 	if asIs.Title != toBe.Title {
-		sb.WriteString(fmt.Sprintf("title: \"%s\" → \"%s\"; ", asIs.Title, toBe.Title))
+		fmt.Fprintf(&sb, "title: \"%s\" → \"%s\"; ", asIs.Title, toBe.Title)
 	}
 	if asIs.Kind != toBe.Kind {
-		sb.WriteString(fmt.Sprintf("kind: \"%s\" → \"%s\"; ", asIs.Kind, toBe.Kind))
+		fmt.Fprintf(&sb, "kind: \"%s\" → \"%s\"; ", asIs.Kind, toBe.Kind)
 	}
 	if asIs.Technology != toBe.Technology {
-		sb.WriteString(fmt.Sprintf("technology: \"%s\" → \"%s\"; ", asIs.Technology, toBe.Technology))
+		fmt.Fprintf(&sb, "technology: \"%s\" → \"%s\"; ", asIs.Technology, toBe.Technology)
 	}
 	if asIs.Description != toBe.Description {
 		sb.WriteString("description: changed; ")
 	}
 	if asIs.Status != toBe.Status {
-		sb.WriteString(fmt.Sprintf("status: \"%s\" → \"%s\"; ", asIs.Status, toBe.Status))
+		fmt.Fprintf(&sb, "status: \"%s\" → \"%s\"; ", asIs.Status, toBe.Status)
 	}
 
 	result := sb.String()
