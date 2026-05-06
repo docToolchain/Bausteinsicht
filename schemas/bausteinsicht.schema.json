@@ -1,0 +1,92 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Bausteinsicht Model",
+  "description": "Architecture model in Bausteinsicht format",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "config": {
+      "$ref": "#/definitions/Config"
+    },
+    "model": {
+      "type": "object"
+    },
+    "relationships": {
+      "items": {
+        "$ref": "#/definitions/Relationship"
+      },
+      "type": "array"
+    },
+    "specification": {
+      "$ref": "#/definitions/Specification"
+    },
+    "views": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "specification",
+    "model",
+    "relationships",
+    "views"
+  ],
+  "definitions": {
+    "Config": {
+      "properties": {
+        "author": {
+          "type": "string"
+        },
+        "legend": {
+          "type": "boolean"
+        },
+        "metadata": {
+          "type": "boolean"
+        },
+        "repo": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Relationship": {
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "from": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "from",
+        "to"
+      ],
+      "type": "object"
+    },
+    "Specification": {
+      "properties": {
+        "elements": {
+          "type": "object"
+        },
+        "relationships": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "elements"
+      ],
+      "type": "object"
+    }
+  }
+}

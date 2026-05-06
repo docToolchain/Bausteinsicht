@@ -4,6 +4,7 @@ DIST := dist
         build_linux_amd64 build_linux_arm64 \
         build_darwin_amd64 build_darwin_arm64 \
         build_windows_amd64 build_windows_arm64 \
+        schema-generate schema-validate \
         test test-race bench vet staticcheck gosec nilaway govulncheck \
         gitleaks golangci-lint check clean install-tools install-hooks
 
@@ -47,6 +48,21 @@ build_windows_arm64:
 	CGO_ENABLED=0 GOOS=windows GOARCH=arm64 go build -o $(DIST)/bausteinsicht_windows_arm64/bausteinsicht.exe ./cmd/bausteinsicht/
 	@echo "→ $(DIST)/bausteinsicht_windows_arm64/bausteinsicht.exe"
 
+# JSON Schema — Generate schema from Go types
+schema-generate: build
+	./bausteinsicht schema generate
+	@echo "✅ Schema generated"
+
+# JSON Schema — Validate schema is current (CI check)
+schema-validate: build
+	./bausteinsicht schema generate
+	@if git diff --quiet schemas/bausteinsicht.schema.json; then \
+		echo "✅ Schema is up to date"; \
+	else \
+		echo "❌ Schema is out of date. Run 'make schema-generate' and commit."; \
+		exit 1; \
+	fi
+
 # Run all tests
 test:
 	go test ./...
@@ -60,7 +76,7 @@ bench:
 	go test -bench=. -benchmem ./...
 
 # Run all checks (lint + security + tests)
-check: vet staticcheck gosec nilaway govulncheck test-race
+check: vet staticcheck gosec nilaway govulncheck test-race schema-validate
 
 # go vet — built-in static analysis
 vet:
