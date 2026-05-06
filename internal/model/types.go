@@ -129,15 +129,16 @@ type RelationshipKind struct {
 }
 
 type Element struct {
-	Kind        string             `json:"kind"`
-	Title       string             `json:"title"`
-	Description string             `json:"description,omitempty"`
-	Technology  string             `json:"technology,omitempty"`
-	Tags        []string           `json:"tags,omitempty"`
-	Status      string             `json:"status,omitempty"` // e.g., "deployed", "deprecated", "archived"
-	Decisions   []string           `json:"decisions,omitempty"` // ADR IDs linked to this element
-	Children    map[string]Element `json:"children,omitempty"`
-	Metadata    map[string]string  `json:"metadata,omitempty"`
+	Kind         string             `json:"kind"`
+	Title        string             `json:"title"`
+	Description  string             `json:"description,omitempty"`
+	Technology   string             `json:"technology,omitempty"`
+	Tags         []string           `json:"tags,omitempty"`
+	Status       string             `json:"status,omitempty"` // e.g., "deployed", "deprecated", "archived"
+	Decisions    []string           `json:"decisions,omitempty"` // ADR IDs linked to this element
+	LastModified string             `json:"lastModified,omitempty"` // RFC3339 timestamp (optional override for git-based staleness detection)
+	Children     map[string]Element `json:"children,omitempty"`
+	Metadata     map[string]string  `json:"metadata,omitempty"`
 }
 
 type Relationship struct {
