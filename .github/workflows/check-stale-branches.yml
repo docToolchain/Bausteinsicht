@@ -1,0 +1,73 @@
+name: Check for Stale Branches
+
+on:
+  schedule:
+    - cron: '0 9 * * 1'  # Weekly Monday 9am UTC
+  workflow_dispatch:
+
+jobs:
+  check-stale:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Detect stale branches
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Find branches not merged to main, older than 7 days
+          git fetch origin
+
+          STALE_BRANCHES=""
+          BRANCH_COUNT=0
+
+          for branch in $(git branch -r | grep -v main | grep -v HEAD | sed 's|origin/||'); do
+            COMMIT_DATE=$(git log -1 --format=%ai origin/$branch 2>/dev/null | cut -d' ' -f1)
+            if [ -z "$COMMIT_DATE" ]; then
+              continue
+            fi
+
+            DAYS_OLD=$(( ($(date +%s) - $(date -d "$COMMIT_DATE" +%s 2>/dev/null || echo 0)) / 86400 ))
+
+            # Check if merged to main
+            if ! git merge-base --is-ancestor origin/$branch origin/main 2>/dev/null; then
+              if [ "$DAYS_OLD" -gt 7 ]; then
+                STALE_BRANCHES="$STALE_BRANCHES- \`$branch\` ($DAYS_OLD days old)
+"
+                BRANCH_COUNT=$((BRANCH_COUNT + 1))
+              fi
+            fi
+          done
+
+          if [ "$BRANCH_COUNT" -gt 0 ]; then
+            echo "⚠️ **Stale Branches Found**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Found $BRANCH_COUNT stale branch(es) (unmerged, >7 days old):" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "$STALE_BRANCHES" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            gh issue create \
+              --title "🧹 Cleanup: Stale branches found" \
+              --body "Found stale branches (not merged to main, >7 days old):
+
+$STALE_BRANCHES
+
+**Recommendation:**
+Review if these branches should be:
+1. Merged (if still relevant work)
+2. Deleted (if work is abandoned or superseded)
+
+Delete with:
+\`\`\`bash
+git fetch origin
+git branch -D <branch>
+git push origin --delete <branch>
+\`\`\`" \
+              --label infrastructure \
+              2>/dev/null || echo "Issue already exists or other error"
+          else
+            echo "✅ No stale branches found" >> $GITHUB_STEP_SUMMARY
+          fi
