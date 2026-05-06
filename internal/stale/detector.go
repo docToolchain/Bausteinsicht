@@ -17,11 +17,11 @@ func Detect(m *model.BausteinsichtModel, modelPath string, config StaleConfig) (
 		return result, nil
 	}
 
-	// Get last modification date of the model file
-	lastModified, err := GetLastModifiedDate(modelPath)
+	// Get last modification date of the model file (fallback for elements without explicit lastModified)
+	fileLastModified, err := GetLastModifiedDate(modelPath)
 	if err != nil {
 		// Don't fail if git integration has issues; just flag everything as potentially stale
-		lastModified = time.Time{}
+		fileLastModified = time.Time{}
 	}
 
 	// Flatten the model to get all elements
@@ -43,8 +43,16 @@ func Detect(m *model.BausteinsichtModel, modelPath string, config StaleConfig) (
 			continue
 		}
 
+		// Determine element's last modified time (use per-element override if provided)
+		elemLastModified := fileLastModified
+		if elem.LastModified != "" {
+			if parsedTime, err := time.Parse(time.RFC3339, elem.LastModified); err == nil {
+				elemLastModified = parsedTime
+			}
+		}
+
 		// Check staleness criteria
-		if !shouldFlag(elem, lastModified, config) {
+		if !shouldFlag(elem, elemLastModified, config) {
 			continue
 		}
 
@@ -53,8 +61,8 @@ func Detect(m *model.BausteinsichtModel, modelPath string, config StaleConfig) (
 			ID:                dotPath,
 			Title:             elem.Title,
 			Kind:              elem.Kind,
-			LastModified:      lastModified,
-			DaysSinceModified: DaysSince(lastModified),
+			LastModified:      elemLastModified,
+			DaysSinceModified: DaysSince(elemLastModified),
 			MissingStatus:     elem.Status == "",
 			MissingADR:        len(elem.Decisions) == 0,
 			IncomingRelCount:  relIndex.incoming[dotPath],
