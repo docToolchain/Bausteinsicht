@@ -49,12 +49,6 @@ func runSchemaGenerate(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("failed to convert schema to JSON: %w", err)
 	}
 
-	// Create output directory if it doesn't exist
-	outputDir := os.Getenv("PWD")
-	if len(outputDir) == 0 {
-		outputDir = "."
-	}
-
 	// Write to file
 	if err := os.WriteFile(outputFile, jsonBytes, 0600); err != nil {
 		return fmt.Errorf("failed to write schema file: %w", err)

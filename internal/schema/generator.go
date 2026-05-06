@@ -41,7 +41,7 @@ func (g *Generator) Generate(v interface{}) *JSONSchema {
 
 	// Generate properties from struct fields
 	t := reflect.TypeOf(v)
-	if t.Kind() == reflect.Ptr {
+	if t.Kind() == reflect.Ptr { //nolint:govet
 		t = t.Elem()
 	}
 
@@ -70,7 +70,7 @@ func (g *Generator) Generate(v interface{}) *JSONSchema {
 
 // generateFieldSchema generates schema for a single field
 func (g *Generator) generateFieldSchema(t reflect.Type) interface{} {
-	if t.Kind() == reflect.Ptr {
+	if t.Kind() == reflect.Ptr { //nolint:govet
 		return g.generateFieldSchema(t.Elem())
 	}
 
