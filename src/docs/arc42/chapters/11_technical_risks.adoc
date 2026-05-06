@@ -47,6 +47,30 @@ For the complete risk register, sensitivity point analysis, and tradeoff analysi
 | Low
 | Medium
 | Go performance makes this unlikely below ~1000 elements. Profile with 500-element model. (Priority: *v2*)
+
+| R-5
+| LSP server crashes or hangs — VS Code extension depends on LSP availability for autocompletion and validation.
+| Medium
+| Medium
+| Implement health checks, restart logic, and timeout handling. Add telemetry for crash detection. (Priority: *post-release*)
+
+| R-6
+| DSL import parsing errors — Structurizr DSL and LikeC4 parsers may fail on valid but unexpected DSL syntax, losing data on import.
+| Medium
+| High
+| Add comprehensive error messages and validation warnings. Implement roundtrip tests (import → export → import). (Priority: *after release*)
+
+| R-7
+| Large model export performance — exporting 1000+ element models to Mermaid or Structurizr DSL could be slow.
+| Low
+| Medium
+| Add streaming export for large models. Profile with 500-element export. (Priority: *v2*)
+
+| R-8
+| Search result completeness — element search with pattern matching might miss results due to regex escaping or scope filtering.
+| Low
+| Low
+| Add property-based tests for search patterns. Test edge cases: special characters, deep nesting, circular references. (Priority: *post-release*)
 |===
 
 === Technical Debts
@@ -54,6 +78,8 @@ For the complete risk register, sensitivity point analysis, and tradeoff analysi
 * *No auto-layout (TP-1):* First sync produces a flat row of elements. Users must arrange manually in draw.io. Acceptable for v1; evaluate hierarchical auto-layout as opt-in post-release.
 * *Single template style (TP-6):* `bausteinsicht init` ships a default template, but only one style. Consider additional template styles or a template gallery post-release.
 * *E2E test coverage:* 26 of 215 tests are skipped (mostly environment-related). Reduce skip count in CI to improve confidence.
+* *LSP editor support (TP-7):* LSP server implemented but only VS Code integration complete. Extend to other editors (Neovim, Sublime, Emacs) post-release.
+* *Import roundtrip completeness (TP-8):* Structurizr DSL and LikeC4 imports work but may lose custom metadata on export-import cycle. Document lossy fields and plan full roundtrip support for v2.
 
 === Non-Risks
 
