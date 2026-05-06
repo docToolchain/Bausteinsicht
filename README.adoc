@@ -1,5 +1,8 @@
 = Bausteinsicht
 
+image:https://codecov.io/gh/docToolchain/Bausteinsicht/graph/badge.svg?token=FCZ6CCTBKJ[Codecov]
+image:https://github.com/docToolchain/Bausteinsicht/workflows/Go%20CI/badge.svg[Go CI]
+
 Architecture-as-code tool with https://www.drawio.com/[draw.io] as visual frontend and bidirectional synchronization.
 
 Define your architecture in a JSONC text file, and Bausteinsicht generates and updates draw.io diagrams automatically — in both directions.
