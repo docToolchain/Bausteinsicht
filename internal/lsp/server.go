@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 )
@@ -182,6 +184,13 @@ func (s *Server) handleMessage(msg *JSONRPCMessage) interface{} {
 		return nil
 
 	case "shutdown":
+		// Send response before exiting (LSP spec requirement)
+		response := &JSONRPCMessage{
+			JSONRPC: "2.0",
+			ID:      msg.ID,
+			Result:  map[string]interface{}{},
+		}
+		s.sendMessage(response)
 		os.Exit(0)
 
 	default:
@@ -312,13 +321,28 @@ func (s *Server) detectModel() {
 }
 
 func (s *Server) isModelFile(filename string) bool {
-	return strings.HasSuffix(filename, "architecture.jsonc")
+	base := filepath.Base(filename)
+	return strings.Contains(base, "architecture") && strings.HasSuffix(base, ".jsonc")
 }
 
 func URIToPath(uri string) string {
-	// Remove file:// prefix
-	if strings.HasPrefix(uri, "file://") {
-		return uri[7:]
+	// Parse URI to handle cross-platform paths and URL-encoded characters
+	u, err := url.Parse(uri)
+	if err != nil {
+		// Fall back to simple prefix removal on parse error
+		if strings.HasPrefix(uri, "file://") {
+			return uri[7:]
+		}
+		return uri
 	}
-	return uri
+
+	// Extract path from parsed URI
+	path := filepath.FromSlash(u.Path)
+
+	// On Windows, remove leading slash from absolute paths (C:/path not /C:/path)
+	if runtime.GOOS == "windows" && len(path) > 0 && path[0] == '/' && len(path) > 2 && path[2] == ':' {
+		path = path[1:]
+	}
+
+	return path
 }

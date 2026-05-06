@@ -2,6 +2,7 @@ package lsp
 
 import (
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"strings"
 )
@@ -27,7 +28,9 @@ type CodeLensData struct {
 
 // GenerateCodeLens extracts element definitions from the document and generates CodeLens objects.
 func GenerateCodeLens(doc *Document) []CodeLens {
-	if !strings.HasSuffix(doc.Filename, "architecture.jsonc") {
+	// Check if filename matches *architecture*.jsonc pattern
+	base := filepath.Base(doc.Filename)
+	if !strings.Contains(base, "architecture") || !strings.HasSuffix(base, ".jsonc") {
 		return nil
 	}
 

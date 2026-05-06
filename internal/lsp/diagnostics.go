@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -50,8 +51,25 @@ type ValidationWarning struct {
 }
 
 func ValidateDocument(doc *Document, workDir string) []Diagnostic {
-	if !strings.HasSuffix(doc.Filename, "architecture.jsonc") {
+	// Check if filename matches *architecture*.jsonc pattern
+	base := filepath.Base(doc.Filename)
+	if !strings.Contains(base, "architecture") || !strings.HasSuffix(base, ".jsonc") {
 		return nil
+	}
+
+	// Validate path to prevent directory traversal (SEC-001)
+	cleanPath := filepath.Clean(doc.Filename)
+	for _, component := range strings.Split(cleanPath, string(filepath.Separator)) {
+		if component == ".." {
+			return []Diagnostic{
+				{
+					Range:    Range{Start: Position{Line: 0, Character: 0}, End: Position{Line: 0, Character: 10}},
+					Message:  "Invalid path: contains directory traversal",
+					Severity: DiagnosticError,
+					Source:   "bausteinsicht",
+				},
+			}
+		}
 	}
 
 	// Call bausteinsicht validate --format json
