@@ -10,7 +10,9 @@ import (
 
 func main() {
 	var debug bool
+	var stdio bool // Accept -stdio flag (used by LSP clients, can be ignored)
 	flag.BoolVar(&debug, "debug", false, "Enable debug logging to stderr")
+	flag.BoolVar(&stdio, "stdio", false, "Use stdio for LSP communication (default behavior)")
 	flag.Parse()
 
 	// Set up logging
