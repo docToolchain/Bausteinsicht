@@ -152,3 +152,57 @@ func ResolveView(m *BausteinsichtModel, view *View) ([]string, error) {
 	sort.Strings(result)
 	return result, nil
 }
+
+// FilterElementsByTags applies tag-based filtering to a flat element map.
+// It includes elements that have ALL FilterTags and excludes elements with ANY ExcludeTags.
+func FilterElementsByTags(elements map[string]*Element, filterTags, excludeTags []string) map[string]*Element {
+	// Quick exit: no filtering
+	if len(filterTags) == 0 && len(excludeTags) == 0 {
+		return elements
+	}
+
+	result := make(map[string]*Element)
+	for id, elem := range elements {
+		// Check exclude first: if ANY exclude-tag matches, skip
+		excluded := false
+		for _, excludeTag := range excludeTags {
+			for _, elemTag := range elem.Tags {
+				if elemTag == excludeTag {
+					excluded = true
+					break
+				}
+			}
+			if excluded {
+				break
+			}
+		}
+		if excluded {
+			continue
+		}
+
+		// Check include: if ANY filter-tags are specified, element must have ALL of them
+		if len(filterTags) > 0 {
+			hasAllFilterTags := true
+			for _, filterTag := range filterTags {
+				found := false
+				for _, elemTag := range elem.Tags {
+					if elemTag == filterTag {
+						found = true
+						break
+					}
+				}
+				if !found {
+					hasAllFilterTags = false
+					break
+				}
+			}
+			if !hasAllFilterTags {
+				continue
+			}
+		}
+
+		result[id] = elem
+	}
+
+	return result
+}

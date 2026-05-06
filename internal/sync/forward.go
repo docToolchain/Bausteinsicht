@@ -1,6 +1,7 @@
 package sync
 
 import (
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -16,6 +17,63 @@ const (
 	defaultWidth     = 120.0
 	defaultHeight    = 60.0
 )
+
+// applyTagStyles applies styles defined in tag definitions to an element's style.
+// For each tag on the element, looks up the corresponding TagDefinition and merges
+// any styles defined there into the element's style string.
+func applyTagStyles(elem *model.Element, spec *model.Specification, baseStyle string) string {
+	if len(elem.Tags) == 0 {
+		return baseStyle
+	}
+
+	// Build a map of tag ID to TagDefinition for quick lookup
+	tagDefMap := make(map[string]model.TagDefinition)
+	for _, tagDef := range spec.Tags {
+		tagDefMap[tagDef.ID] = tagDef
+	}
+
+	// Collect all style properties from tags that apply to this element
+	styleProps := make(map[string]interface{})
+	for _, tagID := range elem.Tags {
+		if tagDef, ok := tagDefMap[tagID]; ok && len(tagDef.Style) > 0 {
+			for k, v := range tagDef.Style {
+				styleProps[k] = v
+			}
+		}
+	}
+
+	// If no tag styles found, return base style
+	if len(styleProps) == 0 {
+		return baseStyle
+	}
+
+	// Convert style properties to a string and merge with baseStyle
+	tagStyleStr := ""
+	for k, v := range styleProps {
+		tagStyleStr += k + "=" + toString(v) + ";"
+	}
+
+	return mergeStyles(baseStyle, tagStyleStr)
+}
+
+// toString converts a value to a string representation suitable for draw.io style attributes.
+func toString(v interface{}) string {
+	switch val := v.(type) {
+	case string:
+		return val
+	case float64:
+		if val == float64(int64(val)) {
+			return strconv.FormatInt(int64(val), 10)
+		}
+		return strconv.FormatFloat(val, 'f', -1, 64)
+	case int:
+		return strconv.Itoa(val)
+	case bool:
+		return strconv.FormatBool(val)
+	default:
+		return fmt.Sprintf("%v", v)
+	}
+}
 
 // ForwardOptions holds optional parameters for forward sync.
 type ForwardOptions struct {
@@ -57,7 +115,7 @@ func ApplyForward(
 	}
 
 	if len(m.Views) == 0 {
-		applyForwardToPage(cs, doc, templates, flat, nil, result)
+		applyForwardToPage(cs, doc, templates, flat, nil, &m.Specification, result)
 		return result
 	}
 
@@ -72,6 +130,7 @@ func applyForwardToPage(
 	templates *drawio.TemplateSet,
 	flat map[string]*model.Element,
 	elemFilter map[string]bool,
+	spec *model.Specification,
 	result *ForwardResult,
 ) {
 	page := firstPage(doc)
@@ -79,7 +138,7 @@ func applyForwardToPage(
 		result.Warnings = append(result.Warnings, "no page found in document")
 		return
 	}
-	applyChangesToPage(cs, page, templates, flat, elemFilter, "", "", result)
+	applyChangesToPage(cs, page, templates, flat, elemFilter, "", "", spec, result)
 
 	// Reconcile orphaned elements: remove any element on the page whose
 	// bausteinsicht_id is not present in the current model. This handles
@@ -137,7 +196,7 @@ func applyForwardPerView(
 		}
 
 		if scopeID != "" {
-			createScopeBoundary(scopeID, viewID, page, templates, flat, result)
+			createScopeBoundary(scopeID, viewID, page, templates, flat, &m.Specification, result)
 			// Include scope element in the filter so connectors targeting the
 			// boundary element are rendered (#217).
 			elemSet[scopeID] = true
@@ -150,7 +209,7 @@ func applyForwardPerView(
 		// this handles elements newly included via view changes (#231).
 		populateNewPage(page, viewID, scopeID, templates, flat, elemSet, m, result)
 
-		applyChangesToPage(cs, page, templates, flat, elemSet, viewID, scopeID, result)
+		applyChangesToPage(cs, page, templates, flat, elemSet, viewID, scopeID, &m.Specification, result)
 
 		// Populate connectors for relationships whose endpoints are both
 		// on the page but whose connector doesn't exist yet. This handles
@@ -250,13 +309,13 @@ func populateNewPage(
 			if !ok {
 				continue
 			}
-			placeSingleElement(id, viewID, scopeID, page, templates, flat, pos.X, pos.Y, false, result)
+			placeSingleElement(id, viewID, scopeID, page, templates, flat, &m.Specification, pos.X, pos.Y, false, result)
 		}
 	} else {
 		// Incremental: fall back to cursor-based placement.
 		pl := computePlacement(page)
 		for _, id := range toPlace {
-			applyElementAdded(id, viewID, scopeID, page, templates, flat, &pl, result)
+			applyElementAdded(id, viewID, scopeID, page, templates, flat, &m.Specification, &pl, result)
 		}
 	}
 }
@@ -370,12 +429,14 @@ func liftEndpoint(id string, elemFilter map[string]bool) string {
 
 // createScopeBoundary creates a boundary/swimlane element for the scope element
 // of a view (e.g., the parent system in a container view).
+// spec provides tag definitions for applying tag-based styles.
 func createScopeBoundary(
 	scopeID string,
 	viewID string,
 	page *drawio.Page,
 	templates *drawio.TemplateSet,
 	flat map[string]*model.Element,
+	spec *model.Specification,
 	result *ForwardResult,
 ) {
 	// Skip if already present on the page.
@@ -396,7 +457,13 @@ func createScopeBoundary(
 		result.Warnings = append(result.Warnings, "no boundary template for kind: "+boundaryKind)
 	}
 
-	style := ts.Style
+	baseStyle := ts.Style
+	// Apply tag-based styles if any tags are defined on the element
+	if spec != nil && len(elem.Tags) > 0 {
+		baseStyle = applyTagStyles(elem, spec, baseStyle)
+	}
+
+	style := baseStyle
 	width := ts.Width
 	if width == 0 {
 		width = 400
@@ -431,6 +498,7 @@ func createScopeBoundary(
 // endpoints are in the filter set.
 // viewID is used to scope cell IDs for file-wide uniqueness (empty = legacy).
 // scopeID identifies the boundary element for parenting children (empty = no scope).
+// spec provides tag definitions for applying tag-based styles.
 func applyChangesToPage(
 	cs *ChangeSet,
 	page *drawio.Page,
@@ -439,6 +507,7 @@ func applyChangesToPage(
 	elemFilter map[string]bool,
 	viewID string,
 	scopeID string,
+	spec *model.Specification,
 	result *ForwardResult,
 ) {
 	pl := computePlacement(page)
@@ -449,7 +518,7 @@ func applyChangesToPage(
 			if elemFilter != nil && !elemFilter[ch.ID] {
 				continue
 			}
-			applyElementAdded(ch.ID, viewID, scopeID, page, templates, flat, &pl, result)
+			applyElementAdded(ch.ID, viewID, scopeID, page, templates, flat, spec, &pl, result)
 		case Modified:
 			if elemFilter != nil && !elemFilter[ch.ID] && ch.ID != scopeID {
 				continue
@@ -592,6 +661,7 @@ func computePlacement(page *drawio.Page) placement {
 // applyElementAdded creates a new element on page with a visual new-element marker.
 // If scopeID is set and the element is a child of the scope, it is parented to the
 // scope boundary cell.
+// spec provides tag definitions for applying tag-based styles.
 func applyElementAdded(
 	id string,
 	viewID string,
@@ -599,6 +669,7 @@ func applyElementAdded(
 	page *drawio.Page,
 	templates *drawio.TemplateSet,
 	flat map[string]*model.Element,
+	spec *model.Specification,
 	pl *placement,
 	result *ForwardResult,
 ) {
@@ -628,7 +699,13 @@ func applyElementAdded(
 		result.Warnings = append(result.Warnings, "no template style for kind: "+elem.Kind)
 	}
 
-	style := mergeStyles(ts.Style, newElementMarker)
+	// Apply tag-based styles if any tags are defined on the element
+	baseStyle := ts.Style
+	if spec != nil && len(elem.Tags) > 0 {
+		baseStyle = applyTagStyles(elem, spec, baseStyle)
+	}
+
+	style := mergeStyles(baseStyle, newElementMarker)
 
 	width := ts.Width
 	if width == 0 {
@@ -675,6 +752,7 @@ func placeSingleElement(
 	page *drawio.Page,
 	templates *drawio.TemplateSet,
 	flat map[string]*model.Element,
+	spec *model.Specification,
 	x, y float64,
 	markNew bool,
 	result *ForwardResult,
@@ -695,9 +773,15 @@ func placeSingleElement(
 		result.Warnings = append(result.Warnings, "no template style for kind: "+elem.Kind)
 	}
 
-	style := ts.Style
+	baseStyle := ts.Style
+	// Apply tag-based styles if any tags are defined on the element
+	if spec != nil && len(elem.Tags) > 0 {
+		baseStyle = applyTagStyles(elem, spec, baseStyle)
+	}
+
+	style := baseStyle
 	if markNew {
-		style = mergeStyles(ts.Style, newElementMarker)
+		style = mergeStyles(baseStyle, newElementMarker)
 	}
 
 	width := ts.Width
