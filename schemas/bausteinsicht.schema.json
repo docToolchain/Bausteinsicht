@@ -7,6 +7,9 @@
     "$schema": {
       "type": "string"
     },
+    "asIs": {
+      "$ref": "#/definitions/ModelSnapshot"
+    },
     "config": {
       "$ref": "#/definitions/Config"
     },
@@ -33,6 +36,9 @@
     },
     "specification": {
       "$ref": "#/definitions/Specification"
+    },
+    "toBe": {
+      "$ref": "#/definitions/ModelSnapshot"
     },
     "views": {
       "type": "object"
@@ -130,6 +136,24 @@
         "key",
         "title",
         "steps"
+      ],
+      "type": "object"
+    },
+    "ModelSnapshot": {
+      "properties": {
+        "elements": {
+          "type": "object"
+        },
+        "relationships": {
+          "items": {
+            "$ref": "#/definitions/Relationship"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "elements",
+        "relationships"
       ],
       "type": "object"
     },
