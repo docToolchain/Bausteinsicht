@@ -1,6 +1,7 @@
 package snapshot
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/docToolchain/Bausteinsicht/internal/model"
@@ -41,9 +42,10 @@ func NewSnapshot(message string, model *model.BausteinsichtModel) *Snapshot {
 	return snapshot
 }
 
-// generateSnapshotID creates a timestamp-based snapshot ID
+// generateSnapshotID creates a timestamp-based snapshot ID with nanosecond precision
 func generateSnapshotID() string {
-	return time.Now().UTC().Format("snapshot-2006-01-02T15-04-05Z")
+	now := time.Now().UTC()
+	return now.Format("snapshot-2006-01-02T15-04-05") + fmt.Sprintf(".%09dZ", now.Nanosecond())
 }
 
 // ToMetadata converts a snapshot to its metadata representation
