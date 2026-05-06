@@ -280,3 +280,25 @@ func writeMermaidElement(b *strings.Builder, e elemEntry, indent string) {
 			escapeQuotes(e.Elem.Title), escapeQuotes(e.Elem.Description))
 	}
 }
+
+// ExportAllViewsToMermaid exports all views from the model as Mermaid diagrams.
+// Returns a slice of view keys in order and a map of view key → Mermaid diagram code.
+func ExportAllViewsToMermaid(m *model.BausteinsichtModel) ([]string, map[string]string, error) {
+	diagrams := make(map[string]string)
+	var viewKeys []string
+
+	for viewKey := range m.Views {
+		viewKeys = append(viewKeys, viewKey)
+	}
+	sort.Strings(viewKeys)
+
+	for _, viewKey := range viewKeys {
+		diagramCode, err := FormatView(m, viewKey, Mermaid)
+		if err != nil {
+			return nil, nil, err
+		}
+		diagrams[viewKey] = diagramCode
+	}
+
+	return viewKeys, diagrams, nil
+}
