@@ -24,6 +24,36 @@ jobs:
       - run: go build ./...
       - run: go test ./...
 
+  coverage:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        with:
+          go-version-file: go.mod
+      - name: Generate coverage report
+        run: |
+          mkdir -p coverage
+          go test -coverprofile=coverage/coverage.out ./... || true
+          go tool cover -html=coverage/coverage.out -o coverage/coverage.html
+      - name: Calculate coverage percentage
+        id: coverage
+        run: |
+          if [ -f coverage/coverage.out ]; then
+            COVERAGE=$(go tool cover -func=coverage/coverage.out | grep total | awk '{print $NF}')
+            echo "percentage=${COVERAGE}" >> $GITHUB_OUTPUT
+            echo "📊 Code Coverage: ${COVERAGE}"
+          fi
+      - name: Upload coverage report
+        uses: actions/upload-artifact@6f51ac03b9356f520e9adb1b1b7802705f340c2b # v4
+        if: always()
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 30
+
   schema-validation:
     runs-on: ubuntu-latest
     permissions:
