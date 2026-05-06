@@ -3,7 +3,6 @@ package template
 import (
 	"bytes"
 	"fmt"
-	"html"
 	"sort"
 	"strings"
 
@@ -112,8 +111,8 @@ func (g *Generator) addElement(parent *etree.Element, kind string, x, y int) {
 	cell := parent.CreateElement("mxCell")
 	cell.CreateAttr("id", fmt.Sprintf("%d", g.nextID))
 	g.nextID++
-	cell.CreateAttr("value", html.EscapeString(label))
-	cell.CreateAttr("style", style)
+	cell.CreateAttr("value", label)           // Don't escape: draw.io uses html=1 and requires raw HTML markup for rich text
+	cell.CreateAttr("style", style+";html=1") // Enable HTML rendering in draw.io
 	cell.CreateAttr("vertex", "1")
 	cell.CreateAttr("parent", "1")
 
@@ -127,8 +126,8 @@ func (g *Generator) addElement(parent *etree.Element, kind string, x, y int) {
 
 func (g *Generator) buildStyle(cfg ShapeConfig, colors ColorStyle, _ model.ElementKind) string {
 	parts := []string{
-		fmt.Sprintf("fillColor=%s", strings.TrimPrefix(colors.Fill, "#")),
-		fmt.Sprintf("strokeColor=%s", strings.TrimPrefix(colors.Stroke, "#")),
+		fmt.Sprintf("fillColor=%s", colors.Fill),
+		fmt.Sprintf("strokeColor=%s", colors.Stroke),
 		"fontColor=#000000",
 		"fontSize=12",
 	}
