@@ -10,14 +10,14 @@ import (
 )
 
 type statusResult struct {
-	Summary  map[string]int `json:"summary"`
+	Summary  map[string]int  `json:"summary"`
 	Elements []statusElement `json:"elements"`
 }
 
 type statusElement struct {
-	ID    string `json:"id"`
-	Kind  string `json:"kind"`
-	Title string `json:"title"`
+	ID     string `json:"id"`
+	Kind   string `json:"kind"`
+	Title  string `json:"title"`
 	Status string `json:"status"`
 }
 
@@ -30,7 +30,7 @@ func newStatusCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringP("filter", "f", "", "Filter elements by status (proposed, design, implementation, deployed, deprecated, archived)")
-	cmd.Flags().StringP("model", "m", "architecture.jsonc", "Path to architecture model file")
+	// Note: --model is registered as PersistentFlag on root command, not locally
 
 	return cmd
 }
@@ -65,7 +65,10 @@ func runStatus(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Collect all elements with their status
-	flatElements, _ := model.FlattenElements(m)
+	flatElements, err := model.FlattenElements(m)
+	if err != nil {
+		return exitWithCode(fmt.Errorf("flattening model: %w", err), 1)
+	}
 
 	result := statusResult{
 		Summary:  make(map[string]int),
@@ -99,9 +102,9 @@ func runStatus(cmd *cobra.Command, _ []string) error {
 
 		// Collect element
 		result.Elements = append(result.Elements, statusElement{
-			ID:    id,
-			Kind:  elem.Kind,
-			Title: elem.Title,
+			ID:     id,
+			Kind:   elem.Kind,
+			Title:  elem.Title,
 			Status: status,
 		})
 	}
