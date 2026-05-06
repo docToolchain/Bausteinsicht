@@ -87,7 +87,7 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 	}
 
 	// When --format json, output structured JSON with diagram source. (#241)
-	if format == "json" {
+	if outputFormat == "json" {
 		type diagramEntry struct {
 			View   string `json:"view"`
 			Format string `json:"format"`

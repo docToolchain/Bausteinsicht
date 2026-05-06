@@ -83,7 +83,10 @@ func (s *Server) readMessages() error {
 		headers := make(map[string]string)
 		for {
 			line, err := reader.ReadString('\n')
-			if err != nil && err != io.EOF {
+			if err == io.EOF {
+				return nil // Client disconnected cleanly
+			}
+			if err != nil {
 				return err
 			}
 			line = strings.TrimSpace(line)
@@ -108,8 +111,11 @@ func (s *Server) readMessages() error {
 		}
 
 		body := make([]byte, length)
-		_, err = reader.Read(body)
-		if err != nil && err != io.EOF {
+		_, err = io.ReadFull(reader, body)
+		if err != nil {
+			if err == io.EOF {
+				return fmt.Errorf("unexpected EOF while reading message body")
+			}
 			return err
 		}
 
