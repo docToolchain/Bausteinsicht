@@ -267,10 +267,10 @@ func placeLayered(
 
 	// First pass: place left-aligned and track row membership for centering.
 	type rowInfo struct {
-		ids      []string
-		width    float64
-		height   float64
-		y        float64
+		ids    []string
+		width  float64
+		height float64
+		y      float64
 	}
 	var rows []rowInfo
 	curY := originY

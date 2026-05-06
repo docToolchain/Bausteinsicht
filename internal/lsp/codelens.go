@@ -70,7 +70,7 @@ func GenerateCodeLens(doc *Document) []CodeLens {
 				Arguments: []interface{}{
 					elementID,
 					map[string]interface{}{
-						"kind":  kind,
+						"kind":   kind,
 						"status": status,
 						"views":  viewCount,
 					},

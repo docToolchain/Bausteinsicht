@@ -9,10 +9,10 @@ import (
 )
 
 type Diagnostic struct {
-	Range   Range  `json:"range"`
-	Message string `json:"message"`
-	Severity int `json:"severity"`
-	Source  string `json:"source"`
+	Range    Range  `json:"range"`
+	Message  string `json:"message"`
+	Severity int    `json:"severity"`
+	Source   string `json:"source"`
 }
 
 type Range struct {
@@ -33,8 +33,8 @@ const (
 )
 
 type ValidateOutput struct {
-	Valid   bool `json:"valid"`
-	Errors  []ValidationError `json:"errors,omitempty"`
+	Valid    bool                `json:"valid"`
+	Errors   []ValidationError   `json:"errors,omitempty"`
 	Warnings []ValidationWarning `json:"warnings,omitempty"`
 }
 

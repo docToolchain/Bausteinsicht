@@ -46,8 +46,8 @@ func TestGenerateCodeLens(t *testing.T) {
 
 func TestExtractKind(t *testing.T) {
 	tests := []struct {
-		lines       []string
-		startLine   int
+		lines        []string
+		startLine    int
 		expectedKind string
 	}{
 		{
@@ -85,8 +85,8 @@ func TestExtractKind(t *testing.T) {
 
 func TestExtractStatus(t *testing.T) {
 	tests := []struct {
-		lines         []string
-		startLine     int
+		lines          []string
+		startLine      int
 		expectedStatus string
 	}{
 		{
@@ -124,10 +124,10 @@ func TestExtractStatus(t *testing.T) {
 
 func TestEstimateViewCount(t *testing.T) {
 	tests := []struct {
-		content    string
-		elementID  string
-		minViews   int
-		maxViews   int
+		content   string
+		elementID string
+		minViews  int
+		maxViews  int
 	}{
 		{
 			`{"model": {"svc": {}, "api": {"depends_on": "svc"}}}`,

@@ -72,15 +72,15 @@ func TestFindLineInDocument(t *testing.T) {
 	}
 
 	tests := []struct {
-		path         string
+		path          string
 		preferredLine int
-		expectedLine int
+		expectedLine  int
 	}{
-		{"model", 2, 1},                    // Line 2 → 0-indexed = 1
-		{"model.svc", 3, 2},                // Line 3 → 0-indexed = 2
-		{"model.svc.kind", 4, 3},           // Line 4 → 0-indexed = 3
-		{"nonexistent", 0, 0},              // Not found → fallback line 0
-		{"svc", 0, 2},                      // Search for "svc" in document
+		{"model", 2, 1},          // Line 2 → 0-indexed = 1
+		{"model.svc", 3, 2},      // Line 3 → 0-indexed = 2
+		{"model.svc.kind", 4, 3}, // Line 4 → 0-indexed = 3
+		{"nonexistent", 0, 0},    // Not found → fallback line 0
+		{"svc", 0, 2},            // Search for "svc" in document
 	}
 
 	for _, tt := range tests {
@@ -140,10 +140,10 @@ func TestDiagnosticSeverityMapping(t *testing.T) {
 	}
 
 	tests := []struct {
-		name         string
-		output       ValidateOutput
-		expectedSev  int
-		expectedMsg  string
+		name        string
+		output      ValidateOutput
+		expectedSev int
+		expectedMsg string
 	}{
 		{
 			"error severity",

@@ -53,9 +53,9 @@ type InitializeResult struct {
 }
 
 type ServerCapabilities struct {
-	TextDocumentSync int    `json:"textDocumentSync"`
+	TextDocumentSync   int  `json:"textDocumentSync"`
 	DiagnosticProvider bool `json:"diagnosticProvider"`
-	CodeLensProvider struct {
+	CodeLensProvider   struct {
 		CodeLensOptions
 	} `json:"codeLensProvider"`
 }
@@ -212,7 +212,7 @@ func (s *Server) handleInitialize(id interface{}, params *InitializeParams) inte
 		ID:      id,
 		Result: InitializeResult{
 			Capabilities: ServerCapabilities{
-				TextDocumentSync: 2, // Full document sync
+				TextDocumentSync:   2, // Full document sync
 				DiagnosticProvider: true,
 				CodeLensProvider: struct {
 					CodeLensOptions
