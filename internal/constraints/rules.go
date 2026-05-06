@@ -83,6 +83,12 @@ func requiredField(c model.Constraint, m *model.BausteinsichtModel) []Violation 
 			missing = el.Technology == ""
 		case "title":
 			missing = el.Title == ""
+		default:
+			// Unsupported field name — return error violation immediately
+			return []Violation{{
+				ConstraintID: c.ID,
+				Message:      fmt.Sprintf("%s: unsupported field %q (valid: description, technology, title)", c.Description, c.Field),
+			}}
 		}
 		if missing {
 			bad = append(bad, fmt.Sprintf("%s: missing %s", id, c.Field))
