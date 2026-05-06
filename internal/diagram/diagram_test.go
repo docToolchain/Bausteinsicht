@@ -343,3 +343,125 @@ func TestColorForKind_UnknownKind(t *testing.T) {
 		t.Error("expected default colors for unknown kind")
 	}
 }
+
+// --- Tag Filtering Tests ---
+
+func TestApplyTagFiltering_NoTags(t *testing.T) {
+	resolved := []string{"elem1", "elem2", "elem3"}
+	flat := map[string]*model.Element{
+		"elem1": {Kind: "system", Title: "Elem1", Tags: []string{"tag1"}},
+		"elem2": {Kind: "system", Title: "Elem2", Tags: []string{"tag2"}},
+		"elem3": {Kind: "system", Title: "Elem3", Tags: []string{"tag3"}},
+	}
+
+	result := applyTagFiltering(resolved, flat, nil, nil)
+	if len(result) != 3 {
+		t.Errorf("expected 3 elements, got %d", len(result))
+	}
+}
+
+func TestApplyTagFiltering_WithFilterTags(t *testing.T) {
+	resolved := []string{"elem1", "elem2", "elem3"}
+	flat := map[string]*model.Element{
+		"elem1": {Kind: "system", Title: "Elem1", Tags: []string{"backend", "critical"}},
+		"elem2": {Kind: "system", Title: "Elem2", Tags: []string{"backend"}},
+		"elem3": {Kind: "system", Title: "Elem3", Tags: []string{"frontend"}},
+	}
+
+	result := applyTagFiltering(resolved, flat, []string{"backend"}, nil)
+	if len(result) != 2 {
+		t.Errorf("expected 2 elements with backend tag, got %d", len(result))
+	}
+}
+
+func TestApplyTagFiltering_WithExcludeTags(t *testing.T) {
+	resolved := []string{"elem1", "elem2", "elem3"}
+	flat := map[string]*model.Element{
+		"elem1": {Kind: "system", Title: "Elem1", Tags: []string{"experimental"}},
+		"elem2": {Kind: "system", Title: "Elem2", Tags: []string{"stable"}},
+		"elem3": {Kind: "system", Title: "Elem3", Tags: []string{"deprecated"}},
+	}
+
+	result := applyTagFiltering(resolved, flat, nil, []string{"experimental", "deprecated"})
+	if len(result) != 1 {
+		t.Errorf("expected 1 stable element, got %d", len(result))
+	}
+}
+
+func TestFormatView_WithTagFiltering(t *testing.T) {
+	m := testModel()
+	// Add tags to the test model elements
+	user := m.Model["user"]
+	user.Tags = []string{"external"}
+	m.Model["user"] = user
+
+	shop := m.Model["shop"]
+	shop.Tags = []string{"core"}
+	m.Model["shop"] = shop
+
+	payment := m.Model["payment"]
+	payment.Tags = []string{"external"}
+	m.Model["payment"] = payment
+
+	// Add tags specification
+	m.Specification.Tags = []model.TagDefinition{
+		{ID: "external", Description: "External actors/systems"},
+		{ID: "core", Description: "Core business systems"},
+	}
+
+	// Create a view with tag filtering
+	m.Views["core-only"] = model.View{
+		Title:      "Core Systems",
+		Include:    []string{"*"},
+		FilterTags: []string{"core"},
+	}
+
+	result, err := FormatView(m, "core-only", PlantUML)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if result == "" {
+		t.Error("expected non-empty diagram output")
+	}
+	// Verify that only the core system is included
+	if !strings.Contains(result, "shop") {
+		t.Error("expected 'shop' in diagram")
+	}
+}
+
+func TestFormatView_WithExcludeTagFiltering(t *testing.T) {
+	m := testModel()
+	// Add tags to the test model elements
+	user := m.Model["user"]
+	user.Tags = []string{"external"}
+	m.Model["user"] = user
+
+	shop := m.Model["shop"]
+	shop.Tags = []string{"core"}
+	m.Model["shop"] = shop
+
+	payment := m.Model["payment"]
+	payment.Tags = []string{"external"}
+	m.Model["payment"] = payment
+
+	// Add tags specification
+	m.Specification.Tags = []model.TagDefinition{
+		{ID: "external", Description: "External actors/systems"},
+		{ID: "core", Description: "Core business systems"},
+	}
+
+	// Create a view that excludes external elements
+	m.Views["internal-only"] = model.View{
+		Title:       "Internal Systems",
+		Include:     []string{"*"},
+		ExcludeTags: []string{"external"},
+	}
+
+	result, err := FormatView(m, "internal-only", PlantUML)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if result == "" {
+		t.Error("expected non-empty diagram output")
+	}
+}

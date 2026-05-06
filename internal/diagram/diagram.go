@@ -19,6 +19,65 @@ const (
 // C4-PlantUML is part of the PlantUML stdlib since v2.x, so we use
 // the <C4/...> include syntax which resolves locally without network access.
 
+// applyTagFiltering filters resolved element IDs based on tag criteria.
+// Elements must have ALL filterTags (intersection) and must not have ANY excludeTags (union).
+func applyTagFiltering(resolved []string, flat map[string]*model.Element, filterTags, excludeTags []string) []string {
+	if len(filterTags) == 0 && len(excludeTags) == 0 {
+		return resolved
+	}
+
+	var result []string
+	for _, id := range resolved {
+		elem := flat[id]
+		if elem == nil {
+			// Element not found in flat map, skip it (shouldn't happen)
+			continue
+		}
+
+		// Check exclude tags: if ANY exclude-tag matches, skip
+		excluded := false
+		for _, excludeTag := range excludeTags {
+			for _, elemTag := range elem.Tags {
+				if elemTag == excludeTag {
+					excluded = true
+					break
+				}
+			}
+			if excluded {
+				break
+			}
+		}
+		if excluded {
+			continue
+		}
+
+		// Check filter tags: if ANY filter-tags are specified, element must have ALL of them
+		if len(filterTags) > 0 {
+			hasAllFilterTags := true
+			for _, filterTag := range filterTags {
+				found := false
+				for _, elemTag := range elem.Tags {
+					if elemTag == filterTag {
+						found = true
+						break
+					}
+				}
+				if !found {
+					hasAllFilterTags = false
+					break
+				}
+			}
+			if !hasAllFilterTags {
+				continue
+			}
+		}
+
+		result = append(result, id)
+	}
+
+	return result
+}
+
 // FormatView renders a view as a C4 diagram in the given format.
 func FormatView(m *model.BausteinsichtModel, viewKey string, f Format) (string, error) {
 	view, ok := m.Views[viewKey]
@@ -32,6 +91,9 @@ func FormatView(m *model.BausteinsichtModel, viewKey string, f Format) (string, 
 	}
 
 	flat, _ := model.FlattenElements(m)
+
+	// Apply tag-based filtering if specified in the view.
+	resolved = applyTagFiltering(resolved, flat, view.FilterTags, view.ExcludeTags)
 	sort.Strings(resolved)
 
 	// Determine C4 level from view content.
