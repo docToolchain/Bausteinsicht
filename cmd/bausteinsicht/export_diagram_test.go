@@ -158,3 +158,37 @@ func TestExportDiagram_InvalidView(t *testing.T) {
 		t.Error("expected error for nonexistent view")
 	}
 }
+
+func TestExportDiagram_StructurizrToStdout(t *testing.T) {
+	modelPath := writeExportDiagramModel(t)
+	out, err := executeRootCmd("export-diagram", "--model", modelPath, "--diagram-format", "structurizr")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "workspace {") {
+		t.Error("expected 'workspace {' in structurizr output")
+	}
+	if !strings.Contains(out, "model {") {
+		t.Error("expected 'model {' in structurizr output")
+	}
+	if !strings.Contains(out, "views {") {
+		t.Error("expected 'views {' in structurizr output")
+	}
+}
+
+func TestExportDiagram_StructurizrToFile(t *testing.T) {
+	modelPath := writeExportDiagramModel(t)
+	outDir := t.TempDir()
+	_, err := executeRootCmd("export-diagram", "--model", modelPath, "--diagram-format", "structurizr", "--output", outDir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	dslPath := filepath.Join(outDir, "workspace.dsl")
+	data, err := os.ReadFile(dslPath)
+	if err != nil {
+		t.Fatalf("expected workspace.dsl to be written: %v", err)
+	}
+	if !strings.Contains(string(data), "workspace {") {
+		t.Errorf("workspace.dsl missing 'workspace {': %s", data)
+	}
+}

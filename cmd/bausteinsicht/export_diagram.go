@@ -9,6 +9,7 @@ import (
 
 	"github.com/docToolchain/Bausteinsicht/internal/diagram"
 	"github.com/docToolchain/Bausteinsicht/internal/export"
+	dslexport "github.com/docToolchain/Bausteinsicht/internal/exporter/structurizr"
 	"github.com/docToolchain/Bausteinsicht/internal/model"
 	"github.com/spf13/cobra"
 )
@@ -16,13 +17,13 @@ import (
 func newExportDiagramCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "export-diagram",
-		Short: "Export views as C4 diagrams (PlantUML, Mermaid, DOT, D2, HTML5)",
-		Long:  "Exports architecture views as text-based C4 diagrams (PlantUML, Mermaid, DOT, D2) or interactive HTML5 viewer.",
+		Short: "Export views as C4 diagrams (PlantUML, Mermaid, DOT, D2, HTML5, Structurizr DSL)",
+		Long:  "Exports architecture views as text-based C4 diagrams (PlantUML, Mermaid, DOT, D2), interactive HTML5 viewer, or Structurizr DSL workspace.",
 		RunE:  runExportDiagram,
 	}
 
 	cmd.Flags().String("view", "", "Export only this view (by key)")
-	cmd.Flags().String("diagram-format", "plantuml", "Diagram format: plantuml, mermaid, dot, d2, or html")
+	cmd.Flags().String("diagram-format", "plantuml", "Diagram format: plantuml, mermaid, dot, d2, html, or structurizr")
 	cmd.Flags().String("output", "", "Output directory (default: stdout)")
 
 	return cmd
@@ -51,6 +52,28 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 	m, err := model.Load(modelPath)
 	if err != nil {
 		return exitWithCode(fmt.Errorf("loading model: %w", err), 2)
+	}
+
+	// Structurizr DSL export: outputs the whole workspace in one file.
+	if diagramFormat == "structurizr" {
+		// Structurizr exports the entire workspace, not individual views
+		if viewKey != "" {
+			return exitWithCode(fmt.Errorf("--view is not supported with structurizr format (exports entire workspace)"), 1)
+		}
+		dsl := dslexport.Export(m)
+		if outputDir == "" {
+			_, _ = fmt.Fprint(cmd.OutOrStdout(), dsl)
+			return nil
+		}
+		if err := os.MkdirAll(outputDir, 0750); err != nil {
+			return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
+		}
+		outPath := filepath.Join(outputDir, "workspace.dsl")
+		if err := os.WriteFile(outPath, []byte(dsl), 0600); err != nil { //nolint:gosec
+			return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
+		}
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", outPath)
+		return nil
 	}
 
 	// Determine which views to export.
@@ -83,7 +106,7 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 		f = diagram.Mermaid
 		ext = "mmd"
 	default:
-		return exitWithCode(fmt.Errorf("unknown diagram format %q: valid values are \"plantuml\", \"mermaid\", \"dot\", \"d2\", or \"html\"", diagramFormat), 2)
+		return exitWithCode(fmt.Errorf("unknown diagram format %q: valid values are \"plantuml\", \"mermaid\", \"dot\", \"d2\", \"html\", or \"structurizr\"", diagramFormat), 2)
 	}
 
 	// When --format json, output structured JSON with diagram source. (#241)
