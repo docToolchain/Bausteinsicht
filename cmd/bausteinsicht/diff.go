@@ -49,10 +49,14 @@ func runDiff(cmd *cobra.Command, _ []string) error {
 		if err != nil {
 			return exitWithCode(fmt.Errorf("marshaling JSON: %w", err), 2)
 		}
-		fmt.Fprint(cmd.OutOrStdout(), string(data))
+		if _, err := fmt.Fprint(cmd.OutOrStdout(), string(data)); err != nil {
+			return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
+		}
 	case "text":
 		output := formatDiffAsText(result)
-		fmt.Fprint(cmd.OutOrStdout(), output)
+		if _, err := fmt.Fprint(cmd.OutOrStdout(), output); err != nil {
+			return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
+		}
 	default:
 		return exitWithCode(fmt.Errorf("invalid format: %s (expected text or json)", format), 2)
 	}
@@ -105,7 +109,7 @@ func formatDiffAsText(result *diff.DiffResult) string {
 						change.AsIs.Technology, change.ToBe.Technology)
 				}
 				if change.AsIs.Description != change.ToBe.Description {
-					output += fmt.Sprintf("      description: changed\n")
+					output += "      description: changed\n"
 				}
 				if change.AsIs.Status != change.ToBe.Status {
 					output += fmt.Sprintf("      status: \"%s\" → \"%s\"\n",
