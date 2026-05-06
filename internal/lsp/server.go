@@ -336,8 +336,8 @@ func URIToPath(uri string) string {
 		return uri
 	}
 
-	// Extract path from parsed URI
-	path := filepath.FromSlash(u.Path)
+	// Extract path from parsed URI (keep forward slashes per RFC 8089)
+	path := u.Path
 
 	// On Windows, remove leading slash from absolute paths (C:/path not /C:/path)
 	if runtime.GOOS == "windows" && len(path) > 0 && path[0] == '/' && len(path) > 2 && path[2] == ':' {
