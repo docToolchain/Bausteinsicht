@@ -177,3 +177,23 @@ _Updated by `/risk-mitigate` on 2026-03-04_
 | Sampling Review (~20%) | ✅ Present | PR merge policy: security review + code review required |
 
 **Overall Status:** 9/10 measures active (1 N/A)
+
+## Branch & PR Management
+
+### Duplicate PR Prevention
+To prevent duplicate/parallel branch development (as happened with PR #332 vs #361), we've implemented automated checks:
+
+**See:** [Issue #362](https://github.com/docToolchain/Bausteinsicht/issues/362) for detailed implementation plan
+
+Key automation layers:
+1. **GitHub Actions**: Stale branch detection, duplicate PR detection, branch freshness checks
+2. **Pre-Commit Hooks**: Warn if branch is behind main before committing
+3. **PR Template**: Developer checklist for branch status and duplicate checks
+4. **Branch Protection Rules**: Require branch to be up-to-date with main
+5. **Periodic Cleanup**: Weekly automation to identify merged branches and stale branches
+6. **Local CLI Tools**: `scripts/check-duplicate-branches.sh` for manual verification
+
+**Best Practice:**
+- Always rebase your branch on main before opening a PR: `git rebase origin/main`
+- Check for overlapping work before PR creation
+- Delete merged branches promptly: `git branch -d <branch>` and `git push origin --delete <branch>`
