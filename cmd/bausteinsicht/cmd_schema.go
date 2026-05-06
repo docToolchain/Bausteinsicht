@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/docToolchain/Bausteinsicht/internal/model"
 	"github.com/docToolchain/Bausteinsicht/internal/schema"
