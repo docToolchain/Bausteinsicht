@@ -101,7 +101,9 @@ func partitionElements(resolved []string, flat map[string]*model.Element, scope 
 }
 
 type relEntry struct {
-	From, To, Label string
+	From  string `json:"from"`
+	To    string `json:"to"`
+	Label string `json:"label,omitempty"`
 }
 
 func filterRelationships(rels []model.Relationship, elemSet map[string]bool) []relEntry {

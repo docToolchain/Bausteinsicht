@@ -1,6 +1,7 @@
 package diagram
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -172,5 +173,173 @@ func TestMermaid_Relationships(t *testing.T) {
 
 	if !strings.Contains(result, "uses") {
 		t.Error("expected relationship label 'uses'")
+	}
+}
+
+// --- DOT Tests ---
+
+func TestDOT_ContextView(t *testing.T) {
+	m := testModel()
+	result, err := RenderDOT(m, "context")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(result, "digraph") {
+		t.Error("expected digraph declaration")
+	}
+	if !strings.Contains(result, "rankdir=LR") {
+		t.Error("expected left-right direction")
+	}
+	if !strings.Contains(result, "[actor]") {
+		t.Error("expected element kind in node label")
+	}
+	if !strings.Contains(result, "->") {
+		t.Error("expected edge arrows")
+	}
+}
+
+func TestDOT_WithColor(t *testing.T) {
+	m := testModel()
+	result, err := RenderDOT(m, "context")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(result, "fillcolor=") {
+		t.Error("expected fillcolor attribute")
+	}
+	if !strings.Contains(result, "color=") {
+		t.Error("expected color attribute for edges")
+	}
+}
+
+func TestDOT_InvalidView(t *testing.T) {
+	m := testModel()
+	_, err := RenderDOT(m, "nonexistent")
+	if err == nil {
+		t.Error("expected error for nonexistent view")
+	}
+}
+
+// --- D2 Tests ---
+
+func TestD2_ContextView(t *testing.T) {
+	m := testModel()
+	result, err := RenderD2(m, "context")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(result, "direction: right") {
+		t.Error("expected direction declaration")
+	}
+	if !strings.Contains(result, "shape: rectangle") {
+		t.Error("expected rectangle shapes")
+	}
+	if !strings.Contains(result, "style.fill:") {
+		t.Error("expected fill styling")
+	}
+}
+
+func TestD2_WithRelationships(t *testing.T) {
+	m := testModel()
+	result, err := RenderD2(m, "context")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(result, "->") {
+		t.Error("expected relationship arrows")
+	}
+	if !strings.Contains(result, "uses") {
+		t.Error("expected relationship labels")
+	}
+}
+
+func TestD2_InvalidView(t *testing.T) {
+	m := testModel()
+	_, err := RenderD2(m, "nonexistent")
+	if err == nil {
+		t.Error("expected error for nonexistent view")
+	}
+}
+
+// --- HTML5 Tests ---
+
+func TestHTML_ContextView(t *testing.T) {
+	m := testModel()
+	result, err := RenderHTML(m, "context")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(result, "<!DOCTYPE html>") {
+		t.Error("expected HTML5 doctype")
+	}
+	if !strings.Contains(result, "<body>") {
+		t.Error("expected body element")
+	}
+	if !strings.Contains(result, "DIAGRAM_DATA") {
+		t.Error("expected embedded diagram data")
+	}
+	if !strings.Contains(result, "createElementNS") {
+		t.Error("expected SVG creation via JavaScript")
+	}
+}
+
+func TestHTML_ValidJSON(t *testing.T) {
+	m := testModel()
+	result, err := RenderHTML(m, "context")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Extract JSON from template
+	start := strings.Index(result, "const DIAGRAM_DATA = ")
+	if start < 0 {
+		t.Fatal("could not find DIAGRAM_DATA in HTML")
+	}
+	start += len("const DIAGRAM_DATA = ")
+	end := strings.Index(result[start:], ";")
+	if end < 0 {
+		t.Fatal("could not find end of DIAGRAM_DATA")
+	}
+
+	jsonStr := result[start : start+end]
+	var data HTMLDiagramData
+	if err := json.Unmarshal([]byte(jsonStr), &data); err != nil {
+		t.Errorf("embedded JSON is invalid: %v", err)
+	}
+
+	if data.Title == "" {
+		t.Error("expected non-empty title in diagram data")
+	}
+	if len(data.Nodes) == 0 {
+		t.Error("expected nodes in diagram data")
+	}
+}
+
+func TestHTML_InvalidView(t *testing.T) {
+	m := testModel()
+	_, err := RenderHTML(m, "nonexistent")
+	if err == nil {
+		t.Error("expected error for nonexistent view")
+	}
+}
+
+// --- Colors Tests ---
+
+func TestColorForKind_KnownKind(t *testing.T) {
+	style := ColorForKind("actor")
+	if style.Fill == "" || style.Stroke == "" {
+		t.Error("expected non-empty fill and stroke for known kind")
+	}
+}
+
+func TestColorForKind_UnknownKind(t *testing.T) {
+	style := ColorForKind("unknown")
+	if style.Fill == "" || style.Stroke == "" {
+		t.Error("expected default colors for unknown kind")
 	}
 }
