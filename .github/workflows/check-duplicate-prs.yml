@@ -1,0 +1,60 @@
+name: Check for Duplicate PRs
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  check-duplicates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Detect duplicate functionality
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Get files changed in this PR
+          BASE_COMMIT=$(git merge-base origin/main HEAD)
+          FILES=$(git diff --name-only $BASE_COMMIT HEAD)
+
+          echo "Files changed in this PR:"
+          echo "$FILES"
+          echo ""
+
+          # Check for similar changes in other open PRs
+          DUPLICATES=""
+          for pr in $(gh pr list --state open --json number -q '.[].number'); do
+            if [ "$pr" -ne "${{ github.event.pull_request.number }}" ]; then
+              PR_FILES=$(gh pr view "$pr" --json files -q '.files[].path' | tr '\n' ' ')
+
+              # Check for overlapping packages/modules
+              for file in $FILES; do
+                PACKAGE=$(echo "$file" | cut -d'/' -f1,2)
+                if echo "$PR_FILES" | grep -q "$PACKAGE"; then
+                  DUPLICATES="$DUPLICATES\n- PR #$pr"
+                  break
+                fi
+              done
+            fi
+          done
+
+          if [ ! -z "$DUPLICATES" ]; then
+            echo "⚠️ Potential duplicates detected:"
+            echo -e "$DUPLICATES"
+            echo ""
+
+            gh pr comment ${{ github.event.pull_request.number }} \
+              --body "⚠️ **Potential Duplicate Work Detected**
+
+This PR may overlap with other open PRs:$(echo -e "$DUPLICATES")
+
+Please review and coordinate:
+1. Confirm this PR doesn't duplicate existing work
+2. If duplicate, consider closing this PR
+3. If improvements, consider cherry-picking into existing PR instead"
+          else
+            echo "✅ No overlapping work detected"
+          fi

@@ -1,0 +1,52 @@
+name: Check Branch Freshness
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  freshness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Check if branch needs rebase
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git fetch origin
+
+          BASE=$(git merge-base origin/main HEAD)
+          MAIN_HEAD=$(git rev-parse origin/main)
+
+          if [ "$BASE" != "$MAIN_HEAD" ]; then
+            COMMITS_BEHIND=$(git rev-list --count HEAD..origin/main)
+            COMMITS_ON_BRANCH=$(git rev-list --count $BASE..HEAD)
+
+            echo "## 📊 Branch Status" >> $GITHUB_STEP_SUMMARY
+            echo "- Commits on this branch: $COMMITS_ON_BRANCH" >> $GITHUB_STEP_SUMMARY
+            echo "- Commits main is ahead: $COMMITS_BEHIND" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            if [ "$COMMITS_BEHIND" -gt 0 ]; then
+              echo "- ⚠️ Branch is behind main" >> $GITHUB_STEP_SUMMARY
+
+              gh pr comment ${{ github.event.pull_request.number }} \
+                --body "⚠️ **Branch is behind main by $COMMITS_BEHIND commit(s)**
+
+This may cause merge conflicts or miss recent bug fixes/improvements.
+
+**Recommended action:**
+\`\`\`bash
+git fetch origin
+git rebase origin/main
+git push --force-with-lease
+\`\`\`
+
+This ensures compatibility with the latest main and prevents conflicts."
+            fi
+          else
+            echo "✅ Branch is up-to-date with main" >> $GITHUB_STEP_SUMMARY
+          fi

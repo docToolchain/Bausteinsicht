@@ -5,6 +5,10 @@ set -euo pipefail
 
 echo "==> Running pre-commit checks..."
 
+# 0. branch freshness — warn if behind main
+echo "  branch freshness..."
+bash scripts/pre-commit-branch-check
+
 # 1. gofmt — check formatting (fast)
 echo "  gofmt..."
 UNFORMATTED=$(gofmt -l . 2>&1 | grep -v vendor/ || true)
