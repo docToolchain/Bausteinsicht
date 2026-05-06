@@ -87,11 +87,11 @@ func runSnapshotDiff(cmd *cobra.Command, args []string) error {
 }
 
 type ModelDiff struct {
-	AddedElements      []string            `json:"addedElements,omitempty"`
-	RemovedElements    []string            `json:"removedElements,omitempty"`
-	ChangedElements    map[string][]string `json:"changedElements,omitempty"`
-	AddedRelationships []RelDiff           `json:"addedRelationships,omitempty"`
-	RemovedRelationships []RelDiff         `json:"removedRelationships,omitempty"`
+	AddedElements        []string            `json:"addedElements,omitempty"`
+	RemovedElements      []string            `json:"removedElements,omitempty"`
+	ChangedElements      map[string][]string `json:"changedElements,omitempty"`
+	AddedRelationships   []RelDiff           `json:"addedRelationships,omitempty"`
+	RemovedRelationships []RelDiff           `json:"removedRelationships,omitempty"`
 }
 
 type RelDiff struct {
