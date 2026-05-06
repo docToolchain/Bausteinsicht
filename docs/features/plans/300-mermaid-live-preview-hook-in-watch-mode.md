@@ -121,7 +121,33 @@ Extend `watch` and `sync` commands to export Mermaid C4 diagrams automatically t
 3. ✅ C4 level auto-detected correctly per view scope
 4. ✅ All unit tests passing (lint, build, race detector)
 5. ✅ Mermaid output renders in GitHub web UI
-6. ✅ CI/CD pipeline green (all platforms)
+6. ⏳ CI/CD pipeline green (all platforms) — in progress
+
+## Implementation Status
+- **Phase 1 (Foundation)**: ✅ COMPLETE
+  - `markdown.go` created with `WrapDiagramsInMarkdown()`
+  - C4 level detection integrated via existing `detectLevel()`
+  - `ExportAllViewsToMermaid()` function implemented
+  
+- **Phase 2 (CLI Flags)**: ✅ COMPLETE
+  - `--mermaid` and `--mermaid-output` flags added to `sync` command
+  - `--mermaid` and `--mermaid-output` flags added to `watch` command
+  - Mermaid export integrated into sync workflow
+  
+- **Phase 3 (Watch Integration)**: ✅ COMPLETE
+  - Post-sync Mermaid export implemented in `doSync()` callback
+  - Only exports when sync succeeds (skips on failure)
+  
+- **Phase 4 (Testing)**: ✅ COMPLETE
+  - Unit tests for Markdown wrapper (4 tests)
+  - Unit tests for multi-view export (2 tests)
+  - Integration tests for sync command (3 tests)
+  - E2E verification: All tests passing
+
+## PR Status
+- Branch: `300-mermaid-live-preview-hook-in-watch-mode`
+- PR: #349
+- CI: Running (Go CI queued/in progress)
 
 ---
 
