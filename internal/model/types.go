@@ -47,6 +47,12 @@ type Config struct {
 	Repo     string `json:"repo,omitempty"`
 }
 
+// ModelSnapshot represents a snapshot of architecture (as-is or to-be)
+type ModelSnapshot struct {
+	Elements      map[string]Element `json:"elements"`
+	Relationships []Relationship     `json:"relationships"`
+}
+
 // BausteinsichtModel is the top-level model file
 type BausteinsichtModel struct {
 	Schema        string             `json:"$schema,omitempty"`
@@ -57,6 +63,8 @@ type BausteinsichtModel struct {
 	Views         map[string]View    `json:"views"`
 	DynamicViews  []DynamicView      `json:"dynamicViews,omitempty"`
 	Constraints   []Constraint       `json:"constraints,omitempty"`
+	AsIs          *ModelSnapshot     `json:"asIs,omitempty"`
+	ToBe          *ModelSnapshot     `json:"toBe,omitempty"`
 
 	// ElementOrder stores the definition order of element kinds from
 	// specification.elements. Used by the layout engine for layer assignment.
