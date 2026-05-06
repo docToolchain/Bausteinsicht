@@ -43,11 +43,19 @@ func Detect(m *model.BausteinsichtModel, modelPath string, config StaleConfig) (
 			continue
 		}
 
-		// Determine element's last modified time (use per-element override if provided)
+		// Determine element's last modified time:
+		// Priority 1: explicit lastModified field in model (per-element override)
+		// Priority 2: git-based per-element search
+		// Priority 3: file-level modification date (fallback)
 		elemLastModified := fileLastModified
 		if elem.LastModified != "" {
 			if parsedTime, err := time.Parse(time.RFC3339, elem.LastModified); err == nil {
 				elemLastModified = parsedTime
+			}
+		} else {
+			// Try per-element git search
+			if gitMod, err := GetLastModifiedDateForElement(modelPath, dotPath); err == nil && !gitMod.IsZero() {
+				elemLastModified = gitMod
 			}
 		}
 
@@ -114,6 +122,10 @@ func isExcluded(kind string, excludeKinds []string) bool {
 func isViewIncluded(dotPath string, m *model.BausteinsichtModel) bool {
 	for _, view := range m.Views {
 		for _, pattern := range view.Include {
+			// Skip empty patterns to avoid panics
+			if pattern == "" {
+				continue
+			}
 			// Simple pattern matching: exact match or wildcard
 			if pattern == "*" || pattern == dotPath {
 				return true

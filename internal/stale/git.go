@@ -65,3 +65,52 @@ func IsStale(lastModified time.Time, thresholdDays int) bool {
 	daysSince := DaysSince(lastModified)
 	return daysSince >= thresholdDays
 }
+
+// GetLastModifiedDateForElement returns the date when an element was last modified in git.
+// It searches git history for the most recent change that touched the element key.
+// If per-element tracking is not possible, falls back to file-level modification date.
+func GetLastModifiedDateForElement(filePath string, elementKey string) (time.Time, error) {
+	// First, get the file's last modified date as fallback
+	fileMod, err := GetLastModifiedDate(filePath)
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	// Try to find element-specific changes via git log with pattern search
+	// Search for commits that modified this specific element key in the JSON
+	absPath, err := filepath.Abs(filePath)
+	if err != nil {
+		return fileMod, nil // Fallback to file-level
+	}
+
+	// Build a regex pattern to search for this element key in JSON
+	// e.g. for "api.backend" search for "\"backend\"" or "'backend'"
+	keyParts := strings.Split(elementKey, ".")
+	if len(keyParts) == 0 {
+		return fileMod, nil
+	}
+	searchKey := keyParts[len(keyParts)-1] // Use the leaf key for less ambiguity
+
+	// git log -S: search for given string in diffs
+	// --follow: follow file renames
+	// -1: get most recent
+	// --format=%aI: ISO 8601 format
+	cmd := exec.Command("git", "log", "-S", "\""+searchKey+"\"", "--follow", "-1", "--format=%aI", "--", absPath)
+	output, err := cmd.Output()
+	if err != nil {
+		// Element key not found in git history, use file-level
+		return fileMod, nil
+	}
+
+	dateStr := strings.TrimSpace(string(output))
+	if dateStr == "" {
+		return fileMod, nil // Fallback to file-level
+	}
+
+	parsedTime, err := time.Parse(time.RFC3339, dateStr)
+	if err != nil {
+		return fileMod, nil // Fallback to file-level on parse error
+	}
+
+	return parsedTime, nil
+}
