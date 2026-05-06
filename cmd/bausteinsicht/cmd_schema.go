@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/docToolchain/Bausteinsicht/internal/model"
 	"github.com/docToolchain/Bausteinsicht/internal/schema"
@@ -36,6 +37,11 @@ func newSchemaGenerateCmd() *cobra.Command {
 
 func runSchemaGenerate(cmd *cobra.Command, _ []string) error {
 	outputFile, _ := cmd.Flags().GetString("output")
+
+	// Validate output path to prevent directory traversal (SEC-001)
+	if err := validatePathContainment(outputFile); err != nil {
+		return exitWithCode(fmt.Errorf("--output: %w", err), 1)
+	}
 
 	// Create schema generator
 	gen := schema.NewGenerator()

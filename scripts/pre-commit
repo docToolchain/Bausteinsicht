@@ -35,8 +35,11 @@ fi
 echo "  schema validation..."
 if command -v go &>/dev/null; then
     SCHEMA_BEFORE=$(md5sum schemas/bausteinsicht.schema.json 2>/dev/null || echo "")
-    go build -o /tmp/bausteinsicht-check ./cmd/bausteinsicht/ 2>/dev/null || true
-    /tmp/bausteinsicht-check schema generate >/dev/null 2>&1 || true
+    # Use mktemp for secure temp file generation (SEC-016)
+    TMPBIN=$(mktemp /tmp/bausteinsicht-check.XXXXXX)
+    trap "rm -f '$TMPBIN'" EXIT
+    go build -o "$TMPBIN" ./cmd/bausteinsicht/ 2>/dev/null || true
+    "$TMPBIN" schema generate >/dev/null 2>&1 || true
     SCHEMA_AFTER=$(md5sum schemas/bausteinsicht.schema.json 2>/dev/null || echo "")
 
     if [ "$SCHEMA_BEFORE" != "$SCHEMA_AFTER" ]; then
