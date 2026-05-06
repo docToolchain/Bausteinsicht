@@ -7,7 +7,7 @@ DIST := dist
         schema-generate schema-validate \
         build-extension package-extension \
         test test-race bench vet staticcheck gosec nilaway govulncheck \
-        gitleaks golangci-lint check clean install-tools install-hooks
+        gitleaks golangci-lint check check-duplicates clean install-tools install-hooks
 
 # Ensure GOPATH/bin is in PATH for installed tools
 export PATH := $(PATH):$(shell go env GOPATH)/bin
@@ -84,6 +84,11 @@ test-race:
 bench:
 	go test -bench=. -benchmem ./...
 
+# Check for duplicate branches
+check-duplicates:
+	@echo "🔍 Checking for duplicate branches..."
+	bash scripts/check-duplicate-branches.sh
+
 # Run all checks (lint + security + tests)
 check: vet staticcheck gosec nilaway govulncheck test-race schema-validate
 
@@ -124,11 +129,13 @@ install-tools:
 	@echo "Install golangci-lint via: https://golangci-lint.run/welcome/install/"
 	@echo "Install gitleaks via: https://github.com/gitleaks/gitleaks#installing"
 
-# Install git pre-commit hook
+# Install git hooks (pre-commit and pre-push)
 install-hooks:
 	cp scripts/pre-commit .git/hooks/pre-commit
 	chmod +x .git/hooks/pre-commit
-	@echo "Pre-commit hook installed."
+	cp scripts/pre-push .git/hooks/pre-push
+	chmod +x .git/hooks/pre-push
+	@echo "Git hooks installed (pre-commit, pre-push)."
 
 clean:
 	rm -f bausteinsicht
