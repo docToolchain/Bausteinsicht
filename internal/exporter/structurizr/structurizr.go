@@ -116,8 +116,8 @@ func (e *exporter) writeOneView(b *strings.Builder, key string, v model.View, in
 		title = key
 	}
 
-	if viewType == "landscape" || v.Scope == "" {
-		fmt.Fprintf(b, "%slandscape \"%s\" \"%s\" {\n", indent, key, title)
+	if viewType == "systemLandscape" || v.Scope == "" {
+		fmt.Fprintf(b, "%ssystemLandscape \"%s\" \"%s\" {\n", indent, key, title)
 	} else {
 		scopeVar := e.varMap[v.Scope]
 		if scopeVar == "" {
@@ -133,7 +133,7 @@ func (e *exporter) writeOneView(b *strings.Builder, key string, v model.View, in
 // detectViewType returns the Structurizr view type keyword for v.
 func (e *exporter) detectViewType(v model.View) string {
 	if v.Scope == "" {
-		return "landscape"
+		return "systemLandscape"
 	}
 	scopeElem := e.flat[v.Scope]
 	if scopeElem == nil {
@@ -205,9 +205,11 @@ func dotToVar(path string) string {
 	return strings.ReplaceAll(path, ".", "_")
 }
 
-// escDQ escapes double quotes in s for embedding in a Structurizr string literal.
+// escDQ escapes double quotes and newlines in s for embedding in a Structurizr string literal.
 func escDQ(s string) string {
-	return strings.ReplaceAll(s, `"`, `\"`)
+	s = strings.ReplaceAll(s, `"`, `\"`)
+	s = strings.ReplaceAll(s, "\n", `\n`)
+	return s
 }
 
 func sortedKeys[V any](m map[string]V) []string {

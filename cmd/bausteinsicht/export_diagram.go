@@ -56,6 +56,10 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 
 	// Structurizr DSL export: outputs the whole workspace in one file.
 	if diagramFormat == "structurizr" {
+		// Structurizr exports the entire workspace, not individual views
+		if viewKey != "" {
+			return exitWithCode(fmt.Errorf("--view is not supported with structurizr format (exports entire workspace)"), 1)
+		}
 		dsl := dslexport.Export(m)
 		if outputDir == "" {
 			_, _ = fmt.Fprint(cmd.OutOrStdout(), dsl)

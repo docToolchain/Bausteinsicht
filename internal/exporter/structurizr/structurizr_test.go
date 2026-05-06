@@ -38,7 +38,7 @@ func buildTestModel() *model.BausteinsichtModel {
 			{From: "orderSystem.api", To: "paymentGateway", Label: "Charges via"},
 		},
 		Views: map[string]model.View{
-			"context": {Title: "System Context", Scope: "orderSystem", Include: []string{"*"}},
+			"context":    {Title: "System Context", Scope: "orderSystem", Include: []string{"*"}},
 			"containers": {Title: "Containers", Scope: "orderSystem", Include: []string{"*"}},
 		},
 	}
@@ -204,8 +204,8 @@ func TestExport_LandscapeView(t *testing.T) {
 		"overview": {Title: "Overview", Include: []string{"*"}},
 	}
 	out := structurizr.Export(m)
-	if !strings.Contains(out, "landscape") {
-		t.Errorf("expected 'landscape' view type for scope-less view, got:\n%s", out)
+	if !strings.Contains(out, "systemLandscape") {
+		t.Errorf("expected 'systemLandscape' view type for scope-less view, got:\n%s", out)
 	}
 }
 
