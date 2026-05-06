@@ -43,16 +43,15 @@ export async function activate(context: vscode.ExtensionContext) {
 
 	// Client options
 	const clientOptions: LanguageClientOptions = {
-		// Activate on architecture.jsonc files
+		// Activate on any jsonc file (extension is primarily for architecture models)
 		documentSelector: [
 			{
 				scheme: 'file',
 				language: 'jsonc',
-				pattern: '**/architecture.jsonc',
 			},
 		],
 		synchronize: {
-			fileEvents: vscode.workspace.createFileSystemWatcher('**/architecture.jsonc'),
+			fileEvents: vscode.workspace.createFileSystemWatcher('**/*architecture*.jsonc'),
 		},
 		initializationOptions: {
 			rootPath: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
@@ -73,14 +72,12 @@ export async function activate(context: vscode.ExtensionContext) {
 		console.log('Bausteinsicht LSP client started successfully');
 	} catch (error) {
 		statusBarItem.text = '$(error) Bausteinsicht: Failed to connect';
-		vscode.window.showErrorMessage(
-			`Failed to start Bausteinsicht LSP server: ${error}`
-		);
+		const errorMsg = `Failed to start Bausteinsicht LSP server: ${error}`;
+		vscode.window.showErrorMessage(errorMsg);
 		console.error('Failed to start LSP client:', error);
-		throw error;
 	}
 
-	// Register commands
+	// Register commands (always, even if LSP server failed)
 	registerCommands(context);
 }
 
