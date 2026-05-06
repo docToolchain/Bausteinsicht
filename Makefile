@@ -6,7 +6,7 @@ DIST := dist
         build_windows_amd64 build_windows_arm64 \
         schema-generate schema-validate \
         build-extension package-extension \
-        test test-race bench vet staticcheck gosec nilaway govulncheck \
+        test test-race bench coverage vet staticcheck gosec nilaway govulncheck \
         gitleaks golangci-lint check clean install-tools install-hooks
 
 # Ensure GOPATH/bin is in PATH for installed tools
@@ -79,6 +79,21 @@ test:
 # Run tests with race detector
 test-race:
 	go test -race ./...
+
+# Measure code coverage and generate reports
+coverage:
+	@mkdir -p coverage
+	@echo "Measuring code coverage..."
+	@go test -coverprofile=coverage/coverage.out ./... > /dev/null 2>&1 || true
+	@if [ -f coverage/coverage.out ]; then \
+		go tool cover -html=coverage/coverage.out -o coverage/coverage.html; \
+		echo "📊 Coverage report generated: coverage/coverage.html"; \
+		echo ""; \
+		echo "Coverage by package:"; \
+		go tool cover -func=coverage/coverage.out | awk 'NR>1 {printf "  %-50s %s\n", $$1, $$NF}' | sort -k2 -rn; \
+	else \
+		echo "⚠️  Coverage report could not be generated"; \
+	fi
 
 # Run benchmarks
 bench:
