@@ -205,14 +205,14 @@ func formatDiffText(diffs *ModelDiff) string {
 		return "No differences found.\n"
 	}
 
-	sb.WriteString(fmt.Sprintf("Architecture Differences (Total Changes: %d)\n", totalChanges))
+	fmt.Fprintf(&sb, "Architecture Differences (Total Changes: %d)\n", totalChanges)
 	sb.WriteString(strings.Repeat("=", 50))
 	sb.WriteString("\n\n")
 
 	if len(diffs.AddedElements) > 0 {
-		sb.WriteString(fmt.Sprintf("Added Elements (%d):\n", len(diffs.AddedElements)))
+		fmt.Fprintf(&sb, "Added Elements (%d):\n", len(diffs.AddedElements))
 		for _, id := range diffs.AddedElements {
-			sb.WriteString(fmt.Sprintf("  + %s\n", id))
+			fmt.Fprintf(&sb, "  + %s\n", id)
 		}
 		sb.WriteString("\n")
 	}

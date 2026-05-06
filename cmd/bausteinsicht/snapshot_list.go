@@ -45,13 +45,13 @@ func runSnapshotList(cmd *cobra.Command, _ []string) error {
 		_, _ = fmt.Fprintln(cmd.OutOrStdout(), string(data))
 	case "table":
 		w := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
-		fmt.Fprintln(w, "ID\tTIMESTAMP\tELEMENTS\tRELATIONSHIPS\tMESSAGE")
+		_, _ = fmt.Fprintln(w, "ID\tTIMESTAMP\tELEMENTS\tRELATIONSHIPS\tMESSAGE")
 		for _, s := range snapshots {
 			message := s.Message
 			if len(message) > 30 {
 				message = message[:27] + "..."
 			}
-			fmt.Fprintf(w, "%s\t%s\t%d\t%d\t%s\n",
+			_, _ = fmt.Fprintf(w, "%s\t%s\t%d\t%d\t%s\n",
 				s.ID,
 				s.Timestamp.Format("2006-01-02 15:04:05"),
 				s.ElementCount,
@@ -59,7 +59,7 @@ func runSnapshotList(cmd *cobra.Command, _ []string) error {
 				message,
 			)
 		}
-		w.Flush()
+		_ = w.Flush()
 	default:
 		return exitWithCode(fmt.Errorf("unknown format: %s", format), 2)
 	}

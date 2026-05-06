@@ -3,22 +3,12 @@ package main
 import (
 	"bytes"
 	"os"
-	"sort"
 	"testing"
 	"time"
 
 	"github.com/docToolchain/Bausteinsicht/internal/model"
 	"github.com/docToolchain/Bausteinsicht/internal/snapshot"
 )
-
-func getKeys(m map[string]model.Element) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
-}
 
 func TestSnapshotDiffCmd(t *testing.T) {
 	tmpDir := t.TempDir()
