@@ -1,0 +1,61 @@
+name: Check Branch Origin
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  verify-from-main:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Verify branch created from main
+        run: |
+          git fetch origin
+
+          # Get the merge base (common ancestor) of this branch and main
+          BASE=$(git merge-base origin/main HEAD)
+          MAIN_HEAD=$(git rev-parse origin/main)
+
+          echo "Current branch: $(git rev-parse --abbrev-ref HEAD)"
+          echo "Merge base: $BASE"
+          echo "Main HEAD: $MAIN_HEAD"
+
+          if [ "$BASE" = "$MAIN_HEAD" ]; then
+            echo "✅ Branch created directly from main HEAD"
+            exit 0
+          fi
+
+          # Check if branch has diverged (contains commits not in main)
+          COMMITS_AHEAD=$(git rev-list --count origin/main..HEAD)
+          COMMITS_BEHIND=$(git rev-list --count HEAD..origin/main)
+
+          if [ "$COMMITS_BEHIND" -gt 0 ]; then
+            echo "⚠️  Branch is behind main by $COMMITS_BEHIND commit(s)"
+            echo ""
+            echo "Recommendation: Rebase this branch on main"
+            echo "  git rebase origin/main"
+            echo "  git push --force-with-lease"
+            echo ""
+
+            gh pr comment ${{ github.event.pull_request.number }} \
+              --body "⚠️ **Branch Behind Main**
+
+This branch is based on an older commit from main and is behind by **$COMMITS_BEHIND commit(s)**.
+
+This often happens when a feature branch is created from another feature branch instead of from main directly.
+
+**Recommendation:**
+\`\`\`bash
+git fetch origin
+git rebase origin/main
+git push --force-with-lease
+\`\`\`
+
+After rebasing, this warning will disappear."
+
+            # Don't fail - let it proceed with warning
+          fi
