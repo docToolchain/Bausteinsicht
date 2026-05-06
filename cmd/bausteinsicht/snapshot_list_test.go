@@ -40,9 +40,16 @@ func TestSnapshotListCmd(t *testing.T) {
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
 
-	originalWd, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(originalWd)
+	originalWd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get current directory: %v", err)
+	}
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("failed to change directory: %v", err)
+	}
+	defer func() {
+		_ = os.Chdir(originalWd)
+	}()
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("command failed: %v", err)
@@ -66,9 +73,16 @@ func TestSnapshotListCmdEmpty(t *testing.T) {
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
 
-	originalWd, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(originalWd)
+	originalWd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get current directory: %v", err)
+	}
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("failed to change directory: %v", err)
+	}
+	defer func() {
+		_ = os.Chdir(originalWd)
+	}()
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("command failed: %v", err)
@@ -105,9 +119,16 @@ func TestSnapshotListCmdJSON(t *testing.T) {
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
 
-	originalWd, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(originalWd)
+	originalWd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get current directory: %v", err)
+	}
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("failed to change directory: %v", err)
+	}
+	defer func() {
+		_ = os.Chdir(originalWd)
+	}()
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("command failed: %v", err)
