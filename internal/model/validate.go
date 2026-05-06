@@ -216,6 +216,30 @@ func validateViews(m *BausteinsichtModel) []ValidationError {
 				})
 			}
 		}
+
+		// Validate filter-tags
+		validTagIDs := make(map[string]bool)
+		for _, tag := range m.Specification.Tags {
+			validTagIDs[tag.ID] = true
+		}
+		for _, tag := range view.FilterTags {
+			if !validTagIDs[tag] {
+				errs = append(errs, ValidationError{
+					Path:    path + ".filter-tags",
+					Message: fmt.Sprintf("tag %q is not defined in specification.tags", tag),
+				})
+			}
+		}
+
+		// Validate exclude-tags
+		for _, tag := range view.ExcludeTags {
+			if !validTagIDs[tag] {
+				errs = append(errs, ValidationError{
+					Path:    path + ".exclude-tags",
+					Message: fmt.Sprintf("tag %q is not defined in specification.tags", tag),
+				})
+			}
+		}
 	}
 	return errs
 }
