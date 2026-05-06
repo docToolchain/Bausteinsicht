@@ -109,7 +109,7 @@ func TestWrapDiagramsInMarkdownOrderPreserved(t *testing.T) {
 	if zPos < 0 || aPos < 0 || mPos < 0 {
 		t.Fatal("missing sections")
 	}
-	if !(zPos < aPos && aPos < mPos) {
+	if zPos >= aPos || aPos >= mPos {
 		t.Fatal("view order not preserved")
 	}
 }
