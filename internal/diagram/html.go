@@ -3,6 +3,7 @@ package diagram
 import (
 	"encoding/json"
 	"fmt"
+	"html"
 	"sort"
 
 	"github.com/docToolchain/Bausteinsicht/internal/model"
@@ -10,15 +11,15 @@ import (
 
 // HTMLNode represents a node in the interactive diagram.
 type HTMLNode struct {
-	ID          string `json:"id"`
-	Title       string `json:"title"`
-	Kind        string `json:"kind"`
-	Description string `json:"description,omitempty"`
-	Technology  string `json:"technology,omitempty"`
+	ID          string  `json:"id"`
+	Title       string  `json:"title"`
+	Kind        string  `json:"kind"`
+	Description string  `json:"description,omitempty"`
+	Technology  string  `json:"technology,omitempty"`
 	X           float64 `json:"x"`
 	Y           float64 `json:"y"`
-	Fill        string `json:"fill"`
-	Stroke      string `json:"stroke"`
+	Fill        string  `json:"fill"`
+	Stroke      string  `json:"stroke"`
 }
 
 // HTMLEdge is a type alias for relEntry used in HTML diagram output.
@@ -107,9 +108,9 @@ func RenderHTML(m *model.BausteinsichtModel, viewKey string) (string, error) {
 
 	dataJSON, _ := json.Marshal(data)
 
-	// Generate HTML with embedded JavaScript renderer
-	html := generateHTMLTemplate(view.Title, string(dataJSON))
-	return html, nil
+	// Generate HTML with embedded JavaScript renderer (escape title for HTML safety)
+	htmlContent := generateHTMLTemplate(html.EscapeString(view.Title), string(dataJSON))
+	return htmlContent, nil
 }
 
 func generateHTMLTemplate(title, dataJSON string) string {

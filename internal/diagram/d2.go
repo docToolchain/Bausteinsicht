@@ -54,13 +54,14 @@ func RenderD2(m *model.BausteinsichtModel, viewKey string) (string, error) {
 		}
 
 		// Node with styling
-		fmt.Fprintf(&b, "%s: %s {\n", nodeID, escapeD2String(title))
+		nodeLabel := escapeD2String(title)
+		if elem.Kind != "" {
+			nodeLabel = fmt.Sprintf("%s [%s]", escapeD2String(title), elem.Kind)
+		}
+		fmt.Fprintf(&b, "%s: %s {\n", nodeID, nodeLabel)
 		fmt.Fprintf(&b, "  shape: rectangle\n")
 		fmt.Fprintf(&b, "  style.fill: \"%s\"\n", style.Fill)
 		fmt.Fprintf(&b, "  style.stroke: \"%s\"\n", style.Stroke)
-		if elem.Kind != "" {
-			fmt.Fprintf(&b, "  label: %s [%s]\n", escapeD2String(title), elem.Kind)
-		}
 		if elem.Description != "" {
 			fmt.Fprintf(&b, "  note: %s\n", escapeD2String(elem.Description))
 		}

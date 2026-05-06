@@ -65,10 +65,12 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 		views = m.Views
 	}
 
-	// Handle new export formats (DOT, D2, HTML)
+	outputFormat, _ := cmd.Flags().GetString("format")
+
+	// Handle new export formats (DOT, D2, HTML) — with JSON envelope support
 	switch diagramFormat {
 	case "dot", "d2", "html":
-		return handleNewFormats(cmd, m, views, diagramFormat, outputDir, viewKey)
+		return handleNewFormats(cmd, m, views, diagramFormat, outputFormat, outputDir, viewKey)
 	}
 
 	var f diagram.Format
@@ -83,8 +85,6 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 	default:
 		return exitWithCode(fmt.Errorf("unknown diagram format %q: valid values are \"plantuml\", \"mermaid\", \"dot\", \"d2\", or \"html\"", diagramFormat), 2)
 	}
-
-	format, _ := cmd.Flags().GetString("format")
 
 	// When --format json, output structured JSON with diagram source. (#241)
 	if format == "json" {
@@ -135,11 +135,11 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 	return nil
 }
 
-func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map[string]model.View, format, outputDir, viewKey string) error {
+func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map[string]model.View, diagramFormat, outputFormat, outputDir, viewKey string) error {
 	var renderFunc func(*model.BausteinsichtModel, string) (string, error)
 	var ext string
 
-	switch format {
+	switch diagramFormat {
 	case "dot":
 		renderFunc = diagram.RenderDOT
 		ext = "dot"
@@ -150,11 +150,36 @@ func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map
 		renderFunc = diagram.RenderHTML
 		ext = "html"
 	default:
-		return exitWithCode(fmt.Errorf("unsupported format: %s", format), 2)
+		return exitWithCode(fmt.Errorf("unsupported format: %s", diagramFormat), 2)
+	}
+
+	// When --format json, output structured JSON with diagram source
+	if outputFormat == "json" {
+		type diagramEntry struct {
+			View   string `json:"view"`
+			Format string `json:"format"`
+			Source string `json:"source"`
+		}
+		var entries []diagramEntry
+		keys := sortedKeys(views)
+		for _, key := range keys {
+			result, fmtErr := renderFunc(m, key)
+			if fmtErr != nil {
+				return exitWithCode(fmtErr, 1)
+			}
+			entries = append(entries, diagramEntry{
+				View:   key,
+				Format: diagramFormat,
+				Source: result,
+			})
+		}
+		data, _ := json.MarshalIndent(entries, "", "  ")
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), string(data))
+		return nil
 	}
 
 	// For HTML, create a single file containing all views
-	if format == "html" {
+	if diagramFormat == "html" {
 		// When exporting to HTML, we need to handle multiple views in a single file
 		if viewKey != "" {
 			// Single view HTML export
