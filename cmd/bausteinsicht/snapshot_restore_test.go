@@ -35,9 +35,16 @@ func TestSnapshotRestoreCmd(t *testing.T) {
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
 
-	originalWd, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(originalWd)
+	originalWd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get current directory: %v", err)
+	}
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("failed to change directory: %v", err)
+	}
+	defer func() {
+		_ = os.Chdir(originalWd)
+	}()
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("command failed: %v", err)
@@ -97,9 +104,16 @@ func TestSnapshotRestoreCmdOverwrite(t *testing.T) {
 	cmd := newSnapshotRestoreCmd()
 	cmd.SetArgs([]string{snap.ID, outputFile})
 
-	originalWd, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(originalWd)
+	originalWd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get current directory: %v", err)
+	}
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("failed to change directory: %v", err)
+	}
+	defer func() {
+		_ = os.Chdir(originalWd)
+	}()
 
 	if err := cmd.Execute(); err == nil {
 		t.Fatal("expected error when file exists without --force")
@@ -123,9 +137,16 @@ func TestSnapshotRestoreCmdNotFound(t *testing.T) {
 	cmd := newSnapshotRestoreCmd()
 	cmd.SetArgs([]string{"nonexistent-snapshot", "/tmp/output.jsonc"})
 
-	originalWd, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(originalWd)
+	originalWd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get current directory: %v", err)
+	}
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("failed to change directory: %v", err)
+	}
+	defer func() {
+		_ = os.Chdir(originalWd)
+	}()
 
 	if err := cmd.Execute(); err == nil {
 		t.Fatal("expected error for nonexistent snapshot")
