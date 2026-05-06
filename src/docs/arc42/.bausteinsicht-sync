@@ -1,7 +1,8 @@
 {
-  "timestamp": "2026-03-05T10:07:31Z",
-  "model_hash": "sha256:bcfd90724cec8c2a17c5ff2fbafa0308c8bc2d392be508dbac329da27a559c66",
-  "drawio_hash": "sha256:405302baf11c1d02babeec452d8e16c491df86416d29d5f23b3aaec4c496cb4d",
+  "checksum": "sha256:0fe7a9a1001a0fed91a708fd2dc5cfe9ab5eab304deff2ebd48bc3163da51c31",
+  "timestamp": "2026-05-06T20:43:44Z",
+  "model_hash": "sha256:c294bfb3b62f48548e2d29153ce5b5505ebb44f47065153e5bdf5d2a7587c554",
+  "drawio_hash": "sha256:17fd723308e0cba60d1982adb9d55d54dc2e38c158368bd38b40345fbee1c39a",
   "elements": {
     "bausteinsicht": {
       "title": "Bausteinsicht",
@@ -13,6 +14,30 @@
       "description": "Command-line interface providing validate, sync, export, and watch commands",
       "technology": "Go / Cobra",
       "kind": "container"
+    },
+    "bausteinsicht.constraints": {
+      "title": "Constraints",
+      "description": "Validation constraints for model linting and consistency checking",
+      "technology": "Go",
+      "kind": "container"
+    },
+    "bausteinsicht.diagram": {
+      "title": "Diagram",
+      "description": "Text-based diagram export to Mermaid C4 and PlantUML formats with markdown wrapping",
+      "technology": "Go",
+      "kind": "container"
+    },
+    "bausteinsicht.diagram.markdown": {
+      "title": "Markdown",
+      "description": "Markdown document wrapper for multiple diagram pages",
+      "technology": "Go",
+      "kind": "component"
+    },
+    "bausteinsicht.diagram.mermaid_c4": {
+      "title": "Mermaid C4",
+      "description": "Mermaid C4 diagram generation with C4 level detection",
+      "technology": "Go",
+      "kind": "component"
     },
     "bausteinsicht.drawio": {
       "title": "draw.io",
@@ -52,7 +77,43 @@
     },
     "bausteinsicht.export": {
       "title": "Export",
-      "description": "Diagram export to PNG and SVG formats via draw.io CLI",
+      "description": "Export diagrams to PNG, SVG, and other visual formats via draw.io CLI",
+      "technology": "Go",
+      "kind": "container"
+    },
+    "bausteinsicht.exporter": {
+      "title": "Exporter",
+      "description": "Architecture export to Structurizr DSL and other formats",
+      "technology": "Go",
+      "kind": "container"
+    },
+    "bausteinsicht.exporter.structurizr": {
+      "title": "Structurizr",
+      "description": "Structurizr DSL export with smart variable naming",
+      "technology": "Go",
+      "kind": "component"
+    },
+    "bausteinsicht.importer": {
+      "title": "Importer",
+      "description": "Import architecture from Structurizr DSL and LikeC4 formats",
+      "technology": "Go",
+      "kind": "container"
+    },
+    "bausteinsicht.importer.likec4": {
+      "title": "LikeC4",
+      "description": "LikeC4 DSL parsing and model conversion",
+      "technology": "Go",
+      "kind": "component"
+    },
+    "bausteinsicht.importer.structurizr": {
+      "title": "Structurizr",
+      "description": "Structurizr DSL parsing and model conversion",
+      "technology": "Go",
+      "kind": "component"
+    },
+    "bausteinsicht.lsp": {
+      "title": "Language Server",
+      "description": "Language Server Protocol implementation for VS Code and other editors",
       "technology": "Go",
       "kind": "container"
     },
@@ -91,6 +152,12 @@
       "description": "Model validation rules for elements, relationships, and views",
       "technology": "Go",
       "kind": "component"
+    },
+    "bausteinsicht.search": {
+      "title": "Search",
+      "description": "Element and relationship search with filtering and pattern matching",
+      "technology": "Go",
+      "kind": "container"
     },
     "bausteinsicht.sync": {
       "title": "Sync Engine",
@@ -133,6 +200,12 @@
       "description": "Sync state persistence using SHA256 hashes for change detection",
       "technology": "Go",
       "kind": "component"
+    },
+    "bausteinsicht.table": {
+      "title": "Table",
+      "description": "Export architecture to CSV and Markdown table formats",
+      "technology": "Go",
+      "kind": "container"
     },
     "bausteinsicht.watcher": {
       "title": "Watcher",
@@ -222,143 +295,330 @@
     },
     {
       "from": "bausteinsicht.cli",
-      "to": "bausteinsicht.export",
+      "to": "bausteinsicht.diagram",
       "index": 9,
+      "label": "exports Mermaid diagrams",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.cli",
+      "to": "bausteinsicht.export",
+      "index": 10,
       "label": "triggers export",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.cli",
+      "to": "bausteinsicht.importer",
+      "index": 11,
+      "label": "imports models",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.cli",
+      "to": "bausteinsicht.exporter",
+      "index": 12,
+      "label": "exports DSL",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.cli",
+      "to": "bausteinsicht.table",
+      "index": 13,
+      "label": "exports tables",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.cli",
+      "to": "bausteinsicht.search",
+      "index": 14,
+      "label": "searches elements",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.cli",
+      "to": "bausteinsicht.constraints",
+      "index": 15,
+      "label": "validates constraints",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.cli",
+      "to": "bausteinsicht.lsp",
+      "index": 16,
+      "label": "starts language server",
       "kind": "uses"
     },
     {
       "from": "bausteinsicht.sync.engine",
       "to": "bausteinsicht.sync.diff",
-      "index": 10,
+      "index": 17,
       "label": "detects changes",
       "kind": "uses"
     },
     {
       "from": "bausteinsicht.sync.engine",
       "to": "bausteinsicht.sync.forward",
-      "index": 11,
+      "index": 18,
       "label": "model to drawio",
       "kind": "uses"
     },
     {
       "from": "bausteinsicht.sync.engine",
       "to": "bausteinsicht.sync.reverse",
-      "index": 12,
+      "index": 19,
       "label": "drawio to model",
       "kind": "uses"
     },
     {
       "from": "bausteinsicht.sync.engine",
       "to": "bausteinsicht.sync.state",
-      "index": 13,
+      "index": 20,
       "label": "loads/saves state",
       "kind": "uses"
     },
     {
       "from": "bausteinsicht.sync.engine",
       "to": "bausteinsicht.sync.conflict",
-      "index": 14,
+      "index": 21,
       "label": "resolves conflicts",
       "kind": "uses"
     },
     {
       "from": "bausteinsicht.sync.forward",
       "to": "bausteinsicht.drawio.element",
-      "index": 15,
+      "index": 22,
       "label": "creates/updates elements",
       "kind": "uses"
     },
     {
       "from": "bausteinsicht.sync.forward",
       "to": "bausteinsicht.drawio.connector",
-      "index": 16,
+      "index": 23,
       "label": "creates/updates connectors",
       "kind": "uses"
     },
     {
       "from": "bausteinsicht.sync.reverse",
       "to": "bausteinsicht.model.patch",
-      "index": 17,
+      "index": 24,
       "label": "comment-preserving updates",
       "kind": "uses"
     },
     {
       "from": "bausteinsicht.drawio.element",
       "to": "bausteinsicht.drawio.label",
-      "index": 18,
+      "index": 25,
       "label": "generates labels",
       "kind": "uses"
     },
     {
       "from": "bausteinsicht.drawio.element",
       "to": "bausteinsicht.drawio.template",
-      "index": 19,
+      "index": 26,
       "label": "looks up styles",
       "kind": "uses"
     },
     {
       "from": "bausteinsicht.drawio.element",
       "to": "bausteinsicht.drawio.document",
-      "index": 20,
+      "index": 27,
       "label": "modifies pages",
       "kind": "uses"
     },
     {
       "from": "bausteinsicht.drawio.connector",
       "to": "bausteinsicht.drawio.document",
-      "index": 21,
+      "index": 28,
       "label": "modifies pages",
       "kind": "uses"
     },
     {
       "from": "bausteinsicht.model.loader",
       "to": "bausteinsicht.model.resolve",
-      "index": 22,
+      "index": 29,
       "label": "resolves element IDs",
       "kind": "uses"
     },
     {
       "from": "bausteinsicht.model.loader",
       "to": "bausteinsicht.model.types",
-      "index": 23,
+      "index": 30,
       "label": "populates structs",
       "kind": "uses"
     },
     {
       "from": "bausteinsicht.model.validate",
       "to": "bausteinsicht.model.types",
-      "index": 24,
+      "index": 31,
       "label": "reads model structs",
       "kind": "uses"
     },
     {
       "from": "bausteinsicht.model.validate",
       "to": "bausteinsicht.model.resolve",
-      "index": 25,
+      "index": 32,
       "label": "resolves patterns",
       "kind": "uses"
     },
     {
       "from": "bausteinsicht.model.patch",
       "to": "bausteinsicht.model.types",
-      "index": 26,
+      "index": 33,
       "label": "reads model structs",
       "kind": "uses"
     },
     {
       "from": "bausteinsicht.watcher",
       "to": "bausteinsicht.sync.engine",
-      "index": 27,
+      "index": 34,
       "label": "triggers on file change",
       "kind": "uses"
     },
     {
       "from": "bausteinsicht.export",
       "to": "bausteinsicht.drawio.document",
-      "index": 28,
+      "index": 35,
       "label": "reads diagram pages",
       "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.diagram",
+      "to": "bausteinsicht.model",
+      "index": 36,
+      "label": "reads model for export",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.diagram.mermaid_c4",
+      "to": "bausteinsicht.model.types",
+      "index": 37,
+      "label": "renders elements",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.diagram.markdown",
+      "to": "bausteinsicht.diagram.mermaid_c4",
+      "index": 38,
+      "label": "wraps diagrams",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.importer",
+      "to": "bausteinsicht.model",
+      "index": 39,
+      "label": "populates model",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.importer.structurizr",
+      "to": "bausteinsicht.model.types",
+      "index": 40,
+      "label": "creates elements",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.importer.likec4",
+      "to": "bausteinsicht.model.types",
+      "index": 41,
+      "label": "creates elements",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.exporter.structurizr",
+      "to": "bausteinsicht.model",
+      "index": 42,
+      "label": "reads model",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.search",
+      "to": "bausteinsicht.model",
+      "index": 43,
+      "label": "searches elements",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.search",
+      "to": "bausteinsicht.model.resolve",
+      "index": 44,
+      "label": "resolves patterns",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.table",
+      "to": "bausteinsicht.model",
+      "index": 45,
+      "label": "reads model",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.table",
+      "to": "bausteinsicht.diagram",
+      "index": 46,
+      "label": "optionally uses diagrams",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.constraints",
+      "to": "bausteinsicht.model",
+      "index": 47,
+      "label": "validates model",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.constraints",
+      "to": "bausteinsicht.model.validate",
+      "index": 48,
+      "label": "extends validation",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.lsp",
+      "to": "bausteinsicht.model",
+      "index": 49,
+      "label": "indexes for completion",
+      "kind": "uses"
     }
-  ]
+  ],
+  "rendered_elements": {
+    "bausteinsicht": true,
+    "bausteinsicht.cli": true,
+    "bausteinsicht.constraints": true,
+    "bausteinsicht.diagram": true,
+    "bausteinsicht.diagram.markdown": true,
+    "bausteinsicht.diagram.mermaid_c4": true,
+    "bausteinsicht.drawio": true,
+    "bausteinsicht.drawio.connector": true,
+    "bausteinsicht.drawio.document": true,
+    "bausteinsicht.drawio.element": true,
+    "bausteinsicht.drawio.label": true,
+    "bausteinsicht.drawio.template": true,
+    "bausteinsicht.export": true,
+    "bausteinsicht.exporter": true,
+    "bausteinsicht.exporter.structurizr": true,
+    "bausteinsicht.importer": true,
+    "bausteinsicht.importer.likec4": true,
+    "bausteinsicht.importer.structurizr": true,
+    "bausteinsicht.lsp": true,
+    "bausteinsicht.model": true,
+    "bausteinsicht.model.loader": true,
+    "bausteinsicht.model.patch": true,
+    "bausteinsicht.model.resolve": true,
+    "bausteinsicht.model.types": true,
+    "bausteinsicht.model.validate": true,
+    "bausteinsicht.search": true,
+    "bausteinsicht.sync": true,
+    "bausteinsicht.sync.conflict": true,
+    "bausteinsicht.sync.diff": true,
+    "bausteinsicht.sync.engine": true,
+    "bausteinsicht.sync.forward": true,
+    "bausteinsicht.sync.reverse": true,
+    "bausteinsicht.sync.state": true,
+    "bausteinsicht.table": true,
+    "bausteinsicht.watcher": true,
+    "developer": true,
+    "drawio_app": true,
+    "ide": true
+  }
 }
