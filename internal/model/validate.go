@@ -41,6 +41,7 @@ func ValidateWithWarnings(m *BausteinsichtModel) ValidationResult {
 	result.Errors = append(result.Errors, validateViews(m)...)
 	result.Errors = append(result.Errors, validateDynamicViews(m)...)
 	result.Warnings = append(result.Warnings, validateEmptyModel(m)...)
+	result.Warnings = append(result.Warnings, validateLifecycleStatus(m)...)
 	return result
 }
 
@@ -304,4 +305,65 @@ func lookupChild(parent Element, path string) (Element, error) {
 		return child, nil
 	}
 	return lookupChild(child, rest)
+}
+
+// validateLifecycleStatus checks element status fields for validity and lifecycle warnings.
+func validateLifecycleStatus(m *BausteinsichtModel) []ValidationWarning {
+	var warnings []ValidationWarning
+	flatElements, _ := FlattenElements(m)
+
+	// Collect outgoing relationships by element
+	outgoing := make(map[string][]string)
+	for _, rel := range m.Relationships {
+		outgoing[rel.From] = append(outgoing[rel.From], rel.To)
+	}
+
+	for id, elem := range flatElements {
+		if elem.Status == "" {
+			continue // Status is optional
+		}
+
+		// Validate status value
+		validStatus := false
+		for _, valid := range ValidStatuses {
+			if elem.Status == valid {
+				validStatus = true
+				break
+			}
+		}
+		if !validStatus {
+			warnings = append(warnings, ValidationWarning{
+				Path:    "model." + id,
+				Message: fmt.Sprintf("unknown status %q; valid values are: %v", elem.Status, ValidStatuses),
+			})
+			continue
+		}
+
+		// Rule: archived elements should not have outgoing relationships
+		if elem.Status == StatusArchived && len(outgoing[id]) > 0 {
+			warnings = append(warnings, ValidationWarning{
+				Path:    "model." + id,
+				Message: fmt.Sprintf("archived element has %d outgoing relationships; archived elements should not have active relationships", len(outgoing[id])),
+			})
+		}
+
+		// Rule: deprecated elements should ideally have a successor
+		if elem.Status == StatusDeprecated {
+			hasSuccessor := false
+			for _, target := range outgoing[id] {
+				if targetElem, ok := flatElements[target]; ok && targetElem.Status == StatusDeployed && targetElem.Kind == elem.Kind {
+					hasSuccessor = true
+					break
+				}
+			}
+			if !hasSuccessor {
+				warnings = append(warnings, ValidationWarning{
+					Path:    "model." + id,
+					Message: "deprecated element has no deployed successor of the same kind; consider linking to a replacement",
+				})
+			}
+		}
+	}
+
+	return warnings
 }
