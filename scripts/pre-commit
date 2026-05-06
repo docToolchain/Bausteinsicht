@@ -31,4 +31,23 @@ if command -v gitleaks &>/dev/null; then
     gitleaks detect --source . --no-git --no-banner
 fi
 
+# 5. schema validation — ensure schema.json is up to date
+echo "  schema validation..."
+if command -v go &>/dev/null; then
+    SCHEMA_BEFORE=$(md5sum schemas/bausteinsicht.schema.json 2>/dev/null || echo "")
+    # Use mktemp for secure temp file generation (SEC-016)
+    TMPBIN=$(mktemp /tmp/bausteinsicht-check.XXXXXX)
+    trap "rm -f '$TMPBIN'" EXIT
+    go build -o "$TMPBIN" ./cmd/bausteinsicht/ 2>/dev/null || true
+    "$TMPBIN" schema generate >/dev/null 2>&1 || true
+    SCHEMA_AFTER=$(md5sum schemas/bausteinsicht.schema.json 2>/dev/null || echo "")
+
+    if [ "$SCHEMA_BEFORE" != "$SCHEMA_AFTER" ]; then
+        echo "ERROR: Schema is out of date"
+        echo "The schema.json file has been regenerated. Please review and stage the changes:"
+        echo "  git add schemas/bausteinsicht.schema.json"
+        exit 1
+    fi
+fi
+
 echo "==> All pre-commit checks passed."
