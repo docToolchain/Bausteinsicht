@@ -27,9 +27,10 @@ brew install docToolchain/tap/bausteinsicht
 # Or: Winget, Scoop, or build from source
 ```
 
-### 3. Create architecture.jsonc
+### 3. Create Architecture Model
 ```
-Create a file named "architecture.jsonc" in your project root
+Create a file with "architecture" in the name (e.g., architecture.jsonc, my-architecture.jsonc)
+Extension auto-activates when it detects the file
 ```
 
 ### 4. Start Editing

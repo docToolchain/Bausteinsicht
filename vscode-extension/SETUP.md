@@ -151,11 +151,19 @@ code %APPDATA%\Code\User\settings.json
 
 ## 📁 Schritt 3: Architecture Modell erstellen
 
-1. Erstelle eine neue Datei `architecture.jsonc` in deinem Projekt:
+1. Erstelle eine neue JSONC-Datei mit "architecture" im Namen:
 
 ```bash
+# Standard-Konvention
 touch architecture.jsonc
+
+# Oder flexibel benannt (z.B. für mehrere Modelle)
+touch my-architecture.jsonc
+touch system-design.jsonc
+touch platform-architecture.jsonc
 ```
+
+**Die Extension aktiviert sich automatisch**, wenn der Dateiname "architecture" enthält.
 
 2. Starte mit einer minimalen Architektur:
 
@@ -272,12 +280,18 @@ Klick auf "Open in draw.io" öffnet das Element in draw.io.
 
 ### Problem: Extension wird nicht aktiviert
 
-**Symptom:** Keine CodeLens, keine Validierungsfehler, obwohl `architecture.jsonc` vorhanden ist
+**Symptom:** Keine CodeLens, keine Validierungsfehler, obwohl Architecture-Datei vorhanden ist
 
 **Lösungen:**
-1. Stelle sicher, dass die Datei `architecture.jsonc` heißt (nicht z.B. `architecture.json`)
-2. Öffne Debug Console (Ctrl+Shift+Y) und suche nach Extension-Aktivierungsfehlern
-3. Restart VS Code
+1. Stelle sicher, dass die Datei "architecture" im Namen hat:
+   - ✅ `architecture.jsonc`
+   - ✅ `my-architecture.jsonc`
+   - ✅ `system-design-architecture.jsonc`
+   - ❌ `model.jsonc` (kein "architecture" im Namen)
+   
+2. Dateiendung muss `.jsonc` sein (nicht `.json`)
+3. Öffne Debug Console (Ctrl+Shift+Y) und suche nach Extension-Aktivierungsfehlern
+4. Restart VS Code (Ctrl+Shift+P → Developer: Reload Window)
 
 ### Problem: "Cannot find module 'mocha'" (Development)
 

@@ -26,7 +26,7 @@
   ],
   "activationEvents": [
     "onLanguage:jsonc",
-    "workspaceContains:**/architecture.jsonc"
+    "workspaceContains:**/*architecture*.jsonc"
   ],
   "main": "./dist/extension.js",
   "contributes": {
