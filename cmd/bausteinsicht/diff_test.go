@@ -10,7 +10,11 @@ func createTempFile(t *testing.T, content string) string {
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer tmpFile.Close()
+	defer func() {
+		if err := tmpFile.Close(); err != nil {
+			t.Logf("Failed to close temp file: %v", err)
+		}
+	}()
 
 	if _, err := tmpFile.WriteString(content); err != nil {
 		t.Fatalf("Failed to write to temp file: %v", err)
