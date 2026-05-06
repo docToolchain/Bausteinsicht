@@ -818,6 +818,7 @@ func TestSyncRecoversEmptyMxfile(t *testing.T) {
 	m.Views = map[string]model.View{}
 	m.Model = map[string]model.Element{}
 	m.Relationships = nil
+	m.DynamicViews = nil
 	if err := model.Save("architecture.jsonc", m); err != nil {
 		t.Fatalf("save emptied model: %v", err)
 	}

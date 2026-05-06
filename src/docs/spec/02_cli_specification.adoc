@@ -54,6 +54,10 @@ See link:01_use_cases.adoc[Use Cases] for the functional overview of all CLI com
 | Export views as PlantUML C4 or Mermaid C4 text diagrams
 | Implemented
 
+| `bausteinsicht export-sequence`
+| Export dynamic views as PlantUML or Mermaid sequence diagrams
+| Implemented
+
 | `bausteinsicht --version`
 | Display version number
 | Implemented
@@ -643,4 +647,114 @@ $ bausteinsicht export-diagram --format json
   "files": ["./context.puml"],
   "success": true
 }
+----
+
+==== `bausteinsicht export-sequence`
+
+Exports dynamic views from the model as PlantUML or Mermaid sequence diagram source files.
+Dynamic views describe the runtime behaviour of the system as ordered message sequences between elements.
+
+**Flags:**
+
+[cols="2,3,1,2"]
+|===
+| Flag | Description | Required | Default
+
+| `--model`
+| Path to the model file.
+| No
+| Auto-detected
+
+| `--view`
+| Export only the dynamic view with this key.
+| No
+| All dynamic views
+
+| `--diagram-format`
+| Diagram format: `plantuml` or `mermaid`.
+| No
+| `plantuml`
+
+| `--output`
+| Output directory for exported files. When omitted, output is written to stdout.
+| No
+| stdout
+
+| `--format`
+| Output format: `text` or `json`.
+| No
+| `text`
+|===
+
+**Behavior:**
+
+* Loads the model and reads `dynamicViews` entries.
+* Steps are sorted by `index` and rendered in order.
+* Participants are listed in first-appearance order.
+* Participant display names are resolved from the element `title`; falls back to element ID if the element is not in the model.
+* If `--output` is given, files are named `sequence-<view-key>.puml` (PlantUML) or `sequence-<view-key>.md` (Mermaid).
+* If no dynamic views are defined in the model, a warning is written to stderr and the command exits with `0`.
+
+**Arrow type mapping:**
+
+[cols="1,2,2"]
+|===
+| Step type | PlantUML | Mermaid
+
+| `sync` (or omitted)
+| `A -> B`
+| `A->>B`
+
+| `return`
+| `A --> B`
+| `A-->>B`
+
+| `async`
+| `A ->> B`
+| `A-)B`
+|===
+
+**JSON output structure:**
+[source,json]
+----
+[
+  {
+    "view": "checkout-flow",
+    "format": "plantuml",
+    "source": "@startuml checkout_flow\n..."
+  }
+]
+----
+
+**Exit codes:**
+
+* `0` -- all sequence diagrams exported successfully (or no dynamic views defined)
+* `1` -- specified `--view` key not found
+* `2` -- model file not found, invalid `--diagram-format`, or I/O error
+
+**Example:**
+[source,bash]
+----
+$ bausteinsicht export-sequence
+@startuml checkout_flow
+title Checkout Flow
+...
+@enduml
+
+$ bausteinsicht export-sequence --output docs/sequences
+Exported: docs/sequences/sequence-checkout-flow.puml
+
+$ bausteinsicht export-sequence --diagram-format mermaid --view checkout-flow
+sequenceDiagram
+    title Checkout Flow
+...
+
+$ bausteinsicht export-sequence --format json
+[
+  {
+    "view": "checkout-flow",
+    "format": "plantuml",
+    "source": "@startuml checkout_flow\n..."
+  }
+]
 ----

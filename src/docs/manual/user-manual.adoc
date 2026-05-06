@@ -462,6 +462,57 @@ bausteinsicht export-table --table-format adoc --output elements.adoc
 bausteinsicht export-table --table-format markdown
 ----
 
+==== Sequence Diagrams (Dynamic Views)
+
+Dynamic views describe the runtime behaviour of your system as ordered message sequences.
+Define them in the `dynamicViews` array of your model file and export them as PlantUML or Mermaid source:
+
+[source,jsonc]
+----
+"dynamicViews": [
+  {
+    "key": "checkout-flow",
+    "title": "Checkout Flow",
+    "steps": [
+      { "index": 1, "from": "customer",    "to": "webshop.api", "label": "POST /orders",  "type": "sync" },
+      { "index": 2, "from": "webshop.api", "to": "webshop.db",  "label": "persist order", "type": "sync" },
+      { "index": 3, "from": "webshop.api", "to": "customer",    "label": "201 Created",   "type": "return" }
+    ]
+  }
+]
+----
+
+[source,bash]
+----
+# Export all dynamic views as PlantUML to stdout
+bausteinsicht export-sequence
+
+# Write PlantUML files to a directory
+bausteinsicht export-sequence --output docs/sequences
+
+# Export one view as Mermaid
+bausteinsicht export-sequence --view checkout-flow --diagram-format mermaid
+
+# Machine-readable JSON output (for LLM/CI use)
+bausteinsicht export-sequence --format json
+----
+
+Step types control the arrow style in the diagram:
+
+[cols="1,3"]
+|===
+| Type | Meaning
+
+| `sync` (default)
+| Synchronous call — solid arrow
+
+| `return`
+| Response — dashed arrow
+
+| `async`
+| Fire-and-forget — async arrow
+|===
+
 NOTE: Image export requires the draw.io Desktop CLI.
 In containers, the `drawio-export` wrapper handles headless rendering via xvfb.
 See <<troubleshooting>> for common export issues.
@@ -497,10 +548,13 @@ See the link:../spec/02_cli_specification.adoc[CLI Specification] for full comma
 | Export views as PNG/SVG images
 
 | `bausteinsicht export-diagram`
-| Export views as PlantUML or Mermaid diagrams
+| Export views as PlantUML or Mermaid C4 diagrams
 
 | `bausteinsicht export-table`
 | Export element list as AsciiDoc or Markdown table
+
+| `bausteinsicht export-sequence`
+| Export dynamic views as PlantUML or Mermaid sequence diagrams
 
 | `bausteinsicht --version`
 | Display version number
