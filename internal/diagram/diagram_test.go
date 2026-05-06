@@ -343,3 +343,57 @@ func TestColorForKind_UnknownKind(t *testing.T) {
 		t.Error("expected default colors for unknown kind")
 	}
 }
+
+// --- ExportAllViewsToMermaid Tests ---
+
+func TestExportAllViewsToMermaid(t *testing.T) {
+	m := testModel()
+	viewKeys, diagrams, err := ExportAllViewsToMermaid(m)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(viewKeys) != 2 {
+		t.Fatalf("expected 2 views, got %d", len(viewKeys))
+	}
+
+	if len(diagrams) != 2 {
+		t.Fatalf("expected 2 diagrams, got %d", len(diagrams))
+	}
+
+	// Check that both views are present
+	if _, ok := diagrams["context"]; !ok {
+		t.Error("missing context view diagram")
+	}
+	if _, ok := diagrams["containers"]; !ok {
+		t.Error("missing containers view diagram")
+	}
+
+	// Check that diagrams contain Mermaid syntax
+	contextDiagram := diagrams["context"]
+	if !strings.Contains(contextDiagram, "C4") {
+		t.Error("context diagram missing C4 syntax")
+	}
+
+	containerDiagram := diagrams["containers"]
+	if !strings.Contains(containerDiagram, "C4") {
+		t.Error("containers diagram missing C4 syntax")
+	}
+}
+
+func TestExportAllViewsToMermaidEmpty(t *testing.T) {
+	m := &model.BausteinsichtModel{
+		Views: make(map[string]model.View),
+	}
+	viewKeys, diagrams, err := ExportAllViewsToMermaid(m)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(viewKeys) != 0 {
+		t.Fatalf("expected 0 views, got %d", len(viewKeys))
+	}
+	if len(diagrams) != 0 {
+		t.Fatalf("expected 0 diagrams, got %d", len(diagrams))
+	}
+}
