@@ -90,10 +90,88 @@
             }
           }
         },
+        "constraints": {
+          "kind": "container",
+          "title": "Constraints",
+          "description": "Validation constraints for model linting and consistency checking",
+          "technology": "Go"
+        },
+        "diagram": {
+          "kind": "container",
+          "title": "Diagram",
+          "description": "Text-based diagram export to Mermaid C4 and PlantUML formats with markdown wrapping",
+          "technology": "Go",
+          "children": {
+            "mermaid_c4": {
+              "kind": "component",
+              "title": "Mermaid C4",
+              "description": "Mermaid C4 diagram generation with C4 level detection",
+              "technology": "Go"
+            },
+            "markdown": {
+              "kind": "component",
+              "title": "Markdown",
+              "description": "Markdown document wrapper for multiple diagram pages",
+              "technology": "Go"
+            }
+          }
+        },
+        "exporter": {
+          "kind": "container",
+          "title": "Exporter",
+          "description": "Architecture export to Structurizr DSL and other formats",
+          "technology": "Go",
+          "children": {
+            "structurizr": {
+              "kind": "component",
+              "title": "Structurizr",
+              "description": "Structurizr DSL export with smart variable naming",
+              "technology": "Go"
+            }
+          }
+        },
         "export": {
           "kind": "container",
           "title": "Export",
-          "description": "Diagram export to PNG and SVG formats via draw.io CLI",
+          "description": "Export diagrams to PNG, SVG, and other visual formats via draw.io CLI",
+          "technology": "Go"
+        },
+        "importer": {
+          "kind": "container",
+          "title": "Importer",
+          "description": "Import architecture from Structurizr DSL and LikeC4 formats",
+          "technology": "Go",
+          "children": {
+            "structurizr": {
+              "kind": "component",
+              "title": "Structurizr",
+              "description": "Structurizr DSL parsing and model conversion",
+              "technology": "Go"
+            },
+            "likec4": {
+              "kind": "component",
+              "title": "LikeC4",
+              "description": "LikeC4 DSL parsing and model conversion",
+              "technology": "Go"
+            }
+          }
+        },
+        "lsp": {
+          "kind": "container",
+          "title": "Language Server",
+          "description": "Language Server Protocol implementation for VS Code and other editors",
+          "technology": "Go"
+        },
+        "search": {
+          "kind": "container",
+          "title": "Search",
+          "description": "Element and relationship search with filtering and pattern matching",
+          "technology": "Go"
+        },
+        "table": {
+          "kind": "container",
+          "title": "Table",
+          "description": "Export architecture to CSV and Markdown table formats",
           "technology": "Go"
         },
         "model": {
@@ -259,8 +337,50 @@
     },
     {
       "from": "bausteinsicht.cli",
+      "to": "bausteinsicht.diagram",
+      "label": "exports Mermaid diagrams",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.cli",
       "to": "bausteinsicht.export",
       "label": "triggers export",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.cli",
+      "to": "bausteinsicht.importer",
+      "label": "imports models",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.cli",
+      "to": "bausteinsicht.exporter",
+      "label": "exports DSL",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.cli",
+      "to": "bausteinsicht.table",
+      "label": "exports tables",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.cli",
+      "to": "bausteinsicht.search",
+      "label": "searches elements",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.cli",
+      "to": "bausteinsicht.constraints",
+      "label": "validates constraints",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.cli",
+      "to": "bausteinsicht.lsp",
+      "label": "starts language server",
       "kind": "uses"
     },
     {
