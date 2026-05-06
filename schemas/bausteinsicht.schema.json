@@ -10,6 +10,18 @@
     "config": {
       "$ref": "#/definitions/Config"
     },
+    "constraints": {
+      "items": {
+        "$ref": "#/definitions/Constraint"
+      },
+      "type": "array"
+    },
+    "dynamicViews": {
+      "items": {
+        "$ref": "#/definitions/DynamicView"
+      },
+      "type": "array"
+    },
     "model": {
       "type": "object"
     },
@@ -50,6 +62,77 @@
       },
       "type": "object"
     },
+    "Constraint": {
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "element-kind": {
+          "type": "string"
+        },
+        "field": {
+          "type": "string"
+        },
+        "from-kind": {
+          "type": "string"
+        },
+        "from-kinds": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "max": {
+          "type": "integer"
+        },
+        "rule": {
+          "type": "string"
+        },
+        "technologies": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "to-kind": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "description",
+        "rule"
+      ],
+      "type": "object"
+    },
+    "DynamicView": {
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "steps": {
+          "items": {
+            "$ref": "#/definitions/SequenceStep"
+          },
+          "type": "array"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "title",
+        "steps"
+      ],
+      "type": "object"
+    },
     "Relationship": {
       "properties": {
         "description": {
@@ -71,6 +154,32 @@
       "required": [
         "from",
         "to"
+      ],
+      "type": "object"
+    },
+    "SequenceStep": {
+      "properties": {
+        "from": {
+          "type": "string"
+        },
+        "index": {
+          "type": "integer"
+        },
+        "label": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "index",
+        "from",
+        "to",
+        "label"
       ],
       "type": "object"
     },
