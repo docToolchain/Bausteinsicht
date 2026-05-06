@@ -26,7 +26,6 @@ type Result struct {
 
 	// Extra fields populated depending on type.
 	Technology  string `json:"technology,omitempty"`
-	Status      string `json:"status,omitempty"`
 	From        string `json:"from,omitempty"`
 	To          string `json:"to,omitempty"`
 	Description string `json:"description,omitempty"`

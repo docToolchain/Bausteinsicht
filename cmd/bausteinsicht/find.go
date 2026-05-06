@@ -119,8 +119,6 @@ func printFindText(cmd *cobra.Command, resp search.Response) error {
 			extra := ""
 			if r.Technology != "" {
 				extra = "  technology: " + r.Technology
-			} else if r.Status != "" {
-				extra = "  status: " + r.Status
 			}
 			if _, err := fmt.Fprintf(out, "  %-28s [%-10s]  %-35s%s  score: %d\n",
 				r.ID, r.Kind, fmt.Sprintf("%q", r.Title), extra, r.Score); err != nil {
