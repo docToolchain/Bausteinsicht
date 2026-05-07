@@ -70,9 +70,9 @@ func runHealth(cmd *cobra.Command, _ []string) error {
 		if err := os.WriteFile(outputPath, []byte(output), 0644); err != nil {
 			return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
 		}
-		fmt.Fprintf(cmd.OutOrStdout(), "Health report written to %s\n", outputPath)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Health report written to %s\n", outputPath)
 	} else {
-		fmt.Fprint(cmd.OutOrStdout(), output)
+		_, _ = fmt.Fprint(cmd.OutOrStdout(), output)
 	}
 
 	return nil
@@ -82,13 +82,13 @@ func formatHealthReport(score *health.HealthScore, summaryOnly bool) string {
 	var sb strings.Builder
 
 	// Header
-	sb.WriteString(fmt.Sprintf("Architecture Health Report\n"))
-	sb.WriteString(fmt.Sprintf("==========================\n\n"))
+	sb.WriteString("Architecture Health Report\n")
+	sb.WriteString("==========================\n\n")
 
 	// Overall score
-	sb.WriteString(fmt.Sprintf("Overall Score: %.1f/100 [%s]\n", score.Overall, score.Grade))
-	sb.WriteString(fmt.Sprintf("Summary: %s\n", score.Summary))
-	sb.WriteString(fmt.Sprintf("Timestamp: %s\n\n", score.Timestamp))
+	fmt.Fprintf(&sb, "Overall Score: %.1f/100 [%s]\n", score.Overall, score.Grade)
+	fmt.Fprintf(&sb, "Summary: %s\n", score.Summary)
+	fmt.Fprintf(&sb, "Timestamp: %s\n\n", score.Timestamp)
 
 	if summaryOnly {
 		return sb.String()
