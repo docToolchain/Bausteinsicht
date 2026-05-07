@@ -1,5 +1,8 @@
 = Bausteinsicht
 
+image:https://sonarcloud.io/api/project_badges/measure?project=docToolchain_Bausteinsicht&metric=alert_status[Quality Gate Status,link=https://sonarcloud.io/summary/new_code?id=docToolchain_Bausteinsicht]
+image:https://sonarcloud.io/api/project_badges/measure?project=docToolchain_Bausteinsicht&metric=coverage&token=squ_0000000000000000000000000000000000000000[Coverage,link=https://sonarcloud.io/component_measures?id=docToolchain_Bausteinsicht&metric=coverage]
+
 Architecture-as-code tool with https://www.drawio.com/[draw.io] as visual frontend and bidirectional synchronization.
 
 Define your architecture in a JSONC text file, and Bausteinsicht generates and updates draw.io diagrams automatically — in both directions.

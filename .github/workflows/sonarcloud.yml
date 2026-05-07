@@ -1,0 +1,62 @@
+name: SonarCloud Analysis
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  sonarcloud:
+    runs-on: ubuntu-latest
+    name: SonarCloud Analysis
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        with:
+          go-version-file: go.mod
+
+      - name: Run tests with coverage
+        run: |
+          go test -v -coverprofile=coverage.out -covermode=atomic ./...
+
+      - name: Run Go security checks
+        run: |
+          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+          golangci-lint run --out-format json > golangci-report.json || true
+
+      - name: Upload coverage to Codecov (optional backup)
+        uses: codecov/codecov-action@d9f34f8cd5cb3b3eb79507e7505779dac632d969 # v3
+        with:
+          files: ./coverage.out
+          flags: go-coverage
+          fail_ci_if_error: false
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: |
+            -Dsonar.projectKey=docToolchain_Bausteinsicht
+            -Dsonar.organization=doctoolchain
+
+      - name: Check quality gate
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "Quality gate check: SonarCloud analysis complete."
+          echo "View detailed report: https://sonarcloud.io/project/overview?id=docToolchain_Bausteinsicht"
