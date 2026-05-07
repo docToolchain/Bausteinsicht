@@ -32,17 +32,24 @@ jobs:
       - name: Generate test report
         id: report
         if: matrix.os == 'ubuntu-latest'
+        continue-on-error: true
         run: |
           cd scripts/test-report-generator
           go build -o test-report-generator
           cd ../..
-          ./scripts/test-report-generator/test-report-generator -coverage=coverage.out -format=json < test-results.json > test-report.json
-          ./scripts/test-report-generator/test-report-generator -coverage=coverage.out -format=html < test-results.json > test-report.html
-          # Extract metrics for outputs
-          PASS_RATE=$(jq -r '.tests.pass_rate' test-report.json)
-          COVERAGE=$(jq -r '.coverage | to_entries | map(select(.value != null) | .value.coverage) | if length > 0 then add / length else 0 end' test-report.json)
-          echo "pass-rate=${PASS_RATE}" >> $GITHUB_OUTPUT
-          echo "coverage=${COVERAGE}" >> $GITHUB_OUTPUT
+          if [ -f test-results.json ]; then
+            echo "Generating reports from test-results.json"
+            ./scripts/test-report-generator/test-report-generator -coverage=coverage.out -format=json < test-results.json > test-report.json
+            ./scripts/test-report-generator/test-report-generator -coverage=coverage.out -format=html < test-results.json > test-report.html
+            # Extract metrics for outputs
+            PASS_RATE=$(jq -r '.tests.pass_rate' test-report.json)
+            COVERAGE=$(jq -r '.coverage | to_entries | map(select(.value != null) | .value.coverage) | if length > 0 then add / length else 0 end' test-report.json)
+            echo "pass-rate=${PASS_RATE}" >> $GITHUB_OUTPUT
+            echo "coverage=${COVERAGE}" >> $GITHUB_OUTPUT
+          else
+            echo "test-results.json not found!"
+            exit 1
+          fi
       - name: Upload test reports
         if: matrix.os == 'ubuntu-latest'
         uses: actions/upload-artifact@v4
