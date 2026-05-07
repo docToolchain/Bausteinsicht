@@ -156,7 +156,9 @@ func renderMergedHTML(reports []OSReport) string {
 			display: none;
 			padding: 40px;
 		}
-		.tab-radio:checked + .tab-label + .tab-content {
+		#tab-linux:checked ~ .tab-content-linux,
+		#tab-windows:checked ~ .tab-content-windows,
+		#tab-macos:checked ~ .tab-content-macos {
 			display: block;
 		}
 
@@ -278,20 +280,24 @@ func renderMergedHTML(reports []OSReport) string {
 		<div class="tab-nav">
 `
 
-	// Render tab labels and content
-	for i, report := range reports {
-		checked := ""
-		if i == 0 {
-			checked = " checked"
-		}
-
-		html += `			<input type="radio" id="tab-` + report.OS + `" class="tab-radio"` + checked + `>
-			<label for="tab-` + report.OS + `" class="tab-label">` + report.Icon + ` ` + report.Label + `</label>
+	// Render tab labels only (inputs are hidden below)
+	for _, report := range reports {
+		html += `			<label for="tab-` + report.OS + `" class="tab-label">` + report.Icon + ` ` + report.Label + `</label>
 `
 	}
 
 	html += `		</div>
 `
+
+	// Hidden input elements for tab state management
+	for i, osReport := range reports {
+		html += `		<input type="radio" id="tab-` + osReport.OS + `" name="tab-group" class="tab-radio"`
+		if i == 0 {
+			html += ` checked`
+		}
+		html += `>
+`
+	}
 
 	// Render tab content
 	for _, osReport := range reports {
@@ -304,7 +310,7 @@ func renderMergedHTML(reports []OSReport) string {
 		coverage := fmt.Sprintf("%.1f", overallCoverage)
 		duration := fmt.Sprintf("%.2f", r.Tests.TotalTime)
 
-		html += `		<div class="tab-content">
+		html += `		<div class="tab-content tab-content-` + osReport.OS + `">
 			<div class="metrics">
 				<div class="metric-card">
 					<div class="metric-value">` + totalTests + `</div>
