@@ -230,6 +230,11 @@ func TestExportPage_ErrorWhenOutputMissing(t *testing.T) {
 }
 
 func TestExportPage_Integration(t *testing.T) {
+	// Skip in CI environments where headless draw.io may not work properly
+	if os.Getenv("CI") != "" || os.Getenv("GITHUB_ACTIONS") != "" {
+		t.Skip("skipping draw.io integration test in CI environment")
+	}
+
 	// Skip if draw.io CLI is not available.
 	if _, err := exec.LookPath("drawio-export"); err != nil {
 		if _, err := exec.LookPath("drawio"); err != nil {

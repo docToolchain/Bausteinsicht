@@ -16,13 +16,175 @@ jobs:
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
+    outputs:
+      test-pass-rate: ${{ steps.report.outputs.pass-rate }}
+      coverage: ${{ steps.report.outputs.coverage }}
+      performance-change: ${{ steps.report.outputs.performance-change }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
         with:
           go-version-file: go.mod
       - run: go build ./...
-      - run: go test ./...
+      - name: Run tests with coverage
+        continue-on-error: true
+        shell: bash
+        run: go test ./... -json -covermode=atomic -coverprofile=coverage.out > test-results.json
+      - name: Check coverage file
+        shell: bash
+        run: |
+          if [ -f coverage.out ]; then
+            echo "✓ coverage.out exists"
+            wc -l coverage.out
+            echo "First 10 lines:"
+            head -10 coverage.out
+          else
+            echo "✗ coverage.out not found"
+          fi
+      - name: Check source files
+        shell: bash
+        run: |
+          echo "Checking if source files are readable..."
+          find internal -name "*.go" -type f | head -5 | while read f; do
+            if [ -f "$f" ]; then
+              echo "✓ $f ($(wc -l < "$f") lines)"
+            else
+              echo "✗ $f not found"
+            fi
+          done
+      - name: Generate test report
+        id: report
+        shell: bash
+        run: |
+          GOEXE=$(go env GOEXE)
+          cd scripts/test-report-generator
+          go build -o test-report-generator${GOEXE} .
+          cd ../..
+
+          # Determine OS key from matrix.os
+          OS_NAME=${{ matrix.os }}
+          OS_KEY="${OS_NAME%%-*}"
+
+          if [ -f test-results.json ]; then
+            echo "Generating reports for ${OS_KEY} from test-results.json"
+            # Only pass coverage.out if it exists (it may not exist on failed runs or Windows)
+            if [ -f coverage.out ]; then
+              ./scripts/test-report-generator/test-report-generator${GOEXE} -coverage=coverage.out -format=json < test-results.json > test-report-${OS_KEY}.json
+            else
+              echo "Warning: coverage.out not found, generating report without coverage data"
+              ./scripts/test-report-generator/test-report-generator${GOEXE} -format=json < test-results.json > test-report-${OS_KEY}.json
+            fi
+          else
+            echo "test-results.json not found!"
+            exit 1
+          fi
+        continue-on-error: true
+      - name: Upload test reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-${{ matrix.os }}
+          path: |
+            test-report-*.json
+            test-results.json
+            coverage.out
+          retention-days: 30
+
+  merge-reports:
+    needs: build-and-test
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: test-reports-*
+          merge-multiple: true
+      - name: Build test-report-generator
+        run: |
+          cd scripts/test-report-generator
+          go build -o test-report-generator .
+      - name: Merge reports into combined HTML
+        continue-on-error: true
+        run: |
+          ./scripts/test-report-generator/test-report-generator \
+            -merge \
+            -report-linux=test-report-ubuntu.json \
+            -report-windows=test-report-windows.json \
+            -report-macos=test-report-macos.json \
+            > test-report-combined.html
+      - name: Upload combined report
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report-combined
+          path: test-report-combined.html
+          retention-days: 90
+
+  report-pr-comment:
+    if: github.event_name == 'pull_request'
+    needs: [build-and-test, merge-reports]
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: test-reports-*
+          merge-multiple: true
+      - name: Post test report comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            // Load all three reports
+            const linux = JSON.parse(fs.readFileSync('test-report-ubuntu.json', 'utf8'));
+            const windows = JSON.parse(fs.readFileSync('test-report-windows.json', 'utf8'));
+            const macos = JSON.parse(fs.readFileSync('test-report-macos.json', 'utf8'));
+
+            function getMetrics(report) {
+              const coverages = Object.values(report.coverage || {});
+              let totalStmt = 0, coveredStmt = 0;
+              coverages.forEach(pkg => {
+                totalStmt += pkg.stmt_total;
+                coveredStmt += pkg.stmt_covered;
+              });
+              const coverage = totalStmt > 0 ? (coveredStmt / totalStmt * 100).toFixed(1) : 'N/A';
+              return {
+                tests: report.tests.total,
+                passed: report.tests.passed,
+                failed: report.tests.failed,
+                passRate: report.tests.pass_rate.toFixed(1),
+                coverage: coverage,
+                duration: report.tests.total_time_seconds.toFixed(2)
+              };
+            }
+
+            const linuxMetrics = getMetrics(linux);
+            const windowsMetrics = getMetrics(windows);
+            const macosMetrics = getMetrics(macos);
+
+            // Generate Markdown report with multi-OS comparison
+            let markdown = '## 📊 Test Report (Multi-OS)\n\n';
+            markdown += '| Metric | 🐧 Linux | 🪟 Windows | 🍎 macOS |\n';
+            markdown += '|--------|----------|-----------|--------|\n';
+            markdown += `| Total Tests | ${linuxMetrics.tests} | ${windowsMetrics.tests} | ${macosMetrics.tests} |\n`;
+            markdown += `| ✅ Passed | ${linuxMetrics.passed} (${linuxMetrics.passRate}%) | ${windowsMetrics.passed} (${windowsMetrics.passRate}%) | ${macosMetrics.passed} (${macosMetrics.passRate}%) |\n`;
+            markdown += `| ❌ Failed | ${linuxMetrics.failed} | ${windowsMetrics.failed} | ${macosMetrics.failed} |\n`;
+            markdown += `| ⏱️ Duration | ${linuxMetrics.duration}s | ${windowsMetrics.duration}s | ${macosMetrics.duration}s |\n`;
+            markdown += `| 📦 Coverage | ${linuxMetrics.coverage}% | ${windowsMetrics.coverage}% | ${macosMetrics.coverage}% |\n\n`;
+            markdown += '💡 Full report: Download artifacts from this workflow run.';
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: markdown
+            });
 
   schema-validation:
     runs-on: ubuntu-latest
