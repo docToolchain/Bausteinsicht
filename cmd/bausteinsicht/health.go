@@ -95,8 +95,8 @@ func formatHealthReport(score *health.HealthScore, summaryOnly bool) string {
 	}
 
 	// Model stats
-	sb.WriteString(fmt.Sprintf("Model Statistics\n"))
-	sb.WriteString(fmt.Sprintf("----------------\n"))
+	sb.WriteString("Model Statistics\n")
+	sb.WriteString("----------------\n")
 	sb.WriteString(fmt.Sprintf("Elements: %d\n", score.ElementCnt))
 	sb.WriteString(fmt.Sprintf("Relationships: %d\n", score.RelCnt))
 	sb.WriteString(fmt.Sprintf("Views: %d\n\n", score.ViewCnt))
