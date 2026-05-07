@@ -57,7 +57,7 @@ func ApplyForward(
 	}
 
 	if len(m.Views) == 0 {
-		applyForwardToPage(cs, doc, templates, flat, nil, result)
+		applyForwardToPage(cs, doc, templates, flat, nil, m, result)
 		return result
 	}
 
@@ -72,6 +72,7 @@ func applyForwardToPage(
 	templates *drawio.TemplateSet,
 	flat map[string]*model.Element,
 	elemFilter map[string]bool,
+	m *model.BausteinsichtModel,
 	result *ForwardResult,
 ) {
 	page := firstPage(doc)
@@ -85,6 +86,9 @@ func applyForwardToPage(
 	// bausteinsicht_id is not present in the current model. This handles
 	// cases where the sync state is missing or the model was emptied. (#110)
 	reconcileOrphanedElements(page, flat, result)
+
+	// Synchronize decision badges with the model
+	synchronizeDecisionBadges(page, m)
 }
 
 // applyForwardPerView iterates over model views and applies changes per page.
@@ -183,6 +187,9 @@ func applyForwardPerView(
 				result.MetadataUpdated++
 			}
 		}
+
+		// Synchronize decision badges with the model
+		synchronizeDecisionBadges(page, m)
 	}
 }
 
@@ -1121,4 +1128,83 @@ func createBackNavButton(
 	geo.CreateAttr("width", "140")
 	geo.CreateAttr("height", "30")
 	geo.CreateAttr("as", "geometry")
+}
+
+// synchronizeDecisionBadges updates decision badges on all elements in a page
+// to match the model. It removes old badges and creates new ones based on the
+// element's decision links in the model.
+func synchronizeDecisionBadges(page *drawio.Page, m *model.BausteinsichtModel) {
+	if m == nil {
+		return
+	}
+
+	// Build decision map for quick lookup
+	decisionMap := make(map[string]*model.DecisionRecord)
+	for i := range m.Specification.Decisions {
+		decisionMap[m.Specification.Decisions[i].ID] = &m.Specification.Decisions[i]
+	}
+
+	// Find all elements on the page
+	root := page.Root()
+	if root == nil {
+		return
+	}
+
+	for _, obj := range root.SelectElements("object") {
+		elemID := obj.SelectAttrValue("bausteinsicht_id", "")
+		if elemID == "" {
+			continue
+		}
+
+		// Look up element in model
+		elem, ok := findElementByID(m, elemID)
+		if !ok || elem == nil {
+			continue
+		}
+
+		// Find the mxCell for this element
+		cell := obj.SelectElement("mxCell")
+		if cell == nil {
+			continue
+		}
+
+		// Remove old decision badges
+		children := cell.SelectElements("mxCell")
+		for i := len(children) - 1; i >= 0; i-- {
+			badgeID := children[i].SelectAttrValue("bausteinsicht_decision_id", "")
+			if badgeID != "" {
+				cell.RemoveChild(children[i])
+			}
+		}
+
+		// Add new decision badges
+		if len(elem.Decisions) > 0 {
+			AddDecisionBadges(cell, elem.Decisions, decisionMap)
+		}
+	}
+}
+
+// findElementByID finds an element in the model by its dot-path ID (e.g., "system.backend.api")
+func findElementByID(m *model.BausteinsichtModel, id string) (*model.Element, bool) {
+	parts := strings.Split(id, ".")
+	if len(parts) == 0 {
+		return nil, false
+	}
+
+	elem, ok := m.Model[parts[0]]
+	if !ok {
+		return nil, false
+	}
+
+	// Navigate through child elements
+	current := &elem
+	for _, part := range parts[1:] {
+		child, ok := current.Children[part]
+		if !ok {
+			return nil, false
+		}
+		current = &child
+	}
+
+	return current, true
 }

@@ -40,8 +40,11 @@ func ValidateWithWarnings(m *BausteinsichtModel) ValidationResult {
 	result.Errors = append(result.Errors, validateRelationships(m)...)
 	result.Errors = append(result.Errors, validateViews(m)...)
 	result.Errors = append(result.Errors, validateDynamicViews(m)...)
+	result.Errors = append(result.Errors, validateDecisions(m)...)
 	result.Warnings = append(result.Warnings, validateEmptyModel(m)...)
 	result.Warnings = append(result.Warnings, validateLifecycleStatus(m)...)
+	result.Warnings = append(result.Warnings, validateOrphanDecisions(m)...)
+	result.Warnings = append(result.Warnings, validateSupersededDecisions(m)...)
 	return result
 }
 
@@ -360,6 +363,115 @@ func validateLifecycleStatus(m *BausteinsichtModel) []ValidationWarning {
 				warnings = append(warnings, ValidationWarning{
 					Path:    "model." + id,
 					Message: "deprecated element has no deployed successor of the same kind; consider linking to a replacement",
+				})
+			}
+		}
+	}
+
+	return warnings
+}
+
+// validateDecisions checks for unknown ADR IDs referenced by elements and relationships.
+func validateDecisions(m *BausteinsichtModel) []ValidationError {
+	var errs []ValidationError
+
+	// Build a map of known decision IDs
+	knownDecisions := make(map[string]bool)
+	for _, decision := range m.Specification.Decisions {
+		knownDecisions[decision.ID] = true
+	}
+
+	// Check elements
+	flatElements, _ := FlattenElements(m)
+	for id, elem := range flatElements {
+		for _, decisionID := range elem.Decisions {
+			if !knownDecisions[decisionID] {
+				errs = append(errs, ValidationError{
+					Path:    "model." + id,
+					Message: fmt.Sprintf("references unknown decision %q", decisionID),
+				})
+			}
+		}
+	}
+
+	// Check relationships
+	for i, rel := range m.Relationships {
+		for _, decisionID := range rel.Decisions {
+			if !knownDecisions[decisionID] {
+				errs = append(errs, ValidationError{
+					Path:    fmt.Sprintf("relationships[%d]", i),
+					Message: fmt.Sprintf("references unknown decision %q", decisionID),
+				})
+			}
+		}
+	}
+
+	return errs
+}
+
+// validateOrphanDecisions checks for decisions that are not referenced by any element or relationship.
+func validateOrphanDecisions(m *BausteinsichtModel) []ValidationWarning {
+	var warnings []ValidationWarning
+
+	// Build a set of referenced decisions
+	referencedDecisions := make(map[string]bool)
+
+	flatElements, _ := FlattenElements(m)
+	for _, elem := range flatElements {
+		for _, decisionID := range elem.Decisions {
+			referencedDecisions[decisionID] = true
+		}
+	}
+
+	for _, rel := range m.Relationships {
+		for _, decisionID := range rel.Decisions {
+			referencedDecisions[decisionID] = true
+		}
+	}
+
+	// Check for orphans
+	for _, decision := range m.Specification.Decisions {
+		if !referencedDecisions[decision.ID] {
+			warnings = append(warnings, ValidationWarning{
+				Path:    "specification.decisions",
+				Message: fmt.Sprintf("decision %q is not referenced by any element or relationship", decision.ID),
+			})
+		}
+	}
+
+	return warnings
+}
+
+// validateSupersededDecisions checks for superseded decisions that are still referenced.
+func validateSupersededDecisions(m *BausteinsichtModel) []ValidationWarning {
+	var warnings []ValidationWarning
+
+	// Build a map of decision status
+	decisionStatus := make(map[string]ADRStatus)
+	for _, decision := range m.Specification.Decisions {
+		decisionStatus[decision.ID] = decision.Status
+	}
+
+	// Check elements
+	flatElements, _ := FlattenElements(m)
+	for id, elem := range flatElements {
+		for _, decisionID := range elem.Decisions {
+			if status, exists := decisionStatus[decisionID]; exists && status == ADRSuperseded {
+				warnings = append(warnings, ValidationWarning{
+					Path:    "model." + id,
+					Message: fmt.Sprintf("references superseded decision %q", decisionID),
+				})
+			}
+		}
+	}
+
+	// Check relationships
+	for i, rel := range m.Relationships {
+		for _, decisionID := range rel.Decisions {
+			if status, exists := decisionStatus[decisionID]; exists && status == ADRSuperseded {
+				warnings = append(warnings, ValidationWarning{
+					Path:    fmt.Sprintf("relationships[%d]", i),
+					Message: fmt.Sprintf("references superseded decision %q", decisionID),
 				})
 			}
 		}
