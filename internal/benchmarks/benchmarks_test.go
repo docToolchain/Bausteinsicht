@@ -184,7 +184,9 @@ func BenchmarkFileRead(b *testing.B) {
 	m := generateSyntheticModel(100, 200)
 	tmpdir := b.TempDir()
 	path := filepath.Join(tmpdir, "model.json")
-	model.Save(path, m)
+	if err := model.Save(path, m); err != nil {
+		b.Fatalf("Save failed: %v", err)
+	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
