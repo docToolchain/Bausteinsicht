@@ -12,7 +12,7 @@ import (
 // BenchmarkModelLoad measures time to load JSONC model
 func BenchmarkModelLoad(b *testing.B) {
 	tmpFile := createTempModel(b, generateLargeModel(100, 200))
-	defer os.Remove(tmpFile)
+	defer os.Remove(tmpFile) //nolint:errcheck
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -86,7 +86,7 @@ func createTempModel(b *testing.B, m *model.BausteinsichtModel) string {
 	if err != nil {
 		b.Fatalf("failed to create temp file: %v", err)
 	}
-	defer f.Close()
+	defer f.Close() //nolint:errcheck
 
 	if err := model.Save(f.Name(), m); err != nil {
 		b.Fatalf("failed to save model: %v", err)
@@ -152,7 +152,7 @@ func generateLargeModel(elementCount, relationshipCount int) *model.Bausteinsich
 // BenchmarkLargeModelLoad loads a model with 500+ elements
 func BenchmarkLargeModelLoad(b *testing.B) {
 	tmpFile := createTempModel(b, generateLargeModel(500, 1000))
-	defer os.Remove(tmpFile)
+	defer os.Remove(tmpFile) //nolint:errcheck
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
