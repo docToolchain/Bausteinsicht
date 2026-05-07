@@ -188,6 +188,9 @@
         "elements": {
           "type": "object"
         },
+        "patterns": {
+          "type": "object"
+        },
         "relationships": {
           "type": "object"
         }

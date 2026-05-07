@@ -111,9 +111,38 @@ type Constraint struct {
 	Technologies []string `json:"technologies,omitempty"`
 }
 
+// PatternElement describes an element template in a pattern
+type PatternElement struct {
+	ID          string            `json:"id"`
+	Kind        string            `json:"kind"`
+	Title       string            `json:"title"`
+	Technology  string            `json:"technology,omitempty"`
+	Description string            `json:"description,omitempty"`
+	Tags        []string          `json:"tags,omitempty"`
+	Children    []PatternElement  `json:"children,omitempty"`
+}
+
+// PatternRelationship describes a relationship template in a pattern
+type PatternRelationship struct {
+	ID          string `json:"id"`
+	From        string `json:"from"`
+	To          string `json:"to"`
+	Label       string `json:"label,omitempty"`
+	Kind        string `json:"kind,omitempty"`
+	Description string `json:"description,omitempty"`
+}
+
+// PatternDefinition describes a reusable topology pattern
+type PatternDefinition struct {
+	Description  string                 `json:"description,omitempty"`
+	Elements     []PatternElement       `json:"elements"`
+	Relationships []PatternRelationship `json:"relationships,omitempty"`
+}
+
 type Specification struct {
 	Elements      map[string]ElementKind      `json:"elements"`
 	Relationships map[string]RelationshipKind `json:"relationships,omitempty"`
+	Patterns      map[string]PatternDefinition `json:"patterns,omitempty"`
 }
 
 type ElementKind struct {

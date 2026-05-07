@@ -40,6 +40,7 @@ func ValidateWithWarnings(m *BausteinsichtModel) ValidationResult {
 	result.Errors = append(result.Errors, validateRelationships(m)...)
 	result.Errors = append(result.Errors, validateViews(m)...)
 	result.Errors = append(result.Errors, validateDynamicViews(m)...)
+	result.Errors = append(result.Errors, validatePatterns(m)...)
 	result.Warnings = append(result.Warnings, validateEmptyModel(m)...)
 	result.Warnings = append(result.Warnings, validateLifecycleStatus(m)...)
 	return result
@@ -366,4 +367,44 @@ func validateLifecycleStatus(m *BausteinsichtModel) []ValidationWarning {
 	}
 
 	return warnings
+}
+
+// validatePatterns checks pattern definitions for consistency
+func validatePatterns(m *BausteinsichtModel) []ValidationError {
+	var errs []ValidationError
+
+	for patternID, pattern := range m.Specification.Patterns {
+		path := "specification.patterns." + patternID
+
+		// Validate all element kinds referenced in the pattern exist
+		for i, elem := range pattern.Elements {
+			elemPath := fmt.Sprintf("%s.elements[%d]", path, i)
+			if elem.Kind == "" {
+				errs = append(errs, ValidationError{
+					Path:    elemPath,
+					Message: "missing required field \"kind\"",
+				})
+			} else if _, exists := m.Specification.Elements[elem.Kind]; !exists {
+				errs = append(errs, ValidationError{
+					Path:    elemPath,
+					Message: fmt.Sprintf("unknown kind %q", elem.Kind),
+				})
+			}
+		}
+
+		// Validate all relationship kinds referenced in the pattern exist
+		for i, rel := range pattern.Relationships {
+			relPath := fmt.Sprintf("%s.relationships[%d]", path, i)
+			if rel.Kind != "" {
+				if _, exists := m.Specification.Relationships[rel.Kind]; !exists {
+					errs = append(errs, ValidationError{
+						Path:    relPath,
+						Message: fmt.Sprintf("unknown relationship kind %q", rel.Kind),
+					})
+				}
+			}
+		}
+	}
+
+	return errs
 }
