@@ -72,7 +72,7 @@ func runRepl(cmd *cobra.Command, _ []string) error {
 			if err.Error() == "exit" {
 				break
 			}
-			fmt.Fprintf(cmd.ErrOrStderr(), "Error: %v\n", err)
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Error: %v\n", err)
 		}
 	}
 
@@ -140,7 +140,7 @@ func (s *replState) executeCommand(line string, cmd *cobra.Command) error {
 }
 
 func (s *replState) printHelp() {
-	fmt.Println(`
+	fmt.Print(`
 Commands:
   list elements          — List all elements
   list relationships     — List all relationships
@@ -330,9 +330,12 @@ func (s *replState) undoCommand() error {
 
 func (s *replState) saveUndo() {
 	// Deep copy current model state
-	data, _ := json.Marshal(s.model)
+	data, err := json.Marshal(s.model)
+	if err != nil {
+		return
+	}
 	var copy model.BausteinsichtModel
-	json.Unmarshal(data, &copy)
+	_ = json.Unmarshal(data, &copy)
 
 	s.undoStack = append(s.undoStack, &copy)
 
