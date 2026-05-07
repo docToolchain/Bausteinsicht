@@ -53,6 +53,34 @@ func DecisionBadgeColor(status ADRStatus) string {
 	}
 }
 
+// Relationship cardinality values
+const (
+	CardinalityOneToOne   = "1:1"
+	CardinalityOneToMany  = "1:N"
+	CardinalityManyToMany = "N:N"
+)
+
+var ValidCardinalities = []string{
+	CardinalityOneToOne,
+	CardinalityOneToMany,
+	CardinalityManyToMany,
+}
+
+// Data flow annotation values
+const (
+	DataFlowSync             = "sync"
+	DataFlowAsync            = "async"
+	DataFlowRequestResponse  = "request/response"
+	DataFlowPublishSubscribe = "publish/subscribe"
+)
+
+var ValidDataFlows = []string{
+	DataFlowSync,
+	DataFlowAsync,
+	DataFlowRequestResponse,
+	DataFlowPublishSubscribe,
+}
+
 // Config holds top-level configuration for diagram generation.
 type Config struct {
 	Metadata *bool  `json:"metadata,omitempty"`
@@ -225,6 +253,8 @@ type Relationship struct {
 	Kind        string   `json:"kind,omitempty"`
 	Description string   `json:"description,omitempty"`
 	Decisions   []string `json:"decisions,omitempty"`
+	Cardinality string   `json:"cardinality,omitempty"`
+	DataFlow    string   `json:"dataFlow,omitempty"`
 }
 
 type View struct {
