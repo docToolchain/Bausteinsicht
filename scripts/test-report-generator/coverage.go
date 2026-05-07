@@ -251,6 +251,8 @@ func resolveModulePath(importPath string, searchDir string, moduleName string) s
 		return ""
 	}
 	relPath := strings.TrimPrefix(importPath, moduleName+"/")
+	// Convert forward slashes (from coverage.out) to OS-specific separators
+	relPath = filepath.FromSlash(relPath)
 	return filepath.Join(searchDir, relPath)
 }
 
