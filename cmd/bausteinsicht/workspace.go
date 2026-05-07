@@ -188,7 +188,7 @@ func runWorkspaceList(cmd *cobra.Command, configPath string) error {
 	for i, ref := range cfg.Models {
 		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "  %d. ID: %s, Path: %s", i+1, ref.ID, ref.Path)
 		if ref.Prefix != "" {
-			fmt.Fprintf(cmd.OutOrStdout(), ", Prefix: %s", ref.Prefix)
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), ", Prefix: %s", ref.Prefix)
 		}
 		_, _ = fmt.Fprint(cmd.OutOrStdout(), "\n")
 	}

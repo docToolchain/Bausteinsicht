@@ -120,6 +120,7 @@ func MergeModels(loaded []LoadedModel) (*model.BausteinsichtModel, error) {
 		if prefix == "" {
 			prefix = lm.Ref.ID
 		}
+		_ = prefix // TODO: use prefix for remapping element IDs
 
 		for _, constraint := range lm.Model.Constraints {
 			remappedConstraint := constraint
