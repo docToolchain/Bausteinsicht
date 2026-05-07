@@ -37,6 +37,7 @@ jobs:
           go build -o test-report-generator
           cd ../..
           ./scripts/test-report-generator/test-report-generator -coverage=coverage.out -format=json < test-results.json > test-report.json
+          ./scripts/test-report-generator/test-report-generator -coverage=coverage.out -format=html < test-results.json > test-report.html
           # Extract metrics for outputs
           PASS_RATE=$(jq -r '.tests.pass_rate' test-report.json)
           COVERAGE=$(jq -r '.coverage | to_entries | map(select(.value != null) | .value.coverage) | if length > 0 then add / length else 0 end' test-report.json)
@@ -48,6 +49,7 @@ jobs:
         with:
           name: test-reports
           path: |
+            test-report.html
             test-report.json
             test-results.json
             coverage.out
