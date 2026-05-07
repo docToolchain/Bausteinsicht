@@ -50,7 +50,7 @@ func TestRelationshipRoundTrip(t *testing.T) {
 
 		data, _ := json.Marshal(orig)
 		var decoded Relationship
-		json.Unmarshal(data, &decoded)
+		_ = json.Unmarshal(data, &decoded)
 
 		if decoded.From != orig.From || decoded.To != orig.To || decoded.Label != orig.Label {
 			t.Fatalf("relationship roundtrip failed")
