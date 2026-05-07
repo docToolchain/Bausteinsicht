@@ -99,47 +99,55 @@ func main() {
 func parseTestJSON(r io.Reader) ([]TestResult, error) {
 	decoder := json.NewDecoder(r)
 	var results []TestResult
-	var lastTest *TestResult
+	tests := make(map[string]*TestResult) // key: "package::test"
 
 	for {
 		var event TestEvent
 		err := decoder.Decode(&event)
 		if err == io.EOF {
-			if lastTest != nil && lastTest.Result == "" {
-				results = append(results, *lastTest)
-			}
 			break
 		}
 		if err != nil {
 			return nil, fmt.Errorf("decode error: %w", err)
 		}
 
+		// Skip events with empty test names (package-level events)
+		if event.Test == "" {
+			continue
+		}
+
+		key := event.Package + "::" + event.Test
+
 		switch event.Action {
 		case "run":
-			lastTest = &TestResult{
+			tests[key] = &TestResult{
 				Package: event.Package,
 				Test:    event.Test,
 				Result:  "",
 			}
 		case "pass":
-			if lastTest != nil && lastTest.Test == event.Test {
-				lastTest.Result = "PASS"
-				lastTest.Elapsed = event.Elapsed
-				results = append(results, *lastTest)
+			if test, exists := tests[key]; exists {
+				test.Result = "PASS"
+				test.Elapsed = event.Elapsed
 			}
 		case "fail":
-			if lastTest != nil && lastTest.Test == event.Test {
-				lastTest.Result = "FAIL"
-				lastTest.Elapsed = event.Elapsed
-				lastTest.Output = event.Output
-				results = append(results, *lastTest)
+			if test, exists := tests[key]; exists {
+				test.Result = "FAIL"
+				test.Elapsed = event.Elapsed
+				test.Output = event.Output
 			}
 		case "skip":
-			if lastTest != nil && lastTest.Test == event.Test {
-				lastTest.Result = "SKIP"
-				lastTest.Elapsed = event.Elapsed
-				results = append(results, *lastTest)
+			if test, exists := tests[key]; exists {
+				test.Result = "SKIP"
+				test.Elapsed = event.Elapsed
 			}
+		}
+	}
+
+	// Collect all tests with results
+	for _, test := range tests {
+		if test.Result != "" {
+			results = append(results, *test)
 		}
 	}
 
