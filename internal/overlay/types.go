@@ -1,5 +1,9 @@
 package overlay
 
+import (
+	"encoding/json"
+)
+
 type MetricsFile struct {
 	Meta    MetaInfo       `json:"meta"`
 	Metrics []ElementMetric `json:"metrics"`
@@ -13,7 +17,26 @@ type MetaInfo struct {
 
 type ElementMetric struct {
 	ElementID string             `json:"elementId"`
-	Values    map[string]float64 `json:"values,flatten"`
+	Values    map[string]float64
+}
+
+func (em *ElementMetric) UnmarshalJSON(data []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	em.Values = make(map[string]float64)
+	for key, val := range raw {
+		if key == "elementId" {
+			if str, ok := val.(string); ok {
+				em.ElementID = str
+			}
+		} else if num, ok := val.(float64); ok {
+			em.Values[key] = num
+		}
+	}
+	return nil
 }
 
 type NormalizedMetric struct {
