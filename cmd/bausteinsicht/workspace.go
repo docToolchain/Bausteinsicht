@@ -78,7 +78,7 @@ func runWorkspaceMerge(cmd *cobra.Command, configPath, outputPath string) error 
 		})
 		_, _ = fmt.Fprintln(cmd.OutOrStdout(), string(out))
 	} else {
-		fmt.Fprintf(cmd.OutOrStdout(), "Merged %d models into %s\n", len(loaded), outputPath)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Merged %d models into %s\n", len(loaded), outputPath)
 	}
 
 	return nil
@@ -146,7 +146,7 @@ func runWorkspaceValidate(cmd *cobra.Command, configPath string) error {
 		})
 		_, _ = fmt.Fprintln(cmd.OutOrStdout(), string(out))
 	} else {
-		fmt.Fprintf(cmd.OutOrStdout(), "✓ Workspace configuration is valid (%d models)\n", len(loaded))
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "✓ Workspace configuration is valid (%d models)\n", len(loaded))
 	}
 
 	return nil
@@ -177,28 +177,28 @@ func runWorkspaceList(cmd *cobra.Command, configPath string) error {
 		return nil
 	}
 
-	fmt.Fprintf(cmd.OutOrStdout(), "Workspace: %s\n", cfg.Workspace.Name)
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Workspace: %s\n", cfg.Workspace.Name)
 	if cfg.Workspace.Description != "" {
-		fmt.Fprintf(cmd.OutOrStdout(), "Description: %s\n\n", cfg.Workspace.Description)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Description: %s\n\n", cfg.Workspace.Description)
 	} else {
-		fmt.Fprint(cmd.OutOrStdout(), "\n")
+		_, _ = fmt.Fprint(cmd.OutOrStdout(), "\n")
 	}
 
-	fmt.Fprint(cmd.OutOrStdout(), "Models:\n")
+	_, _ = fmt.Fprint(cmd.OutOrStdout(), "Models:\n")
 	for i, ref := range cfg.Models {
-		fmt.Fprintf(cmd.OutOrStdout(), "  %d. ID: %s, Path: %s", i+1, ref.ID, ref.Path)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "  %d. ID: %s, Path: %s", i+1, ref.ID, ref.Path)
 		if ref.Prefix != "" {
 			fmt.Fprintf(cmd.OutOrStdout(), ", Prefix: %s", ref.Prefix)
 		}
-		fmt.Fprint(cmd.OutOrStdout(), "\n")
+		_, _ = fmt.Fprint(cmd.OutOrStdout(), "\n")
 	}
 
 	if len(cfg.CrossRels) > 0 {
-		fmt.Fprintf(cmd.OutOrStdout(), "\nCross-Model Relationships: %d\n", len(cfg.CrossRels))
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "\nCross-Model Relationships: %d\n", len(cfg.CrossRels))
 	}
 
 	if len(cfg.Views) > 0 {
-		fmt.Fprintf(cmd.OutOrStdout(), "Workspace Views: %d\n", len(cfg.Views))
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Workspace Views: %d\n", len(cfg.Views))
 	}
 
 	return nil
