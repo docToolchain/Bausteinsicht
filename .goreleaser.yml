@@ -30,6 +30,14 @@ archives:
 checksum:
   name_template: "checksums.txt"
 
+sboms:
+  - artifacts: archive
+    format: spdx-json
+    output: sbom.spdx.json
+  - artifacts: archive
+    format: cyclonedx-json
+    output: sbom.cyclonedx.json
+
 changelog:
   use: github
   sort: asc
