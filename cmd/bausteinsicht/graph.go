@@ -62,9 +62,9 @@ func runGraph(cmd *cobra.Command, _ []string) error {
 		if err := os.WriteFile(outputPath, []byte(output), 0644); err != nil {
 			return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
 		}
-		fmt.Fprintf(cmd.OutOrStdout(), "Graph analysis written to %s\n", outputPath)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Graph analysis written to %s\n", outputPath)
 	} else {
-		fmt.Fprint(cmd.OutOrStdout(), output)
+		_, _ = fmt.Fprint(cmd.OutOrStdout(), output)
 	}
 
 	return nil
@@ -79,9 +79,9 @@ func formatGraphReport(result *graph.GraphAnalysis, cyclesOnly, showCentrality b
 	// Summary
 	sb.WriteString("Summary\n")
 	sb.WriteString("-------\n")
-	sb.WriteString(fmt.Sprintf("Elements: %d\n", result.ElementCount))
-	sb.WriteString(fmt.Sprintf("Relationships: %d\n", result.RelationshipCount))
-	sb.WriteString(fmt.Sprintf("Max Dependency Depth: %d\n", result.MaxDepth))
+	fmt.Fprintf(&sb, "Elements: %d\n", result.ElementCount)
+	fmt.Fprintf(&sb, "Relationships: %d\n", result.RelationshipCount)
+	fmt.Fprintf(&sb, "Max Dependency Depth: %d\n", result.MaxDepth)
 	sb.WriteString(fmt.Sprintf("Graph Type: "))
 	if result.IDAGValid {
 		sb.WriteString("DAG (acyclic)")
