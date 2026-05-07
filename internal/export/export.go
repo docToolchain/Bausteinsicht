@@ -3,6 +3,7 @@
 package export
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -41,7 +42,24 @@ func DetectDrawioBinary() (string, error) {
 			return candidate, nil
 		}
 	}
-	return "", fmt.Errorf("draw.io CLI not found; install from https://www.drawio.com/")
+	return "", buildDrawioNotFoundError()
+}
+
+// buildDrawioNotFoundError returns a detailed error message with troubleshooting steps.
+func buildDrawioNotFoundError() error {
+	msg := strings.Builder{}
+	msg.WriteString("draw.io CLI not found\n\n")
+	msg.WriteString("Installation options:\n")
+	msg.WriteString("  Windows (Scoop):    scoop install drawio\n")
+	msg.WriteString("  Windows (Choco):    choco install drawio\n")
+	msg.WriteString("  macOS (Homebrew):   brew install draw.io\n")
+	msg.WriteString("  Linux:              See https://www.drawio.com\n\n")
+	msg.WriteString("If already installed, try these troubleshooting steps:\n")
+	msg.WriteString("  1. Add draw.io to PATH (Scoop): scoop reset drawio\n")
+	msg.WriteString("  2. Set env var: export BAUSTEINSICHT_DRAWIO_PATH=/path/to/draw.io\n")
+	msg.WriteString("  3. Use CLI flag: bausteinsicht export --drawio-path /path/to/draw.io\n\n")
+	msg.WriteString("More info: https://github.com/docToolchain/Bausteinsicht/issues/385\n")
+	return errors.New(msg.String())
 }
 
 // BuildExportArgs constructs the command-line arguments for a draw.io export.
