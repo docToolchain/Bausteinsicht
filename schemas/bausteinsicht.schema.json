@@ -184,6 +184,14 @@
     },
     "Relationship": {
       "properties": {
+        "cardinality": {
+          "type": "string",
+          "enum": ["1:1", "1:N", "N:N"]
+        },
+        "dataFlow": {
+          "type": "string",
+          "enum": ["sync", "async", "request/response", "publish/subscribe"]
+        },
         "decisions": {
           "items": {
             "type": "string"
