@@ -147,11 +147,11 @@ type TestResult struct {
 
 // CoverageInfo represents coverage for a package
 type CoverageInfo struct {
-	Package      string
-	Coverage     float64 // 0-100
-	StmtCovered  int
-	StmtTotal    int
-	IsLowCoverage bool // < 80%
+	Package       string  `json:"package"`
+	Coverage      float64 `json:"coverage"` // 0-100
+	StmtCovered   int     `json:"stmt_covered"`
+	StmtTotal     int     `json:"stmt_total"`
+	IsLowCoverage bool    `json:"is_low_coverage"` // < 80%
 }
 
 func loadReport(path string) (*Report, error) {
