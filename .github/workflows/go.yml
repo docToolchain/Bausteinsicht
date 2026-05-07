@@ -16,13 +16,84 @@ jobs:
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
+    outputs:
+      test-pass-rate: ${{ steps.report.outputs.pass-rate }}
+      coverage: ${{ steps.report.outputs.coverage }}
+      performance-change: ${{ steps.report.outputs.performance-change }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
         with:
           go-version-file: go.mod
       - run: go build ./...
-      - run: go test ./...
+      - name: Run tests with coverage
+        run: go test ./... -json -coverprofile=coverage.out > test-results.json
+      - name: Generate test report
+        id: report
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          cd scripts/test-report-generator
+          go build -o test-report-generator
+          cd ../..
+          go run ./scripts/test-report-generator -coverage=coverage.out -format=json < test-results.json > test-report.json
+          # Extract metrics for outputs
+          PASS_RATE=$(jq -r '.tests.pass_rate' test-report.json)
+          COVERAGE=$(jq -r '.coverage | to_entries | map(.value.coverage) | add / length' test-report.json)
+          echo "pass-rate=${PASS_RATE}" >> $GITHUB_OUTPUT
+          echo "coverage=${COVERAGE}" >> $GITHUB_OUTPUT
+      - name: Upload test reports
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@6f51b1e991c87e8e092e08e368234eacfb08c766 # v4
+        with:
+          name: test-reports
+          path: |
+            test-report.json
+            test-results.json
+            coverage.out
+          retention-days: 30
+
+  report-pr-comment:
+    if: github.event_name == 'pull_request'
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4
+        with:
+          name: test-reports
+      - name: Post test report comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = JSON.parse(fs.readFileSync('test-report.json', 'utf8'));
+
+            // Generate Markdown report
+            let markdown = '## 📊 Test Report\n\n';
+            markdown += `| Metric | Value |\n|--------|-------|\n`;
+            markdown += `| Total Tests | ${report.tests.total} |\n`;
+            markdown += `| ✅ Passed | ${report.tests.passed} (${report.tests.pass_rate.toFixed(1)}%) |\n`;
+            markdown += `| ❌ Failed | ${report.tests.failed} |\n`;
+            markdown += `| ⏭️ Skipped | ${report.tests.skipped} |\n`;
+            markdown += `| ⏱️ Duration | ${report.tests.total_time_seconds.toFixed(2)}s |\n`;
+
+            // Calculate overall coverage
+            const coverages = Object.values(report.coverage || {});
+            let totalStmt = 0, coveredStmt = 0;
+            coverages.forEach(pkg => {
+              totalStmt += pkg.stmt_total;
+              coveredStmt += pkg.stmt_covered;
+            });
+            const overallCoverage = totalStmt > 0 ? (coveredStmt / totalStmt * 100).toFixed(1) : 'N/A';
+            markdown += `| 📦 Coverage | ${overallCoverage}% |\n\n`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: markdown
+            });
 
   schema-validation:
     runs-on: ubuntu-latest
