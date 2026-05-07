@@ -36,6 +36,8 @@ jobs:
           if [ -f coverage.out ]; then
             echo "✓ coverage.out exists"
             wc -l coverage.out
+            echo "First 10 lines:"
+            head -10 coverage.out
           else
             echo "✗ coverage.out not found"
           fi
