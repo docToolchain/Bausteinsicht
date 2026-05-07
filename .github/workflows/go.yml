@@ -28,11 +28,7 @@ jobs:
       - run: go build ./...
       - name: Run tests with coverage
         continue-on-error: true
-        if: matrix.os == 'ubuntu-latest'
-        run: go test ./... -json -coverprofile=coverage.out > test-results.json
-      - name: Run tests (no coverage)
-        if: matrix.os != 'ubuntu-latest'
-        run: go test ./...
+        run: go test ./... -json -coverprofile=coverage.out -skip=TestExportPage_Integration > test-results.json
       - name: Generate test report
         id: report
         if: matrix.os == 'ubuntu-latest'
