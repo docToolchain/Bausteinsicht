@@ -22,6 +22,7 @@ func newAddFromPatternCmd() *cobra.Command {
 
 	cmd.Flags().String("id", "", "Base ID for generated elements (required)")
 	cmd.Flags().String("title", "", "Base title for generated elements (default: --id)")
+	cmd.Flags().String("prefix", "", "Namespace prefix (modifies {base} to prefix-base)")
 	cmd.MarkFlagRequired("id")
 
 	return cmd
@@ -43,6 +44,12 @@ func runAddFromPattern(cmd *cobra.Command, args []string) error {
 	modelPath, _ := cmd.Flags().GetString("model")
 	baseID, _ := cmd.Flags().GetString("id")
 	title, _ := cmd.Flags().GetString("title")
+	prefix, _ := cmd.Flags().GetString("prefix")
+
+	// Apply prefix if provided
+	if prefix != "" {
+		baseID = prefix + "-" + baseID
+	}
 
 	if modelPath == "" {
 		detected, err := model.AutoDetect(".")
