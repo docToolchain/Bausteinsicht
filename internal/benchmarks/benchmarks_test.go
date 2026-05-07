@@ -65,7 +65,7 @@ func BenchmarkModelLoad(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		var result model.BausteinsichtModel
-		json.Unmarshal(data, &result)
+		_ = json.Unmarshal(data, &result)
 	}
 }
 
@@ -77,7 +77,7 @@ func BenchmarkModelLoadLarge(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		var result model.BausteinsichtModel
-		json.Unmarshal(data, &result)
+		_ = json.Unmarshal(data, &result)
 	}
 }
 
@@ -107,7 +107,7 @@ func BenchmarkFlattenElements(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		model.FlattenElements(m)
+		_, _ = model.FlattenElements(m)
 	}
 }
 
@@ -125,7 +125,7 @@ func BenchmarkDiagramFormatView(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		diagram.FormatView(m, "test", diagram.PlantUML)
+		_, _ = diagram.FormatView(m, "test", diagram.PlantUML)
 	}
 }
 
@@ -138,7 +138,7 @@ func BenchmarkTableExportMarkdown(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		table.FormatView(m, "test", table.Markdown)
+		_, _ = table.FormatView(m, "test", table.Markdown)
 	}
 }
 
@@ -151,7 +151,7 @@ func BenchmarkTableExportAsciidoc(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		table.FormatView(m, "test", table.AsciiDoc)
+		_, _ = table.FormatView(m, "test", table.AsciiDoc)
 	}
 }
 
@@ -163,7 +163,7 @@ func BenchmarkRoundTripJSON(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		data, _ := json.Marshal(m)
 		var result model.BausteinsichtModel
-		json.Unmarshal(data, &result)
+		_ = json.Unmarshal(data, &result)
 	}
 }
 
@@ -199,6 +199,6 @@ func BenchmarkValidateAndFlatten(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		model.Validate(m)
-		model.FlattenElements(m)
+		_, _ = model.FlattenElements(m)
 	}
 }
