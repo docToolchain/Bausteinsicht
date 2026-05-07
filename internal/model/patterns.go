@@ -19,17 +19,10 @@ func ExpandPattern(pattern PatternDefinition, baseID, title string) ([]Element, 
 		"{BASE}":  strings.ToUpper(baseID),
 	}
 
-	// Expand elements
+	// Expand elements (including nested children)
 	elements := make([]Element, len(pattern.Elements))
 	for i, tmpl := range pattern.Elements {
-		elements[i] = Element{
-			Kind:        tmpl.Kind,
-			Title:       replaceVars(tmpl.Title, vars),
-			Description: replaceVars(tmpl.Description, vars),
-			Technology:  replaceVars(tmpl.Technology, vars),
-			Tags:        tmpl.Tags,
-		}
-		// Element ID is set separately by caller
+		elements[i] = expandPatternElement(tmpl, vars)
 	}
 
 	// Expand relationships
@@ -47,6 +40,28 @@ func ExpandPattern(pattern PatternDefinition, baseID, title string) ([]Element, 
 	return elements, relationships, nil
 }
 
+// expandPatternElement recursively expands an element template, including children
+func expandPatternElement(tmpl PatternElement, vars map[string]string) Element {
+	elem := Element{
+		Kind:        tmpl.Kind,
+		Title:       replaceVars(tmpl.Title, vars),
+		Description: replaceVars(tmpl.Description, vars),
+		Technology:  replaceVars(tmpl.Technology, vars),
+		Tags:        tmpl.Tags,
+	}
+
+	// Recursively expand children if present
+	if len(tmpl.Children) > 0 {
+		elem.Children = make(map[string]Element, len(tmpl.Children))
+		for _, childTmpl := range tmpl.Children {
+			childID := replaceVars(childTmpl.ID, vars)
+			elem.Children[childID] = expandPatternElement(childTmpl, vars)
+		}
+	}
+
+	return elem
+}
+
 // ExpandPatternIDs applies variable substitution to element and relationship IDs
 func ExpandPatternIDs(pattern PatternDefinition, baseID string) ([]string, []string, error) {
 	vars := map[string]string{
@@ -54,9 +69,9 @@ func ExpandPatternIDs(pattern PatternDefinition, baseID string) ([]string, []str
 		"{BASE}": strings.ToUpper(baseID),
 	}
 
-	elemIDs := make([]string, len(pattern.Elements))
-	for i, tmpl := range pattern.Elements {
-		elemIDs[i] = replaceVars(tmpl.ID, vars)
+	var elemIDs []string
+	for _, tmpl := range pattern.Elements {
+		elemIDs = append(elemIDs, expandPatternElementIDs(tmpl, vars)...)
 	}
 
 	relIDs := make([]string, len(pattern.Relationships))
@@ -65,6 +80,15 @@ func ExpandPatternIDs(pattern PatternDefinition, baseID string) ([]string, []str
 	}
 
 	return elemIDs, relIDs, nil
+}
+
+// expandPatternElementIDs recursively extracts all element IDs from a pattern element
+func expandPatternElementIDs(tmpl PatternElement, vars map[string]string) []string {
+	ids := []string{replaceVars(tmpl.ID, vars)}
+	for _, childTmpl := range tmpl.Children {
+		ids = append(ids, expandPatternElementIDs(childTmpl, vars)...)
+	}
+	return ids
 }
 
 // replaceVars substitutes template variables in a string

@@ -113,12 +113,13 @@ type Constraint struct {
 
 // PatternElement describes an element template in a pattern
 type PatternElement struct {
-	ID          string `json:"id"`
-	Kind        string `json:"kind"`
-	Title       string `json:"title"`
-	Technology  string `json:"technology,omitempty"`
-	Description string `json:"description,omitempty"`
-	Tags        []string `json:"tags,omitempty"`
+	ID          string            `json:"id"`
+	Kind        string            `json:"kind"`
+	Title       string            `json:"title"`
+	Technology  string            `json:"technology,omitempty"`
+	Description string            `json:"description,omitempty"`
+	Tags        []string          `json:"tags,omitempty"`
+	Children    []PatternElement  `json:"children,omitempty"`
 }
 
 // PatternRelationship describes a relationship template in a pattern
