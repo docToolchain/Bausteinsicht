@@ -107,6 +107,7 @@ type FileCoverage struct {
 	StmtCovered int              `json:"stmt_covered"`
 	Coverage    float64          `json:"coverage"`
 	Blocks      []CoverageBlock  `json:"blocks"`
+	SourceLines []string         `json:"source_lines,omitempty"`
 }
 
 // CoverageDetails holds file-level coverage information
@@ -203,6 +204,15 @@ func parseCoverageFileDetailed(path string, sourceRoot string) (map[string]*Cove
 			NumStmt:   stmtCount,
 			Count:     count,
 		})
+	}
+
+	// Read source lines for each file and embed in FileCoverage
+	for _, fc := range fileCoverage {
+		if fc.LocalPath != "" {
+			if sourceLines := readSourceLines(fc.LocalPath); sourceLines != nil {
+				fc.SourceLines = sourceLines
+			}
+		}
 	}
 
 	// Calculate percentages

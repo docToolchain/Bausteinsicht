@@ -485,11 +485,11 @@ func (r *Report) renderLineLevelCoverage() string {
 	for _, importPath := range files {
 		fc := r.Details.Files[importPath]
 
-		// Read source lines
-		sourceLines := readSourceLines(fc.LocalPath)
-		if sourceLines == nil {
-			continue // Skip if we can't read the file
+		// Use embedded source lines from coverage data (embedded during report generation on CI)
+		if fc.SourceLines == nil || len(fc.SourceLines) == 0 {
+			continue // Skip if source lines are not available
 		}
+		sourceLines := fc.SourceLines
 
 		// Build line coverage map
 		lineCoverage := buildLineCoverageMap(fc.Blocks, len(sourceLines)-1)
