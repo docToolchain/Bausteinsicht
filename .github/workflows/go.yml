@@ -35,7 +35,7 @@ jobs:
           cd scripts/test-report-generator
           go build -o test-report-generator
           cd ../..
-          go run ./scripts/test-report-generator -coverage=coverage.out -format=json < test-results.json > test-report.json
+          ./scripts/test-report-generator/test-report-generator -coverage=coverage.out -format=json < test-results.json > test-report.json
           # Extract metrics for outputs
           PASS_RATE=$(jq -r '.tests.pass_rate' test-report.json)
           COVERAGE=$(jq -r '.coverage | to_entries | map(.value.coverage) | add / length' test-report.json)
@@ -43,7 +43,7 @@ jobs:
           echo "coverage=${COVERAGE}" >> $GITHUB_OUTPUT
       - name: Upload test reports
         if: matrix.os == 'ubuntu-latest'
-        uses: actions/upload-artifact@6f51b1e991c87e8e092e08e368234eacfb08c766 # v4
+        uses: actions/upload-artifact@v4
         with:
           name: test-reports
           path: |
@@ -59,7 +59,7 @@ jobs:
     permissions:
       pull-requests: write
     steps:
-      - uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4
+      - uses: actions/download-artifact@v4
         with:
           name: test-reports
       - name: Post test report comment
