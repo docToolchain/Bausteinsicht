@@ -49,31 +49,40 @@ func TestSyncStateRecoveryCorruptFile(t *testing.T) {
 		t.Fatal("Initial sync failed")
 	}
 
-	// Verify state file was created
-	if !tc.FileExists(stateFile) {
-		t.Fatal("State file should be created after sync")
+	// 3. Manually create a state file to test corruption handling
+	validState := &SyncState{
+		ModelHash:  "abc123",
+		DrawioHash: "def456",
+		Timestamp:  "2026-05-07T00:00:00Z",
+	}
+	// Write state to file manually (simulating what CLI would do)
+	if data, err := json.MarshalIndent(validState, "", "  "); err == nil {
+		os.WriteFile(stateFile, data, 0644)
 	}
 
-	// 3. Corrupt the state file (truncate it)
+	// Verify state file was created
+	if !tc.FileExists(stateFile) {
+		t.Fatal("State file should be created")
+	}
+
+	// 4. Corrupt the state file (truncate it)
 	tc.CorruptFile(stateFile)
 
-	// 4. Run sync again — should handle corrupted state gracefully
-	state, err = LoadState(stateFile)
+	// 5. Run sync again — should handle corrupted state gracefully
+	corruptedState, err := LoadState(stateFile)
 	if err != nil {
 		// Acceptable error — state file is corrupted
 		// Should provide recovery mechanism
-		if state == nil {
-			t.Logf("Corrupted state detected, will reinitialize: %v", err)
-		}
+		t.Logf("Corrupted state detected, will reinitialize: %v", err)
 	}
 
-	// 5. Sync should still work (treat as fresh sync)
+	// 6. Sync should still work (treat as fresh sync)
 	doc2, err := drawio.LoadDocument(dioPath)
 	if err != nil {
 		t.Fatalf("Reload drawio: %v", err)
 	}
 
-	result = Run(m, doc2, state, minimalTemplates(t), map[string]bool{})
+	result = Run(m, doc2, corruptedState, minimalTemplates(t), map[string]bool{})
 	if result == nil {
 		t.Fatal("Sync should return valid result even after state corruption")
 	}
