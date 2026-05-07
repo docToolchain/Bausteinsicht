@@ -1,0 +1,213 @@
+:jbake-title: ADR-006: Testing Strategy
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: Development
+:jbake-order: 6
+
+= ADR-006: Testing Strategy — Unit/Integration/E2E Classification
+
+== Status
+
+Accepted
+
+== Context
+
+Bausteinsicht is a complex tool with multiple interconnected components:
+* **Model layer** — JSONC parsing, validation, transformation
+* **Sync engine** — bidirectional diff/merge with draw.io
+* **Export/import** — PlantUML, Mermaid, Structurizr DSL rendering
+* **CLI** — Cobra commands, file I/O, error handling
+
+As the codebase grows and contributors increase, there is ambiguity about:
+- Which test types (unit/integration/E2E) belong in which package
+- How to balance test speed vs coverage completeness
+- When to mock vs use real file I/O
+- How to organize test code for maintainability
+
+Testing strategy clarity enables:
+- Consistent test structure across packages
+- Faster CI feedback (test categorization for parallelization)
+- Clear expectations for new contributors
+- Documented trade-offs between isolation and realism
+
+== Decision
+
+Adopt a **three-tier testing strategy** with clear boundaries:
+
+=== 1. Unit Tests (70% of test suite)
+
+**Definition:** Fast, isolated tests of pure functions or single components.
+
+**Characteristics:**
+- No external I/O (files, network, draw.io)
+- No database or mutable state
+- Execution time: <100ms per test
+- Use `_test.go` files in the same package
+
+**Examples:**
+- `model.Validate()` — validates a struct, no I/O
+- `diagram.EscapeHTML()` — string transformation
+- `sync.DetectChanges()` — pure diff computation (given input state)
+- `table.FormatMarkdown()` — text generation
+
+**Location:**
+```
+internal/model/validate_test.go
+internal/diagram/plantuml_test.go
+internal/sync/diff_test.go
+```
+
+**Mocking Policy:**
+- Mock external services when necessary for isolation
+- Use `github.com/golang/mock/gomock` for interface mocks (if needed)
+- For most Bausteinsicht tests, pure functions eliminate need for mocks
+
+**Property-Based Testing:**
+- Use `pgregory.net/rapid` for roundtrip and idempotency tests
+- Cover critical paths: JSON marshal/unmarshal, validation consistency
+
+=== 2. Integration Tests (25% of test suite)
+
+**Definition:** Tests combining multiple components with local I/O (files, XML).
+
+**Characteristics:**
+- Multiple components interact (e.g., model load + validation)
+- File I/O or XML manipulation
+- Execution time: <1s per test
+- Use temporary files (`t.TempDir()`)
+- Use real dependencies (no mocks unless unavoidable)
+
+**Examples:**
+- Load JSONC file → validate → check results
+- Load draw.io XML → detect changes → apply sync
+- Load model → flatten elements → render Mermaid
+
+**Location:**
+Append to `_test.go` in the same package, or use separate `_integration_test.go`:
+```
+internal/model/loader_test.go (file I/O + parsing)
+internal/sync/sync_test.go (model + XML roundtrip)
+internal/exporter/structurizr/export_test.go (model → DSL generation)
+```
+
+**Isolation Strategy:**
+- Use `t.TempDir()` for file artifacts
+- Avoid `os.Getenv()` — pass config via function args
+- Clean up resources (file handles, temp dirs) explicitly
+- Run with `-race` to detect concurrency issues
+
+=== 3. E2E Tests (5% of test suite)
+
+**Definition:** Full CLI workflows testing real user scenarios.
+
+**Characteristics:**
+- Execute CLI commands directly (e.g., `bausteinsicht sync`, `bausteinsicht export`)
+- Real artifacts (JSONC files, draw.io files)
+- Execution time: <5s per test
+- Stored in `cmd/bausteinsicht/*_integration_test.go`
+
+**Examples:**
+- `bausteinsicht init` → creates valid model file
+- `bausteinsicht sync --watch` → updates draw.io from model changes
+- `bausteinsicht export-diagram --format mermaid` → produces valid Mermaid
+
+**Location:**
+```
+cmd/bausteinsicht/sync_integration_test.go
+cmd/bausteinsicht/export_integration_test.go
+```
+
+**Execution:**
+- Run separately from unit tests (not in standard `go test` suite)
+- Can be triggered via CI on merge to main only
+
+== Rationale
+
+=== Why Three Tiers?
+
+The **test pyramid principle** maximizes test value while controlling CI time:
+- **Unit tests** (base) — wide coverage, instant feedback
+- **Integration tests** (middle) — realistic scenarios, medium cost
+- **E2E tests** (top) — catch critical failures, high cost
+
+This structure is proven in large Go projects (Kubernetes, Docker, etcd).
+
+=== Why <100ms for Unit Tests?
+
+Fast feedback enables developers to run tests locally during development.
+Tests >200ms discourage frequent execution, leading to batched testing and slower iteration.
+
+=== Why Avoid Mocking by Default?
+
+Mocks can diverge from real implementations. For Bausteinsicht:
+- Most components deal with data transformation (pure functions)
+- Dependencies are few (beevik/etree for XML, spf13/cobra for CLI)
+- Real unit tests are often simpler than mocked tests
+
+Mocks are appropriate for:
+- External APIs (not applicable to Bausteinsicht v1)
+- Expensive operations (e.g., draw.io headless export)
+- Platform-specific behavior (e.g., file locking on Windows)
+
+=== Why Separate E2E Tests?
+
+E2E tests are slow and brittle. They should not block regular CI.
+Isolating them enables:
+- E2E tests run only on main merges or nightly
+- Developers can iterate quickly with unit + integration tests
+- CI displays both results independently
+
+== Consequences
+
+=== Positive
+
+1. **Clarity for Contributors** — Testing expectations are explicit
+2. **Faster Local Development** — Unit tests run in <1s locally
+3. **Faster CI** — Parallel execution of independent test suites
+4. **Comprehensive Coverage** — All three tiers ensure real-world reliability
+5. **Maintenance** — Smaller test functions are easier to debug
+
+=== Negative
+
+1. **Test Duplication** — Some scenarios may need both unit + integration tests
+2. **E2E Test Maintenance** — CLI changes may break many E2E tests (mitigated by small E2E suite)
+3. **Learning Curve** — New contributors must understand three tiers
+
+=== Neutral
+
+1. **Execution Time Trade-off** — Full test suite (unit + integration + E2E) takes ~15s
+   - Acceptable for pre-commit hook (developers rarely run full suite locally)
+   - CI runs all on parallel runners (~5s wall time)
+
+== Implementation
+
+=== Coverage Targets (Phase 2)
+
+These targets balance effort vs benefit:
+
+- **internal/sync/** → 95% (critical path, complex algorithms)
+- **internal/model/** → 90% (data validation, parsing)
+- **internal/diagram/** → 85% (export rendering, many code paths)
+- **cmd/bausteinsicht/** → 70% (Cobra CLI setup, less critical)
+- **internal/drawio/** → 80% (XML manipulation, schema-specific)
+
+Overall target: **≥85% package coverage** for critical paths, **≥70% for CLI**.
+
+=== Migration Path
+
+1. Audit existing tests → categorize as unit/integration/E2E
+2. Rename/move integration tests to `_integration_test.go`
+3. Implement E2E test suite for critical CLI workflows
+4. Add CI step to report test categorization
+5. Monitor test execution time; adjust tier classification if needed
+
+== Related Decision Records
+
+- link:ADR-002-Implementation-Language.adoc[ADR-002] — Go as implementation language (influences test frameworks)
+- link:ADR-003-Risk-Classification.adoc[ADR-003] — Risk tier (influences coverage targets)
+
+== References
+
+- https://golang.org/doc/effective_go#testing[Go Testing Best Practices]
+- https://martinfowler.com/bliki/TestPyramid.html[Martin Fowler — Test Pyramid]
+- https://github.com/kubernetes/community/blob/master/contributors/devel/sig-testing/testing.md[Kubernetes Testing Guidelines]
