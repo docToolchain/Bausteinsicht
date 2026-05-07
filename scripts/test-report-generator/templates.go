@@ -252,6 +252,33 @@ func (r *Report) RenderHTML() string {
 			font-size: 0.9em;
 			color: #666;
 		}
+		/* Coverage Viewer */
+		.coverage-section { margin-top: 50px; }
+		.coverage-section h2 { color: #333; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #667eea; }
+		.file-accordion { border: 1px solid #e0e0e0; border-radius: 6px; margin-bottom: 10px; overflow: hidden; }
+		.file-accordion details { border: none; }
+		.file-header {
+			padding: 12px 20px; cursor: pointer; background: #f8f9fa; border: none; width: 100%;
+			text-align: left; font-size: 0.95em; user-select: none; display: flex; justify-content: space-between; align-items: center;
+		}
+		.file-header:hover { background: #e9ecef; }
+		.file-accordion details[open] > summary { background: #e8eaf6; }
+		.file-name { font-family: "SFMono-Regular", Consolas, monospace; font-weight: 600; color: #333; }
+		.file-coverage-badge {
+			font-size: 0.85em; padding: 3px 10px; border-radius: 12px; font-weight: 600; color: white;
+		}
+		.badge-high { background: #28a745; }
+		.badge-mid { background: #fd7e14; }
+		.badge-low { background: #dc3545; }
+		.code-viewer { font-family: "SFMono-Regular", Consolas, monospace; font-size: 0.82em; overflow-x: auto; }
+		.code-table { width: 100%%; border-collapse: collapse; }
+		.line-num {
+			width: 50px; min-width: 50px; text-align: right; padding: 1px 12px 1px 6px;
+			color: #999; background: #f8f9fa; border-right: 1px solid #e0e0e0; user-select: none; vertical-align: top;
+		}
+		.line-code { padding: 1px 6px 1px 12px; white-space: pre; }
+		.line-covered { background: #d4edda; }
+		.line-uncovered { background: #f8d7da; }
 		@media (max-width: 768px) {
 			.header { padding: 20px; }
 			.header h1 { font-size: 1.8em; }
@@ -370,7 +397,12 @@ func (r *Report) RenderHTML() string {
 
 	html += `				</table>
 			</div>
-		</div>
+`
+
+	// Add line-level coverage section
+	html += r.renderLineLevelCoverage()
+
+	html += `		</div>
 
 		<div class="footer">
 			<p>Generated at ` + r.Timestamp + `</p>
@@ -397,6 +429,96 @@ func (r *Report) RenderHTML() string {
 </html>`
 
 	return html
+}
+
+// renderLineLevelCoverage generates HTML for file-level code coverage visualization
+func (r *Report) renderLineLevelCoverage() string {
+	if r.Details == nil || len(r.Details.Files) == 0 {
+		return ""
+	}
+
+	var buf strings.Builder
+	buf.WriteString(`			<div class="chart-section">
+				<h2>🔬 Line-Level Coverage</h2>
+`)
+
+	// Collect and sort files
+	var files []string
+	for importPath := range r.Details.Files {
+		// Skip test files and vendor
+		if strings.Contains(importPath, "_test.go") || strings.Contains(importPath, "vendor/") {
+			continue
+		}
+		files = append(files, importPath)
+	}
+	sort.Strings(files)
+
+	// Generate accordion for each file
+	for _, importPath := range files {
+		fc := r.Details.Files[importPath]
+
+		// Read source lines
+		sourceLines := readSourceLines(fc.LocalPath)
+		if sourceLines == nil {
+			continue // Skip if we can't read the file
+		}
+
+		// Build line coverage map
+		lineCoverage := buildLineCoverageMap(fc.Blocks, len(sourceLines)-1)
+
+		// Determine badge color
+		badgeClass := "badge-high"
+		if fc.Coverage < 50 {
+			badgeClass = "badge-low"
+		} else if fc.Coverage < 80 {
+			badgeClass = "badge-mid"
+		}
+
+		// Create accordion entry
+		buf.WriteString(`				<div class="file-accordion">
+					<details>
+						<summary class="file-header">
+							<span class="file-name">` + importPath + `</span>
+							<span class="file-coverage-badge ` + badgeClass + `">` +
+				fmt.Sprintf("%.1f%%", fc.Coverage) + `</span>
+						</summary>
+						<div class="code-viewer">
+							<table class="code-table">
+`)
+
+		// Add code lines with coverage highlighting
+		for lineNum, code := range sourceLines {
+			if lineNum == 0 {
+				continue // Skip index 0 (used for 1-based indexing)
+			}
+
+			lineClass := ""
+			if lineNum < len(lineCoverage) {
+				switch lineCoverage[lineNum] {
+				case "covered":
+					lineClass = ` class="line-covered"`
+				case "uncovered":
+					lineClass = ` class="line-uncovered"`
+				}
+			}
+
+			buf.WriteString(`								<tr` + lineClass + `>
+									<td class="line-num">` + fmt.Sprintf("%d", lineNum) + `</td>
+									<td class="line-code">` + htmlEscapeCode(code) + `</td>
+								</tr>
+`)
+		}
+
+		buf.WriteString(`							</table>
+						</div>
+					</details>
+				</div>
+`)
+	}
+
+	buf.WriteString(`			</div>
+`)
+	return buf.String()
 }
 
 // Helper functions for HTML generation

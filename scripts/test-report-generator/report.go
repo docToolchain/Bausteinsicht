@@ -14,6 +14,7 @@ type Report struct {
 	LowCoverageList []string                   `json:"low_coverage_packages,omitempty"`
 	SlowestTests    []SlowTest                 `json:"slowest_tests,omitempty"`
 	RegressionTests *RegressionTestStats       `json:"regression_tests,omitempty"`
+	Details         *CoverageDetails           `json:"coverage_details,omitempty"`
 }
 
 // TestStats aggregates test results

@@ -16,6 +16,7 @@ func main() {
 	previousReport := flag.String("previous", "", "Path to previous report.json for trend comparison")
 	outputFormat := flag.String("format", "json", "Output format: json, markdown, html")
 	slowThreshold := flag.Float64("slow-threshold", 2.0, "Performance regression threshold (x times average)")
+	sourceRoot := flag.String("source-root", ".", "Root directory to resolve source file paths")
 	flag.Parse()
 
 	// Read test results from stdin (go test -json output)
@@ -27,9 +28,10 @@ func main() {
 
 	// Read coverage data if provided
 	var coverageData map[string]*CoverageInfo
+	var coverageDetails *CoverageDetails
 	if *coverageFile != "" {
 		var err error
-		coverageData, err = parseCoverageFile(*coverageFile)
+		coverageData, coverageDetails, err = parseCoverageFileDetailed(*coverageFile, *sourceRoot)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error parsing coverage file: %v\n", err)
 			os.Exit(1)
@@ -37,7 +39,7 @@ func main() {
 	}
 
 	// Generate report
-	report := generateReport(testResults, coverageData)
+	report := generateReport(testResults, coverageData, coverageDetails)
 
 	// Detect performance regressions
 	regressions := report.DetectPerformanceRegression(*slowThreshold)
@@ -166,7 +168,7 @@ func loadReport(path string) (*Report, error) {
 	return &report, nil
 }
 
-func generateReport(tests []TestResult, coverage map[string]*CoverageInfo) *Report {
+func generateReport(tests []TestResult, coverage map[string]*CoverageInfo, details *CoverageDetails) *Report {
 	stats := aggregateTests(tests)
 
 	// Find slowest tests
@@ -177,6 +179,7 @@ func generateReport(tests []TestResult, coverage map[string]*CoverageInfo) *Repo
 		Tests:        stats,
 		Coverage:     coverage,
 		SlowestTests: slowestTests,
+		Details:      details,
 	}
 	return report
 }
