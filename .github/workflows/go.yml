@@ -39,7 +39,7 @@ jobs:
           ./scripts/test-report-generator/test-report-generator -coverage=coverage.out -format=json < test-results.json > test-report.json
           # Extract metrics for outputs
           PASS_RATE=$(jq -r '.tests.pass_rate' test-report.json)
-          COVERAGE=$(jq -r '.coverage | to_entries | map(.value.coverage) | add / length' test-report.json)
+          COVERAGE=$(jq -r '.coverage | to_entries | map(select(.value != null) | .value.coverage) | if length > 0 then add / length else 0 end' test-report.json)
           echo "pass-rate=${PASS_RATE}" >> $GITHUB_OUTPUT
           echo "coverage=${COVERAGE}" >> $GITHUB_OUTPUT
       - name: Upload test reports
