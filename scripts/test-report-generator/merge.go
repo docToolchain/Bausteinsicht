@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 )
 
 // OSReport wraps a Report with OS metadata for merged reports
@@ -82,6 +83,163 @@ func loadReportFromJSON(path string) (*Report, error) {
 	return &report, nil
 }
 
+// renderOverviewTab generates a comparison overview of all OS reports
+func renderOverviewTab(reports []OSReport) string {
+	var buf strings.Builder
+
+	buf.WriteString(`		<div class="chart-section">
+			<h2>🔄 Platform Comparison</h2>
+			<table class="comparison-table">
+				<tr>
+					<th>Platform</th>
+					<th>Total Tests</th>
+					<th>Passed</th>
+					<th>Failed</th>
+					<th>Skipped</th>
+					<th>Pass Rate</th>
+					<th>Duration</th>
+					<th>Coverage</th>
+				</tr>
+`)
+
+	for _, osReport := range reports {
+		overallCov := calculateOverallCoverage(osReport.Report.Coverage)
+		passed := osReport.Report.Tests.Passed
+		failed := osReport.Report.Tests.Failed
+		passRate := osReport.Report.Tests.PassRate
+		duration := osReport.Report.Tests.TotalTime
+
+		failedStyle := ""
+		if failed > 0 {
+			failedStyle = ` class="highlight-fail"`
+		}
+
+		covStyle := ""
+		if overallCov < 80 {
+			covStyle = ` class="highlight-warn"`
+		}
+
+		buf.WriteString(fmt.Sprintf(`				<tr>
+					<td>%s %s</td>
+					<td>%d</td>
+					<td>%d</td>
+					<td%s>%d</td>
+					<td>%d</td>
+					<td>%.1f%%</td>
+					<td>%.2fs</td>
+					<td%s>%.1f%%</td>
+				</tr>
+`, osReport.Icon, osReport.Label, osReport.Report.Tests.Total, passed, failedStyle, failed, osReport.Report.Tests.Skipped, passRate, duration, covStyle, overallCov))
+	}
+
+	buf.WriteString(`			</table>
+		</div>
+`)
+
+	// Package differences
+	packageDiffs := getPackageDifferences(reports)
+	if len(packageDiffs) > 0 {
+		buf.WriteString(`		<div class="chart-section">
+			<h2>📦 Package Differences</h2>
+			<p style="font-size: 0.9em; color: #666; margin-bottom: 15px;">Showing packages with test count or failure differences across platforms</p>
+			<table class="comparison-table">
+				<tr>
+					<th>Package</th>
+`)
+		for _, osReport := range reports {
+			buf.WriteString(fmt.Sprintf(`					<th>%s %s</th>
+`, osReport.Icon, osReport.Label))
+		}
+		buf.WriteString(`				</tr>
+`)
+
+		for _, pkg := range sortedPackages(packageDiffs) {
+			buf.WriteString(`				<tr>
+`)
+			buf.WriteString(fmt.Sprintf(`					<td><code>%s</code></td>
+`, pkg))
+
+			for _, osReport := range reports {
+				if stats, ok := osReport.Report.Tests.ByPackage[pkg]; ok {
+					style := ""
+					if stats.Failed > 0 {
+						style = ` class="highlight-fail"`
+					}
+					buf.WriteString(fmt.Sprintf(`					<td%s>%d / %d (✅ %d)</td>
+`, style, stats.Failed, stats.Total, stats.Passed))
+				} else {
+					buf.WriteString(`					<td style="color: #999;">N/A</td>
+`)
+				}
+			}
+			buf.WriteString(`				</tr>
+`)
+		}
+
+		buf.WriteString(`			</table>
+		</div>
+`)
+	}
+
+	return buf.String()
+}
+
+// getPackageDifferences returns a map of packages that have differences across OS reports
+func getPackageDifferences(reports []OSReport) map[string]*PackageStats {
+	diffs := make(map[string]*PackageStats)
+
+	// Collect all packages
+	allPackages := make(map[string]bool)
+	for _, osReport := range reports {
+		for pkg := range osReport.Report.Tests.ByPackage {
+			allPackages[pkg] = true
+		}
+	}
+
+	// Find packages with differences
+	for pkg := range allPackages {
+		var totalCounts []int
+		var failCounts []int
+
+		for _, osReport := range reports {
+			if stats, ok := osReport.Report.Tests.ByPackage[pkg]; ok {
+				totalCounts = append(totalCounts, stats.Total)
+				failCounts = append(failCounts, stats.Failed)
+			} else {
+				totalCounts = append(totalCounts, 0)
+				failCounts = append(failCounts, 0)
+			}
+		}
+
+		// Check if there are differences
+		hasDiff := false
+		if len(totalCounts) > 0 {
+			first := totalCounts[0]
+			for _, count := range totalCounts {
+				if count != first {
+					hasDiff = true
+					break
+				}
+			}
+		}
+
+		// Check if any platform has failures
+		hasFailures := false
+		for _, count := range failCounts {
+			if count > 0 {
+				hasFailures = true
+				break
+			}
+		}
+
+		if hasDiff || hasFailures {
+			diffs[pkg] = &PackageStats{}
+		}
+	}
+
+	return diffs
+}
+
 // renderMergedHTML generates an HTML report with tabs for multiple OS reports
 func renderMergedHTML(reports []OSReport) string {
 	if len(reports) == 0 {
@@ -156,10 +314,39 @@ func renderMergedHTML(reports []OSReport) string {
 			display: none;
 			padding: 40px;
 		}
+		#tab-overview:checked ~ .tab-content-overview,
 		#tab-linux:checked ~ .tab-content-linux,
 		#tab-windows:checked ~ .tab-content-windows,
 		#tab-macos:checked ~ .tab-content-macos {
 			display: block;
+		}
+
+		.comparison-table {
+			width: 100%;
+			border-collapse: collapse;
+		}
+		.comparison-table th {
+			background: #f8f9fa;
+			padding: 15px;
+			text-align: left;
+			font-weight: 600;
+			color: #333;
+			border-bottom: 2px solid #ddd;
+		}
+		.comparison-table td {
+			padding: 12px 15px;
+			border-bottom: 1px solid #eee;
+		}
+		.comparison-table tr:hover {
+			background: #f9f9f9;
+		}
+		.highlight-fail {
+			color: #d9534f;
+			font-weight: 600;
+		}
+		.highlight-warn {
+			color: #fd7e14;
+			font-weight: 600;
 		}
 
 		.metrics {
@@ -278,9 +465,10 @@ func renderMergedHTML(reports []OSReport) string {
 		</div>
 
 		<div class="tab-nav">
+			<label for="tab-overview" class="tab-label">📊 Overview</label>
 `
 
-	// Render tab labels only (inputs are hidden below)
+	// Render OS tab labels
 	for _, report := range reports {
 		html += `			<label for="tab-` + report.OS + `" class="tab-label">` + report.Icon + ` ` + report.Label + `</label>
 `
@@ -290,16 +478,21 @@ func renderMergedHTML(reports []OSReport) string {
 `
 
 	// Hidden input elements for tab state management
-	for i, osReport := range reports {
-		html += `		<input type="radio" id="tab-` + osReport.OS + `" name="tab-group" class="tab-radio"`
-		if i == 0 {
-			html += ` checked`
-		}
-		html += `>
+	html += `		<input type="radio" id="tab-overview" name="tab-group" class="tab-radio" checked>
+`
+
+	// OS inputs
+	for _, osReport := range reports {
+		html += `		<input type="radio" id="tab-` + osReport.OS + `" name="tab-group" class="tab-radio">
 `
 	}
 
-	// Render tab content
+	// Render Overview tab content
+	html += `		<div class="tab-content tab-content-overview">
+` + renderOverviewTab(reports) + `		</div>
+`
+
+	// Render OS tab content
 	for _, osReport := range reports {
 		r := osReport.Report
 

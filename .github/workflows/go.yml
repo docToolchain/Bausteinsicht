@@ -28,6 +28,7 @@ jobs:
       - run: go build ./...
       - name: Run tests with coverage
         continue-on-error: true
+        shell: bash
         run: go test ./... -json -coverprofile=coverage.out > test-results.json
       - name: Generate test report
         id: report
