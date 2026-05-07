@@ -55,6 +55,55 @@ func getAttr(el *etree.Element, name string) string {
 	return attr.Value
 }
 
+// AddDecisionBadges adds decision badges as child cells to an element shape.
+// One badge is created per decision, positioned in a row in the top-right corner.
+func AddDecisionBadges(elementCell *etree.Element, decisions []string, decisionMap map[string]*model.DecisionRecord) {
+	if len(decisions) == 0 {
+		return // No badges if no decisions
+	}
+
+	// Get element width (or use default if not set)
+	width := getAttrFloat(elementCell, "width", 100)
+
+	// Badge dimensions and positioning
+	badgeWidth := 30.0
+	badgeHeight := 20.0
+	badgeStartX := width - (badgeWidth * float64(len(decisions))) - 4
+	badgeY := 2.0
+
+	for i, decisionID := range decisions {
+		badge := etree.NewElement("mxCell")
+		badge.CreateAttr("id", fmt.Sprintf("%s_decision_%d", getAttr(elementCell, "id"), i))
+		badge.CreateAttr("value", "⚖")
+
+		// Determine color based on decision status
+		color := model.DecisionBadgeColor("")
+		if decision, ok := decisionMap[decisionID]; ok {
+			color = model.DecisionBadgeColor(decision.Status)
+		}
+
+		badge.CreateAttr("style", fmt.Sprintf(
+			"rounded=0;fillColor=%s;strokeColor=%s;fontSize=14;fontColor=#ffffff;"+
+				"whiteSpace=wrap;overflow=hidden;connectable=0;align=center;verticalAlign=middle",
+			color, color))
+		badge.CreateAttr("vertex", "1")
+		badge.CreateAttr("parent", getAttr(elementCell, "id"))
+		badge.CreateAttr("bausteinsicht_decision_id", decisionID)
+
+		// Geometry for the badge
+		badgeX := badgeStartX + (badgeWidth * float64(i))
+		geom := etree.NewElement("mxGeometry")
+		geom.CreateAttr("x", fmt.Sprintf("%.0f", badgeX))
+		geom.CreateAttr("y", fmt.Sprintf("%.0f", badgeY))
+		geom.CreateAttr("width", fmt.Sprintf("%.0f", badgeWidth))
+		geom.CreateAttr("height", fmt.Sprintf("%.0f", badgeHeight))
+		geom.CreateAttr("as", "geometry")
+
+		badge.AddChild(geom)
+		elementCell.AddChild(badge)
+	}
+}
+
 // getAttrFloat retrieves a float attribute value with default
 func getAttrFloat(el *etree.Element, name string, defaultVal float64) float64 {
 	attr := el.SelectAttr(name)
