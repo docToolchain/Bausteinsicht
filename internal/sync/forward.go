@@ -558,8 +558,9 @@ func firstPage(doc *drawio.Document) *drawio.Page {
 
 // placement tracks where the next new element should be placed.
 type placement struct {
-	nextX float64
-	nextY float64
+	nextX      float64
+	nextY      float64
+	childCount map[string]int // tracks number of children per parent for grid layout (#330)
 }
 
 // computePlacement scans existing elements on a page and returns a placement
@@ -586,7 +587,11 @@ func computePlacement(page *drawio.Page) placement {
 	if maxY > 0 {
 		startY = maxY + elementGap
 	}
-	return placement{nextX: elementGap, nextY: startY}
+	return placement{
+		nextX:      elementGap,
+		nextY:      startY,
+		childCount: make(map[string]int),
+	}
 }
 
 // applyElementAdded creates a new element on page with a visual new-element marker.
@@ -639,6 +644,22 @@ func applyElementAdded(
 		height = defaultHeight
 	}
 
+	// For child elements, use relative coordinates within the parent.
+	// Position children in a grid starting at (20, 80) inside the parent boundary (#330).
+	x, y := pl.nextX, pl.nextY
+	if scopeID != "" && isChildOf(id, scopeID) {
+		// Use relative coordinates: first child at (20, 80), then in grid layout
+		childIndex := pl.childCount[scopeID]
+		const childGridCols = 3
+		const childStartX = 20.0
+		const childStartY = 80.0
+		const childSpacingX = 160.0
+		const childSpacingY = 100.0
+		x = childStartX + float64(childIndex%childGridCols)*childSpacingX
+		y = childStartY + float64(childIndex/childGridCols)*childSpacingY
+		pl.childCount[scopeID]++
+	}
+
 	data := drawio.ElementData{
 		ID:          id,
 		CellID:      scopedCellID(viewID, id),
@@ -646,8 +667,8 @@ func applyElementAdded(
 		Title:       elem.Title,
 		Technology:  elem.Technology,
 		Description: elem.Description,
-		X:           pl.nextX,
-		Y:           pl.nextY,
+		X:           x,
+		Y:           y,
 		Width:       width,
 		Height:      height,
 		SubCells:    subCellsFromTemplate(ts),
