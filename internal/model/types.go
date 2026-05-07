@@ -39,6 +39,20 @@ func StatusColor(status string) string {
 	}
 }
 
+// DecisionBadgeColor returns the draw.io badge color for a given ADR status
+func DecisionBadgeColor(status ADRStatus) string {
+	switch status {
+	case ADRActive:
+		return "#0066cc" // blue
+	case ADRSuperseded, ADRDeprecated:
+		return "#999999" // grey
+	case ADRProposed:
+		return "#ffcc00" // yellow
+	default:
+		return "#ffffff" // white
+	}
+}
+
 // Config holds top-level configuration for diagram generation.
 type Config struct {
 	Metadata *bool  `json:"metadata,omitempty"`
@@ -111,9 +125,29 @@ type Constraint struct {
 	Technologies []string `json:"technologies,omitempty"`
 }
 
+// ADRStatus describes the status of an architecture decision record
+type ADRStatus string
+
+const (
+	ADRProposed    ADRStatus = "proposed"
+	ADRActive      ADRStatus = "active"
+	ADRDeprecated  ADRStatus = "deprecated"
+	ADRSuperseded  ADRStatus = "superseded"
+)
+
+// DecisionRecord represents an architecture decision record (ADR)
+type DecisionRecord struct {
+	ID      string    `json:"id"`
+	Title   string    `json:"title"`
+	Status  ADRStatus `json:"status"`
+	Date    string    `json:"date,omitempty"`
+	FilePath string   `json:"file,omitempty"`
+}
+
 type Specification struct {
 	Elements      map[string]ElementKind      `json:"elements"`
 	Relationships map[string]RelationshipKind `json:"relationships,omitempty"`
+	Decisions     []DecisionRecord            `json:"decisions,omitempty"`
 }
 
 type ElementKind struct {
@@ -140,11 +174,12 @@ type Element struct {
 }
 
 type Relationship struct {
-	From        string `json:"from"`
-	To          string `json:"to"`
-	Label       string `json:"label,omitempty"`
-	Kind        string `json:"kind,omitempty"`
-	Description string `json:"description,omitempty"`
+	From        string   `json:"from"`
+	To          string   `json:"to"`
+	Label       string   `json:"label,omitempty"`
+	Kind        string   `json:"kind,omitempty"`
+	Description string   `json:"description,omitempty"`
+	Decisions   []string `json:"decisions,omitempty"`
 }
 
 type View struct {
