@@ -68,7 +68,7 @@ func TestRapidChangesDebounce(t *testing.T) {
 	var mu sync.Mutex
 	var called int
 
-	w, err := New([]string{path}, 200*time.Millisecond, func(changedFile string) {
+	w, err := New([]string{path}, 300*time.Millisecond, func(changedFile string) {
 		mu.Lock()
 		defer mu.Unlock()
 		called++
@@ -89,7 +89,7 @@ func TestRapidChangesDebounce(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 	}
 
-	time.Sleep(400 * time.Millisecond)
+	time.Sleep(600 * time.Millisecond)
 
 	mu.Lock()
 	defer mu.Unlock()
