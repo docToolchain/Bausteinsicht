@@ -455,7 +455,14 @@ func (r *Report) renderTabContent(tabID string) string {
 // renderLineLevelCoverage generates HTML for file-level code coverage visualization
 func (r *Report) renderLineLevelCoverage() string {
 	if r.Details == nil || len(r.Details.Files) == 0 {
-		return ""
+		return `			<div class="chart-section">
+				<h2>🔬 Line-Level Coverage</h2>
+				<p style="color: #999; font-size: 0.95em; padding: 20px; background: #f9f9f9; border-radius: 4px;">
+					Line-level coverage data is not available. This typically occurs when the coverage profile was not generated
+					during the test run. Ensure that tests are executed with the <code>-coverprofile</code> flag.
+				</p>
+			</div>
+`
 	}
 
 	var buf strings.Builder
