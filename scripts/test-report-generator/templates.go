@@ -147,8 +147,12 @@ func (r *Report) RenderMarkdown() string {
 // RenderHTML generates an interactive HTML dashboard with Plotly charts
 func (r *Report) RenderHTML() string {
 	overallCoverage := calculateOverallCoverage(r.Coverage)
+	totalTests := fmt.Sprintf("%d", r.Tests.Total)
+	passRate := fmt.Sprintf("%.1f", r.Tests.PassRate)
+	coverage := fmt.Sprintf("%.1f", overallCoverage)
+	duration := fmt.Sprintf("%.2f", r.Tests.TotalTime)
 
-	html := fmt.Sprintf(`<!DOCTYPE html>
+	html := `<!DOCTYPE html>
 <html lang="en">
 <head>
 	<meta charset="UTF-8">
@@ -159,7 +163,7 @@ func (r *Report) RenderHTML() string {
 		* { margin: 0; padding: 0; box-sizing: border-box; }
 		body {
 			font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", sans-serif;
-			background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%);
+			background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 			min-height: 100vh;
 			padding: 40px 20px;
 		}
@@ -172,7 +176,7 @@ func (r *Report) RenderHTML() string {
 			overflow: hidden;
 		}
 		.header {
-			background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%);
+			background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 			color: white;
 			padding: 40px;
 			text-align: center;
@@ -227,7 +231,7 @@ func (r *Report) RenderHTML() string {
 			margin-bottom: 20px;
 		}
 		table {
-			width: 100%%;
+			width: 100%;
 			border-collapse: collapse;
 			margin: 20px 0;
 		}
@@ -271,7 +275,7 @@ func (r *Report) RenderHTML() string {
 		.badge-mid { background: #fd7e14; }
 		.badge-low { background: #dc3545; }
 		.code-viewer { font-family: "SFMono-Regular", Consolas, monospace; font-size: 0.82em; overflow-x: auto; }
-		.code-table { width: 100%%; border-collapse: collapse; }
+		.code-table { width: 100%; border-collapse: collapse; }
 		.line-num {
 			width: 50px; min-width: 50px; text-align: right; padding: 1px 12px 1px 6px;
 			color: #999; background: #f8f9fa; border-right: 1px solid #e0e0e0; user-select: none; vertical-align: top;
@@ -296,25 +300,25 @@ func (r *Report) RenderHTML() string {
 
 		<div class="metrics">
 			<div class="metric-card">
-				<div class="metric-value">%d</div>
+				<div class="metric-value">` + totalTests + `</div>
 				<div class="metric-label">Total Tests</div>
 			</div>
 			<div class="metric-card">
-				<div class="metric-value">%.1f%%</div>
+				<div class="metric-value">` + passRate + `%</div>
 				<div class="metric-label">Pass Rate</div>
 			</div>
 			<div class="metric-card">
-				<div class="metric-value">%.1f%%</div>
+				<div class="metric-value">` + coverage + `%</div>
 				<div class="metric-label">Coverage</div>
 			</div>
 			<div class="metric-card">
-				<div class="metric-value">%.2fs</div>
+				<div class="metric-value">` + duration + `s</div>
 				<div class="metric-label">Duration</div>
 			</div>
 		</div>
 
 		<div class="content">
-`, r.Tests.Total, r.Tests.PassRate, overallCoverage, r.Tests.TotalTime)
+`
 
 	// Add delta section if available
 	if r.Delta != nil {
