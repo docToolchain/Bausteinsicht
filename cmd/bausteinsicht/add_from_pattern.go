@@ -23,7 +23,7 @@ func newAddFromPatternCmd() *cobra.Command {
 	cmd.Flags().String("id", "", "Base ID for generated elements (required)")
 	cmd.Flags().String("title", "", "Base title for generated elements (default: --id)")
 	cmd.Flags().String("prefix", "", "Namespace prefix (modifies {base} to prefix-base)")
-	cmd.MarkFlagRequired("id")
+	_ = cmd.MarkFlagRequired("id")
 
 	return cmd
 }
@@ -101,9 +101,7 @@ func runAddFromPattern(cmd *cobra.Command, args []string) error {
 	}
 
 	// Add relationships (From and To are already expanded by ExpandPattern)
-	for _, rel := range relationships {
-		m.Relationships = append(m.Relationships, rel)
-	}
+	m.Relationships = append(m.Relationships, relationships...)
 
 	// Save the updated model
 	if err := model.Save(modelPath, m); err != nil {
