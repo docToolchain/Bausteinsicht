@@ -149,6 +149,40 @@ func validateRelationships(m *BausteinsichtModel) []ValidationError {
 			}
 		}
 
+		// Validate cardinality
+		if rel.Cardinality != "" {
+			valid := false
+			for _, c := range ValidCardinalities {
+				if rel.Cardinality == c {
+					valid = true
+					break
+				}
+			}
+			if !valid {
+				errs = append(errs, ValidationError{
+					Path:    path,
+					Message: fmt.Sprintf("invalid cardinality %q (valid: %v)", rel.Cardinality, ValidCardinalities),
+				})
+			}
+		}
+
+		// Validate data flow
+		if rel.DataFlow != "" {
+			valid := false
+			for _, df := range ValidDataFlows {
+				if rel.DataFlow == df {
+					valid = true
+					break
+				}
+			}
+			if !valid {
+				errs = append(errs, ValidationError{
+					Path:    path,
+					Message: fmt.Sprintf("invalid dataFlow %q (valid: %v)", rel.DataFlow, ValidDataFlows),
+				})
+			}
+		}
+
 		// Detect fully duplicate relationships (same from, to, kind, and label). (#117, #142)
 		// Multiple relationships between the same pair are allowed if they
 		// differ in kind or label.

@@ -39,6 +39,34 @@ func StatusColor(status string) string {
 	}
 }
 
+// Relationship cardinality values
+const (
+	CardinalityOneToOne   = "1:1"
+	CardinalityOneToMany  = "1:N"
+	CardinalityManyToMany = "N:N"
+)
+
+var ValidCardinalities = []string{
+	CardinalityOneToOne,
+	CardinalityOneToMany,
+	CardinalityManyToMany,
+}
+
+// Data flow annotation values
+const (
+	DataFlowSync             = "sync"
+	DataFlowAsync            = "async"
+	DataFlowRequestResponse  = "request/response"
+	DataFlowPublishSubscribe = "publish/subscribe"
+)
+
+var ValidDataFlows = []string{
+	DataFlowSync,
+	DataFlowAsync,
+	DataFlowRequestResponse,
+	DataFlowPublishSubscribe,
+}
+
 // Config holds top-level configuration for diagram generation.
 type Config struct {
 	Metadata *bool  `json:"metadata,omitempty"`
@@ -145,6 +173,8 @@ type Relationship struct {
 	Label       string `json:"label,omitempty"`
 	Kind        string `json:"kind,omitempty"`
 	Description string `json:"description,omitempty"`
+	Cardinality string `json:"cardinality,omitempty"` // e.g., "1:1", "1:N", "N:N"
+	DataFlow    string `json:"dataFlow,omitempty"`    // e.g., "sync", "async", "request/response"
 }
 
 type View struct {
