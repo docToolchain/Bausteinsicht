@@ -270,3 +270,174 @@ func TestExportPage_Integration(t *testing.T) {
 		t.Error("output file is empty")
 	}
 }
+
+// Regression Tests for #388: Windows/macOS Package Manager Path Detection
+
+// TestDetectDrawioBinary_WindowsScoopPath verifies Scoop package manager detection on Windows.
+// Regression test for #388: Users with Scoop-installed draw.io should be detected.
+func TestDetectDrawioBinary_WindowsScoopPath(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("Windows-specific test, skipping on non-Windows")
+	}
+
+	dir := t.TempDir()
+	// Simulate Scoop installation directory
+	scoopApp := filepath.Join(dir, "apps", "drawio", "current")
+	if err := os.MkdirAll(scoopApp, 0755); err != nil {
+		t.Fatal(err)
+	}
+	fakeBin := fakeBinary(t, scoopApp, "draw.io")
+
+	// Set SCOOP env var to temp dir to override user's actual Scoop installation
+	t.Setenv("SCOOP", dir)
+	t.Setenv("PATH", "")
+
+	// Override platform paths to only return Scoop paths
+	old := platformPaths
+	platformPaths = func() []string {
+		return []string{
+			filepath.Join(dir, "apps", "drawio", "current", "draw.io.exe"),
+			filepath.Join(dir, "shims", "draw.io.exe"),
+		}
+	}
+	t.Cleanup(func() { platformPaths = old })
+
+	bin, err := DetectDrawioBinary()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if bin != fakeBin {
+		t.Errorf("expected %q, got %q", fakeBin, bin)
+	}
+}
+
+// TestDetectDrawioBinary_WindowsChocolateyPath verifies Chocolatey package manager detection.
+// Regression test for #388: Users with Chocolatey-installed draw.io should be detected.
+func TestDetectDrawioBinary_WindowsChocolateyPath(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("Windows-specific test, skipping on non-Windows")
+	}
+
+	dir := t.TempDir()
+	chocoDir := filepath.Join(dir, "chocolatey", "bin")
+	if err := os.MkdirAll(chocoDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	fakeBin := fakeBinary(t, chocoDir, "draw.io")
+
+	// Clear environment and override platform paths
+	t.Setenv("PATH", "")
+	t.Setenv("SCOOP", "")
+
+	old := platformPaths
+	platformPaths = func() []string {
+		return []string{
+			filepath.Join(dir, "chocolatey", "bin", "draw.io.exe"),
+		}
+	}
+	t.Cleanup(func() { platformPaths = old })
+
+	bin, err := DetectDrawioBinary()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if bin != fakeBin {
+		t.Errorf("expected %q, got %q", fakeBin, bin)
+	}
+}
+
+// TestDetectDrawioBinary_macOSHomebrewAppleSilicon verifies Homebrew detection on Apple Silicon Macs.
+// Regression test for #388: macOS users with Homebrew (M1/M2/M3) should be detected.
+func TestDetectDrawioBinary_macOSHomebrewAppleSilicon(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("macOS-specific test, skipping on non-macOS")
+	}
+
+	dir := t.TempDir()
+	brewDir := filepath.Join(dir, "opt", "homebrew", "bin")
+	if err := os.MkdirAll(brewDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	fakeBin := fakeBinary(t, brewDir, "draw.io")
+
+	// Clear PATH and override platform paths
+	t.Setenv("PATH", "")
+
+	old := platformPaths
+	platformPaths = func() []string {
+		return []string{
+			filepath.Join(dir, "opt", "homebrew", "bin", "draw.io"),
+		}
+	}
+	t.Cleanup(func() { platformPaths = old })
+
+	bin, err := DetectDrawioBinary()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if bin != fakeBin {
+		t.Errorf("expected %q, got %q", fakeBin, bin)
+	}
+}
+
+// TestDetectDrawioBinary_macOSHomebrewIntel verifies Homebrew detection on Intel Macs.
+// Regression test for #388: Intel Mac users with Homebrew should be detected.
+func TestDetectDrawioBinary_macOSHomebrewIntel(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("macOS-specific test, skipping on non-macOS")
+	}
+
+	dir := t.TempDir()
+	brewDir := filepath.Join(dir, "usr", "local", "bin")
+	if err := os.MkdirAll(brewDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	fakeBin := fakeBinary(t, brewDir, "draw.io")
+
+	// Clear PATH and override platform paths
+	t.Setenv("PATH", "")
+
+	old := platformPaths
+	platformPaths = func() []string {
+		return []string{
+			filepath.Join(dir, "usr", "local", "bin", "draw.io"),
+		}
+	}
+	t.Cleanup(func() { platformPaths = old })
+
+	bin, err := DetectDrawioBinary()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if bin != fakeBin {
+		t.Errorf("expected %q, got %q", fakeBin, bin)
+	}
+}
+
+// TestDetectDrawioBinary_SearchOrderPriority verifies that PATH takes priority over platform paths.
+// Regression test for #388: ensure search order is correct (PATH first, then package managers).
+func TestDetectDrawioBinary_SearchOrderPriority(t *testing.T) {
+	pathDir := t.TempDir()
+	platformDir := t.TempDir()
+
+	// Create draw.io in both PATH and platform-specific locations
+	pathBin := fakeBinary(t, pathDir, "drawio")
+	platformBin := fakeBinary(t, platformDir, "draw.io")
+
+	t.Setenv("PATH", pathDir)
+
+	old := platformPaths
+	platformPaths = func() []string {
+		return []string{platformBin}
+	}
+	t.Cleanup(func() { platformPaths = old })
+
+	bin, err := DetectDrawioBinary()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// Should find drawio in PATH first, not the platform-specific one
+	if bin != pathBin {
+		t.Errorf("expected PATH binary %q, got %q (should prioritize PATH)", pathBin, bin)
+	}
+}
