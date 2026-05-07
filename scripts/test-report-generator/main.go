@@ -8,12 +8,14 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 )
 
 func main() {
 	coverageFile := flag.String("coverage", "", "Path to coverage.out file (from go test -coverprofile)")
 	previousReport := flag.String("previous", "", "Path to previous report.json for trend comparison")
 	outputFormat := flag.String("format", "json", "Output format: json, markdown, html")
+	slowThreshold := flag.Float64("slow-threshold", 2.0, "Performance regression threshold (x times average)")
 	flag.Parse()
 
 	// Read test results from stdin (go test -json output)
@@ -36,6 +38,13 @@ func main() {
 
 	// Generate report
 	report := generateReport(testResults, coverageData)
+
+	// Detect performance regressions
+	regressions := report.DetectPerformanceRegression(*slowThreshold)
+	if len(regressions) > 0 {
+		// Add to slowest tests list if there are regressions
+		report.SlowestTests = append(report.SlowestTests, regressions...)
+	}
 
 	// Load previous report for comparison
 	if *previousReport != "" {
@@ -158,12 +167,43 @@ func loadReport(path string) (*Report, error) {
 }
 
 func generateReport(tests []TestResult, coverage map[string]*CoverageInfo) *Report {
+	stats := aggregateTests(tests)
+
+	// Find slowest tests
+	slowestTests := findSlowestTests(tests, 10)
+
 	report := &Report{
-		Timestamp: formatTimestamp(),
-		Tests:     aggregateTests(tests),
-		Coverage:  coverage,
+		Timestamp:    formatTimestamp(),
+		Tests:        stats,
+		Coverage:     coverage,
+		SlowestTests: slowestTests,
 	}
 	return report
+}
+
+// findSlowestTests returns the N slowest tests
+func findSlowestTests(tests []TestResult, n int) []SlowTest {
+	var slowTests []SlowTest
+	for _, t := range tests {
+		if t.Result == "PASS" || t.Result == "FAIL" { // Count passed and failed, skip skipped
+			slowTests = append(slowTests, SlowTest{
+				Package: t.Package,
+				Test:    t.Test,
+				Elapsed: t.Elapsed,
+			})
+		}
+	}
+
+	// Sort by elapsed time, descending
+	sort.Slice(slowTests, func(i, j int) bool {
+		return slowTests[i].Elapsed > slowTests[j].Elapsed
+	})
+
+	// Return top N
+	if len(slowTests) > n {
+		return slowTests[:n]
+	}
+	return slowTests
 }
 
 func aggregateTests(tests []TestResult) TestStats {
