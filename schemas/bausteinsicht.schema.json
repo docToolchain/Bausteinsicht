@@ -135,6 +135,12 @@
     },
     "Relationship": {
       "properties": {
+        "cardinality": {
+          "type": "string"
+        },
+        "dataFlow": {
+          "type": "string"
+        },
         "description": {
           "type": "string"
         },
