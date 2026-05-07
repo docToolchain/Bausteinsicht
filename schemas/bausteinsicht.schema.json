@@ -108,6 +108,31 @@
       ],
       "type": "object"
     },
+    "DecisionRecord": {
+      "properties": {
+        "date": {
+          "type": "string"
+        },
+        "file": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "status"
+      ],
+      "type": "object"
+    },
     "DynamicView": {
       "properties": {
         "description": {
@@ -135,6 +160,12 @@
     },
     "Relationship": {
       "properties": {
+        "decisions": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "description": {
           "type": "string"
         },
@@ -185,6 +216,12 @@
     },
     "Specification": {
       "properties": {
+        "decisions": {
+          "items": {
+            "$ref": "#/definitions/DecisionRecord"
+          },
+          "type": "array"
+        },
         "elements": {
           "type": "object"
         },
