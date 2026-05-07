@@ -82,7 +82,7 @@ func formatGraphReport(result *graph.GraphAnalysis, cyclesOnly, showCentrality b
 	fmt.Fprintf(&sb, "Elements: %d\n", result.ElementCount)
 	fmt.Fprintf(&sb, "Relationships: %d\n", result.RelationshipCount)
 	fmt.Fprintf(&sb, "Max Dependency Depth: %d\n", result.MaxDepth)
-	sb.WriteString(fmt.Sprintf("Graph Type: "))
+	sb.WriteString("Graph Type: ")
 	if result.IDAGValid {
 		sb.WriteString("DAG (acyclic)")
 	} else {
@@ -92,7 +92,7 @@ func formatGraphReport(result *graph.GraphAnalysis, cyclesOnly, showCentrality b
 
 	// Cycles
 	if len(result.Cycles) > 0 {
-		sb.WriteString(fmt.Sprintf("Cycles Found: %d\n", len(result.Cycles)))
+		fmt.Fprintf(&sb, "Cycles Found: %d\n", len(result.Cycles))
 		sb.WriteString("--------\n")
 		for idx, cycle := range result.Cycles {
 			sb.WriteString(fmt.Sprintf("Cycle %d (length %d): %s\n", idx+1, cycle.Length, strings.Join(cycle.Elements, " → ")))
