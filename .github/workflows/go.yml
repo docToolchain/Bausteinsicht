@@ -100,7 +100,7 @@ jobs:
         with:
           name: test-report-combined
           path: test-report-combined.html
-          retention-days: 30
+          retention-days: 90
 
   report-pr-comment:
     if: github.event_name == 'pull_request'

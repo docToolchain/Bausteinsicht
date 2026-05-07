@@ -1,0 +1,84 @@
+name: Publish Test Reports
+
+on:
+  workflow_run:
+    workflows: [Go CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: write
+  pages: write
+
+concurrency:
+  group: pages-reports-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  publish-reports:
+    if: github.event.workflow_run.conclusion == 'success' || github.event.workflow_run.conclusion == 'failure'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}/test-reports/
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: Download test report artifact
+        uses: dawidd6/action-download-artifact@09f2f74827fd3a8607589e5ad7f9398816ea7201 # v3
+        with:
+          workflow: go.yml
+          workflow_conclusion: success
+          branch: main
+          name: test-report-combined
+          path: test-reports/
+        continue-on-error: true
+
+      - name: Create index
+        if: success()
+        run: |
+          cat > test-reports/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>Test Reports</title>
+            <style>
+              body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 20px; background: #f5f5f5; }
+              .container { max-width: 800px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+              h1 { color: #333; margin-top: 0; }
+              a { color: #0366d6; text-decoration: none; }
+              a:hover { text-decoration: underline; }
+              .latest { background: #f6f8fa; padding: 20px; border-radius: 6px; margin: 20px 0; border-left: 4px solid #0366d6; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <h1>📊 Multi-OS Test Reports</h1>
+              <p>Latest test reports from the Bausteinsicht CI pipeline.</p>
+              <div class="latest">
+                <h2>Latest Report</h2>
+                <p><a href="test-report-combined.html">📊 View Multi-OS Test Report</a></p>
+                <p style="color: #666; font-size: 0.9em;">Shows cross-platform comparison of test results and coverage across Linux, Windows, and macOS.</p>
+              </div>
+            </div>
+          </body>
+          </html>
+          EOF
+
+      - name: Setup Pages
+        uses: actions/configure-pages@8621a4fbcff3ef4a4f215528626f2362a96a3e5d # v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
+        with:
+          path: test-reports/
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
