@@ -320,9 +320,29 @@ func (r *Report) RenderHTML() string {
 		<div class="content">
 `
 
-	// Add delta section if available
-	if r.Delta != nil {
-		html += `			<div class="chart-section">
+	html += r.renderTabContent("")
+
+	html += `		<div class="footer">
+			<p>Generated at ` + r.Timestamp + `</p>
+		</div>
+	</div>
+
+	<script>
+		// Lazy Plotly init for first tab
+		initPlotlyChart("");
+	</script>
+</body>
+</html>`
+
+	return html
+}
+
+// renderTabContent generates the main content area for a report tab
+// tabID is used to make chart IDs unique across multiple tabs (e.g., "linux", "windows", "")
+func (r *Report) renderTabContent(tabID string) string {
+	chartID := "packageChart" + tabID
+
+	html := `			<div class="chart-section">
 				<h2>📈 Changes from Previous Run</h2>
 				<table>
 					<tr>
@@ -330,6 +350,9 @@ func (r *Report) RenderHTML() string {
 						<th>Change</th>
 					</tr>
 `
+
+	// Add delta section if available
+	if r.Delta != nil {
 		if r.Delta.PassRateChange > 0 {
 			html += fmt.Sprintf(`					<tr>
 						<td>Pass Rate</td>
@@ -357,16 +380,14 @@ func (r *Report) RenderHTML() string {
 					</tr>
 `, color, sign, r.Delta.CoverageChange)
 		}
-
-		html += `				</table>
-			</div>
-`
 	}
 
-	// Charts for test results by package
-	html += `			<div class="chart-section">
+	html += `				</table>
+			</div>
+
+			<div class="chart-section">
 				<h2>📦 Test Results by Package</h2>
-				<div id="packageChart" class="chart-container"></div>
+				<div id="` + chartID + `" class="chart-container"></div>
 			</div>
 
 			<div class="chart-section">
@@ -406,31 +427,27 @@ func (r *Report) RenderHTML() string {
 	// Add line-level coverage section
 	html += r.renderLineLevelCoverage()
 
-	html += `		</div>
+	html += `			<script>
+				// Plotly chart data for tab ` + tabID + `
+				function initPlotlyChart(tabID) {
+					if (tabID !== "` + tabID + `") return;
+					var chartId = "packageChart` + tabID + `";
+					var packageNames = [` + formatPackageList(r.Tests.ByPackage) + `];
+					var passed = [` + formatPackageMetric(r.Tests.ByPackage, "Passed") + `];
+					var failed = [` + formatPackageMetric(r.Tests.ByPackage, "Failed") + `];
+					var skipped = [` + formatPackageMetric(r.Tests.ByPackage, "Skipped") + `];
 
-		<div class="footer">
-			<p>Generated at ` + r.Timestamp + `</p>
-		</div>
-	</div>
+					var trace1 = { name: '✅ Passed', x: packageNames, y: passed, type: 'bar', marker: {color: '#5cb85c'} };
+					var trace2 = { name: '❌ Failed', x: packageNames, y: failed, type: 'bar', marker: {color: '#d9534f'} };
+					var trace3 = { name: '⏭️ Skipped', x: packageNames, y: skipped, type: 'bar', marker: {color: '#f0ad4e'} };
 
-	<script>
-		// Package test results chart
-		var packageNames = [` + formatPackageList(r.Tests.ByPackage) + `];
-		var passed = [` + formatPackageMetric(r.Tests.ByPackage, "Passed") + `];
-		var failed = [` + formatPackageMetric(r.Tests.ByPackage, "Failed") + `];
-		var skipped = [` + formatPackageMetric(r.Tests.ByPackage, "Skipped") + `];
+					var data = [trace1, trace2, trace3];
+					var layout = { barmode: 'stack', height: 400, hovermode: 'x unified' };
 
-		var trace1 = { name: '✅ Passed', x: packageNames, y: passed, type: 'bar', marker: {color: '#5cb85c'} };
-		var trace2 = { name: '❌ Failed', x: packageNames, y: failed, type: 'bar', marker: {color: '#d9534f'} };
-		var trace3 = { name: '⏭️ Skipped', x: packageNames, y: skipped, type: 'bar', marker: {color: '#f0ad4e'} };
-
-		var data = [trace1, trace2, trace3];
-		var layout = { barmode: 'stack', height: 400, hovermode: 'x unified' };
-
-		Plotly.newPlot('packageChart', data, layout);
-	</script>
-</body>
-</html>`
+					Plotly.newPlot(chartId, data, layout);
+				}
+			</script>
+`
 
 	return html
 }

@@ -12,12 +12,29 @@ import (
 )
 
 func main() {
+	// Regular report flags
 	coverageFile := flag.String("coverage", "", "Path to coverage.out file (from go test -coverprofile)")
 	previousReport := flag.String("previous", "", "Path to previous report.json for trend comparison")
 	outputFormat := flag.String("format", "json", "Output format: json, markdown, html")
 	slowThreshold := flag.Float64("slow-threshold", 2.0, "Performance regression threshold (x times average)")
 	sourceRoot := flag.String("source-root", ".", "Root directory to resolve source file paths")
+
+	// Merge mode flags
+	mergeMode := flag.Bool("merge", false, "Merge multiple OS reports into one HTML report")
+	reportLinux := flag.String("report-linux", "", "Path to Linux JSON report")
+	reportWindows := flag.String("report-windows", "", "Path to Windows JSON report")
+	reportMacos := flag.String("report-macos", "", "Path to macOS JSON report")
+
 	flag.Parse()
+
+	// Handle merge mode
+	if *mergeMode {
+		if err := runMerge(*reportLinux, *reportWindows, *reportMacos); err != nil {
+			fmt.Fprintf(os.Stderr, "Error merging reports: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
 
 	// Read test results from stdin (go test -json output)
 	testResults, err := parseTestJSON(os.Stdin)
