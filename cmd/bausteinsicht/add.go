@@ -10,6 +10,16 @@ func newAddCmd() *cobra.Command {
 
 	cmd.AddCommand(newAddElementCmd())
 	cmd.AddCommand(newAddRelationshipCmd())
+	cmd.AddCommand(newAddFromPatternCmd())
+
+	// Create a pattern sub-group
+	patternCmd := &cobra.Command{
+		Use:   "pattern",
+		Short: "Manage patterns",
+	}
+	patternCmd.AddCommand(newListPatternsCmd())
+
+	cmd.AddCommand(patternCmd)
 
 	return cmd
 }
