@@ -45,6 +45,9 @@ func main() {
 		}
 	}
 
+	// Compute derived fields before output
+	report.computeDerivedFields()
+
 	// Output report in requested format
 	switch *outputFormat {
 	case "json":
@@ -55,9 +58,9 @@ func main() {
 		}
 		fmt.Println(string(output))
 	case "markdown":
-		fmt.Print(report.ToMarkdown())
+		fmt.Print(report.RenderMarkdown())
 	case "html":
-		fmt.Print(report.ToHTML())
+		fmt.Print(report.RenderHTML())
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown format: %s\n", *outputFormat)
 		os.Exit(1)

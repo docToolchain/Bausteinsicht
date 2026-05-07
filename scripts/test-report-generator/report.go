@@ -74,6 +74,34 @@ type ReportDelta struct {
 	ResolvedFailures int     `json:"resolved_failures"`
 }
 
+// computeDerivedFields computes fields like low coverage list and slowest tests
+func (r *Report) computeDerivedFields() {
+	// Collect low coverage packages
+	for pkg, info := range r.Coverage {
+		if info.IsLowCoverage {
+			r.LowCoverageList = append(r.LowCoverageList, pkg)
+		}
+	}
+	sort.Strings(r.LowCoverageList)
+
+	// Compute regression test stats
+	regTests := &RegressionTestStats{}
+	for _, testType := range r.Tests.ByType {
+		if testType.Type == "regression" {
+			regTests.Total = testType.Total
+			regTests.Passed = testType.Passed
+			regTests.Failed = testType.Failed
+			regTests.Skipped = testType.Skipped
+			if testType.Total > 0 {
+				regTests.PassRate = testType.PassRate
+			}
+		}
+	}
+	if regTests.Total > 0 {
+		r.RegressionTests = regTests
+	}
+}
+
 // CompareTo compares this report with a previous one and sets Delta
 func (r *Report) CompareTo(prev *Report) {
 	if prev == nil {
