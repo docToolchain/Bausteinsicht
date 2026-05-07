@@ -91,28 +91,28 @@ func extractPackage(filePath string) string {
 
 // CoverageBlock represents one instrumented block from coverage.out
 type CoverageBlock struct {
-	StartLine int
-	StartCol  int
-	EndLine   int
-	EndCol    int
-	NumStmt   int
-	Count     int // 0 = uncovered, >0 = covered
+	StartLine int `json:"start_line"`
+	StartCol  int `json:"start_col"`
+	EndLine   int `json:"end_line"`
+	EndCol    int `json:"end_col"`
+	NumStmt   int `json:"num_stmt"`
+	Count     int `json:"count"`
 }
 
 // FileCoverage holds per-file coverage: block list + aggregated stats
 type FileCoverage struct {
-	ImportPath  string
-	LocalPath   string
-	StmtTotal   int
-	StmtCovered int
-	Coverage    float64 // 0-100
-	Blocks      []CoverageBlock
+	ImportPath  string           `json:"import_path"`
+	LocalPath   string           `json:"local_path"`
+	StmtTotal   int              `json:"stmt_total"`
+	StmtCovered int              `json:"stmt_covered"`
+	Coverage    float64          `json:"coverage"`
+	Blocks      []CoverageBlock  `json:"blocks"`
 }
 
 // CoverageDetails holds file-level coverage information
 type CoverageDetails struct {
-	Files    map[string]*FileCoverage
-	ModuleName string
+	Files      map[string]*FileCoverage `json:"files"`
+	ModuleName string                   `json:"module_name"`
 }
 
 // parseCoverageFileDetailed parses coverage.out and returns both package and file-level coverage
