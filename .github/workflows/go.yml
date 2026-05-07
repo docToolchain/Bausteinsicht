@@ -31,7 +31,6 @@ jobs:
         run: go test ./... -json -coverprofile=coverage.out > test-results.json
       - name: Generate test report
         id: report
-        continue-on-error: true
         shell: bash
         run: |
           GOEXE=$(go env GOEXE)
@@ -45,11 +44,18 @@ jobs:
 
           if [ -f test-results.json ]; then
             echo "Generating reports for ${OS_KEY} from test-results.json"
-            ./scripts/test-report-generator/test-report-generator${GOEXE} -coverage=coverage.out -format=json < test-results.json > test-report-${OS_KEY}.json
+            # Only pass coverage.out if it exists (it may not exist on failed runs or Windows)
+            if [ -f coverage.out ]; then
+              ./scripts/test-report-generator/test-report-generator${GOEXE} -coverage=coverage.out -format=json < test-results.json > test-report-${OS_KEY}.json
+            else
+              echo "Warning: coverage.out not found, generating report without coverage data"
+              ./scripts/test-report-generator/test-report-generator${GOEXE} -format=json < test-results.json > test-report-${OS_KEY}.json
+            fi
           else
             echo "test-results.json not found!"
             exit 1
           fi
+        continue-on-error: true
       - name: Upload test reports
         uses: actions/upload-artifact@v4
         with:
