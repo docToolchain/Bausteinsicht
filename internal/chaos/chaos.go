@@ -31,7 +31,7 @@ func (tc *TestChaos) CorruptFile(path string) {
 	if err != nil {
 		tc.t.Fatalf("CorruptFile: %v", err)
 	}
-	defer f.Close()
+	defer f.Close() //nolint:errcheck
 	if _, err := f.WriteString(""); err != nil {
 		tc.t.Fatalf("CorruptFile truncate: %v", err)
 	}
@@ -43,7 +43,7 @@ func (tc *TestChaos) CorruptFilePartial(path string, content string) {
 	if err != nil {
 		tc.t.Fatalf("CorruptFilePartial: %v", err)
 	}
-	defer f.Close()
+	defer f.Close() //nolint:errcheck
 	if _, err := f.WriteString(content); err != nil {
 		tc.t.Fatalf("CorruptFilePartial write: %v", err)
 	}
@@ -80,7 +80,7 @@ func (tc *TestChaos) CreateEmptyFile(path string) string {
 	if err != nil {
 		tc.t.Fatalf("CreateEmptyFile: %v", err)
 	}
-	defer f.Close()
+	defer f.Close() //nolint:errcheck
 	return absPath
 }
 

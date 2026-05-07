@@ -57,7 +57,7 @@ func TestSyncStateRecoveryCorruptFile(t *testing.T) {
 	}
 	// Write state to file manually (simulating what CLI would do)
 	if data, err := json.MarshalIndent(validState, "", "  "); err == nil {
-		os.WriteFile(stateFile, data, 0644)
+		_ = os.WriteFile(stateFile, data, 0644)
 	}
 
 	// Verify state file was created
@@ -133,7 +133,7 @@ func TestSyncStatePartialWrite(t *testing.T) {
 	}
 
 	// Try to load the partially written state
-	state, err = LoadState(stateFile)
+	state, _ = LoadState(stateFile) //nolint:ineffassign
 
 	// Either error (graceful rejection) or nil state (fresh sync)
 	// Both are acceptable — system should recover
