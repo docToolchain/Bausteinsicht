@@ -41,6 +41,17 @@ jobs:
           else
             echo "✗ coverage.out not found"
           fi
+      - name: Check source files
+        shell: bash
+        run: |
+          echo "Checking if source files are readable..."
+          find internal -name "*.go" -type f | head -5 | while read f; do
+            if [ -f "$f" ]; then
+              echo "✓ $f ($(wc -l < "$f") lines)"
+            else
+              echo "✗ $f not found"
+            fi
+          done
       - name: Generate test report
         id: report
         shell: bash
