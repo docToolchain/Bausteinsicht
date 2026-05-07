@@ -1,0 +1,18 @@
+goos: linux
+goarch: amd64
+pkg: github.com/docToolchain/Bausteinsicht/internal/benchmarks
+cpu: Intel(R) Pentium(R) CPU G4400T @ 2.90GHz
+BenchmarkModelLoad-2              	    7741	    473913 ns/op	   82960 B/op	    1348 allocs/op
+BenchmarkModelLoadLarge-2         	    1644	   2635127 ns/op	  366513 B/op	    6556 allocs/op
+BenchmarkModelValidation-2        	   22074	    214188 ns/op	   80336 B/op	     631 allocs/op
+BenchmarkModelValidationLarge-2   	    3313	   1355386 ns/op	  604974 B/op	    3796 allocs/op
+BenchmarkFlattenElements-2        	  151936	     29479 ns/op	   21352 B/op	     111 allocs/op
+BenchmarkDiagramFormatView-2      	  100153	     45909 ns/op	   23506 B/op	     172 allocs/op
+BenchmarkTableExportMarkdown-2    	   93030	     59570 ns/op	   42964 B/op	     227 allocs/op
+BenchmarkTableExportAsciidoc-2    	   78244	     62549 ns/op	   42916 B/op	     227 allocs/op
+BenchmarkRoundTripJSON-2          	    5740	    764105 ns/op	  122730 B/op	    1560 allocs/op
+BenchmarkFileWrite-2              	    8601	    475850 ns/op	   81553 B/op	     229 allocs/op
+BenchmarkFileRead-2               	    2367	   1804573 ns/op	  470440 B/op	    1454 allocs/op
+BenchmarkValidateAndFlatten-2     	   18342	    262653 ns/op	  101691 B/op	     742 allocs/op
+PASS
+ok  	github.com/docToolchain/Bausteinsicht/internal/benchmarks	66.020s
