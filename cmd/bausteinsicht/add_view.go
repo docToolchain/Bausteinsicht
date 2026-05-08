@@ -27,8 +27,10 @@ func newAddViewCmd() *cobra.Command {
 
 	cmd.Flags().String("scope", "", "Scope element ID (parent element to show)")
 	cmd.Flags().StringSlice("include", []string{}, "Elements to include in view (repeatable)")
-	cmd.Flags().String("title", "", "View title (display name)")
+	cmd.Flags().String("title", "", "View title (display name) (required)")
 	cmd.Flags().String("description", "", "View description")
+
+	_ = cmd.MarkFlagRequired("title")
 
 	return cmd
 }

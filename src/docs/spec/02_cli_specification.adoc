@@ -462,9 +462,9 @@ Creates a new view or modifies an existing view's include list. Designed for LLM
 | (empty)
 
 | `--title`
-| View title (display name).
-| No
-| (empty)
+| View title (display name) (required).
+| Yes
+| --
 
 | `--description`
 | View description.
@@ -482,7 +482,7 @@ Creates a new view or modifies an existing view's include list. Designed for LLM
 **Exit codes:**
 
 * `0` -- view added/updated successfully
-* `1` -- scope or include element not found
+* `1` -- scope or include element not found, or missing required flag
 * `2` -- model file not found or I/O error
 
 **Example:**
