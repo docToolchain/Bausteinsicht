@@ -2,7 +2,10 @@
 
 package export
 
-import "os"
+import (
+	"os"
+	"path/filepath"
+)
 
 // platformDrawioPaths returns platform-native draw.io install locations for macOS.
 // Search order: Homebrew (Apple Silicon) → Homebrew (Intel) → App Store → Manual Install
@@ -10,7 +13,7 @@ func platformDrawioPaths() []string {
 	var paths []string
 
 	// Homebrew package manager (Apple Silicon - M1/M2/M3).
-	// Homebrew installs to /opt/homebrew/ on Apple Silicon
+	// Homebrew installs to /opt/homebrew/ on Apple Silicon Macs
 	paths = append(paths,
 		"/opt/homebrew/bin/draw.io",
 		"/opt/homebrew/opt/drawio/bin/draw.io",
@@ -28,7 +31,7 @@ func platformDrawioPaths() []string {
 
 	// User-level install (~/Applications).
 	if home, err := os.UserHomeDir(); err == nil {
-		paths = append(paths, home+"/Applications/draw.io.app/Contents/MacOS/draw.io")
+		paths = append(paths, filepath.Join(home, "Applications", "draw.io.app", "Contents", "MacOS", "draw.io"))
 	}
 
 	return paths

@@ -273,32 +273,30 @@ func TestExportPage_Integration(t *testing.T) {
 
 // Regression Tests for #388: Windows/macOS Package Manager Path Detection
 
-// TestDetectDrawioBinary_WindowsScoopPath verifies Scoop package manager detection on Windows.
+// TestDetectDrawioBinary_WindowsScoopPath verifies Scoop package manager detection.
 // Regression test for #388: Users with Scoop-installed draw.io should be detected.
+// This test runs on all platforms and mocks the platform-specific path detection.
 func TestDetectDrawioBinary_WindowsScoopPath(t *testing.T) {
-	if runtime.GOOS != "windows" {
-		t.Skip("Windows-specific test, skipping on non-Windows")
-	}
-
 	dir := t.TempDir()
-	// Simulate Scoop installation directory
-	scoopApp := filepath.Join(dir, "apps", "drawio", "current")
-	if err := os.MkdirAll(scoopApp, 0755); err != nil {
+	// Simulate Scoop installation directory: C:\Users\<user>\scoop\shims\draw.io.exe
+	scoopShims := filepath.Join(dir, "scoop", "shims")
+	if err := os.MkdirAll(scoopShims, 0755); err != nil {
 		t.Fatal(err)
 	}
-	fakeBin := fakeBinary(t, scoopApp, "draw.io")
+	// Always use .exe extension to match Windows behavior
+	exeName := "draw.io.exe"
+	exePath := filepath.Join(scoopShims, exeName)
+	if err := os.WriteFile(exePath, []byte("#!/bin/sh\n"), 0755); err != nil {
+		t.Fatal(err)
+	}
 
-	// Set SCOOP env var to temp dir to override user's actual Scoop installation
-	t.Setenv("SCOOP", dir)
+	// Clear PATH so only platform paths are checked
 	t.Setenv("PATH", "")
 
-	// Override platform paths to only return Scoop paths
+	// Override platform paths to return Scoop paths (this would come from user's home on real Windows)
 	old := platformPaths
 	platformPaths = func() []string {
-		return []string{
-			filepath.Join(dir, "apps", "drawio", "current", "draw.io.exe"),
-			filepath.Join(dir, "shims", "draw.io.exe"),
-		}
+		return []string{exePath}
 	}
 	t.Cleanup(func() { platformPaths = old })
 
@@ -306,34 +304,34 @@ func TestDetectDrawioBinary_WindowsScoopPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if bin != fakeBin {
-		t.Errorf("expected %q, got %q", fakeBin, bin)
+	if bin != exePath {
+		t.Errorf("expected %q, got %q", exePath, bin)
 	}
 }
 
 // TestDetectDrawioBinary_WindowsChocolateyPath verifies Chocolatey package manager detection.
 // Regression test for #388: Users with Chocolatey-installed draw.io should be detected.
+// This test runs on all platforms and mocks the platform-specific path detection.
 func TestDetectDrawioBinary_WindowsChocolateyPath(t *testing.T) {
-	if runtime.GOOS != "windows" {
-		t.Skip("Windows-specific test, skipping on non-Windows")
-	}
-
 	dir := t.TempDir()
+	// Simulate Chocolatey installation directory: C:\ProgramData\chocolatey\bin\draw.io.exe
 	chocoDir := filepath.Join(dir, "chocolatey", "bin")
 	if err := os.MkdirAll(chocoDir, 0755); err != nil {
 		t.Fatal(err)
 	}
-	fakeBin := fakeBinary(t, chocoDir, "draw.io")
+	// Always use .exe extension to match Windows behavior
+	exeName := "draw.io.exe"
+	exePath := filepath.Join(chocoDir, exeName)
+	if err := os.WriteFile(exePath, []byte("#!/bin/sh\n"), 0755); err != nil {
+		t.Fatal(err)
+	}
 
-	// Clear environment and override platform paths
+	// Clear PATH so only platform paths are checked
 	t.Setenv("PATH", "")
-	t.Setenv("SCOOP", "")
 
 	old := platformPaths
 	platformPaths = func() []string {
-		return []string{
-			filepath.Join(dir, "chocolatey", "bin", "draw.io.exe"),
-		}
+		return []string{exePath}
 	}
 	t.Cleanup(func() { platformPaths = old })
 
@@ -341,33 +339,32 @@ func TestDetectDrawioBinary_WindowsChocolateyPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if bin != fakeBin {
-		t.Errorf("expected %q, got %q", fakeBin, bin)
+	if bin != exePath {
+		t.Errorf("expected %q, got %q", exePath, bin)
 	}
 }
 
-// TestDetectDrawioBinary_macOSHomebrewAppleSilicon verifies Homebrew detection on Apple Silicon Macs.
+// TestDetectDrawioBinary_macOSHomebrewAppleSilicon verifies Homebrew detection on Apple Silicon.
 // Regression test for #388: macOS users with Homebrew (M1/M2/M3) should be detected.
+// This test runs on all platforms and mocks the platform-specific path detection.
 func TestDetectDrawioBinary_macOSHomebrewAppleSilicon(t *testing.T) {
-	if runtime.GOOS != "darwin" {
-		t.Skip("macOS-specific test, skipping on non-macOS")
-	}
-
 	dir := t.TempDir()
+	// Simulate Homebrew installation directory on Apple Silicon: /opt/homebrew/bin/draw.io
 	brewDir := filepath.Join(dir, "opt", "homebrew", "bin")
 	if err := os.MkdirAll(brewDir, 0755); err != nil {
 		t.Fatal(err)
 	}
-	fakeBin := fakeBinary(t, brewDir, "draw.io")
+	exePath := filepath.Join(brewDir, "draw.io")
+	if err := os.WriteFile(exePath, []byte("#!/bin/sh\n"), 0755); err != nil {
+		t.Fatal(err)
+	}
 
-	// Clear PATH and override platform paths
+	// Clear PATH so only platform paths are checked
 	t.Setenv("PATH", "")
 
 	old := platformPaths
 	platformPaths = func() []string {
-		return []string{
-			filepath.Join(dir, "opt", "homebrew", "bin", "draw.io"),
-		}
+		return []string{exePath}
 	}
 	t.Cleanup(func() { platformPaths = old })
 
@@ -375,33 +372,32 @@ func TestDetectDrawioBinary_macOSHomebrewAppleSilicon(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if bin != fakeBin {
-		t.Errorf("expected %q, got %q", fakeBin, bin)
+	if bin != exePath {
+		t.Errorf("expected %q, got %q", exePath, bin)
 	}
 }
 
 // TestDetectDrawioBinary_macOSHomebrewIntel verifies Homebrew detection on Intel Macs.
 // Regression test for #388: Intel Mac users with Homebrew should be detected.
+// This test runs on all platforms and mocks the platform-specific path detection.
 func TestDetectDrawioBinary_macOSHomebrewIntel(t *testing.T) {
-	if runtime.GOOS != "darwin" {
-		t.Skip("macOS-specific test, skipping on non-macOS")
-	}
-
 	dir := t.TempDir()
+	// Simulate Homebrew installation directory on Intel: /usr/local/bin/draw.io
 	brewDir := filepath.Join(dir, "usr", "local", "bin")
 	if err := os.MkdirAll(brewDir, 0755); err != nil {
 		t.Fatal(err)
 	}
-	fakeBin := fakeBinary(t, brewDir, "draw.io")
+	exePath := filepath.Join(brewDir, "draw.io")
+	if err := os.WriteFile(exePath, []byte("#!/bin/sh\n"), 0755); err != nil {
+		t.Fatal(err)
+	}
 
-	// Clear PATH and override platform paths
+	// Clear PATH so only platform paths are checked
 	t.Setenv("PATH", "")
 
 	old := platformPaths
 	platformPaths = func() []string {
-		return []string{
-			filepath.Join(dir, "usr", "local", "bin", "draw.io"),
-		}
+		return []string{exePath}
 	}
 	t.Cleanup(func() { platformPaths = old })
 
@@ -409,8 +405,8 @@ func TestDetectDrawioBinary_macOSHomebrewIntel(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if bin != fakeBin {
-		t.Errorf("expected %q, got %q", fakeBin, bin)
+	if bin != exePath {
+		t.Errorf("expected %q, got %q", exePath, bin)
 	}
 }
 
