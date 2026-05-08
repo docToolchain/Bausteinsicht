@@ -409,6 +409,7 @@ func TestDetectDrawioBinary_macOSHomebrewIntel(t *testing.T) {
 		t.Errorf("expected %q, got %q", exePath, bin)
 	}
 }
+<<<<<<< Updated upstream
 
 // TestDetectDrawioBinary_SearchOrderPriority verifies that PATH takes priority over platform paths.
 // Regression test for #388: ensure search order is correct (PATH first, then package managers).
