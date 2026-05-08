@@ -476,13 +476,13 @@ Creates a new view or modifies an existing view's include list. Designed for LLM
 
 * Validates that scope element exists (if specified).
 * Validates that all include elements exist (if specified, excluding wildcard patterns).
-* Creates a new view or updates an existing one with the same key.
-* Uses comment-preserving insertion to update the JSONC file.
+* Checks for duplicate view keys and rejects if already exists.
+* Creates a new view in the JSONC file using comment-preserving insertion.
 
 **Exit codes:**
 
-* `0` -- view added/updated successfully
-* `1` -- scope or include element not found, or missing required flag
+* `0` -- view added successfully
+* `1` -- scope or include element not found, view key already exists, or missing required flag
 * `2` -- model file not found or I/O error
 
 **Example:**

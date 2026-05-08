@@ -50,6 +50,33 @@ func TestAddViewCmd_MissingViewKey(t *testing.T) {
 	}
 }
 
+func TestAddViewCmd_DuplicateView(t *testing.T) {
+	dir := t.TempDir()
+	modelPath := writeViewTestModel(t, dir)
+
+	// Create first view
+	cmd1 := NewRootCmd()
+	cmd1.SetArgs([]string{"add", "view", "myview",
+		"--model", modelPath,
+		"--title", "My View",
+	})
+	if err := cmd1.Execute(); err != nil {
+		t.Fatalf("unexpected error on first add: %v", err)
+	}
+
+	// Try to create duplicate view
+	cmd2 := NewRootCmd()
+	cmd2.SetArgs([]string{"add", "view", "myview",
+		"--model", modelPath,
+		"--title", "Different Title",
+	})
+	err := cmd2.Execute()
+
+	if err == nil {
+		t.Error("expected error for duplicate view")
+	}
+}
+
 func writeViewTestModel(t *testing.T, dir string) string {
 	t.Helper()
 	p := filepath.Join(dir, "architecture.jsonc")

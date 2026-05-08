@@ -93,7 +93,7 @@ func TestAddView_WithWildcards(t *testing.T) {
 	}
 }
 
-func TestAddView_UpdateExisting(t *testing.T) {
+func TestAddView_DuplicateKey(t *testing.T) {
 	m := &BausteinsichtModel{
 		Model: map[string]Element{
 			"system": {Kind: "system", Title: "System"},
@@ -111,13 +111,8 @@ func TestAddView_UpdateExisting(t *testing.T) {
 		Include: []string{"system"},
 	})
 
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	view := m.Views["context"]
-	if view.Title != "New Title" {
-		t.Errorf("expected title 'New Title', got %q", view.Title)
+	if err == nil {
+		t.Error("expected error for duplicate view key")
 	}
 }
 

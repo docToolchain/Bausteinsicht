@@ -2,14 +2,25 @@ package model
 
 import "fmt"
 
-// AddView adds or updates a view in the model.
+// AddView adds a view to the model.
 // Returns an error if:
 // - View key is empty
+// - View with this key already exists
 // - Scope element doesn't exist (if specified)
 // - Include elements don't exist (if specified)
 func (m *BausteinsichtModel) AddView(key string, view View) error {
 	if key == "" {
 		return fmt.Errorf("view key must not be empty")
+	}
+
+	// Initialize views map if needed
+	if m.Views == nil {
+		m.Views = make(map[string]View)
+	}
+
+	// Check for duplicate
+	if _, exists := m.Views[key]; exists {
+		return fmt.Errorf("view %q already exists", key)
 	}
 
 	// Validate scope exists (if specified)
@@ -30,12 +41,7 @@ func (m *BausteinsichtModel) AddView(key string, view View) error {
 		}
 	}
 
-	// Initialize views map if needed
-	if m.Views == nil {
-		m.Views = make(map[string]View)
-	}
-
-	// Add or update view
+	// Add view
 	m.Views[key] = view
 
 	return nil
