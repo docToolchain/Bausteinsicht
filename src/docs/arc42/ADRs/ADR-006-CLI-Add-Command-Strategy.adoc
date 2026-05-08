@@ -1,0 +1,184 @@
+:jbake-title: ADR-006: CLI Add Command Strategy
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: Development
+:jbake-order: 7
+
+= ADR-006: CLI Add Command Strategy — Merge vs. Replace for Existing Items
+
+== Status
+
+Accepted
+
+== Context
+
+The `bausteinsicht add` command family is designed to be LLM-friendly, enabling AI agents and scripts to mutate architecture models via CLI.
+However, there is a design question: What should happen when `add` commands are called on items that already exist?
+
+=== Key Requirements
+
+* **LLM-friendliness**: Commands must work in AI-driven workflows where models evolve incrementally
+* **Predictability**: Users and LLMs must understand the behavior without trial-and-error
+* **Idempotency considerations**: Some workflows may retry commands; behavior must be safe
+* **Consistency**: Similar commands should behave similarly
+
+=== Constraints
+
+* Some `add` commands (`add element`, `add relationship`, `add specification element/relationship`) already reject duplicates
+* `add view` has special use case: modifying a view's `include` list (Issue #392)
+* JSONC files preserve comments and ordering; mutations must maintain this
+
+== Problem Statement
+
+Two conflicting design patterns have emerged:
+
+[cols="1,2,2"]
+|===
+| Command | Current Behavior | Issue #392 Expectation
+
+| `add element` | Reject duplicate | (n/a)
+| `add relationship` | Reject duplicate | (n/a)
+| `add specification element` | Reject duplicate | (n/a)
+| `add specification relationship` | Reject duplicate | (n/a)
+| `add view` | Was: Merge; Now: Reject | Should merge
+|===
+
+The question: Should `add view` (and potentially other commands) support merging?
+
+Example workflow:
+[source,bash]
+----
+# Step 1: Create view with initial elements
+bausteinsicht add view containers --include system.api system.db
+
+# Step 2: Later, add another element to the same view
+bausteinsicht add view containers --include system.cache
+# What should happen?
+# Option A: Error — "view already exists"
+# Option B: Merge — include becomes [system.api, system.db, system.cache]
+----
+
+== Evaluated Options
+
+=== Option A: All `add` Commands Reject Duplicates (Strict Mode)
+
+All `add` commands treat duplicates as errors. Users must use explicit `update` or `delete` commands to modify items.
+
+*Pros:*
+* Simple, predictable semantics
+* Prevents accidental overwrites
+* Consistent with existing `add element/relationship` behavior
+
+*Cons:*
+* Requires separate `update` command infrastructure (not yet implemented)
+* Less LLM-friendly: agents must track state and use different commands
+* Issue #392 explicitly asks for merge behavior on views
+
+=== Option B: Merge on Existing Items (Permissive Mode)
+
+Calling `add` on an existing item merges/updates fields instead of erroring.
+
+**For `add view`:**
+* `--include <elem>` → adds to existing include list (deduplicated)
+* `--title <title>` → updates title (if specified)
+* `--scope <scope>` → updates scope (if specified)
+* `--description <desc>` → updates description (if specified)
+
+**For other commands (future consideration):**
+* `add element` → could update element properties (e.g., `--technology`, `--description`)
+* `add relationship` → could update label or kind
+
+*Pros:*
+* LLM-friendly: agents can incrementally build models without state tracking
+* Issue #392 explicitly requests this for `add view`
+* Aligns with "modify view's include list" requirement
+* Supports idempotent workflows
+
+*Cons:*
+* More complex semantics: which fields merge vs. overwrite?
+* Potential for confusion: is it update or create?
+* Risk of accidental overwrites if user forgets a field
+
+=== Option C: Hybrid — Merge Only for `add view`, Reject for Others
+
+`add view` supports merge semantics (as per Issue #392), while other commands remain strict.
+
+*Pros:*
+* Solves Issue #392 explicitly
+* Reduces scope of behavior change
+* Views have special semantics (include lists are naturally additive)
+
+*Cons:*
+* Inconsistent API: different commands behave differently
+* More complex to explain and document
+* Other commands may need similar merge behavior later
+
+== Decision
+
+**Adopt Option B: Merge on Existing Items**
+
+The merge approach is best for LLM-friendliness and aligns with Issue #392's explicit requirement.
+
+=== Implementation Rules
+
+[cols="1,3"]
+|===
+| Scenario | Behavior
+
+| Call `add view <key>` with only `--include` | Merge: add elements to existing include list
+| Call `add view <key>` with `--title` | Update title (include list unchanged)
+| Call `add view <key>` with `--scope` | Update scope (include list unchanged)
+| Call `add view <key>` with mixed flags | Merge/update each field independently
+| Call `add view <key>` with **no** flags | No-op (view unchanged)
+| Duplicate element in `--include` | Deduplicate (single copy in list)
+|===
+
+=== Command Behavior Examples
+
+[source,bash]
+----
+# Create initial view
+$ bausteinsicht add view containers \
+    --title "System Containers" \
+    --include system.api system.db
+
+# Merge: add element to include list
+$ bausteinsicht add view containers --include system.cache
+# Result: include = [system.api, system.db, system.cache]
+
+# Update: change title without touching include
+$ bausteinsicht add view containers --title "Updated Containers"
+# Result: title = "Updated Containers", include = [system.api, system.db, system.cache]
+
+# Idempotent: same command twice = same result
+$ bausteinsicht add view containers --include system.api
+# Result: no change (api already in list, deduplicated)
+----
+
+== Consequences
+
+=== Positive
+
+* LLM-friendly: agents can use `add view` to incrementally build views
+* Matches Issue #392's intent and examples
+* Supports idempotent workflows (safe to retry)
+* Merging is intuitive for `--include` (additive list)
+
+=== Negative
+
+* More complex implementation and testing
+* Requires clear documentation to avoid confusion
+* Opens door to similar requests for `add element` and `add relationship`
+* Merging semantics must be carefully specified (which fields merge? which overwrite?)
+
+=== Future Considerations
+
+* Consider similar merge semantics for `add element` (`--description`, `--technology`)
+* Consider `--exclude` for `add view` to remove elements
+* Consider `--clear-include` flag to explicitly reset include list
+* May eventually need explicit `update` commands if merge semantics become complex
+
+== References
+
+* Issue #392: feat: Add missing 'add' subcommands for views and specification
+* src/docs/spec/02_cli_specification.adoc: CLI command specifications

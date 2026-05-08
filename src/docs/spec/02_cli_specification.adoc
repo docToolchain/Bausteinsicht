@@ -462,9 +462,9 @@ Creates a new view or modifies an existing view's include list. Designed for LLM
 | (empty)
 
 | `--title`
-| View title (display name) (required).
-| Yes
-| --
+| View title (display name) (required for new views).
+| No
+| (empty)
 
 | `--description`
 | View description.
@@ -474,15 +474,18 @@ Creates a new view or modifies an existing view's include list. Designed for LLM
 
 **Behavior:**
 
+* For new views: requires `--title`; creates view with all specified fields.
+* For existing views: merges fields:
+  - `--title`, `--scope`, `--description` update respective fields (if specified)
+  - `--include` elements are added to existing include list (deduplicated)
 * Validates that scope element exists (if specified).
 * Validates that all include elements exist (if specified, excluding wildcard patterns).
-* Checks for duplicate view keys and rejects if already exists.
-* Creates a new view in the JSONC file using comment-preserving insertion.
+* Uses comment-preserving insertion to update the JSONC file.
 
 **Exit codes:**
 
-* `0` -- view added successfully
-* `1` -- scope or include element not found, view key already exists, or missing required flag
+* `0` -- view added or updated successfully
+* `1` -- scope or include element not found, or missing title for new view
 * `2` -- model file not found or I/O error
 
 **Example:**
@@ -490,9 +493,10 @@ Creates a new view or modifies an existing view's include list. Designed for LLM
 ----
 # Create a new system context view
 $ bausteinsicht add view context \
-  --include "system" "external_system" "user" \
+  --include system external_system user \
   --title "System Context"
 View 'context' added to model
+  Title: System Context
   Includes: [system external_system user]
 
 # Create a nested container view
@@ -501,8 +505,19 @@ $ bausteinsicht add view containers \
   --include "system.*" \
   --title "Containers"
 View 'containers' added to model
+  Title: Containers
   Scope: system
   Includes: [system.*]
+
+# Merge: add element to existing view's include list
+$ bausteinsicht add view containers --include system.logging
+View 'containers' added to model
+  Includes: [system.* system.logging]
+
+# Merge: update title without changing include
+$ bausteinsicht add view containers --title "Updated Containers"
+View 'containers' added to model
+  Title: Updated Containers
 
 # JSON output
 $ bausteinsicht add view context --title "System Context" --format json
@@ -510,7 +525,7 @@ $ bausteinsicht add view context --title "System Context" --format json
   "view_key": "context",
   "title": "System Context",
   "scope": "",
-  "include": []
+  "include": ["system", "external_system", "user"]
 }
 ----
 

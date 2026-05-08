@@ -93,7 +93,7 @@ func TestAddView_WithWildcards(t *testing.T) {
 	}
 }
 
-func TestAddView_DuplicateKey(t *testing.T) {
+func TestAddView_MergeTitle(t *testing.T) {
 	m := &BausteinsichtModel{
 		Model: map[string]Element{
 			"system": {Kind: "system", Title: "System"},
@@ -107,12 +107,75 @@ func TestAddView_DuplicateKey(t *testing.T) {
 	}
 
 	err := m.AddView("context", View{
-		Title:   "New Title",
+		Title: "New Title",
+	})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	view := m.Views["context"]
+	if view.Title != "New Title" {
+		t.Errorf("expected title 'New Title', got %q", view.Title)
+	}
+	if len(view.Include) != 1 || view.Include[0] != "system" {
+		t.Errorf("expected include [system], got %v", view.Include)
+	}
+}
+
+func TestAddView_MergeInclude(t *testing.T) {
+	m := &BausteinsichtModel{
+		Model: map[string]Element{
+			"system": {Kind: "system", Title: "System"},
+			"user":   {Kind: "actor", Title: "User"},
+		},
+		Views: map[string]View{
+			"context": {
+				Title:   "Context",
+				Include: []string{"system"},
+			},
+		},
+	}
+
+	err := m.AddView("context", View{
+		Include: []string{"user"},
+	})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	view := m.Views["context"]
+	if len(view.Include) != 2 {
+		t.Errorf("expected 2 includes, got %d: %v", len(view.Include), view.Include)
+	}
+}
+
+func TestAddView_MergeIncludeDeduplicate(t *testing.T) {
+	m := &BausteinsichtModel{
+		Model: map[string]Element{
+			"system": {Kind: "system", Title: "System"},
+		},
+		Views: map[string]View{
+			"context": {
+				Title:   "Context",
+				Include: []string{"system"},
+			},
+		},
+	}
+
+	// Add same element again
+	err := m.AddView("context", View{
 		Include: []string{"system"},
 	})
 
-	if err == nil {
-		t.Error("expected error for duplicate view key")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	view := m.Views["context"]
+	if len(view.Include) != 1 {
+		t.Errorf("expected 1 include (deduplicated), got %d: %v", len(view.Include), view.Include)
 	}
 }
 

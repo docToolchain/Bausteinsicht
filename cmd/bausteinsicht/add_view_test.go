@@ -8,18 +8,18 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func TestAddViewCmd_MissingTitleFlag(t *testing.T) {
-	cmd := &cobra.Command{}
-	cmd.AddCommand(newAddCmd())
+func TestAddViewCmd_MissingTitleForNewView(t *testing.T) {
+	dir := t.TempDir()
+	modelPath := writeViewTestModel(t, dir)
 
-	cmd.SetArgs([]string{"add", "view", "myview"})
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"add", "view", "newview",
+		"--model", modelPath,
+	})
 	err := cmd.Execute()
 
 	if err == nil {
-		t.Error("expected error for missing --title flag, got nil")
-	}
-	if err != nil && err.Error() != "required flag(s) \"title\" not set" {
-		t.Logf("got error: %v", err)
+		t.Error("expected error for missing --title on new view")
 	}
 }
 
@@ -50,30 +50,40 @@ func TestAddViewCmd_MissingViewKey(t *testing.T) {
 	}
 }
 
-func TestAddViewCmd_DuplicateView(t *testing.T) {
+func TestAddViewCmd_MergeViewFields(t *testing.T) {
 	dir := t.TempDir()
 	modelPath := writeViewTestModel(t, dir)
 
 	// Create first view
 	cmd1 := NewRootCmd()
-	cmd1.SetArgs([]string{"add", "view", "myview",
+	cmd1.SetArgs([]string{"add", "view", "containers",
 		"--model", modelPath,
-		"--title", "My View",
+		"--title", "System Containers",
+		"--include", "webshop",
 	})
 	if err := cmd1.Execute(); err != nil {
 		t.Fatalf("unexpected error on first add: %v", err)
 	}
 
-	// Try to create duplicate view
+	// Merge: update title
 	cmd2 := NewRootCmd()
-	cmd2.SetArgs([]string{"add", "view", "myview",
+	cmd2.SetArgs([]string{"add", "view", "containers",
 		"--model", modelPath,
-		"--title", "Different Title",
+		"--title", "Updated Containers",
 	})
-	err := cmd2.Execute()
+	if err := cmd2.Execute(); err != nil {
+		t.Fatalf("unexpected error on merge title: %v", err)
+	}
 
-	if err == nil {
-		t.Error("expected error for duplicate view")
+	// Merge: add to include list
+	cmd3 := NewRootCmd()
+	cmd3.SetArgs([]string{"add", "view", "containers",
+		"--model", modelPath,
+		"--include", "webshop",
+		"--include", "payments",
+	})
+	if err := cmd3.Execute(); err != nil {
+		t.Fatalf("unexpected error on merge include: %v", err)
 	}
 }
 
@@ -90,6 +100,10 @@ func writeViewTestModel(t *testing.T, dir string) string {
     "webshop": {
       "kind": "system",
       "title": "Webshop"
+    },
+    "payments": {
+      "kind": "system",
+      "title": "Payment Service"
     }
   },
   "relationships": [],

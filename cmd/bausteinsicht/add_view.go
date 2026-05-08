@@ -27,10 +27,8 @@ func newAddViewCmd() *cobra.Command {
 
 	cmd.Flags().String("scope", "", "Scope element ID (parent element to show)")
 	cmd.Flags().StringSlice("include", []string{}, "Elements to include in view (repeatable)")
-	cmd.Flags().String("title", "", "View title (display name) (required)")
+	cmd.Flags().String("title", "", "View title (display name) (required for new views)")
 	cmd.Flags().String("description", "", "View description")
-
-	_ = cmd.MarkFlagRequired("title")
 
 	return cmd
 }
@@ -65,6 +63,15 @@ func runAddView(cmd *cobra.Command, args []string) error {
 	m, err := model.Load(modelPath)
 	if err != nil {
 		return exitWithCode(fmt.Errorf("loading model: %w", err), 2)
+	}
+
+	// Check if this is a new view or update
+	_, viewExists := m.Views[viewKey]
+	if !viewExists && title == "" {
+		return exitWithCode(
+			fmt.Errorf("title is required for new views"),
+			1,
+		)
 	}
 
 	// Create view struct

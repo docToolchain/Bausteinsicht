@@ -2,10 +2,12 @@ package model
 
 import "fmt"
 
-// AddView adds a view to the model.
+// AddView creates a new view or merges fields into an existing view.
+// For existing views:
+// - --include elements are merged (deduplicated)
+// - --title, --scope, --description are updated (if specified)
 // Returns an error if:
 // - View key is empty
-// - View with this key already exists
 // - Scope element doesn't exist (if specified)
 // - Include elements don't exist (if specified)
 func (m *BausteinsichtModel) AddView(key string, view View) error {
@@ -16,11 +18,6 @@ func (m *BausteinsichtModel) AddView(key string, view View) error {
 	// Initialize views map if needed
 	if m.Views == nil {
 		m.Views = make(map[string]View)
-	}
-
-	// Check for duplicate
-	if _, exists := m.Views[key]; exists {
-		return fmt.Errorf("view %q already exists", key)
 	}
 
 	// Validate scope exists (if specified)
@@ -41,8 +38,42 @@ func (m *BausteinsichtModel) AddView(key string, view View) error {
 		}
 	}
 
-	// Add view
-	m.Views[key] = view
+	// Check if view already exists
+	existingView, exists := m.Views[key]
+	if exists {
+		// Merge: keep existing fields, override with new values, merge include lists
+		if view.Title != "" {
+			existingView.Title = view.Title
+		}
+		if view.Scope != "" {
+			existingView.Scope = view.Scope
+		}
+		if view.Description != "" {
+			existingView.Description = view.Description
+		}
+		if view.Layout != "" {
+			existingView.Layout = view.Layout
+		}
+		// Merge include lists (deduplicate)
+		if len(view.Include) > 0 {
+			includedSet := make(map[string]bool)
+			for _, elem := range existingView.Include {
+				includedSet[elem] = true
+			}
+			for _, elem := range view.Include {
+				includedSet[elem] = true
+			}
+			merged := make([]string, 0, len(includedSet))
+			for elem := range includedSet {
+				merged = append(merged, elem)
+			}
+			existingView.Include = merged
+		}
+		m.Views[key] = existingView
+	} else {
+		// New view: use as-is
+		m.Views[key] = view
+	}
 
 	return nil
 }
