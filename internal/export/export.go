@@ -31,25 +31,38 @@ var platformPaths = platformDrawioPaths
 //  2. "drawio" — on PATH (Linux package install)
 //  3. Platform-native install paths (Windows, macOS) via platformPaths()
 func DetectDrawioBinary() (string, error) {
+	var debugInfo strings.Builder
+	debugInfo.WriteString("\n[DEBUG] draw.io CLI detection:\n")
+
+	// Try PATH first
 	for _, name := range []string{"drawio-export", "drawio"} {
 		path, err := exec.LookPath(name)
 		if err == nil {
+			debugInfo.WriteString(fmt.Sprintf("  ✓ Found in PATH: %s\n", path))
 			return path, nil
 		}
+		debugInfo.WriteString(fmt.Sprintf("  ✗ Not in PATH: %s\n", name))
 	}
-	for _, candidate := range platformPaths() {
+
+	// Try platform-specific paths
+	paths := platformPaths()
+	debugInfo.WriteString(fmt.Sprintf("  Checking %d platform-specific paths:\n", len(paths)))
+	for i, candidate := range paths {
 		if _, err := os.Stat(candidate); err == nil {
+			debugInfo.WriteString(fmt.Sprintf("    ✓ [%d] Found: %s\n", i+1, candidate))
 			return candidate, nil
 		}
+		debugInfo.WriteString(fmt.Sprintf("    ✗ [%d] Not found: %s\n", i+1, candidate))
 	}
-	return "", buildDrawioNotFoundError()
+	return "", buildDrawioNotFoundError(debugInfo.String())
 }
 
-// buildDrawioNotFoundError returns a detailed error message with troubleshooting steps.
-func buildDrawioNotFoundError() error {
+// buildDrawioNotFoundError returns a detailed error message with troubleshooting steps and debug info.
+func buildDrawioNotFoundError(debugInfo string) error {
 	msg := strings.Builder{}
-	msg.WriteString("draw.io CLI not found\n\n")
-	msg.WriteString("Installation options:\n")
+	msg.WriteString("draw.io CLI not found\n")
+	msg.WriteString(debugInfo)
+	msg.WriteString("\nInstallation options:\n")
 	msg.WriteString("  Windows (Scoop):    scoop install drawio\n")
 	msg.WriteString("  Windows (Choco):    choco install drawio\n")
 	msg.WriteString("  macOS (Homebrew):   brew install draw.io\n")
