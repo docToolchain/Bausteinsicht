@@ -24,6 +24,60 @@ jobs:
       - run: go build ./...
       - run: go test ./...
 
+  build-multiplatform:
+    name: Build Multi-Platform Binaries
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        include:
+          # Windows
+          - os: windows
+            arch: amd64
+            ext: .exe
+          - os: windows
+            arch: arm64
+            ext: .exe
+          # Linux
+          - os: linux
+            arch: amd64
+            ext: ""
+          - os: linux
+            arch: arm64
+            ext: ""
+          - os: linux
+            arch: arm
+            arm_version: 7
+            ext: ""
+          # macOS
+          - os: darwin
+            arch: amd64
+            ext: ""
+          - os: darwin
+            arch: arm64
+            ext: ""
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}
+          GOARM: ${{ matrix.arm_version || '0' }}
+        run: |
+          go build -o bausteinsicht-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }} ./cmd/bausteinsicht
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bausteinsicht-${{ matrix.os }}-${{ matrix.arch }}
+          path: bausteinsicht-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
+          retention-days: 30
+
   schema-validation:
     runs-on: ubuntu-latest
     permissions:
