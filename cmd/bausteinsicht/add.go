@@ -5,7 +5,7 @@ import "github.com/spf13/cobra"
 func newAddCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add",
-		Short: "Add elements, relationships, or views to the model",
+		Short: "Add elements, relationships, views, or specification types to the model",
 	}
 
 	cmd.AddCommand(newAddElementCmd())
@@ -21,6 +21,7 @@ func newAddCmd() *cobra.Command {
 
 	cmd.AddCommand(patternCmd)
 	cmd.AddCommand(newAddViewCmd())
+	cmd.AddCommand(newAddSpecificationCmd())
 
 	return cmd
 }
