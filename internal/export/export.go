@@ -32,27 +32,27 @@ var platformPaths = platformDrawioPaths
 //  3. Platform-native install paths (Windows, macOS) via platformPaths()
 func DetectDrawioBinary() (string, error) {
 	var debugInfo strings.Builder
-	debugInfo.WriteString("\n[DEBUG] draw.io CLI detection:\n")
+	fmt.Fprintf(&debugInfo, "\n[DEBUG] draw.io CLI detection:\n")
 
 	// Try PATH first
 	for _, name := range []string{"drawio-export", "drawio"} {
 		path, err := exec.LookPath(name)
 		if err == nil {
-			debugInfo.WriteString(fmt.Sprintf("  ✓ Found in PATH: %s\n", path))
+			fmt.Fprintf(&debugInfo, "  ✓ Found in PATH: %s\n", path)
 			return path, nil
 		}
-		debugInfo.WriteString(fmt.Sprintf("  ✗ Not in PATH: %s\n", name))
+		fmt.Fprintf(&debugInfo, "  ✗ Not in PATH: %s\n", name)
 	}
 
 	// Try platform-specific paths
 	paths := platformPaths()
-	debugInfo.WriteString(fmt.Sprintf("  Checking %d platform-specific paths:\n", len(paths)))
+	fmt.Fprintf(&debugInfo, "  Checking %d platform-specific paths:\n", len(paths))
 	for i, candidate := range paths {
 		if _, err := os.Stat(candidate); err == nil {
-			debugInfo.WriteString(fmt.Sprintf("    ✓ [%d] Found: %s\n", i+1, candidate))
+			fmt.Fprintf(&debugInfo, "    ✓ [%d] Found: %s\n", i+1, candidate)
 			return candidate, nil
 		}
-		debugInfo.WriteString(fmt.Sprintf("    ✗ [%d] Not found: %s\n", i+1, candidate))
+		fmt.Fprintf(&debugInfo, "    ✗ [%d] Not found: %s\n", i+1, candidate)
 	}
 	return "", buildDrawioNotFoundError(debugInfo.String())
 }
