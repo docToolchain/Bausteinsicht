@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/docToolchain/Bausteinsicht/internal/diagram"
 	"github.com/docToolchain/Bausteinsicht/internal/drawio"
 	"github.com/docToolchain/Bausteinsicht/internal/model"
 	bsync "github.com/docToolchain/Bausteinsicht/internal/sync"
@@ -17,17 +18,22 @@ import (
 )
 
 func newWatchCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "watch",
 		Short: "Watch model and diagram for changes and auto-sync",
 		Long:  "Watches the model and draw.io files for changes and automatically runs a sync cycle on each change.",
 		RunE:  runWatch,
 	}
+	cmd.Flags().Bool("mermaid", false, "Export Mermaid diagrams to Markdown file")
+	cmd.Flags().String("mermaid-output", "architecture.md", "Output file for Mermaid diagrams")
+	return cmd
 }
 
 func runWatch(cmd *cobra.Command, _ []string) error {
 	modelPath, _ := cmd.Flags().GetString("model")
 	templatePath, _ := cmd.Flags().GetString("template")
+	enableMermaid, _ := cmd.Flags().GetBool("mermaid")
+	mermaidOutput, _ := cmd.Flags().GetString("mermaid-output")
 
 	// Auto-detect model file.
 	if modelPath == "" {
@@ -65,7 +71,7 @@ func runWatch(cmd *cobra.Command, _ []string) error {
 		func(changedFile string) {
 			w.SetSyncing(true)
 			defer w.SetSyncing(false)
-			doSync(changedFile, modelPath, drawioPath, templatePath)
+			doSync(changedFile, modelPath, drawioPath, templatePath, enableMermaid, mermaidOutput)
 		},
 	)
 	if err != nil {
@@ -86,7 +92,7 @@ func runWatch(cmd *cobra.Command, _ []string) error {
 	return nil
 }
 
-func doSync(changedFile, modelPath, drawioPath, templatePath string) {
+func doSync(changedFile, modelPath, drawioPath, templatePath string, enableMermaid bool, mermaidOutput string) {
 	fmt.Printf("[%s] Sync triggered by %s\n", time.Now().Format("15:04:05"), changedFile)
 
 	dir := filepath.Dir(modelPath)
@@ -174,6 +180,27 @@ func doSync(changedFile, modelPath, drawioPath, templatePath string) {
 	if err := bsync.SaveState(statePath, newState); err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR saving sync state: %v\n", err)
 		return
+	}
+
+	// Export Mermaid diagrams if requested and sync succeeded
+	if enableMermaid {
+		viewKeys, diagrams, err := diagram.ExportAllViewsToMermaid(m)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "WARNING: Mermaid export failed: %v\n", err)
+		} else {
+			viewTitles := make(map[string]string)
+			for _, viewKey := range viewKeys {
+				if view, ok := m.Views[viewKey]; ok {
+					viewTitles[viewKey] = view.Title
+				}
+			}
+			markdownContent := diagram.WrapDiagramsInMarkdown(viewKeys, diagrams, viewTitles)
+			if err := os.WriteFile(mermaidOutput, []byte(markdownContent), 0o600); err != nil {
+				fmt.Fprintf(os.Stderr, "WARNING: Failed to write Mermaid file: %v\n", err)
+			} else {
+				fmt.Printf("[%s] Exporting Mermaid...     ✅ %s (%d views)\n", time.Now().Format("15:04:05"), mermaidOutput, len(viewKeys))
+			}
+		}
 	}
 
 	for _, w := range result.Warnings {

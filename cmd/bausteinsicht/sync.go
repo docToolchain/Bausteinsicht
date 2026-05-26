@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/docToolchain/Bausteinsicht/internal/diagram"
 	"github.com/docToolchain/Bausteinsicht/internal/drawio"
 	"github.com/docToolchain/Bausteinsicht/internal/model"
 	bsync "github.com/docToolchain/Bausteinsicht/internal/sync"
@@ -25,6 +26,8 @@ func newSyncCmd() *cobra.Command {
 		RunE:  runSync,
 	}
 	cmd.Flags().Bool("relayout", false, "Re-apply auto-layout to all view pages (resets element positions)")
+	cmd.Flags().Bool("mermaid", false, "Export Mermaid diagrams to Markdown file")
+	cmd.Flags().String("mermaid-output", "architecture.md", "Output file for Mermaid diagrams")
 	return cmd
 }
 
@@ -161,6 +164,31 @@ func runSync(cmd *cobra.Command, _ []string) error {
 	}
 	if err := bsync.SaveState(statePath, newState); err != nil {
 		return exitWithCode(fmt.Errorf("saving sync state: %w", err), 2)
+	}
+
+	// Export Mermaid diagrams if requested
+	enableMermaid, _ := cmd.Flags().GetBool("mermaid")
+	if enableMermaid {
+		mermaidOutput, _ := cmd.Flags().GetString("mermaid-output")
+		viewKeys, diagrams, err := diagram.ExportAllViewsToMermaid(m)
+		if err != nil {
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "WARNING: Mermaid export failed: %v\n", err)
+		} else {
+			viewTitles := make(map[string]string)
+			for _, viewKey := range viewKeys {
+				if view, ok := m.Views[viewKey]; ok {
+					viewTitles[viewKey] = view.Title
+				}
+			}
+			markdownContent := diagram.WrapDiagramsInMarkdown(viewKeys, diagrams, viewTitles)
+			if err := os.WriteFile(mermaidOutput, []byte(markdownContent), 0o600); err != nil {
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "WARNING: Failed to write Mermaid file: %v\n", err)
+			} else {
+				if verbose && format != "json" {
+					_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exporting Mermaid...     ✅ %s (%d views)\n", mermaidOutput, len(viewKeys))
+				}
+			}
+		}
 	}
 
 	// Verbose post-sync details to stderr.
