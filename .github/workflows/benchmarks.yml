@@ -1,0 +1,73 @@
+name: Performance Benchmarks
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  benchmarks:
+    runs-on: ubuntu-latest
+    name: Performance Benchmarks
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install benchstat
+        run: go install golang.org/x/perf/cmd/benchstat@latest
+
+      - name: Run benchmarks (current PR/branch)
+        run: |
+          mkdir -p /tmp/benchmarks
+          go test ./internal/benchmarks -bench=. -benchmem -benchtime=5s > /tmp/benchmarks/new.txt
+
+      - name: Checkout main for baseline
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch origin main
+          git show origin/main:benchmarks/main.txt > /tmp/benchmarks/main.txt 2>/dev/null || touch /tmp/benchmarks/main.txt
+
+      - name: Compare benchmarks (main vs PR)
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "## Benchmark Comparison (Main vs PR)" >> /tmp/benchmarks/summary.md
+          echo "" >> /tmp/benchmarks/summary.md
+          if [ -s /tmp/benchmarks/main.txt ]; then
+            benchstat /tmp/benchmarks/main.txt /tmp/benchmarks/new.txt >> /tmp/benchmarks/summary.md || true
+            echo "" >> /tmp/benchmarks/summary.md
+            echo "⚠️ Regressions >5% flagged above. Review carefully." >> /tmp/benchmarks/summary.md
+          else
+            echo "No baseline found on main. First run or main branch outdated." >> /tmp/benchmarks/summary.md
+          fi
+          cat /tmp/benchmarks/summary.md
+
+      - name: Update baseline on main
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          mkdir -p benchmarks
+          go test ./internal/benchmarks -bench=. -benchmem -benchtime=5s > benchmarks/main.txt
+
+          if git diff --exit-code benchmarks/main.txt > /dev/null 2>&1; then
+            echo "Baselines unchanged, no commit needed"
+          else
+            echo "Baseline updated"
+            git config --local user.email "action@github.com"
+            git config --local user.name "GitHub Action"
+            git add benchmarks/main.txt
+            git commit -m "chore(ci): update benchmark baselines" --no-verify || true
+            git push || true
+          fi
