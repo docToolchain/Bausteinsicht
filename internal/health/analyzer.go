@@ -199,7 +199,8 @@ func (a *Analyzer) scoreDeprecation(elems map[string]*model.Element) CategorySco
 	active := 0
 
 	for id, elem := range elems {
-		if elem.Status == model.StatusDeprecated {
+		switch elem.Status {
+		case model.StatusDeprecated:
 			deprecated++
 			findings = append(findings, Finding{
 				Category: CategoryDeprecation,
@@ -208,7 +209,7 @@ func (a *Analyzer) scoreDeprecation(elems map[string]*model.Element) CategorySco
 				Message:  fmt.Sprintf("element %q is marked as deprecated", id),
 				Elements: []string{id},
 			})
-		} else if elem.Status == model.StatusDeployed || elem.Status == "" {
+		case model.StatusDeployed, "":
 			active++
 		}
 	}
