@@ -42,7 +42,7 @@ func ApplyReverse(changes *ChangeSet, m *model.BausteinsichtModel) *ReverseResul
 		if swaps[relSwapKey{ch.From, ch.To, ch.Type}] {
 			continue // handled as part of a swap pair
 		}
-		applyRelationshipChange(ch, m, result)
+		applyRelationshipChange(ch, m, flatModel, result)
 	}
 
 	// Apply swaps: update direction in-place, preserving kind/label/description.
@@ -195,7 +195,7 @@ func applyElementChange(ch ElementChange, m *model.BausteinsichtModel, flatModel
 	}
 }
 
-func applyRelationshipChange(ch RelationshipChange, m *model.BausteinsichtModel, result *ReverseResult) {
+func applyRelationshipChange(ch RelationshipChange, m *model.BausteinsichtModel, flatModel map[string]*model.Element, result *ReverseResult) {
 	switch ch.Type {
 	case Modified:
 		updated := false
@@ -245,6 +245,18 @@ func applyRelationshipChange(ch RelationshipChange, m *model.BausteinsichtModel,
 		}
 
 	case Added:
+		// Validate that both endpoints exist in the model before adding (#329).
+		// Prevents stale relationships from old draw.io files being imported after model replacement.
+		if _, fromExists := flatModel[ch.From]; !fromExists {
+			result.Warnings = append(result.Warnings,
+				fmt.Sprintf("Relationship %q->%q rejected: From element %q does not exist in model", ch.From, ch.To, ch.From))
+			return
+		}
+		if _, toExists := flatModel[ch.To]; !toExists {
+			result.Warnings = append(result.Warnings,
+				fmt.Sprintf("Relationship %q->%q rejected: To element %q does not exist in model", ch.From, ch.To, ch.To))
+			return
+		}
 		m.Relationships = append(m.Relationships, model.Relationship{
 			From:  ch.From,
 			To:    ch.To,

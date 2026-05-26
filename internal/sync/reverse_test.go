@@ -291,7 +291,8 @@ func TestApplyReverse_EmptyTitleSkipped(t *testing.T) {
 }
 
 func TestApplyReverse_RelationshipAdded(t *testing.T) {
-	m := emptyModel()
+	m := modelWithRel("x", "y", "")
+	m.Relationships = []model.Relationship{} // clear the initial relationship for this test
 	cs := relChangeSet("x", "y", Added, "", "", "uses")
 
 	r := ApplyReverse(cs, m)
@@ -305,6 +306,33 @@ func TestApplyReverse_RelationshipAdded(t *testing.T) {
 	}
 	if r.RelationshipsCreated != 1 {
 		t.Errorf("expected RelationshipsCreated=1, got %d", r.RelationshipsCreated)
+	}
+	if len(r.Warnings) != 0 {
+		t.Errorf("unexpected warnings: %v", r.Warnings)
+	}
+}
+
+// TestApplyReverse_RelationshipAddedStaleElementsRejected verifies that
+// relationships referencing non-existent elements are rejected during reverse sync (#329).
+func TestApplyReverse_RelationshipAddedStaleElementsRejected(t *testing.T) {
+	m := modelWithRel("x", "y", "")
+	m.Relationships = []model.Relationship{} // clear the initial relationship for this test
+	cs := relChangeSet("nonexistent", "y", Added, "", "", "uses")
+
+	r := ApplyReverse(cs, m)
+
+	if len(m.Relationships) != 0 {
+		t.Fatalf("expected 0 relationships (stale rejected), got %d", len(m.Relationships))
+	}
+	if r.RelationshipsCreated != 0 {
+		t.Errorf("expected RelationshipsCreated=0, got %d", r.RelationshipsCreated)
+	}
+	if len(r.Warnings) == 0 {
+		t.Errorf("expected warning about stale relationship, got none")
+	}
+	warnText := strings.Join(r.Warnings, "; ")
+	if !strings.Contains(warnText, "nonexistent") || !strings.Contains(warnText, "does not exist") {
+		t.Errorf("expected warning mentioning non-existent element, got: %s", warnText)
 	}
 }
 
