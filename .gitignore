@@ -31,6 +31,10 @@ tmp/
 my-architecture/
 Simon-Brown-Demo/
 
+# Code coverage
+coverage/
+*.out
+
 # Claude Code (track project settings, ignore user-specific files)
 .claude/settings.local.json
 .claude/projects/
