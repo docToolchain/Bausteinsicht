@@ -1,10 +1,10 @@
-:jbake-title: ADR-006: Testing Strategy
+:jbake-title: ADR-007: Testing Strategy
 :jbake-type: page_toc
 :jbake-status: published
 :jbake-menu: Development
-:jbake-order: 6
+:jbake-order: 7
 
-= ADR-006: Testing Strategy — Unit/Integration/E2E Classification
+= ADR-007: Testing Strategy — Unit/Integration/E2E Classification
 
 == Status
 
