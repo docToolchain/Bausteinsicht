@@ -121,7 +121,7 @@ func formatGraphReport(result *graph.GraphAnalysis, cyclesOnly, showCentrality b
 		sb.WriteString("--------\n")
 		for _, comp := range result.Components {
 			if comp.IsCycle {
-				sb.WriteString(fmt.Sprintf("Component %d (CYCLE): %v\n", comp.ID+1, comp.Elements))
+				fmt.Fprintf(&sb, "Component %d (CYCLE): %v\n", comp.ID+1, comp.Elements)
 			}
 		}
 		sb.WriteString("\n")
@@ -149,8 +149,8 @@ func formatGraphReport(result *graph.GraphAnalysis, cyclesOnly, showCentrality b
 			if len(elemName) > 22 {
 				elemName = elemName[:19] + "..."
 			}
-			sb.WriteString(fmt.Sprintf("%-22s | %9d | %10d | %11.2f | %9.2f\n",
-				elemName, c.InDegree, c.OutDegree, c.Betweenness, c.Closeness))
+			fmt.Fprintf(&sb, "%-22s | %9d | %10d | %11.2f | %9.2f\n",
+				elemName, c.InDegree, c.OutDegree, c.Betweenness, c.Closeness)
 		}
 		sb.WriteString("\n")
 	}
