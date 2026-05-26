@@ -1,0 +1,57 @@
+name: Weekly Repository Maintenance
+
+on:
+  schedule:
+    - cron: '0 8 * * 1'  # Weekly Monday 8am UTC
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Clean up merged branches
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git fetch origin
+
+          # Delete local branches that are merged to main
+          DELETED_LOCAL=$(git branch -d $(git branch --merged origin/main | grep -v main | tr '\n' ' ') 2>&1 || echo "")
+
+          # List remote branches that should be deleted (already merged to main)
+          MERGED_REMOTE=$(git branch -r --merged origin/main | grep -v main | grep -v HEAD | sed 's|origin/||')
+
+          if [ ! -z "$MERGED_REMOTE" ]; then
+            echo "## 🧹 Auto-Cleanup Summary" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Merged branches ready for deletion:**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "$MERGED_REMOTE" | sed 's/^/- /' >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            BRANCH_LIST=$(echo "$MERGED_REMOTE" | tr '\n' ' ')
+
+            # Create issue for notification
+            gh issue create \
+              --title "🧹 Cleanup: Merged branches ready for deletion" \
+              --body "Found branches merged to main. Safe to delete:
+
+$(echo "$MERGED_REMOTE" | sed 's/^/- origin\//')
+
+**How to clean up:**
+\`\`\`bash
+git fetch origin
+git branch -d $(echo "$MERGED_REMOTE" | tr '\n' ' ')
+git push origin $(echo "$MERGED_REMOTE" | sed 's/^/--delete /' | tr '\n' ' ')
+\`\`\`
+
+Or delete individually in GitHub web UI: Settings → Branches" \
+              --label infrastructure \
+              2>/dev/null || echo "Issue creation skipped (may already exist)"
+          else
+            echo "✅ No merged branches to clean up" >> $GITHUB_STEP_SUMMARY
+          fi
