@@ -46,3 +46,4 @@ coverage/
 .$*.bkp
 /bausteinsicht-lsp
 /bausteinsicht-lsp.exe
+coverage/
