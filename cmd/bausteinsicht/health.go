@@ -102,8 +102,8 @@ func formatHealthReport(score *health.HealthScore, summaryOnly bool) string {
 	sb.WriteString(fmt.Sprintf("Views: %d\n\n", score.ViewCnt))
 
 	// Category scores
-	sb.WriteString(fmt.Sprintf("Category Scores\n"))
-	sb.WriteString(fmt.Sprintf("---------------\n"))
+	sb.WriteString("Category Scores\n")
+	sb.WriteString("---------------\n")
 	for _, cat := range score.Categories {
 		sb.WriteString(fmt.Sprintf("%s: %.1f/100 (weight: %.0f%%)\n", cat.Category, cat.Score, cat.Weight*100))
 		if cat.Details != "" {
@@ -113,8 +113,8 @@ func formatHealthReport(score *health.HealthScore, summaryOnly bool) string {
 
 	// Findings
 	if len(score.Categories) > 0 {
-		sb.WriteString(fmt.Sprintf("\nFindings\n"))
-		sb.WriteString(fmt.Sprintf("--------\n"))
+		sb.WriteString("\nFindings\n")
+		sb.WriteString("--------\n")
 
 		for _, cat := range score.Categories {
 			if len(cat.Findings) > 0 {
