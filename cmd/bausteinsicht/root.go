@@ -76,6 +76,7 @@ func NewRootCmd() *cobra.Command {
 	rootCmd.AddCommand(newWorkspaceCmd())
 	rootCmd.AddCommand(newHealthCmd())
 	rootCmd.AddCommand(newGraphCmd())
+	rootCmd.AddCommand(newOverlayCmd())
 
 	return rootCmd
 }
