@@ -6,7 +6,7 @@ DIST := dist
         build_windows_amd64 build_windows_arm64 \
         schema-generate schema-validate \
         build-extension package-extension \
-        test test-race bench vet staticcheck gosec nilaway govulncheck \
+        test test-race bench vet staticcheck gosec nilaway govulncheck deadcode \
         gitleaks golangci-lint check clean install-tools install-hooks
 
 # Ensure GOPATH/bin is in PATH for installed tools
@@ -107,6 +107,11 @@ nilaway:
 govulncheck:
 	govulncheck ./...
 
+# deadcode — dead code detector (report only, does not fail)
+deadcode:
+	deadcode ./... || true
+	@echo "✅ Deadcode scan complete"
+
 # gitleaks — scan for secrets
 gitleaks:
 	gitleaks detect --source . --no-git
@@ -121,6 +126,7 @@ install-tools:
 	go install github.com/securego/gosec/v2/cmd/gosec@latest
 	go install go.uber.org/nilaway/cmd/nilaway@latest
 	go install golang.org/x/vuln/cmd/govulncheck@latest
+	go install golang.org/x/tools/cmd/deadcode@latest
 	@echo "Install golangci-lint via: https://golangci-lint.run/welcome/install/"
 	@echo "Install gitleaks via: https://github.com/gitleaks/gitleaks#installing"
 
