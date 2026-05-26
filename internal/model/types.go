@@ -111,9 +111,17 @@ type Constraint struct {
 	Technologies []string `json:"technologies,omitempty"`
 }
 
+// TagDefinition describes a tag with optional styling for draw.io rendering.
+type TagDefinition struct {
+	ID          string                 `json:"id"`
+	Description string                 `json:"description,omitempty"`
+	Style       map[string]interface{} `json:"style,omitempty"` // draw.io style properties (fillColor, strokeColor, etc.)
+}
+
 type Specification struct {
 	Elements      map[string]ElementKind      `json:"elements"`
 	Relationships map[string]RelationshipKind `json:"relationships,omitempty"`
+	Tags          []TagDefinition            `json:"tags,omitempty"` // Tag definitions with optional styling
 }
 
 type ElementKind struct {
@@ -152,6 +160,8 @@ type View struct {
 	Scope       string   `json:"scope,omitempty"`
 	Include     []string `json:"include,omitempty"`
 	Exclude     []string `json:"exclude,omitempty"`
+	FilterTags  []string `json:"filter-tags,omitempty"` // Include only elements with ALL of these tags
+	ExcludeTags []string `json:"exclude-tags,omitempty"` // Exclude elements with ANY of these tags
 	Description string   `json:"description,omitempty"`
 	Layout      string   `json:"layout,omitempty"`
 }

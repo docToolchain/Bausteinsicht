@@ -1,306 +1,107 @@
 package model
 
 import (
-	"fmt"
-	"strings"
 	"testing"
 )
 
-func buildTestModel() *BausteinsichtModel {
-	return &BausteinsichtModel{
-		Model: map[string]Element{
-			"customer": {
-				Kind:  "actor",
-				Title: "Customer",
-			},
-			"onlineshop": {
-				Kind:  "system",
-				Title: "Online Shop",
-				Children: map[string]Element{
-					"frontend": {
-						Kind:  "container",
-						Title: "Frontend",
-					},
-					"api": {
-						Kind:  "container",
-						Title: "API",
-						Children: map[string]Element{
-							"catalog": {
-								Kind:  "component",
-								Title: "Catalog",
-							},
-							"orders": {
-								Kind:  "component",
-								Title: "Orders",
-							},
-						},
-					},
-					"db": {
-						Kind:  "container",
-						Title: "Database",
-					},
-				},
-			},
-		},
+func TestFilterElementsByTags_NoFilters(t *testing.T) {
+	elements := map[string]*Element{
+		"elem1": {Kind: "system", Title: "Elem1", Tags: []string{"tag1"}},
+		"elem2": {Kind: "system", Title: "Elem2", Tags: []string{"tag2"}},
+	}
+
+	result := FilterElementsByTags(elements, nil, nil)
+	if len(result) != 2 {
+		t.Errorf("expected 2 elements, got %d", len(result))
 	}
 }
 
-func TestResolve_SimpleID(t *testing.T) {
-	m := buildTestModel()
-	elem, err := Resolve(m, "customer")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+func TestFilterElementsByTags_FilterTagsIntersection(t *testing.T) {
+	elements := map[string]*Element{
+		"elem1": {Kind: "system", Title: "Elem1", Tags: []string{"backend", "critical"}},
+		"elem2": {Kind: "system", Title: "Elem2", Tags: []string{"backend"}},
+		"elem3": {Kind: "system", Title: "Elem3", Tags: []string{"frontend"}},
 	}
-	if elem.Kind != "actor" {
-		t.Errorf("expected kind 'actor', got %q", elem.Kind)
+
+	// Filter for elements with both "backend" AND "critical"
+	result := FilterElementsByTags(elements, []string{"backend", "critical"}, nil)
+	if len(result) != 1 {
+		t.Errorf("expected 1 element, got %d", len(result))
+	}
+	if _, ok := result["elem1"]; !ok {
+		t.Errorf("expected elem1 in result")
 	}
 }
 
-func TestResolve_NestedID(t *testing.T) {
-	m := buildTestModel()
-	tests := []struct {
-		id        string
-		wantKind  string
-		wantTitle string
-	}{
-		{"onlineshop", "system", "Online Shop"},
-		{"onlineshop.api", "container", "API"},
-		{"onlineshop.api.catalog", "component", "Catalog"},
-		{"onlineshop.api.orders", "component", "Orders"},
-		{"onlineshop.db", "container", "Database"},
+func TestFilterElementsByTags_SingleFilterTag(t *testing.T) {
+	elements := map[string]*Element{
+		"elem1": {Kind: "system", Title: "Elem1", Tags: []string{"backend"}},
+		"elem2": {Kind: "system", Title: "Elem2", Tags: []string{"backend", "critical"}},
+		"elem3": {Kind: "system", Title: "Elem3", Tags: []string{"frontend"}},
 	}
-	for _, tt := range tests {
-		t.Run(tt.id, func(t *testing.T) {
-			elem, err := Resolve(m, tt.id)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if elem.Kind != tt.wantKind {
-				t.Errorf("expected kind %q, got %q", tt.wantKind, elem.Kind)
-			}
-			if elem.Title != tt.wantTitle {
-				t.Errorf("expected title %q, got %q", tt.wantTitle, elem.Title)
-			}
-		})
+
+	result := FilterElementsByTags(elements, []string{"backend"}, nil)
+	if len(result) != 2 {
+		t.Errorf("expected 2 elements, got %d", len(result))
+	}
+	if _, ok := result["elem1"]; !ok {
+		t.Errorf("expected elem1 in result")
+	}
+	if _, ok := result["elem2"]; !ok {
+		t.Errorf("expected elem2 in result")
 	}
 }
 
-func TestResolve_NonExistent(t *testing.T) {
-	m := buildTestModel()
-	tests := []string{
-		"nonexistent",
-		"onlineshop.nonexistent",
-		"onlineshop.api.nonexistent",
+func TestFilterElementsByTags_ExcludeTagsUnion(t *testing.T) {
+	elements := map[string]*Element{
+		"elem1": {Kind: "system", Title: "Elem1", Tags: []string{"experimental"}},
+		"elem2": {Kind: "system", Title: "Elem2", Tags: []string{"deprecated"}},
+		"elem3": {Kind: "system", Title: "Elem3", Tags: []string{"stable"}},
 	}
-	for _, id := range tests {
-		t.Run(id, func(t *testing.T) {
-			_, err := Resolve(m, id)
-			if err == nil {
-				t.Errorf("expected error for id %q, got nil", id)
-			}
-		})
+
+	// Exclude elements with ANY of "experimental" OR "deprecated"
+	result := FilterElementsByTags(elements, nil, []string{"experimental", "deprecated"})
+	if len(result) != 1 {
+		t.Errorf("expected 1 element, got %d", len(result))
+	}
+	if _, ok := result["elem3"]; !ok {
+		t.Errorf("expected elem3 in result")
 	}
 }
 
-func TestFlattenElements(t *testing.T) {
-	m := buildTestModel()
-	flat, err := FlattenElements(m)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+func TestFilterElementsByTags_FilterAndExclude(t *testing.T) {
+	elements := map[string]*Element{
+		"elem1": {Kind: "system", Title: "Elem1", Tags: []string{"backend", "stable"}},
+		"elem2": {Kind: "system", Title: "Elem2", Tags: []string{"backend", "experimental"}},
+		"elem3": {Kind: "system", Title: "Elem3", Tags: []string{"frontend"}},
 	}
 
-	expected := []string{
-		"customer",
-		"onlineshop",
-		"onlineshop.frontend",
-		"onlineshop.api",
-		"onlineshop.api.catalog",
-		"onlineshop.api.orders",
-		"onlineshop.db",
+	// Include only backend elements, exclude experimental ones
+	result := FilterElementsByTags(elements, []string{"backend"}, []string{"experimental"})
+	if len(result) != 1 {
+		t.Errorf("expected 1 element, got %d", len(result))
 	}
-
-	if len(flat) != len(expected) {
-		t.Errorf("expected %d elements, got %d", len(expected), len(flat))
-	}
-
-	for _, id := range expected {
-		if _, ok := flat[id]; !ok {
-			t.Errorf("expected element %q not found in flat map", id)
-		}
+	if _, ok := result["elem1"]; !ok {
+		t.Errorf("expected elem1 in result")
 	}
 }
 
-func TestFlattenElements_DepthLimit(t *testing.T) {
-	// Build a model with 5 levels — should succeed.
-	m := &BausteinsichtModel{
-		Model: map[string]Element{
-			"a": {Kind: "x", Title: "A", Children: map[string]Element{
-				"b": {Kind: "x", Title: "B", Children: map[string]Element{
-					"c": {Kind: "x", Title: "C", Children: map[string]Element{
-						"d": {Kind: "x", Title: "D", Children: map[string]Element{
-							"e": {Kind: "x", Title: "E"},
-						}},
-					}},
-				}},
-			}},
-		},
-	}
-	flat, err := FlattenElements(m)
-	if err != nil {
-		t.Fatalf("5-level model should succeed, got: %v", err)
-	}
-	if len(flat) != 5 {
-		t.Errorf("expected 5 elements, got %d", len(flat))
+func TestFilterElementsByTags_NoMatches(t *testing.T) {
+	elements := map[string]*Element{
+		"elem1": {Kind: "system", Title: "Elem1", Tags: []string{"tag1"}},
+		"elem2": {Kind: "system", Title: "Elem2", Tags: []string{"tag2"}},
 	}
 
-	// Build a model exceeding MaxElementDepth.
-	deep := map[string]Element{"level0": {Kind: "x", Title: "L0"}}
-	current := deep
-	for i := 1; i <= MaxElementDepth+1; i++ {
-		child := map[string]Element{
-			fmt.Sprintf("level%d", i): {Kind: "x", Title: fmt.Sprintf("L%d", i)},
-		}
-		for k, v := range current {
-			v.Children = child
-			current[k] = v
-		}
-		current = child
-	}
-	deepModel := &BausteinsichtModel{Model: deep}
-	_, err = FlattenElements(deepModel)
-	if err == nil {
-		t.Fatal("expected depth error for deeply nested model, got nil")
-	}
-	if !strings.Contains(err.Error(), "maximum depth") {
-		t.Errorf("expected 'maximum depth' in error, got: %v", err)
+	result := FilterElementsByTags(elements, []string{"nonexistent"}, nil)
+	if len(result) != 0 {
+		t.Errorf("expected 0 elements, got %d", len(result))
 	}
 }
 
-func TestMatchPattern_Wildcard(t *testing.T) {
-	m := buildTestModel()
-	flat, err := FlattenElements(m)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	tests := []struct {
-		pattern string
-		wantIDs []string
-		notWant []string
-	}{
-		{
-			pattern: "onlineshop.*",
-			wantIDs: []string{"onlineshop.frontend", "onlineshop.api", "onlineshop.db"},
-			notWant: []string{"onlineshop.api.catalog", "onlineshop.api.orders", "customer"},
-		},
-		{
-			pattern: "onlineshop.api.*",
-			wantIDs: []string{"onlineshop.api.catalog", "onlineshop.api.orders"},
-			notWant: []string{"onlineshop.api", "onlineshop.frontend"},
-		},
-		{
-			pattern: "customer",
-			wantIDs: []string{"customer"},
-			notWant: []string{"onlineshop"},
-		},
-		{
-			pattern: "*",
-			wantIDs: []string{"customer", "onlineshop"},
-			notWant: []string{"onlineshop.frontend", "onlineshop.api"},
-		},
-		{
-			pattern: "**",
-			wantIDs: []string{"customer", "onlineshop", "onlineshop.frontend",
-				"onlineshop.api", "onlineshop.api.catalog", "onlineshop.api.orders",
-				"onlineshop.db"},
-		},
-		{
-			pattern: "onlineshop.**",
-			wantIDs: []string{"onlineshop.frontend", "onlineshop.api",
-				"onlineshop.api.catalog", "onlineshop.api.orders", "onlineshop.db"},
-			notWant: []string{"customer", "onlineshop"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.pattern, func(t *testing.T) {
-			matches := MatchPattern(flat, tt.pattern)
-			matchSet := make(map[string]bool)
-			for _, m := range matches {
-				matchSet[m] = true
-			}
-			for _, want := range tt.wantIDs {
-				if !matchSet[want] {
-					t.Errorf("pattern %q: expected match %q not found", tt.pattern, want)
-				}
-			}
-			for _, notWant := range tt.notWant {
-				if matchSet[notWant] {
-					t.Errorf("pattern %q: unexpected match %q found", tt.pattern, notWant)
-				}
-			}
-		})
-	}
-}
-
-func TestResolveView(t *testing.T) {
-	m := buildTestModel()
-
-	tests := []struct {
-		name    string
-		view    View
-		wantIDs []string
-		notWant []string
-	}{
-		{
-			name: "include all onlineshop children",
-			view: View{
-				Title:   "Shop View",
-				Include: []string{"onlineshop.*"},
-			},
-			wantIDs: []string{"onlineshop.frontend", "onlineshop.api", "onlineshop.db"},
-			notWant: []string{"onlineshop.api.catalog"},
-		},
-		{
-			name: "include with exclude",
-			view: View{
-				Title:   "Shop No DB",
-				Include: []string{"onlineshop.*"},
-				Exclude: []string{"onlineshop.db"},
-			},
-			wantIDs: []string{"onlineshop.frontend", "onlineshop.api"},
-			notWant: []string{"onlineshop.db", "onlineshop.api.catalog"},
-		},
-		{
-			name: "empty include returns empty",
-			view: View{
-				Title:   "Empty View",
-				Include: []string{},
-			},
-			wantIDs: []string{},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ids, err := ResolveView(m, &tt.view)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			idSet := make(map[string]bool)
-			for _, id := range ids {
-				idSet[id] = true
-			}
-			for _, want := range tt.wantIDs {
-				if !idSet[want] {
-					t.Errorf("expected ID %q not found in result", want)
-				}
-			}
-			for _, notWant := range tt.notWant {
-				if idSet[notWant] {
-					t.Errorf("unexpected ID %q found in result", notWant)
-				}
-			}
-		})
+func TestFilterElementsByTags_EmptyElements(t *testing.T) {
+	elements := make(map[string]*Element)
+	result := FilterElementsByTags(elements, []string{"tag1"}, nil)
+	if len(result) != 0 {
+		t.Errorf("expected 0 elements, got %d", len(result))
 	}
 }

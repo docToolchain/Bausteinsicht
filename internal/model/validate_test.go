@@ -467,3 +467,72 @@ func findSubstring(s, substr string) bool {
 	}
 	return false
 }
+
+func TestValidate_ViewWithValidFilterTags(t *testing.T) {
+	m := buildValidModel()
+	m.Specification.Tags = []TagDefinition{
+		{ID: "backend", Description: "Backend components"},
+		{ID: "frontend", Description: "Frontend components"},
+	}
+	m.Views["filtered"] = View{
+		Title:      "Filtered View",
+		FilterTags: []string{"backend"},
+	}
+
+	errs := Validate(m)
+	for _, e := range errs {
+		if strings.Contains(e.Path, "filter-tags") {
+			t.Errorf("should not report error for valid filter-tags, got: %v", e)
+		}
+	}
+}
+
+func TestValidate_ViewWithInvalidFilterTag(t *testing.T) {
+	m := buildValidModel()
+	m.Specification.Tags = []TagDefinition{
+		{ID: "backend", Description: "Backend components"},
+	}
+	m.Views["filtered"] = View{
+		Title:      "Filtered View",
+		FilterTags: []string{"nonexistent"},
+	}
+
+	errs := Validate(m)
+	if !containsPath(errs, "views.filtered.filter-tags") {
+		t.Errorf("expected error for views.filtered.filter-tags, got %v", errs)
+	}
+}
+
+func TestValidate_ViewWithValidExcludeTags(t *testing.T) {
+	m := buildValidModel()
+	m.Specification.Tags = []TagDefinition{
+		{ID: "experimental", Description: "Experimental components"},
+	}
+	m.Views["filtered"] = View{
+		Title:       "Filtered View",
+		ExcludeTags: []string{"experimental"},
+	}
+
+	errs := Validate(m)
+	for _, e := range errs {
+		if strings.Contains(e.Path, "exclude-tags") {
+			t.Errorf("should not report error for valid exclude-tags, got: %v", e)
+		}
+	}
+}
+
+func TestValidate_ViewWithInvalidExcludeTag(t *testing.T) {
+	m := buildValidModel()
+	m.Specification.Tags = []TagDefinition{
+		{ID: "experimental", Description: "Experimental components"},
+	}
+	m.Views["filtered"] = View{
+		Title:       "Filtered View",
+		ExcludeTags: []string{"nonexistent"},
+	}
+
+	errs := Validate(m)
+	if !containsPath(errs, "views.filtered.exclude-tags") {
+		t.Errorf("expected error for views.filtered.exclude-tags, got %v", errs)
+	}
+}
