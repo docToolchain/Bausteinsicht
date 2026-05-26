@@ -1,0 +1,114 @@
+- generic [active] [ref=e1]:
+  - banner:
+    - navigation [ref=e2]:
+      - link "docToolchain Bausteinsicht" [ref=e3] [cursor=pointer]:
+        - /url: index.html
+        - img "docToolchain" [ref=e5]
+        - text: Bausteinsicht
+      - list [ref=e7]:
+        - listitem
+        - listitem [ref=e8]:
+          - link "Architecture" [ref=e9] [cursor=pointer]:
+            - /url: arc42/chapters/01_introduction_and_goals.html
+        - listitem [ref=e10]:
+          - link "Specification" [ref=e11] [cursor=pointer]:
+            - /url: spec/01_use_cases.html
+        - listitem [ref=e12]:
+          - link "Development" [ref=e13] [cursor=pointer]:
+            - /url: arc42/ADRs/ADR-001-DSL-Format.html
+        - listitem [ref=e14]:
+          - link "PRD" [ref=e15] [cursor=pointer]:
+            - /url: PRD/PRD-001-Bausteinsicht.html
+        - listitem [ref=e16]:
+          - link "spec" [ref=e17] [cursor=pointer]:
+            - /url: spec/07_trust_model.html
+      - searchbox "Search this site…" [ref=e20]
+  - generic [ref=e21]:
+    - main [ref=e24]:
+      - generic [ref=e25]:
+        - heading "Bausteinsicht" [level=1] [ref=e26]
+        - paragraph [ref=e27]: Architecture-as-Code meets draw.io
+        - paragraph [ref=e28]: Maintain your software architecture in a structured JSON model and visualize it in draw.io — with full bidirectional synchronization. No more outdated diagrams.
+        - paragraph [ref=e29]:
+          - link "Get Started" [ref=e30] [cursor=pointer]:
+            - /url: https://github.com/rdmueller/Bauteinsicht
+          - link "Architecture Docs" [ref=e31] [cursor=pointer]:
+            - /url: arc42/chapters/01_introduction_and_goals.html
+      - heading "What makes Bausteinsicht different?" [level=2] [ref=e32]
+      - generic [ref=e33]:
+        - generic [ref=e36]:
+          - heading "🔄 Bidirectional Sync" [level=4] [ref=e37]
+          - paragraph [ref=e38]: Edit in draw.io or in the JSON model — changes sync both ways. No more "which diagram is the latest version?" questions. Your model stays in sync with your diagrams automatically.
+        - generic [ref=e41]:
+          - heading "🎨 draw.io as Frontend" [level=4] [ref=e42]
+          - paragraph [ref=e43]: No proprietary viewer needed. Use the tool everyone already knows. Full control over styling via draw.io templates. Your diagrams look exactly the way you want them.
+        - generic [ref=e46]:
+          - heading "🤖 LLM-Friendly" [level=4] [ref=e47]
+          - paragraph [ref=e48]: JSON model format that LLMs read and write natively. CLI commands let AI agents modify your architecture. IDE autocompletion via JSON Schema — no plugin needed.
+        - generic [ref=e51]:
+          - heading "🛠 Flexible Hierarchy" [level=4] [ref=e52]
+          - paragraph [ref=e53]: Not limited to 4 C4 levels. Define your own element kinds. Components of components? No problem. Your architecture, your rules.
+      - generic [ref=e54]:
+        - heading "How it works" [level=3] [ref=e55]
+        - generic [ref=e56]:
+          - generic [ref=e58]:
+            - generic [ref=e59]:
+              - heading "1. Define your model" [level=5] [ref=e60]
+              - text: JSON with IDE support
+            - code [ref=e63]: "{ \"model\": { \"webshop\": { \"kind\": \"system\", \"title\": \"Webshop\", \"children\": { \"api\": { \"kind\": \"container\", \"title\": \"REST API\", \"technology\": \"Spring Boot\" } } } } }"
+          - generic [ref=e65]:
+            - generic [ref=e66]:
+              - heading "2. Sync and visualize" [level=5] [ref=e67]
+              - text: Single binary CLI
+            - code [ref=e70]: "# Sync model to draw.io bausteinsicht sync # Watch for changes bausteinsicht watch # Let AI modify architecture bausteinsicht add element --id cache --kind container --title \"Redis Cache\" # Validate model bausteinsicht validate"
+      - generic [ref=e71]:
+        - heading "Inspired by the best, built for draw.io" [level=4] [ref=e72]
+        - paragraph [ref=e73]:
+          - text: Bausteinsicht takes the best ideas from
+          - strong [ref=e74]: Structurizr
+          - text: and
+          - strong [ref=e75]: LikeC4
+          - text: and combines them with the world's most popular free diagramming tool.
+      - generic [ref=e76]:
+        - heading "Ready to structure your architecture?" [level=3] [ref=e77]
+        - paragraph [ref=e78]:
+          - link "View on GitHub" [ref=e79] [cursor=pointer]:
+            - /url: https://github.com/rdmueller/Bauteinsicht
+          - link "Specification" [ref=e80] [cursor=pointer]:
+            - /url: spec/01_use_cases.html
+          - link "Product Requirements" [ref=e81] [cursor=pointer]:
+            - /url: PRD/PRD-001-Bausteinsicht.html
+    - contentinfo [ref=e82]:
+      - generic [ref=e84]:
+        - list [ref=e86]:
+          - listitem "User mailing list" [ref=e87]:
+            - link "" [ref=e88] [cursor=pointer]:
+              - /url: mailto:##footer-email##
+              - generic [ref=e89]: 
+          - listitem "Twitter" [ref=e90]:
+            - link "" [ref=e91] [cursor=pointer]:
+              - /url: "##twitter-url##"
+              - generic [ref=e92]: 
+          - listitem "Stack Overflow" [ref=e93]:
+            - link "" [ref=e94] [cursor=pointer]:
+              - /url: "##Stackoverflow-url##"
+              - generic [ref=e95]: 
+        - list [ref=e97]:
+          - listitem "GitHub" [ref=e98]:
+            - link "" [ref=e99] [cursor=pointer]:
+              - /url: "##Github-url##"
+              - generic [ref=e100]: 
+          - listitem "Slack" [ref=e101]:
+            - link "" [ref=e102] [cursor=pointer]:
+              - /url: "##Slack-url##"
+              - generic [ref=e103]: 
+        - generic [ref=e105]:
+          - text: built with
+          - link "docToolchain" [ref=e106] [cursor=pointer]:
+            - /url: https://doctoolchain.org
+          - text: and
+          - link "jBake" [ref=e107] [cursor=pointer]:
+            - /url: https://jbake.org
+          - text: "theme:"
+          - link "docsy" [ref=e108] [cursor=pointer]:
+            - /url: https://www.docsy.dev/
