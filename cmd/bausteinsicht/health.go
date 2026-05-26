@@ -97,31 +97,31 @@ func formatHealthReport(score *health.HealthScore, summaryOnly bool) string {
 	// Model stats
 	sb.WriteString("Model Statistics\n")
 	sb.WriteString("----------------\n")
-	sb.WriteString(fmt.Sprintf("Elements: %d\n", score.ElementCnt))
-	sb.WriteString(fmt.Sprintf("Relationships: %d\n", score.RelCnt))
-	sb.WriteString(fmt.Sprintf("Views: %d\n\n", score.ViewCnt))
+	fmt.Fprintf(&sb, "Elements: %d\n", score.ElementCnt)
+	fmt.Fprintf(&sb, "Relationships: %d\n", score.RelCnt)
+	fmt.Fprintf(&sb, "Views: %d\n\n", score.ViewCnt)
 
 	// Category scores
-	sb.WriteString(fmt.Sprintf("Category Scores\n"))
-	sb.WriteString(fmt.Sprintf("---------------\n"))
+	sb.WriteString("Category Scores\n")
+	sb.WriteString("---------------\n")
 	for _, cat := range score.Categories {
-		sb.WriteString(fmt.Sprintf("%s: %.1f/100 (weight: %.0f%%)\n", cat.Category, cat.Score, cat.Weight*100))
+		fmt.Fprintf(&sb, "%s: %.1f/100 (weight: %.0f%%)\n", cat.Category, cat.Score, cat.Weight*100)
 		if cat.Details != "" {
-			sb.WriteString(fmt.Sprintf("  Details: %s\n", cat.Details))
+			fmt.Fprintf(&sb, "  Details: %s\n", cat.Details)
 		}
 	}
 
 	// Findings
 	if len(score.Categories) > 0 {
-		sb.WriteString(fmt.Sprintf("\nFindings\n"))
-		sb.WriteString(fmt.Sprintf("--------\n"))
+		sb.WriteString("\nFindings\n")
+		sb.WriteString("--------\n")
 
 		for _, cat := range score.Categories {
 			if len(cat.Findings) > 0 {
-				sb.WriteString(fmt.Sprintf("\n%s (%d findings):\n", cat.Category, len(cat.Findings)))
+				fmt.Fprintf(&sb, "\n%s (%d findings):\n", cat.Category, len(cat.Findings))
 				for _, f := range cat.Findings {
-					sb.WriteString(fmt.Sprintf("  [%s] %s\n", f.Severity, f.Title))
-					sb.WriteString(fmt.Sprintf("         %s\n", f.Message))
+					fmt.Fprintf(&sb, "  [%s] %s\n", f.Severity, f.Title)
+					fmt.Fprintf(&sb, "         %s\n", f.Message)
 				}
 			}
 		}

@@ -95,7 +95,7 @@ func formatGraphReport(result *graph.GraphAnalysis, cyclesOnly, showCentrality b
 		fmt.Fprintf(&sb, "Cycles Found: %d\n", len(result.Cycles))
 		sb.WriteString("--------\n")
 		for idx, cycle := range result.Cycles {
-			sb.WriteString(fmt.Sprintf("Cycle %d (length %d): %s\n", idx+1, cycle.Length, strings.Join(cycle.Elements, " → ")))
+			fmt.Fprintf(&sb, "Cycle %d (length %d): %s\n", idx+1, cycle.Length, strings.Join(cycle.Elements, " → "))
 		}
 		sb.WriteString("\n")
 	} else {
@@ -114,14 +114,14 @@ func formatGraphReport(result *graph.GraphAnalysis, cyclesOnly, showCentrality b
 				cycleCount++
 			}
 		}
-		sb.WriteString(fmt.Sprintf("Strongly Connected Components: %d\n", len(result.Components)))
+		fmt.Fprintf(&sb, "Strongly Connected Components: %d\n", len(result.Components))
 		if cycleCount > 0 {
-			sb.WriteString(fmt.Sprintf("  (includes %d cycle(s))\n", cycleCount))
+			fmt.Fprintf(&sb, "  (includes %d cycle(s))\n", cycleCount)
 		}
 		sb.WriteString("--------\n")
 		for _, comp := range result.Components {
 			if comp.IsCycle {
-				sb.WriteString(fmt.Sprintf("Component %d (CYCLE): %v\n", comp.ID+1, comp.Elements))
+				fmt.Fprintf(&sb, "Component %d (CYCLE): %v\n", comp.ID+1, comp.Elements)
 			}
 		}
 		sb.WriteString("\n")
@@ -149,8 +149,8 @@ func formatGraphReport(result *graph.GraphAnalysis, cyclesOnly, showCentrality b
 			if len(elemName) > 22 {
 				elemName = elemName[:19] + "..."
 			}
-			sb.WriteString(fmt.Sprintf("%-22s | %9d | %10d | %11.2f | %9.2f\n",
-				elemName, c.InDegree, c.OutDegree, c.Betweenness, c.Closeness))
+			fmt.Fprintf(&sb, "%-22s | %9d | %10d | %11.2f | %9.2f\n",
+				elemName, c.InDegree, c.OutDegree, c.Betweenness, c.Closeness)
 		}
 		sb.WriteString("\n")
 	}

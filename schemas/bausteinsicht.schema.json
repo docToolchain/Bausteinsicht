@@ -184,6 +184,12 @@
     },
     "Relationship": {
       "properties": {
+        "cardinality": {
+          "type": "string"
+        },
+        "dataFlow": {
+          "type": "string"
+        },
         "decisions": {
           "items": {
             "type": "string"

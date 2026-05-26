@@ -35,9 +35,7 @@ type GraphAnalysis struct {
 
 // NodeInfo holds temporary computation data for graph algorithms.
 type NodeInfo struct {
-	index     int
-	lowlink   int
-	onStack   bool
-	inDegree  int
-	outDegree int
+	index   int
+	lowlink int
+	onStack bool
 }
