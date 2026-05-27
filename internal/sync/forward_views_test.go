@@ -49,6 +49,30 @@ func docWithViewPages() *drawio.Document {
 	return doc
 }
 
+// shopContainersDoc returns a document with a single containers view page for shop tests.
+func shopContainersDoc() *drawio.Document {
+	doc := drawio.NewDocument()
+	doc.AddPage("view-containers", "Container View")
+	return doc
+}
+
+// shopModel returns a model with a shop system scope and a containers view.
+// children defines the direct children of the shop element.
+func shopModel(children map[string]model.Element) *model.BausteinsichtModel {
+	return &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"shop": {Kind: "system", Title: "Shop", Children: children},
+		},
+		Views: map[string]model.View{
+			"containers": {
+				Title:   "Container View",
+				Scope:   "shop",
+				Include: []string{"shop.*"},
+			},
+		},
+	}
+}
+
 // TestApplyForward_ElementOnCorrectViewPage verifies that elements are placed
 // on the page corresponding to their view, not all on the first page.
 func TestApplyForward_ElementOnCorrectViewPage(t *testing.T) {
@@ -427,25 +451,12 @@ func TestApplyForward_ScopeBoundingBox(t *testing.T) {
 // elements placed inside a scope boundary receive coordinates relative to the
 // parent boundary cell, not absolute page coordinates. Regression test for #330.
 func TestApplyForward_ChildElementsUseRelativeCoordinates(t *testing.T) {
-	doc := drawio.NewDocument()
-	doc.AddPage("view-containers", "Container View")
+	doc := shopContainersDoc()
 	ts := minimalTemplates(t)
-
-	m := &model.BausteinsichtModel{
-		Model: map[string]model.Element{
-			"shop": {Kind: "system", Title: "Shop", Children: map[string]model.Element{
-				"api": {Kind: "container", Title: "API"},
-				"db":  {Kind: "container", Title: "DB"},
-			}},
-		},
-		Views: map[string]model.View{
-			"containers": {
-				Title:   "Container View",
-				Scope:   "shop",
-				Include: []string{"shop.*"},
-			},
-		},
-	}
+	m := shopModel(map[string]model.Element{
+		"api": {Kind: "container", Title: "API"},
+		"db":  {Kind: "container", Title: "DB"},
+	})
 
 	cs := &ChangeSet{
 		ModelElementChanges: []ElementChange{
@@ -490,27 +501,14 @@ func TestApplyForward_ChildElementsUseRelativeCoordinates(t *testing.T) {
 // are added incrementally to an existing scope boundary that is too small, the
 // boundary is expanded to contain all child elements (#330).
 func TestApplyForward_ScopeBoundaryExpandsForManyChildren(t *testing.T) {
-	doc := drawio.NewDocument()
-	doc.AddPage("view-containers", "Container View")
+	doc := shopContainersDoc()
 	ts := minimalTemplates(t)
-
-	m := &model.BausteinsichtModel{
-		Model: map[string]model.Element{
-			"shop": {Kind: "system", Title: "Shop", Children: map[string]model.Element{
-				"a": {Kind: "container", Title: "A"},
-				"b": {Kind: "container", Title: "B"},
-				"c": {Kind: "container", Title: "C"},
-				"d": {Kind: "container", Title: "D"},
-			}},
-		},
-		Views: map[string]model.View{
-			"containers": {
-				Title:   "Container View",
-				Scope:   "shop",
-				Include: []string{"shop.*"},
-			},
-		},
-	}
+	m := shopModel(map[string]model.Element{
+		"a": {Kind: "container", Title: "A"},
+		"b": {Kind: "container", Title: "B"},
+		"c": {Kind: "container", Title: "C"},
+		"d": {Kind: "container", Title: "D"},
+	})
 
 	// First sync: adds one child via the fresh-page layout engine so the page
 	// becomes non-fresh for subsequent syncs.
