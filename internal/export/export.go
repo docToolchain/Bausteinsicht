@@ -3,6 +3,7 @@
 package export
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -30,18 +31,46 @@ var platformPaths = platformDrawioPaths
 //  2. "drawio" — on PATH (Linux package install)
 //  3. Platform-native install paths (Windows, macOS) via platformPaths()
 func DetectDrawioBinary() (string, error) {
+	var searched strings.Builder
+
+	// Try PATH first
 	for _, name := range []string{"drawio-export", "drawio"} {
 		path, err := exec.LookPath(name)
 		if err == nil {
 			return path, nil
 		}
+		fmt.Fprintf(&searched, "  PATH: %s not found\n", name)
 	}
+
+	// Try platform-specific paths
 	for _, candidate := range platformPaths() {
 		if _, err := os.Stat(candidate); err == nil {
 			return candidate, nil
 		}
+		fmt.Fprintf(&searched, "  %s not found\n", candidate)
 	}
-	return "", fmt.Errorf("draw.io CLI not found; install from https://www.drawio.com/")
+	return "", buildDrawioNotFoundError(searched.String())
+}
+
+// buildDrawioNotFoundError returns a detailed error message with troubleshooting steps and searched paths.
+func buildDrawioNotFoundError(searchedPaths string) error {
+	msg := strings.Builder{}
+	msg.WriteString("draw.io CLI not found\n")
+	if searchedPaths != "" {
+		msg.WriteString("\nSearched locations:\n")
+		msg.WriteString(searchedPaths)
+	}
+	msg.WriteString("\nInstallation options:\n")
+	msg.WriteString("  Windows (Scoop):    scoop install drawio\n")
+	msg.WriteString("  Windows (Choco):    choco install drawio\n")
+	msg.WriteString("  macOS (Homebrew):   brew install draw.io\n")
+	msg.WriteString("  Linux:              See https://www.drawio.com\n\n")
+	msg.WriteString("If already installed, try these troubleshooting steps:\n")
+	msg.WriteString("  1. Add draw.io to PATH (Scoop): scoop reset drawio\n")
+	msg.WriteString("  2. Set env var: export BAUSTEINSICHT_DRAWIO_PATH=/path/to/draw.io\n")
+	msg.WriteString("  3. Use CLI flag: bausteinsicht export --drawio-path /path/to/draw.io\n\n")
+	msg.WriteString("More info: https://github.com/docToolchain/Bausteinsicht/issues/385\n")
+	return errors.New(msg.String())
 }
 
 // BuildExportArgs constructs the command-line arguments for a draw.io export.
