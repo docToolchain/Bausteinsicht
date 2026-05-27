@@ -45,7 +45,8 @@ jobs:
         shell: bash
         run: |
           echo "Checking if source files are readable..."
-          find internal -name "*.go" -type f | head -5 | while read f; do
+          mapfile -t sample < <(find internal -name "*.go" -type f | head -5; true)
+          for f in "${sample[@]}"; do
             if [ -f "$f" ]; then
               echo "✓ $f ($(wc -l < "$f") lines)"
             else
