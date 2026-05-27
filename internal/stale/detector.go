@@ -89,9 +89,11 @@ func Detect(m *model.BausteinsichtModel, modelPath string, config StaleConfig) (
 }
 
 // shouldFlag returns true if an element should be flagged as stale.
-func shouldFlag(elem *model.Element, modelLastModified time.Time, config StaleConfig) bool {
-	// Criterion 1: Model file not modified in threshold days
-	if modelLastModified.IsZero() || !IsStale(modelLastModified, config.ThresholdDays) {
+// lastModified is the element-level modification time (from git per-element
+// search or file-level fallback).
+func shouldFlag(elem *model.Element, lastModified time.Time, config StaleConfig) bool {
+	// Criterion 1: Element not modified within threshold days
+	if lastModified.IsZero() || !IsStale(lastModified, config.ThresholdDays) {
 		return false
 	}
 
