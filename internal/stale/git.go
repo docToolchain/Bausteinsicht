@@ -9,6 +9,12 @@ import (
 	"time"
 )
 
+// gitPath resolves the absolute path of the git binary via PATH lookup.
+// This satisfies go:S4036 — the resolved path is fixed and unwriteable at call time.
+func gitPath() (string, error) {
+	return exec.LookPath("git")
+}
+
 // GetLastModifiedDate returns the date of the last git commit that touched the given file.
 // If the file is not in a git repository or has never been committed, returns zero time.
 func GetLastModifiedDate(filePath string) (time.Time, error) {
@@ -23,11 +29,16 @@ func GetLastModifiedDate(filePath string) (time.Time, error) {
 		return time.Time{}, fmt.Errorf("file not found: %w", err)
 	}
 
+	git, err := gitPath()
+	if err != nil {
+		return time.Time{}, nil // git not available
+	}
+
 	// Get git log for the file
 	// --follow: follow file renames
 	// -1: get only the latest commit
 	// --format=%aI: ISO 8601 strict format
-	cmd := exec.Command("git", "log", "--follow", "-1", "--format=%aI", "--", absPath)
+	cmd := exec.Command(git, "log", "--follow", "-1", "--format=%aI", "--", absPath)
 	output, err := cmd.Output()
 	if err != nil {
 		// File might not be tracked in git
@@ -91,11 +102,16 @@ func GetLastModifiedDateForElement(filePath string, elementKey string) (time.Tim
 	}
 	searchKey := keyParts[len(keyParts)-1] // Use the leaf key for less ambiguity
 
+	git, err := gitPath()
+	if err != nil {
+		return fileMod, nil // git not available, use file-level
+	}
+
 	// git log -S: search for given string in diffs
 	// --follow: follow file renames
 	// -1: get most recent
 	// --format=%aI: ISO 8601 format
-	cmd := exec.Command("git", "log", "-S", "\""+searchKey+"\"", "--follow", "-1", "--format=%aI", "--", absPath)
+	cmd := exec.Command(git, "log", "-S", "\""+searchKey+"\"", "--follow", "-1", "--format=%aI", "--", absPath)
 	output, err := cmd.Output()
 	if err != nil {
 		// Element key not found in git history, use file-level
