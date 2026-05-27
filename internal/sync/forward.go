@@ -330,6 +330,10 @@ func populateNewPage(
 		for _, id := range toPlace {
 			applyElementAdded(id, viewID, scopeID, page, templates, flat, &m.Specification, &pl, result)
 		}
+		// After placing children, expand the scope boundary so they don't overflow (#330).
+		if scopeID != "" && pl.childCount[scopeID] > 0 {
+			expandScopeToFitChildren(page, scopeID, viewID)
+		}
 	}
 }
 
@@ -627,6 +631,11 @@ func applyChangesToPage(
 			}
 		}
 	}
+
+	// Expand scope boundary to fit any children added in this pass (#330).
+	if scopeID != "" && pl.childCount[scopeID] > 0 {
+		expandScopeToFitChildren(page, scopeID, viewID)
+	}
 }
 
 // firstPage returns the first page in doc, or nil if there are none.
@@ -865,6 +874,64 @@ func resizeScopeBoundary(page *drawio.Page, scopeID string, x, y, width, height 
 	geo.CreateAttr("y", strconv.FormatFloat(y, 'f', -1, 64))
 	geo.CreateAttr("width", strconv.FormatFloat(width, 'f', -1, 64))
 	geo.CreateAttr("height", strconv.FormatFloat(height, 'f', -1, 64))
+}
+
+// expandScopeToFitChildren resizes the scope boundary so all child elements
+// currently parented to it remain within bounds. Only expands, never shrinks (#330).
+func expandScopeToFitChildren(page *drawio.Page, scopeID, viewID string) {
+	parentCellID := scopedCellID(viewID, scopeID)
+
+	maxRight := 0.0
+	maxBottom := 0.0
+	for _, obj := range page.FindAllElements() {
+		cell := obj.FindElement("mxCell")
+		if cell == nil {
+			continue
+		}
+		if cell.SelectAttrValue("parent", "") != parentCellID {
+			continue
+		}
+		geo := cell.FindElement("mxGeometry")
+		if geo == nil {
+			continue
+		}
+		x, _ := strconv.ParseFloat(geo.SelectAttrValue("x", "0"), 64)
+		y, _ := strconv.ParseFloat(geo.SelectAttrValue("y", "0"), 64)
+		w, _ := strconv.ParseFloat(geo.SelectAttrValue("width", "0"), 64)
+		h, _ := strconv.ParseFloat(geo.SelectAttrValue("height", "0"), 64)
+		if right := x + w + childStartX; right > maxRight {
+			maxRight = right
+		}
+		if bottom := y + h + childStartX; bottom > maxBottom {
+			maxBottom = bottom
+		}
+	}
+
+	if maxRight == 0 && maxBottom == 0 {
+		return
+	}
+
+	obj := page.FindElement(scopeID)
+	if obj == nil {
+		return
+	}
+	cell := obj.FindElement("mxCell")
+	if cell == nil {
+		return
+	}
+	geo := cell.FindElement("mxGeometry")
+	if geo == nil {
+		return
+	}
+
+	currentW, _ := strconv.ParseFloat(geo.SelectAttrValue("width", "0"), 64)
+	currentH, _ := strconv.ParseFloat(geo.SelectAttrValue("height", "0"), 64)
+	if maxRight > currentW {
+		geo.CreateAttr("width", strconv.FormatFloat(maxRight, 'f', -1, 64))
+	}
+	if maxBottom > currentH {
+		geo.CreateAttr("height", strconv.FormatFloat(maxBottom, 'f', -1, 64))
+	}
 }
 
 // clearPageElements removes all managed bausteinsicht elements and connectors

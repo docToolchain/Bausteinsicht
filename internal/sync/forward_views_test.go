@@ -498,6 +498,76 @@ func TestApplyForward_ChildElementsUseRelativeCoordinates(t *testing.T) {
 	}
 }
 
+// TestApplyForward_ScopeBoundaryExpandsForManyChildren verifies that when children
+// are added incrementally to an existing scope boundary that is too small, the
+// boundary is expanded to contain all child elements (#330).
+func TestApplyForward_ScopeBoundaryExpandsForManyChildren(t *testing.T) {
+	doc := drawio.NewDocument()
+	doc.AddPage("view-containers", "Container View")
+	ts := minimalTemplates(t)
+
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"shop": {Kind: "system", Title: "Shop", Children: map[string]model.Element{
+				"a": {Kind: "container", Title: "A"},
+				"b": {Kind: "container", Title: "B"},
+				"c": {Kind: "container", Title: "C"},
+				"d": {Kind: "container", Title: "D"},
+			}},
+		},
+		Views: map[string]model.View{
+			"containers": {
+				Title:   "Container View",
+				Scope:   "shop",
+				Include: []string{"shop.*"},
+			},
+		},
+	}
+
+	// First sync: adds one child via the fresh-page layout engine so the page
+	// becomes non-fresh for subsequent syncs.
+	cs1 := &ChangeSet{
+		ModelElementChanges: []ElementChange{
+			{ID: "shop.a", Type: Added},
+		},
+	}
+	ApplyForward(cs1, doc, ts, m)
+
+	// Second sync (incremental): adds three more children in one grid row.
+	// Grid col 2 → x=340, width=120, right=460; + childStartX(20) padding = 480.
+	// This exceeds the default boundary width (400), so expandScopeToFitChildren
+	// must grow the boundary.
+	cs2 := &ChangeSet{
+		ModelElementChanges: []ElementChange{
+			{ID: "shop.b", Type: Added},
+			{ID: "shop.c", Type: Added},
+			{ID: "shop.d", Type: Added},
+		},
+	}
+	ApplyForward(cs2, doc, ts, m)
+
+	page := requirePage(t, doc, "view-containers")
+
+	// Scope boundary must be wide enough to contain 3 children in one row:
+	// col 2 at x=340, width=120, + childStartX(20) margin → needs >= 480.
+	scopeElem := page.FindElement("shop")
+	if scopeElem == nil {
+		t.Fatal("scope element 'shop' not found on page")
+	}
+	cell := scopeElem.FindElement("mxCell")
+	if cell == nil {
+		t.Fatal("scope element has no mxCell")
+	}
+	geo := cell.FindElement("mxGeometry")
+	if geo == nil {
+		t.Fatal("scope element has no mxGeometry")
+	}
+	w, _ := strconv.ParseFloat(geo.SelectAttrValue("width", "0"), 64)
+	if w < 480 {
+		t.Errorf("scope boundary width: got %v, want >= 480 (3 children in one row overflow default 400)", w)
+	}
+}
+
 // TestApplyForward_DeletedElementRemovedFromViewPages verifies that when an
 // element is deleted from the model, it is removed from all view pages where
 // it previously appeared. Regression test for #85.
