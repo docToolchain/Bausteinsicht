@@ -12,7 +12,7 @@ import (
 )
 
 func isDrawioFile(filename string) bool {
-	return strings.HasSuffix(strings.ToLower(filename), ".drawio") && strings.Contains(strings.ToLower(filename), "architecture")
+	return strings.HasSuffix(strings.ToLower(filename), ".drawio")
 }
 
 func newStaleCmd() *cobra.Command {

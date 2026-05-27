@@ -8,6 +8,8 @@ import (
 	"github.com/docToolchain/Bausteinsicht/internal/drawio"
 )
 
+var staleStyleRe = regexp.MustCompile(`(fillColor|strokeColor)=[^;]*;?`)
+
 // MarkInDrawio adds visual indicators to stale elements in a draw.io diagram.
 // Changes fill color and stroke to indicate staleness, with risk-level color coding.
 func MarkInDrawio(staleElements []StaleElement, drawioPath string) error {
@@ -77,8 +79,7 @@ func markStaleElement(elem *etree.Element, staleElem StaleElement) {
 		style = fmt.Sprintf("fillColor=%s;strokeColor=%s;strokeWidth=2", riskColor, riskColor)
 	} else {
 		// Remove existing fillColor and strokeColor if present
-		re := regexp.MustCompile(`(fillColor|strokeColor)=[^;]*;?`)
-		style = re.ReplaceAllString(style, "")
+		style = staleStyleRe.ReplaceAllString(style, "")
 		style = fmt.Sprintf("%s;fillColor=%s;strokeColor=%s;strokeWidth=2", style, riskColor, riskColor)
 	}
 
