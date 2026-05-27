@@ -33,6 +33,14 @@ archives:
 checksum:
   name_template: "checksums.txt"
 
+sboms:
+  - artifacts: archive
+    format: spdx-json
+    output: "{{ .ArtifactName }}.spdx.json"
+  - artifacts: archive
+    format: cyclonedx-json
+    output: "{{ .ArtifactName }}.cyclonedx.json"
+
 changelog:
   use: github
   sort: asc
