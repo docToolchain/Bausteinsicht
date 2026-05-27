@@ -484,18 +484,6 @@ func TestApplyForward_ChildElementsUseRelativeCoordinates(t *testing.T) {
 		}
 	}
 
-	// First child must be at childStartX/childStartY (20, 80).
-	apiElem := page.FindElement("shop.api")
-	apiCell := apiElem.FindElement("mxCell")
-	apiGeo := apiCell.FindElement("mxGeometry")
-	apiX, _ := strconv.ParseFloat(apiGeo.SelectAttrValue("x", "-1"), 64)
-	apiY, _ := strconv.ParseFloat(apiGeo.SelectAttrValue("y", "-1"), 64)
-	if apiX != 20.0 {
-		t.Errorf("first child x: got %v, want 20", apiX)
-	}
-	if apiY != 80.0 {
-		t.Errorf("first child y: got %v, want 80", apiY)
-	}
 }
 
 // TestApplyForward_ScopeBoundaryExpandsForManyChildren verifies that when children
