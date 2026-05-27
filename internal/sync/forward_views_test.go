@@ -1,6 +1,7 @@
 package sync
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 
@@ -419,6 +420,81 @@ func TestApplyForward_ScopeBoundingBox(t *testing.T) {
 	custParent := custCell.SelectAttrValue("parent", "")
 	if custParent == scopeCellID {
 		t.Error("customer should NOT be parented to scope boundary")
+	}
+}
+
+// TestApplyForward_ChildElementsUseRelativeCoordinates verifies that new child
+// elements placed inside a scope boundary receive coordinates relative to the
+// parent boundary cell, not absolute page coordinates. Regression test for #330.
+func TestApplyForward_ChildElementsUseRelativeCoordinates(t *testing.T) {
+	doc := drawio.NewDocument()
+	doc.AddPage("view-containers", "Container View")
+	ts := minimalTemplates(t)
+
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"shop": {Kind: "system", Title: "Shop", Children: map[string]model.Element{
+				"api": {Kind: "container", Title: "API"},
+				"db":  {Kind: "container", Title: "DB"},
+			}},
+		},
+		Views: map[string]model.View{
+			"containers": {
+				Title:   "Container View",
+				Scope:   "shop",
+				Include: []string{"shop.*"},
+			},
+		},
+	}
+
+	cs := &ChangeSet{
+		ModelElementChanges: []ElementChange{
+			{ID: "shop.api", Type: Added},
+			{ID: "shop.db", Type: Added},
+		},
+	}
+
+	ApplyForward(cs, doc, ts, m)
+
+	page := requirePage(t, doc, "view-containers")
+
+	for _, id := range []string{"shop.api", "shop.db"} {
+		elem := page.FindElement(id)
+		if elem == nil {
+			t.Fatalf("expected element %q on page", id)
+		}
+		cell := elem.FindElement("mxCell")
+		if cell == nil {
+			t.Fatalf("%q has no mxCell", id)
+		}
+		geo := cell.FindElement("mxGeometry")
+		if geo == nil {
+			t.Fatalf("%q has no mxGeometry", id)
+		}
+		x, _ := strconv.ParseFloat(geo.SelectAttrValue("x", "-1"), 64)
+		y, _ := strconv.ParseFloat(geo.SelectAttrValue("y", "-1"), 64)
+
+		// Relative coordinates must be small (within parent boundary).
+		// Before fix, children received absolute page coordinates (e.g. y > 1000).
+		if x < 0 || x > 600 {
+			t.Errorf("%q: expected relative x in [0,600], got %v", id, x)
+		}
+		if y < 0 || y > 400 {
+			t.Errorf("%q: expected relative y in [0,400], got %v", id, y)
+		}
+	}
+
+	// First child must be at childStartX/childStartY (20, 80).
+	apiElem := page.FindElement("shop.api")
+	apiCell := apiElem.FindElement("mxCell")
+	apiGeo := apiCell.FindElement("mxGeometry")
+	apiX, _ := strconv.ParseFloat(apiGeo.SelectAttrValue("x", "-1"), 64)
+	apiY, _ := strconv.ParseFloat(apiGeo.SelectAttrValue("y", "-1"), 64)
+	if apiX != 20.0 {
+		t.Errorf("first child x: got %v, want 20", apiX)
+	}
+	if apiY != 80.0 {
+		t.Errorf("first child y: got %v, want 80", apiY)
 	}
 }
 

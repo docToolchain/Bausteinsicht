@@ -16,6 +16,13 @@ const (
 	elementGap       = 40.0
 	defaultWidth     = 120.0
 	defaultHeight    = 60.0
+
+	// Child element placement within a scope boundary (#330).
+	childGridCols  = 3
+	childStartX    = 20.0
+	childStartY    = 80.0
+	childSpacingX  = 160.0
+	childSpacingY  = 100.0
 )
 
 // applyTagStyles applies styles defined in tag definitions to an element's style.
@@ -731,13 +738,7 @@ func applyElementAdded(
 	// Position children in a grid starting at (20, 80) inside the parent boundary (#330).
 	x, y := pl.nextX, pl.nextY
 	if scopeID != "" && isChildOf(id, scopeID) {
-		// Use relative coordinates: first child at (20, 80), then in grid layout
 		childIndex := pl.childCount[scopeID]
-		const childGridCols = 3
-		const childStartX = 20.0
-		const childStartY = 80.0
-		const childSpacingX = 160.0
-		const childSpacingY = 100.0
 		x = childStartX + float64(childIndex%childGridCols)*childSpacingX
 		y = childStartY + float64(childIndex/childGridCols)*childSpacingY
 		pl.childCount[scopeID]++
