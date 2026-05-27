@@ -101,7 +101,10 @@ func runAddView(cmd *cobra.Command, args []string) error {
 			"scope":    scope,
 			"include":  includes,
 		}
-		jsonBytes, _ := json.MarshalIndent(result, "", "  ")
+		jsonBytes, err := json.MarshalIndent(result, "", "  ")
+		if err != nil {
+			return fmt.Errorf("encoding result: %w", err)
+		}
 		fmt.Println(string(jsonBytes))
 	} else {
 		fmt.Printf("View '%s' added to model\n", viewKey)

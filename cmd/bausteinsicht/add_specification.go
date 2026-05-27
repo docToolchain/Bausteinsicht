@@ -102,7 +102,10 @@ func runAddSpecificationElement(cmd *cobra.Command, args []string) error {
 		if description != "" {
 			result["description"] = description
 		}
-		jsonBytes, _ := json.MarshalIndent(result, "", "  ")
+		jsonBytes, err := json.MarshalIndent(result, "", "  ")
+		if err != nil {
+			return fmt.Errorf("encoding result: %w", err)
+		}
 		fmt.Println(string(jsonBytes))
 	} else {
 		fmt.Printf("Element type '%s' added to specification\n", key)
@@ -190,7 +193,10 @@ func runAddSpecificationRelationship(cmd *cobra.Command, args []string) error {
 		if description != "" {
 			result["description"] = description
 		}
-		jsonBytes, _ := json.MarshalIndent(result, "", "  ")
+		jsonBytes, err := json.MarshalIndent(result, "", "  ")
+		if err != nil {
+			return fmt.Errorf("encoding result: %w", err)
+		}
 		fmt.Println(string(jsonBytes))
 	} else {
 		fmt.Printf("Relationship type '%s' added to specification\n", key)
