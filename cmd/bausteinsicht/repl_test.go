@@ -86,10 +86,11 @@ func TestReplExitWithUnsavedChanges(t *testing.T) {
 // TestReplAddElementAndUndo verifies add element followed by undo.
 func TestReplAddElementAndUndo(t *testing.T) {
 	// Simulate: add element with id="backend", kind="container", title="Backend", no desc.
+	// addCommand calls saveUndo() before delegating to addElementInteractive.
 	input := "backend\ncontainer\nBackend\n\n"
 	s := newTestReplState(input)
 
-	s.addElementInteractive()
+	s.addCommand([]string{"element"})
 
 	if _, ok := s.model.Model["backend"]; !ok {
 		t.Fatal("element 'backend' was not added")
@@ -112,10 +113,11 @@ func TestReplAddElementAndUndo(t *testing.T) {
 
 // TestReplAddRelationshipAndUndo verifies add relationship followed by undo.
 func TestReplAddRelationshipAndUndo(t *testing.T) {
+	// addCommand calls saveUndo() before delegating to addRelationshipInteractive.
 	input := "customer\nwebshop\nuses\n"
 	s := newTestReplState(input)
 
-	s.addRelationshipInteractive()
+	s.addCommand([]string{"relationship"})
 
 	if len(s.model.Relationships) != 1 {
 		t.Fatalf("expected 1 relationship, got %d", len(s.model.Relationships))
