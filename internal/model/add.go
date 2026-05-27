@@ -1,6 +1,9 @@
 package model
 
-import "fmt"
+import (
+	"fmt"
+	"sort"
+)
 
 // AddView creates a new view or merges fields into an existing view.
 // For existing views:
@@ -54,7 +57,7 @@ func (m *BausteinsichtModel) AddView(key string, view View) error {
 		if view.Layout != "" {
 			existingView.Layout = view.Layout
 		}
-		// Merge include lists (deduplicate)
+		// Merge include lists (deduplicate, sort for deterministic output)
 		if len(view.Include) > 0 {
 			includedSet := make(map[string]bool)
 			for _, elem := range existingView.Include {
@@ -67,6 +70,7 @@ func (m *BausteinsichtModel) AddView(key string, view View) error {
 			for elem := range includedSet {
 				merged = append(merged, elem)
 			}
+			sort.Strings(merged)
 			existingView.Include = merged
 		}
 		m.Views[key] = existingView
@@ -89,12 +93,16 @@ func (m *BausteinsichtModel) AddSpecificationElement(key string, kind ElementKin
 		return fmt.Errorf("notation must not be empty")
 	}
 
+	// Initialize elements map if needed
+	if m.Specification.Elements == nil {
+		m.Specification.Elements = make(map[string]ElementKind)
+	}
+
 	// Check for duplicate
 	if _, exists := m.Specification.Elements[key]; exists {
 		return fmt.Errorf("element kind %q already exists in specification", key)
 	}
 
-	// Add element kind
 	m.Specification.Elements[key] = kind
 
 	return nil
