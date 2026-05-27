@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -10,6 +11,8 @@ import (
 	"github.com/docToolchain/Bausteinsicht/internal/model"
 	"github.com/spf13/cobra"
 )
+
+var errReplExit = errors.New("exit")
 
 func newReplCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -29,6 +32,7 @@ type replState struct {
 	undoStack  []*model.BausteinsichtModel
 	modified   bool
 	maxUndoLen int
+	scanner    *bufio.Scanner // shared scanner — multiple scanners on os.Stdin lose buffered data
 }
 
 func runRepl(cmd *cobra.Command, _ []string) error {
@@ -51,25 +55,25 @@ func runRepl(cmd *cobra.Command, _ []string) error {
 		modelPath:  modelPath,
 		undoStack:  make([]*model.BausteinsichtModel, 0),
 		maxUndoLen: 50,
+		scanner:    bufio.NewScanner(os.Stdin),
 	}
 
 	fmt.Printf("Bausteinsicht REPL — %s (%d elements)\n", modelPath, len(m.Model))
 	fmt.Println("Type 'help' for commands, 'exit' to quit")
 
-	scanner := bufio.NewScanner(os.Stdin)
 	for {
 		fmt.Print("> ")
-		if !scanner.Scan() {
+		if !state.scanner.Scan() {
 			break // EOF
 		}
 
-		line := strings.TrimSpace(scanner.Text())
+		line := strings.TrimSpace(state.scanner.Text())
 		if line == "" {
 			continue
 		}
 
 		if err := state.executeCommand(line, cmd); err != nil {
-			if err.Error() == "exit" {
+			if errors.Is(err, errReplExit) {
 				break
 			}
 			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Error: %v\n", err)
@@ -107,8 +111,8 @@ func (s *replState) executeCommand(line string, cmd *cobra.Command) error {
 			s.showCommand(parts[1:])
 		}
 	case "remove":
-		if len(parts) < 3 {
-			fmt.Println("Usage: remove <element|relationship> <id>")
+		if len(parts) < 2 {
+			fmt.Println("Usage: remove element <id> | remove relationship <from> <to>")
 		} else {
 			s.removeCommand(parts[1:])
 		}
@@ -125,13 +129,12 @@ func (s *replState) executeCommand(line string, cmd *cobra.Command) error {
 	case "exit":
 		if s.modified {
 			fmt.Print("Model has unsaved changes. Exit anyway? (yes/no): ")
-			scanner := bufio.NewScanner(os.Stdin)
-			if scanner.Scan() && strings.ToLower(scanner.Text()) == "yes" {
-				return fmt.Errorf("exit")
+			if s.scanner.Scan() && strings.ToLower(s.scanner.Text()) == "yes" {
+				return errReplExit
 			}
 			return nil
 		}
-		return fmt.Errorf("exit")
+		return errReplExit
 	default:
 		fmt.Printf("Unknown command: %s\n", parts[0])
 	}
@@ -148,7 +151,8 @@ Commands:
   add element            — Add new element (guided prompts)
   add relationship       — Add new relationship (guided prompts)
   show <id>              — Show element details
-  remove element <id>    — Remove element
+  remove element <id>    — Remove top-level element
+  remove relationship <from> <to> — Remove relationship
   validate               — Validate model
   save                   — Save changes to file
   undo                   — Undo last change
@@ -204,27 +208,34 @@ func (s *replState) addCommand(parts []string) {
 }
 
 func (s *replState) addElementInteractive() {
-	scanner := bufio.NewScanner(os.Stdin)
-
 	fmt.Print("Element ID: ")
-	scanner.Scan()
-	id := strings.TrimSpace(scanner.Text())
+	s.scanner.Scan()
+	id := strings.TrimSpace(s.scanner.Text())
 	if id == "" {
 		fmt.Println("Aborted (empty ID)")
 		return
 	}
 
+	if _, exists := s.model.Model[id]; exists {
+		fmt.Printf("Element '%s' already exists. Overwrite? (yes/no): ", id)
+		s.scanner.Scan()
+		if strings.ToLower(strings.TrimSpace(s.scanner.Text())) != "yes" {
+			fmt.Println("Aborted")
+			return
+		}
+	}
+
 	fmt.Print("Kind: ")
-	scanner.Scan()
-	kind := strings.TrimSpace(scanner.Text())
+	s.scanner.Scan()
+	kind := strings.TrimSpace(s.scanner.Text())
 
 	fmt.Print("Title: ")
-	scanner.Scan()
-	title := strings.TrimSpace(scanner.Text())
+	s.scanner.Scan()
+	title := strings.TrimSpace(s.scanner.Text())
 
 	fmt.Print("Description (optional): ")
-	scanner.Scan()
-	desc := strings.TrimSpace(scanner.Text())
+	s.scanner.Scan()
+	desc := strings.TrimSpace(s.scanner.Text())
 
 	s.model.Model[id] = model.Element{
 		Kind:        kind,
@@ -237,19 +248,17 @@ func (s *replState) addElementInteractive() {
 }
 
 func (s *replState) addRelationshipInteractive() {
-	scanner := bufio.NewScanner(os.Stdin)
-
 	fmt.Print("From (element ID): ")
-	scanner.Scan()
-	from := strings.TrimSpace(scanner.Text())
+	s.scanner.Scan()
+	from := strings.TrimSpace(s.scanner.Text())
 
 	fmt.Print("To (element ID): ")
-	scanner.Scan()
-	to := strings.TrimSpace(scanner.Text())
+	s.scanner.Scan()
+	to := strings.TrimSpace(s.scanner.Text())
 
 	fmt.Print("Label (optional): ")
-	scanner.Scan()
-	label := strings.TrimSpace(scanner.Text())
+	s.scanner.Scan()
+	label := strings.TrimSpace(s.scanner.Text())
 
 	s.model.Relationships = append(s.model.Relationships, model.Relationship{
 		From:  from,
@@ -288,9 +297,41 @@ func (s *replState) removeCommand(parts []string) {
 	switch parts[0] {
 	case "element":
 		id := parts[1]
+		// Only top-level elements can be removed this way; nested children
+		// (dot-path IDs like "shop.api") must be edited in the JSONC directly.
+		if _, exists := s.model.Model[id]; !exists {
+			fmt.Printf("Element '%s' not found (nested elements must be edited in the model file)\n", id)
+			s.undoStack = s.undoStack[:len(s.undoStack)-1] // discard no-op undo entry
+			return
+		}
 		delete(s.model.Model, id)
 		s.modified = true
 		fmt.Printf("✅ Removed element '%s'\n", id)
+
+	case "relationship":
+		if len(parts) < 3 {
+			fmt.Println("Usage: remove relationship <from> <to>")
+			s.undoStack = s.undoStack[:len(s.undoStack)-1]
+			return
+		}
+		from, to := parts[1], parts[2]
+		removed := false
+		rels := s.model.Relationships[:0]
+		for _, r := range s.model.Relationships {
+			if r.From == from && r.To == to {
+				removed = true
+				continue
+			}
+			rels = append(rels, r)
+		}
+		s.model.Relationships = rels
+		if removed {
+			s.modified = true
+			fmt.Printf("✅ Removed relationship %s → %s\n", from, to)
+		} else {
+			fmt.Printf("Relationship %s → %s not found\n", from, to)
+			s.undoStack = s.undoStack[:len(s.undoStack)-1]
+		}
 	}
 }
 
