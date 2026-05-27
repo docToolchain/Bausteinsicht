@@ -28,8 +28,12 @@ func platformDrawioPaths() []string {
 		}
 	}
 
-	// Chocolatey package manager (fixed installation path).
-	paths = append(paths, filepath.Join("C:\\ProgramData\\chocolatey\\bin", "draw.io.exe"))
+	// Chocolatey package manager (uses %PROGRAMDATA%, defaults to C:\ProgramData).
+	progData := os.Getenv("PROGRAMDATA")
+	if progData == "" {
+		progData = `C:\ProgramData`
+	}
+	paths = append(paths, filepath.Join(progData, "chocolatey", "bin", "draw.io.exe"))
 
 	// Official installer (per-user install - LOCALAPPDATA).
 	if localApp := os.Getenv("LOCALAPPDATA"); localApp != "" {

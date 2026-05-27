@@ -31,37 +31,35 @@ var platformPaths = platformDrawioPaths
 //  2. "drawio" — on PATH (Linux package install)
 //  3. Platform-native install paths (Windows, macOS) via platformPaths()
 func DetectDrawioBinary() (string, error) {
-	var debugInfo strings.Builder
-	fmt.Fprintf(&debugInfo, "\n[DEBUG] draw.io CLI detection:\n")
+	var searched strings.Builder
 
 	// Try PATH first
 	for _, name := range []string{"drawio-export", "drawio"} {
 		path, err := exec.LookPath(name)
 		if err == nil {
-			fmt.Fprintf(&debugInfo, "  ✓ Found in PATH: %s\n", path)
 			return path, nil
 		}
-		fmt.Fprintf(&debugInfo, "  ✗ Not in PATH: %s\n", name)
+		fmt.Fprintf(&searched, "  PATH: %s not found\n", name)
 	}
 
 	// Try platform-specific paths
-	paths := platformPaths()
-	fmt.Fprintf(&debugInfo, "  Checking %d platform-specific paths:\n", len(paths))
-	for i, candidate := range paths {
+	for _, candidate := range platformPaths() {
 		if _, err := os.Stat(candidate); err == nil {
-			fmt.Fprintf(&debugInfo, "    ✓ [%d] Found: %s\n", i+1, candidate)
 			return candidate, nil
 		}
-		fmt.Fprintf(&debugInfo, "    ✗ [%d] Not found: %s\n", i+1, candidate)
+		fmt.Fprintf(&searched, "  %s not found\n", candidate)
 	}
-	return "", buildDrawioNotFoundError(debugInfo.String())
+	return "", buildDrawioNotFoundError(searched.String())
 }
 
-// buildDrawioNotFoundError returns a detailed error message with troubleshooting steps and debug info.
-func buildDrawioNotFoundError(debugInfo string) error {
+// buildDrawioNotFoundError returns a detailed error message with troubleshooting steps and searched paths.
+func buildDrawioNotFoundError(searchedPaths string) error {
 	msg := strings.Builder{}
 	msg.WriteString("draw.io CLI not found\n")
-	msg.WriteString(debugInfo)
+	if searchedPaths != "" {
+		msg.WriteString("\nSearched locations:\n")
+		msg.WriteString(searchedPaths)
+	}
 	msg.WriteString("\nInstallation options:\n")
 	msg.WriteString("  Windows (Scoop):    scoop install drawio\n")
 	msg.WriteString("  Windows (Choco):    choco install drawio\n")
