@@ -45,14 +45,13 @@ jobs:
         shell: bash
         run: |
           echo "Checking if source files are readable..."
-          mapfile -t sample < <(find internal -name "*.go" -type f | head -5; true)
-          for f in "${sample[@]}"; do
+          find internal -name "*.go" -type f | head -5 | while IFS= read -r f; do
             if [ -f "$f" ]; then
               echo "✓ $f ($(wc -l < "$f") lines)"
             else
               echo "✗ $f not found"
             fi
-          done
+          done || true
       - name: Generate test report
         id: report
         shell: bash
