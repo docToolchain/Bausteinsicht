@@ -42,6 +42,14 @@ See link:01_use_cases.adoc[Use Cases] for the functional overview of all CLI com
 | Add a new relationship to the model (LLM-friendly)
 | Implemented
 
+| `bausteinsicht add view`
+| Create a new view or modify a view's include list (LLM-friendly)
+| Implemented
+
+| `bausteinsicht add specification`
+| Add element or relationship types to the specification (LLM-friendly)
+| Implemented
+
 | `bausteinsicht export`
 | Export diagram views to PNG or SVG using the draw.io CLI
 | Implemented
@@ -430,6 +438,206 @@ $ bausteinsicht add relationship --from webshop.api --to webshop.db --format jso
 {
   "from": "webshop.api",
   "to": "webshop.db"
+}
+----
+
+==== `bausteinsicht add view`
+
+Creates a new view or modifies an existing view's include list. Designed for LLM-driven workflows to dynamically filter architecture diagrams.
+
+**Flags:**
+
+[cols="2,3,1,1"]
+|===
+| Flag | Description | Required | Default
+
+| `--scope`
+| Parent element ID to set the view's scope (drill-down level).
+| No
+| (none)
+
+| `--include`
+| Element to include in the view (repeatable, e.g., `--include elem1 --include elem2`). Supports wildcard patterns like `system.*`.
+| No
+| (empty)
+
+| `--title`
+| View title (display name) (required for new views).
+| No
+| (empty)
+
+| `--description`
+| View description.
+| No
+| (empty)
+|===
+
+**Behavior:**
+
+* For new views: requires `--title`; creates view with all specified fields.
+* For existing views: merges fields:
+  - `--title`, `--scope`, `--description` update respective fields (if specified)
+  - `--include` elements are added to existing include list (deduplicated)
+* Validates that scope element exists (if specified).
+* Validates that all include elements exist (if specified, excluding wildcard patterns).
+* Uses comment-preserving insertion to update the JSONC file.
+
+**Exit codes:**
+
+* `0` -- view added or updated successfully
+* `1` -- scope or include element not found, or missing title for new view
+* `2` -- model file not found or I/O error
+
+**Example:**
+[source,bash]
+----
+# Create a new system context view
+$ bausteinsicht add view context \
+  --include system external_system user \
+  --title "System Context"
+View 'context' added to model
+  Title: System Context
+  Includes: [system external_system user]
+
+# Create a nested container view
+$ bausteinsicht add view containers \
+  --scope system \
+  --include "system.*" \
+  --title "Containers"
+View 'containers' added to model
+  Title: Containers
+  Scope: system
+  Includes: [system.*]
+
+# Merge: add element to existing view's include list
+$ bausteinsicht add view containers --include system.logging
+View 'containers' added to model
+  Includes: [system.* system.logging]
+
+# Merge: update title without changing include
+$ bausteinsicht add view containers --title "Updated Containers"
+View 'containers' added to model
+  Title: Updated Containers
+
+# JSON output
+$ bausteinsicht add view context --title "System Context" --format json
+{
+  "view_key": "context",
+  "title": "System Context",
+  "scope": "",
+  "include": ["system", "external_system", "user"]
+}
+----
+
+==== `bausteinsicht add specification`
+
+Adds new element or relationship types to the model's specification. Enables definition of custom architecture notations.
+
+===== Add Element Type
+
+Adds a new element kind to the specification.
+
+**Command:** `bausteinsicht add specification element <key>`
+
+**Flags:**
+
+[cols="2,3,1,1"]
+|===
+| Flag | Description | Required | Default
+
+| `--notation`
+| Display notation/name for this element type (e.g., "Custom Component").
+| Yes
+| --
+
+| `--description`
+| Description of this element type.
+| No
+| (empty)
+
+| `--container`
+| Whether this element can contain child elements.
+| No
+| false
+|===
+
+**Exit codes:**
+
+* `0` -- element type added successfully
+* `1` -- invalid key format or duplicate element type
+* `2` -- model file not found or I/O error
+
+**Example:**
+[source,bash]
+----
+$ bausteinsicht add specification element custom_box \
+  --notation "Custom Component" \
+  --description "A custom element type" \
+  --container
+Element type 'custom_box' added to specification
+  Notation: Custom Component
+  Description: A custom element type
+  Container: yes
+
+$ bausteinsicht add specification element data_store \
+  --notation "Data Store" --container --format json
+{
+  "key": "data_store",
+  "notation": "Data Store",
+  "container": true
+}
+----
+
+===== Add Relationship Type
+
+Adds a new relationship kind to the specification.
+
+**Command:** `bausteinsicht add specification relationship <key>`
+
+**Flags:**
+
+[cols="2,3,1,1"]
+|===
+| Flag | Description | Required | Default
+
+| `--notation`
+| Display notation/label for this relationship type (e.g., "calls").
+| Yes
+| --
+
+| `--description`
+| Description of this relationship type.
+| No
+| (empty)
+
+| `--dashed`
+| Whether this relationship is displayed as a dashed line.
+| No
+| false
+|===
+
+**Exit codes:**
+
+* `0` -- relationship type added successfully
+* `1` -- invalid key format or duplicate relationship type
+* `2` -- model file not found or I/O error
+
+**Example:**
+[source,bash]
+----
+$ bausteinsicht add specification relationship depends_on \
+  --notation "depends on" \
+  --dashed
+Relationship type 'depends_on' added to specification
+  Notation: depends on
+  Style: dashed
+
+$ bausteinsicht add specification relationship async_call \
+  --notation "calls (async)" --format json
+{
+  "key": "async_call",
+  "notation": "calls (async)",
+  "dashed": false
 }
 ----
 
