@@ -33,10 +33,10 @@ checksum:
 sboms:
   - artifacts: archive
     format: spdx-json
-    output: sbom.spdx.json
+    output: "{{ .ArtifactName }}.spdx.json"
   - artifacts: archive
     format: cyclonedx-json
-    output: sbom.cyclonedx.json
+    output: "{{ .ArtifactName }}.cyclonedx.json"
 
 changelog:
   use: github

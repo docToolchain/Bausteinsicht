@@ -20,7 +20,7 @@ We provide SBOMs in two formats for maximum compatibility:
 - **Tools**: CycloneDX converters, vulnerability scanners (Grype, Trivy)
 - **Spec**: https://spdx.dev/
 
-### CycloneDX Format (`sbom.cyclonedx.xml`)
+### CycloneDX Format (`sbom.cyclonedx.json`)
 - **Standard**: CycloneDX 1.4
 - **Use case**: Container scanning, supply chain analytics
 - **Tools**: Dependency-Check, BlackDuck, OWASP tools
@@ -34,20 +34,20 @@ Download the SBOM from a release and inspect with tools:
 
 ```bash
 # Using SPDX tools
-spdx-tools validate sbom.spdx.json
+spdx-tools validate bausteinsicht_1.0.0_linux_amd64.tar.gz.spdx.json
 
 # Using CycloneDX tools
-cyclonedx-cli validate --input-file sbom.cyclonedx.xml
+cyclonedx-cli validate --input-file bausteinsicht_1.0.0_linux_amd64.tar.gz.cyclonedx.json
 ```
 
 ### 2. Check for Known Vulnerabilities
 
 ```bash
 # Using Grype (SPDX format)
-grype sbom:sbom.spdx.json
+grype sbom:bausteinsicht_1.0.0_linux_amd64.tar.gz.spdx.json
 
 # Using Trivy (CycloneDX format)
-trivy sbom sbom.cyclonedx.xml
+trivy sbom bausteinsicht_1.0.0_linux_amd64.tar.gz.cyclonedx.json
 ```
 
 ### 3. Integrate into Your Compliance Process

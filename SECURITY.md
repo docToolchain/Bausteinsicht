@@ -108,7 +108,7 @@ We use GitHub's [Dependabot](https://dependabot.com/) to:
 ### Vulnerability Scanning
 
 All PR builds run:
-- `go govulncheck` — scan for known Go vulnerabilities (go.dev/vuln)
+- `govulncheck ./...` — scan for known Go vulnerabilities (go.dev/vuln)
 - `gosec` — static analysis for security issues
 
 ### Policy
