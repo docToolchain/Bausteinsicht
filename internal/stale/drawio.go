@@ -3,6 +3,7 @@ package stale
 import (
 	"fmt"
 	"regexp"
+	"strings"
 
 	"github.com/beevik/etree"
 	"github.com/docToolchain/Bausteinsicht/internal/drawio"
@@ -77,6 +78,7 @@ func markStaleElement(obj *etree.Element, staleElem StaleElement) {
 	// so re-runs are idempotent and don't accumulate strokeWidth entries.
 	style := cell.SelectAttrValue("style", "")
 	style = staleStyleRe.ReplaceAllString(style, "")
+	style = strings.TrimRight(style, ";")
 	style = fmt.Sprintf("%s;fillColor=%s;strokeColor=%s;strokeWidth=2", style, riskColor, riskColor)
 
 	cell.CreateAttr("style", style)

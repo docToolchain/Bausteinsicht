@@ -43,6 +43,11 @@ func Detect(m *model.BausteinsichtModel, modelPath string, config StaleConfig) (
 			continue
 		}
 
+		// Skip elements that carry any excluded tag
+		if isTagExcluded(elem.Tags, config.ExcludeTags) {
+			continue
+		}
+
 		// Determine element's last modified time:
 		// Priority 1: explicit lastModified field in model (per-element override)
 		// Priority 2: git-based per-element search
@@ -115,6 +120,21 @@ func isExcluded(kind string, excludeKinds []string) bool {
 	for _, excluded := range excludeKinds {
 		if kind == excluded {
 			return true
+		}
+	}
+	return false
+}
+
+// isTagExcluded returns true if any of the element's tags appear in excludeTags.
+func isTagExcluded(elemTags []string, excludeTags []string) bool {
+	if len(excludeTags) == 0 {
+		return false
+	}
+	for _, tag := range elemTags {
+		for _, excluded := range excludeTags {
+			if tag == excluded {
+				return true
+			}
 		}
 	}
 	return false

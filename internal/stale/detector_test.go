@@ -153,6 +153,42 @@ func TestIsExcluded_WithExcludedKind(t *testing.T) {
 	}
 }
 
+func TestIsTagExcluded_MatchesExcludedTag(t *testing.T) {
+	if !isTagExcluded([]string{"infra", "legacy"}, []string{"legacy"}) {
+		t.Error("expected element with 'legacy' tag to be excluded")
+	}
+}
+
+func TestIsTagExcluded_NoMatch(t *testing.T) {
+	if isTagExcluded([]string{"core"}, []string{"legacy", "infra"}) {
+		t.Error("expected element with 'core' tag not to be excluded")
+	}
+}
+
+func TestIsTagExcluded_EmptyExcludeList(t *testing.T) {
+	if isTagExcluded([]string{"anything"}, []string{}) {
+		t.Error("empty excludeTags should never exclude")
+	}
+}
+
+func TestDetect_ExcludeTagsSkipsElement(t *testing.T) {
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"infra": {Kind: "system", Title: "Infra", Tags: []string{"infra"}},
+		},
+		Relationships: []model.Relationship{},
+		Views:         map[string]model.View{},
+	}
+	config := StaleConfig{ThresholdDays: 0, ExcludeTags: []string{"infra"}}
+	result, err := Detect(m, "", config)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result.StaleElements) != 0 {
+		t.Errorf("element with excluded tag should not be flagged, got %d stale", len(result.StaleElements))
+	}
+}
+
 func TestIsViewIncluded_ExactMatch(t *testing.T) {
 	m := &model.BausteinsichtModel{
 		Views: map[string]model.View{
