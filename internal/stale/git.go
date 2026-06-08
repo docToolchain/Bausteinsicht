@@ -34,11 +34,12 @@ func GetLastModifiedDate(filePath string) (time.Time, error) {
 		return time.Time{}, nil // git not available
 	}
 
-	// Get git log for the file
+	// Run git log in the file's directory so the correct repo is used.
 	// --follow: follow file renames
 	// -1: get only the latest commit
 	// --format=%aI: ISO 8601 strict format
 	cmd := exec.Command(git, "log", "--follow", "-1", "--format=%aI", "--", absPath)
+	cmd.Dir = filepath.Dir(absPath)
 	output, err := cmd.Output()
 	if err != nil {
 		// File might not be tracked in git
@@ -112,6 +113,7 @@ func GetLastModifiedDateForElement(filePath string, elementKey string) (time.Tim
 	// -1: get most recent
 	// --format=%aI: ISO 8601 format
 	cmd := exec.Command(git, "log", "-S", "\""+searchKey+"\"", "--follow", "-1", "--format=%aI", "--", absPath)
+	cmd.Dir = filepath.Dir(absPath)
 	output, err := cmd.Output()
 	if err != nil {
 		// Element key not found in git history, use file-level

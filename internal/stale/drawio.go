@@ -8,7 +8,7 @@ import (
 	"github.com/docToolchain/Bausteinsicht/internal/drawio"
 )
 
-var staleStyleRe = regexp.MustCompile(`(fillColor|strokeColor)=[^;]*;?`)
+var staleStyleRe = regexp.MustCompile(`(fillColor|strokeColor|strokeWidth)=[^;]*;?`)
 
 // MarkInDrawio adds visual indicators to stale elements in a draw.io diagram.
 // Changes fill color and stroke to indicate staleness, with risk-level color coding.
@@ -32,11 +32,12 @@ func MarkInDrawio(staleElements []StaleElement, drawioPath string) error {
 		return fmt.Errorf("no root element in page")
 	}
 
-	// Build ID to element map for quick lookup
+	// Build ID to element map for quick lookup.
+	// Elements are stored as <object bausteinsicht_id="..."> wrapping an <mxCell>.
 	idMap := make(map[string]*etree.Element)
-	for _, cell := range root.SelectElements("mxCell") {
-		if bausteinsichtID := cell.SelectAttr("bausteinsicht_id"); bausteinsichtID != nil {
-			idMap[bausteinsichtID.Value] = cell
+	for _, obj := range root.SelectElements("object") {
+		if bausteinsichtID := obj.SelectAttr("bausteinsicht_id"); bausteinsichtID != nil {
+			idMap[bausteinsichtID.Value] = obj
 		}
 	}
 
@@ -59,36 +60,31 @@ func MarkInDrawio(staleElements []StaleElement, drawioPath string) error {
 	return nil
 }
 
-// markStaleElement modifies the style attribute to mark stale elements.
-func markStaleElement(elem *etree.Element, staleElem StaleElement) {
-	// Get current style
-	styleAttr := elem.SelectAttr("style")
-	var style string
-	if styleAttr != nil {
-		style = styleAttr.Value
+// markStaleElement modifies the draw.io element to mark it as stale.
+// obj is the <object> element; style changes go on its <mxCell> child.
+func markStaleElement(obj *etree.Element, staleElem StaleElement) {
+	cell := obj.FindElement("mxCell")
+	if cell == nil {
+		return
 	}
 
-	// Add grey fill and risk-based stroke color
 	riskColor := riskColor(staleElem.Risk)
 	if riskColor == "" {
-		riskColor = "#CCCCCC" // Default grey
+		riskColor = "#CCCCCC"
 	}
 
-	// Append or update style properties
-	if style == "" {
-		style = fmt.Sprintf("fillColor=%s;strokeColor=%s;strokeWidth=2", riskColor, riskColor)
-	} else {
-		// Remove existing fillColor and strokeColor if present
-		style = staleStyleRe.ReplaceAllString(style, "")
-		style = fmt.Sprintf("%s;fillColor=%s;strokeColor=%s;strokeWidth=2", style, riskColor, riskColor)
-	}
+	// Get current style from mxCell; strip previous stale marker properties
+	// so re-runs are idempotent and don't accumulate strokeWidth entries.
+	style := cell.SelectAttrValue("style", "")
+	style = staleStyleRe.ReplaceAllString(style, "")
+	style = fmt.Sprintf("%s;fillColor=%s;strokeColor=%s;strokeWidth=2", style, riskColor, riskColor)
 
-	elem.CreateAttr("style", style)
+	cell.CreateAttr("style", style)
 
-	// Add tooltip with staleness info
-	tooltip := fmt.Sprintf("⚠ STALE\\nLast modified: %s\\nNo status set\\nNo ADR linked",
+	// Tooltip lives on the <object> element (consistent with how element.go places description).
+	tooltip := fmt.Sprintf("⚠ STALE\nLast modified: %s\nNo status set\nNo ADR linked",
 		staleElem.LastModified.Format("2006-01-02"))
-	elem.CreateAttr("tooltip", tooltip)
+	obj.CreateAttr("tooltip", tooltip)
 }
 
 // riskColor returns a color code for the risk level.
