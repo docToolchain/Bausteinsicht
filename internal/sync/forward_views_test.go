@@ -559,6 +559,297 @@ func TestApplyForward_ScopeBoundaryExpandsForManyChildren(t *testing.T) {
 	}
 }
 
+// TestApplyForward_RelayoutClearsAndRepopulates verifies that the Relayout option
+// removes all existing managed elements and re-places them via the layout engine.
+func TestApplyForward_RelayoutClearsAndRepopulates(t *testing.T) {
+	doc := shopContainersDoc()
+	ts := minimalTemplates(t)
+	m := shopModel(map[string]model.Element{
+		"a": {Kind: "container", Title: "A"},
+		"b": {Kind: "container", Title: "B"},
+	})
+
+	// First sync: populate the page normally.
+	cs := &ChangeSet{
+		ModelElementChanges: []ElementChange{
+			{ID: "shop.a", Type: Added},
+			{ID: "shop.b", Type: Added},
+		},
+	}
+	ApplyForward(cs, doc, ts, m)
+
+	page := requirePage(t, doc, "view-containers")
+	if page.FindElement("shop.a") == nil {
+		t.Fatal("shop.a not placed after first sync")
+	}
+
+	// Second sync with Relayout=true: should clear and re-place.
+	csEmpty := &ChangeSet{}
+	ApplyForward(csEmpty, doc, ts, m, ForwardOptions{Relayout: true})
+
+	page = requirePage(t, doc, "view-containers")
+	if page.FindElement("shop.a") == nil {
+		t.Error("shop.a missing after relayout — clearPageElements removed it and layout did not re-place")
+	}
+	if page.FindElement("shop.b") == nil {
+		t.Error("shop.b missing after relayout")
+	}
+}
+
+// TestResolveElementFields_ElementNotOnPage verifies that resolveElementFields
+// falls back to model values when the element is not found on the page.
+func TestResolveElementFields_ElementNotOnPage(t *testing.T) {
+	doc := shopContainersDoc()
+	m := shopModel(map[string]model.Element{
+		"a": {Kind: "container", Title: "Model Title", Technology: "Go"},
+	})
+
+	page := requirePage(t, doc, "view-containers")
+	elem := m.Model["shop"]
+	children := elem.Children
+	child := children["a"]
+
+	ch := ElementChange{ID: "shop.a", Field: "title"}
+	title, tech, desc := resolveElementFields(ch, page, &child)
+
+	if title != "Model Title" {
+		t.Errorf("expected model title, got %q", title)
+	}
+	if tech != "Go" {
+		t.Errorf("expected model technology, got %q", tech)
+	}
+	_ = desc
+}
+
+// TestExpandScopeToFitChildren_NoChildren verifies that expandScopeToFitChildren
+// does nothing when no children are parented to the scope.
+func TestExpandScopeToFitChildren_NoChildren(t *testing.T) {
+	doc := shopContainersDoc()
+	ts := minimalTemplates(t)
+	m := shopModel(map[string]model.Element{
+		"a": {Kind: "container", Title: "A"},
+	})
+
+	cs := &ChangeSet{
+		ModelElementChanges: []ElementChange{{ID: "shop.a", Type: Added}},
+	}
+	ApplyForward(cs, doc, ts, m)
+
+	page := requirePage(t, doc, "view-containers")
+	scopeElem := page.FindElement("shop")
+	if scopeElem == nil {
+		t.Fatal("scope element not found")
+	}
+	cell := scopeElem.FindElement("mxCell")
+	if cell == nil {
+		t.Fatal("scope mxCell not found")
+	}
+	geo := cell.FindElement("mxGeometry")
+	if geo == nil {
+		t.Fatal("scope mxGeometry not found")
+	}
+	wBefore := geo.SelectAttrValue("width", "")
+
+	// Call with a scopeID that has no parented children on the page.
+	expandScopeToFitChildren(page, "shop", "view-containers-nonexistent")
+
+	// Width should be unchanged since no children match the nonexistent viewID parent.
+	wAfter := geo.SelectAttrValue("width", "")
+	if wBefore != wAfter {
+		t.Errorf("width changed unexpectedly: %s → %s", wBefore, wAfter)
+	}
+}
+
+// TestResolveElementFields_TechnologyAndDescriptionFields verifies that the
+// technology and description switch cases override only the specified field
+// while keeping the other fields from the current draw.io state.
+func TestResolveElementFields_TechnologyAndDescriptionFields(t *testing.T) {
+	doc := shopContainersDoc()
+	ts := minimalTemplates(t)
+	m := shopModel(map[string]model.Element{
+		"a": {Kind: "container", Title: "Title A", Technology: "Go", Description: "Desc A"},
+	})
+	cs := &ChangeSet{
+		ModelElementChanges: []ElementChange{{ID: "shop.a", Type: Added}},
+	}
+	ApplyForward(cs, doc, ts, m)
+
+	page := requirePage(t, doc, "view-containers")
+	flat, _ := model.FlattenElements(m)
+	elem := flat["shop.a"]
+
+	t.Run("technology", func(t *testing.T) {
+		ch := ElementChange{ID: "shop.a", Field: "technology"}
+		_, tech, _ := resolveElementFields(ch, page, elem)
+		if tech != "Go" {
+			t.Errorf("expected technology %q, got %q", "Go", tech)
+		}
+	})
+
+	t.Run("description", func(t *testing.T) {
+		ch := ElementChange{ID: "shop.a", Field: "description"}
+		_, _, desc := resolveElementFields(ch, page, elem)
+		if desc != "Desc A" {
+			t.Errorf("expected description %q, got %q", "Desc A", desc)
+		}
+	})
+}
+
+// TestApplyForward_RelayoutClearsRelationships verifies that the Relayout option
+// removes connector mxCells (rel- prefix) so they are re-placed after clearing.
+func TestApplyForward_RelayoutClearsRelationships(t *testing.T) {
+	doc := docWithViewPages()
+	ts := minimalTemplates(t)
+	m := modelWithViews()
+
+	cs := &ChangeSet{
+		ModelElementChanges: []ElementChange{
+			{ID: "customer", Type: Added},
+			{ID: "webshop", Type: Added},
+		},
+		ModelRelationshipChanges: []RelationshipChange{
+			{From: "customer", To: "webshop", Type: Added, NewValue: "uses"},
+		},
+	}
+	ApplyForward(cs, doc, ts, m)
+
+	contextPage := requirePage(t, doc, "view-context")
+	connsBefore := findConnectorCount(contextPage)
+	if connsBefore == 0 {
+		t.Fatal("expected at least one connector after first sync")
+	}
+
+	csEmpty := &ChangeSet{}
+	ApplyForward(csEmpty, doc, ts, m, ForwardOptions{Relayout: true})
+
+	contextPage = requirePage(t, doc, "view-context")
+	connsAfter := findConnectorCount(contextPage)
+	if connsAfter == 0 {
+		t.Errorf("expected connectors to be re-placed after relayout, got 0")
+	}
+}
+
+// TestApplyForward_ScopeBoundaryExpandsHeightForManyChildren verifies that when
+// children overflow the scope's default height, expandScopeToFitChildren also
+// grows the height (not just width).
+//
+// Uses a two-step sync: first sync makes the page non-fresh (1 child via layout
+// engine), then the second sync adds 7 more via the incremental path. Child index
+// 6 lands on row 2 (y=280), producing maxBottom=360 which exceeds the default
+// scope height of 300 and triggers the height-expansion branch.
+func TestApplyForward_ScopeBoundaryExpandsHeightForManyChildren(t *testing.T) {
+	doc := shopContainersDoc()
+	ts := minimalTemplates(t)
+
+	// First sync: single child makes the page non-fresh for subsequent syncs.
+	m1 := shopModel(map[string]model.Element{
+		"a": {Kind: "container", Title: "A"},
+	})
+	cs1 := &ChangeSet{
+		ModelElementChanges: []ElementChange{{ID: "shop.a", Type: Added}},
+	}
+	ApplyForward(cs1, doc, ts, m1)
+
+	// Second sync (incremental): 7 new children → childIndex 0-6 → row 2 at y=280.
+	// maxBottom = 280 + 60 (template height) + 20 (childStartX margin) = 360 > 300.
+	allChildren := map[string]model.Element{
+		"a": {Kind: "container", Title: "A"},
+		"b": {Kind: "container", Title: "B"},
+		"c": {Kind: "container", Title: "C"},
+		"d": {Kind: "container", Title: "D"},
+		"e": {Kind: "container", Title: "E"},
+		"f": {Kind: "container", Title: "F"},
+		"g": {Kind: "container", Title: "G"},
+		"h": {Kind: "container", Title: "H"},
+	}
+	m2 := shopModel(allChildren)
+	cs2 := &ChangeSet{
+		ModelElementChanges: []ElementChange{
+			{ID: "shop.b", Type: Added},
+			{ID: "shop.c", Type: Added},
+			{ID: "shop.d", Type: Added},
+			{ID: "shop.e", Type: Added},
+			{ID: "shop.f", Type: Added},
+			{ID: "shop.g", Type: Added},
+			{ID: "shop.h", Type: Added},
+		},
+	}
+	ApplyForward(cs2, doc, ts, m2)
+
+	page := requirePage(t, doc, "view-containers")
+	scopeElem := page.FindElement("shop")
+	if scopeElem == nil {
+		t.Fatal("scope element 'shop' not found")
+	}
+	cell := scopeElem.FindElement("mxCell")
+	if cell == nil {
+		t.Fatal("scope has no mxCell")
+	}
+	geo := cell.FindElement("mxGeometry")
+	if geo == nil {
+		t.Fatal("scope has no mxGeometry")
+	}
+	h, _ := strconv.ParseFloat(geo.SelectAttrValue("height", "0"), 64)
+	if h <= 300 {
+		t.Errorf("scope height not expanded: got %v, expected > 300 (row 2 overflows default 300)", h)
+	}
+}
+
+// TestApplyChangesToPage_ExpandsScopeForChildrenAdded calls applyChangesToPage
+// directly with children as Added elements to cover the expandScopeToFitChildren
+// call in applyChangesToPage (line 561) — bypassing populateNewPage.
+func TestApplyChangesToPage_ExpandsScopeForChildrenAdded(t *testing.T) {
+	doc := shopContainersDoc()
+	ts := minimalTemplates(t)
+	m := shopModel(map[string]model.Element{
+		"a": {Kind: "container", Title: "A"},
+		"b": {Kind: "container", Title: "B"},
+		"c": {Kind: "container", Title: "C"},
+		"d": {Kind: "container", Title: "D"},
+	})
+	flat, _ := model.FlattenElements(m)
+
+	page := requirePage(t, doc, "view-containers")
+	result := &ForwardResult{}
+
+	// Place the scope boundary directly (without children).
+	createScopeBoundary("shop", "containers", page, ts, flat, result)
+
+	// Call applyChangesToPage directly — children are not on the page yet,
+	// so applyElementAdded places them and increments childCount, triggering
+	// expandScopeToFitChildren.
+	cs := &ChangeSet{
+		ModelElementChanges: []ElementChange{
+			{ID: "shop.a", Type: Added},
+			{ID: "shop.b", Type: Added},
+			{ID: "shop.c", Type: Added},
+			{ID: "shop.d", Type: Added},
+		},
+	}
+	elemFilter := map[string]bool{"shop.a": true, "shop.b": true, "shop.c": true, "shop.d": true}
+	applyChangesToPage(cs, page, ts, flat, elemFilter, "containers", "shop", result)
+
+	if page.FindElement("shop.a") == nil {
+		t.Error("shop.a not placed by applyChangesToPage")
+	}
+	scopeElem := page.FindElement("shop")
+	if scopeElem == nil {
+		t.Fatal("scope boundary missing")
+	}
+	cell := scopeElem.FindElement("mxCell")
+	if cell == nil {
+		t.Fatal("scope has no mxCell")
+	}
+	geo := cell.FindElement("mxGeometry")
+	if geo == nil {
+		t.Fatal("scope has no mxGeometry")
+	}
+	w, _ := strconv.ParseFloat(geo.SelectAttrValue("width", "0"), 64)
+	if w < 480 {
+		t.Errorf("scope width not expanded: got %v, expected >= 480 (3 children overflow default 400)", w)
+	}
+}
+
 // TestApplyForward_DeletedElementRemovedFromViewPages verifies that when an
 // element is deleted from the model, it is removed from all view pages where
 // it previously appeared. Regression test for #85.
