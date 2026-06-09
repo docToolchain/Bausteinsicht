@@ -714,34 +714,11 @@ func applyElementAdded(
 		return
 	}
 
-	elem, ok := flat[id]
+	elem, ts, baseStyle, ok := lookupElementStyle(id, flat, templates, spec, result)
 	if !ok {
-		result.Warnings = append(result.Warnings, "element not found in model: "+id)
 		return
 	}
-
-	ts, ok := templates.GetStyle(elem.Kind)
-	if !ok {
-		ts = drawio.TemplateStyle{Width: defaultWidth, Height: defaultHeight}
-		result.Warnings = append(result.Warnings, "no template style for kind: "+elem.Kind)
-	}
-
-	// Apply tag-based styles if any tags are defined on the element
-	baseStyle := ts.Style
-	if spec != nil && len(elem.Tags) > 0 {
-		baseStyle = applyTagStyles(elem, spec, baseStyle)
-	}
-
 	style := mergeStyles(baseStyle, newElementMarker)
-
-	width := ts.Width
-	if width == 0 {
-		width = defaultWidth
-	}
-	height := ts.Height
-	if height == 0 {
-		height = defaultHeight
-	}
 
 	// For child elements, use relative coordinates within the parent.
 	// Position children in a grid starting at (20, 80) inside the parent boundary (#330).
@@ -753,31 +730,13 @@ func applyElementAdded(
 		pl.childCount[scopeID]++
 	}
 
-	data := drawio.ElementData{
-		ID:          id,
-		CellID:      scopedCellID(viewID, id),
-		Kind:        elem.Kind,
-		Title:       elem.Title,
-		Technology:  elem.Technology,
-		Description: elem.Description,
-		X:           x,
-		Y:           y,
-		Width:       width,
-		Height:      height,
-		SubCells:    subCellsFromTemplate(ts),
-	}
-
-	// Parent children of the scope element to the boundary cell.
-	if scopeID != "" && isChildOf(id, scopeID) {
-		data.ParentID = scopedCellID(viewID, scopeID)
-	}
-
+	data := buildElementData(id, viewID, scopeID, elem, ts, x, y)
 	if err := page.CreateElement(data, style); err != nil {
 		result.Warnings = append(result.Warnings, "failed to create element "+id+": "+err.Error())
 		return
 	}
 
-	pl.nextX += width + elementGap
+	pl.nextX += data.Width + elementGap
 	result.ElementsCreated++
 }
 
@@ -798,22 +757,9 @@ func placeSingleElement(
 		return
 	}
 
-	elem, ok := flat[id]
+	elem, ts, baseStyle, ok := lookupElementStyle(id, flat, templates, spec, result)
 	if !ok {
-		result.Warnings = append(result.Warnings, "element not found in model: "+id)
 		return
-	}
-
-	ts, ok := templates.GetStyle(elem.Kind)
-	if !ok {
-		ts = drawio.TemplateStyle{Width: defaultWidth, Height: defaultHeight}
-		result.Warnings = append(result.Warnings, "no template style for kind: "+elem.Kind)
-	}
-
-	baseStyle := ts.Style
-	// Apply tag-based styles if any tags are defined on the element
-	if spec != nil && len(elem.Tags) > 0 {
-		baseStyle = applyTagStyles(elem, spec, baseStyle)
 	}
 
 	style := baseStyle
@@ -821,33 +767,7 @@ func placeSingleElement(
 		style = mergeStyles(baseStyle, newElementMarker)
 	}
 
-	width := ts.Width
-	if width == 0 {
-		width = defaultWidth
-	}
-	height := ts.Height
-	if height == 0 {
-		height = defaultHeight
-	}
-
-	data := drawio.ElementData{
-		ID:          id,
-		CellID:      scopedCellID(viewID, id),
-		Kind:        elem.Kind,
-		Title:       elem.Title,
-		Technology:  elem.Technology,
-		Description: elem.Description,
-		X:           x,
-		Y:           y,
-		Width:       width,
-		Height:      height,
-		SubCells:    subCellsFromTemplate(ts),
-	}
-
-	if scopeID != "" && isChildOf(id, scopeID) {
-		data.ParentID = scopedCellID(viewID, scopeID)
-	}
-
+	data := buildElementData(id, viewID, scopeID, elem, ts, x, y)
 	if err := page.CreateElement(data, style); err != nil {
 		result.Warnings = append(result.Warnings, "failed to create element "+id+": "+err.Error())
 		return
@@ -1001,6 +921,62 @@ func resolveElementFields(ch ElementChange, page *drawio.Page, elem *model.Eleme
 		description = elem.Description
 	}
 	return
+}
+
+// lookupElementStyle resolves the model element, template style, and computed base style
+// for a given element ID. Returns ok=false and appends a warning if the element is unknown.
+func lookupElementStyle(
+	id string,
+	flat map[string]*model.Element,
+	templates *drawio.TemplateSet,
+	spec *model.Specification,
+	result *ForwardResult,
+) (elem *model.Element, ts drawio.TemplateStyle, baseStyle string, ok bool) {
+	e, exists := flat[id]
+	if !exists {
+		result.Warnings = append(result.Warnings, "element not found in model: "+id)
+		return nil, drawio.TemplateStyle{}, "", false
+	}
+	style, styleOk := templates.GetStyle(e.Kind)
+	if !styleOk {
+		style = drawio.TemplateStyle{Width: defaultWidth, Height: defaultHeight}
+		result.Warnings = append(result.Warnings, "no template style for kind: "+e.Kind)
+	}
+	bs := style.Style
+	if spec != nil && len(e.Tags) > 0 {
+		bs = applyTagStyles(e, spec, bs)
+	}
+	return e, style, bs, true
+}
+
+// buildElementData constructs the drawio.ElementData for placing a model element on a page.
+// Width and height default to package-level defaults when the template specifies zero.
+func buildElementData(id, viewID, scopeID string, elem *model.Element, ts drawio.TemplateStyle, x, y float64) drawio.ElementData {
+	w := ts.Width
+	if w == 0 {
+		w = defaultWidth
+	}
+	h := ts.Height
+	if h == 0 {
+		h = defaultHeight
+	}
+	data := drawio.ElementData{
+		ID:          id,
+		CellID:      scopedCellID(viewID, id),
+		Kind:        elem.Kind,
+		Title:       elem.Title,
+		Technology:  elem.Technology,
+		Description: elem.Description,
+		X:           x,
+		Y:           y,
+		Width:       w,
+		Height:      h,
+		SubCells:    subCellsFromTemplate(ts),
+	}
+	if scopeID != "" && isChildOf(id, scopeID) {
+		data.ParentID = scopedCellID(viewID, scopeID)
+	}
+	return data
 }
 
 // applyElementModified updates the changed field of an existing element.
