@@ -2,6 +2,9 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -176,6 +179,83 @@ func TestReplUndoEmpty(t *testing.T) {
 func TestReplValidateCommand(t *testing.T) {
 	s := newTestReplState("")
 	s.validateCommand()
+}
+
+// TestReplAutoDetectFallback_NoModelFile verifies that the REPL command returns
+// an error when no model file is found and --model is not set.
+func TestReplAutoDetectFallback_NoModelFile(t *testing.T) {
+	dir := t.TempDir()
+	orig, _ := os.Getwd()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	defer func() { _ = os.Chdir(orig) }()
+
+	cmd := newReplCmd()
+	cmd.SetArgs([]string{})
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error when no .jsonc file found, got nil")
+	}
+}
+
+// TestReplAutoDetectFallback_FindsModel verifies that the REPL loads a model
+// via auto-detection (no --model flag) when exactly one .jsonc file is present.
+// The REPL loop exits immediately on EOF — no stdin interaction needed.
+func TestReplAutoDetectFallback_FindsModel(t *testing.T) {
+	dir := t.TempDir()
+
+	m := &model.BausteinsichtModel{
+		Model:         map[string]model.Element{"svc": {Kind: "system", Title: "Svc"}},
+		Relationships: []model.Relationship{},
+		Views:         map[string]model.View{},
+	}
+	data, _ := json.Marshal(m)
+	modelPath := filepath.Join(dir, "arch.jsonc")
+	if err := os.WriteFile(modelPath, data, 0600); err != nil {
+		t.Fatalf("writing model: %v", err)
+	}
+
+	orig, _ := os.Getwd()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	defer func() { _ = os.Chdir(orig) }()
+
+	// Replace stdin with an empty reader so the REPL loop exits immediately on EOF.
+	oldStdin := os.Stdin
+	r, w, _ := os.Pipe()
+	os.Stdin = r
+	_ = w.Close()
+	defer func() { os.Stdin = oldStdin }()
+
+	cmd := newReplCmd()
+	cmd.SetArgs([]string{})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("expected clean exit on auto-detected model, got: %v", err)
+	}
+}
+
+// TestReplAutoDetectFallback_AmbiguousModel verifies that two .jsonc files
+// in the same directory cause auto-detection to fail with an error.
+func TestReplAutoDetectFallback_AmbiguousModel(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{"a.jsonc", "b.jsonc"} {
+		_ = os.WriteFile(filepath.Join(dir, name), []byte(`{}`), 0600)
+	}
+
+	orig, _ := os.Getwd()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	defer func() { _ = os.Chdir(orig) }()
+
+	cmd := newReplCmd()
+	cmd.SetArgs([]string{})
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error for ambiguous model, got nil")
+	}
 }
 
 // TestReplUndoStackCapped verifies the undo stack is trimmed to maxUndoLen.
