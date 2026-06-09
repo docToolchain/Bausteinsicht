@@ -110,7 +110,9 @@ func writeTempDrawio(t *testing.T, content string) string {
 	if _, err := f.WriteString(content); err != nil {
 		t.Fatalf("write temp drawio: %v", err)
 	}
-	f.Close()
+	if err := f.Close(); err != nil {
+		t.Fatalf("close temp drawio: %v", err)
+	}
 	return f.Name()
 }
 
