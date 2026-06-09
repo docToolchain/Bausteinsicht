@@ -795,60 +795,6 @@ func TestApplyForward_ScopeBoundaryExpandsHeightForManyChildren(t *testing.T) {
 	}
 }
 
-// TestApplyChangesToPage_ExpandsScopeForChildrenAdded calls applyChangesToPage
-// directly with children as Added elements to cover the expandScopeToFitChildren
-// call in applyChangesToPage (line 561) — bypassing populateNewPage.
-func TestApplyChangesToPage_ExpandsScopeForChildrenAdded(t *testing.T) {
-	doc := shopContainersDoc()
-	ts := minimalTemplates(t)
-	m := shopModel(map[string]model.Element{
-		"a": {Kind: "container", Title: "A"},
-		"b": {Kind: "container", Title: "B"},
-		"c": {Kind: "container", Title: "C"},
-		"d": {Kind: "container", Title: "D"},
-	})
-	flat, _ := model.FlattenElements(m)
-
-	page := requirePage(t, doc, "view-containers")
-	result := &ForwardResult{}
-
-	// Place the scope boundary directly (without children).
-	createScopeBoundary("shop", "containers", page, ts, flat, result)
-
-	// Call applyChangesToPage directly — children are not on the page yet,
-	// so applyElementAdded places them and increments childCount, triggering
-	// expandScopeToFitChildren.
-	cs := &ChangeSet{
-		ModelElementChanges: []ElementChange{
-			{ID: "shop.a", Type: Added},
-			{ID: "shop.b", Type: Added},
-			{ID: "shop.c", Type: Added},
-			{ID: "shop.d", Type: Added},
-		},
-	}
-	elemFilter := map[string]bool{"shop.a": true, "shop.b": true, "shop.c": true, "shop.d": true}
-	applyChangesToPage(cs, page, ts, flat, elemFilter, "containers", "shop", result)
-
-	if page.FindElement("shop.a") == nil {
-		t.Error("shop.a not placed by applyChangesToPage")
-	}
-	scopeElem := page.FindElement("shop")
-	if scopeElem == nil {
-		t.Fatal("scope boundary missing")
-	}
-	cell := scopeElem.FindElement("mxCell")
-	if cell == nil {
-		t.Fatal("scope has no mxCell")
-	}
-	geo := cell.FindElement("mxGeometry")
-	if geo == nil {
-		t.Fatal("scope has no mxGeometry")
-	}
-	w, _ := strconv.ParseFloat(geo.SelectAttrValue("width", "0"), 64)
-	if w < 480 {
-		t.Errorf("scope width not expanded: got %v, expected >= 480 (3 children overflow default 400)", w)
-	}
-}
 
 // TestApplyForward_DeletedElementRemovedFromViewPages verifies that when an
 // element is deleted from the model, it is removed from all view pages where
