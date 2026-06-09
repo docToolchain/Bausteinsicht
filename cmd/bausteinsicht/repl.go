@@ -95,27 +95,27 @@ func (s *replState) executeCommand(line string, cmd *cobra.Command) error {
 	case "list":
 		if len(parts) < 2 {
 			fmt.Println("Usage: list <elements|relationships|views>")
-		} else {
-			s.listCommand(parts[1:])
+			return nil
 		}
+		s.listCommand(parts[1:])
 	case "add":
 		if len(parts) < 2 {
 			fmt.Println("Usage: add <element|relationship>")
-		} else {
-			s.addCommand(parts[1:])
+			return nil
 		}
+		s.addCommand(parts[1:])
 	case "show":
 		if len(parts) < 2 {
 			fmt.Println("Usage: show <element-id>")
-		} else {
-			s.showCommand(parts[1:])
+			return nil
 		}
+		s.showCommand(parts[1:])
 	case "remove":
 		if len(parts) < 2 {
 			fmt.Println("Usage: remove element <id> | remove relationship <from> <to>")
-		} else {
-			s.removeCommand(parts[1:])
+			return nil
 		}
+		s.removeCommand(parts[1:])
 	case "validate":
 		s.validateCommand()
 	case "save":
@@ -127,18 +127,22 @@ func (s *replState) executeCommand(line string, cmd *cobra.Command) error {
 			return err
 		}
 	case "exit":
-		if s.modified {
-			fmt.Print("Model has unsaved changes. Exit anyway? (yes/no): ")
-			if s.scanner.Scan() && strings.ToLower(s.scanner.Text()) == "yes" {
-				return errReplExit
-			}
-			return nil
-		}
-		return errReplExit
+		return s.exitCommand()
 	default:
 		fmt.Printf("Unknown command: %s\n", parts[0])
 	}
 
+	return nil
+}
+
+func (s *replState) exitCommand() error {
+	if !s.modified {
+		return errReplExit
+	}
+	fmt.Print("Model has unsaved changes. Exit anyway? (yes/no): ")
+	if s.scanner.Scan() && strings.ToLower(s.scanner.Text()) == "yes" {
+		return errReplExit
+	}
 	return nil
 }
 
