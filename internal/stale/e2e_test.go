@@ -96,21 +96,7 @@ func TestE2E_CompleteWorkflow(t *testing.T) {
 		if err != nil {
 			t.Fatalf("JSON formatting failed: %v", err)
 		}
-
-		var parsed map[string]interface{}
-		if err := json.Unmarshal([]byte(output), &parsed); err != nil {
-			t.Errorf("output is not valid JSON: %v", err)
-		}
-
-		if _, ok := parsed["StaleElements"]; !ok {
-			t.Error("JSON missing StaleElements field")
-		}
-		if _, ok := parsed["TotalElements"]; !ok {
-			t.Error("JSON missing TotalElements field")
-		}
-		if _, ok := parsed["Timestamp"]; !ok {
-			t.Error("JSON missing Timestamp field")
-		}
+		checkJSONFields(t, output)
 	})
 
 	t.Run("Configuration loading", func(t *testing.T) {
@@ -135,36 +121,16 @@ func TestE2E_CompleteWorkflow(t *testing.T) {
 
 	t.Run("Recommendations", func(t *testing.T) {
 		elem := StaleElement{
-			ID:             "test",
-			MissingStatus:  true,
-			MissingADR:     true,
+			ID:               "test",
+			MissingStatus:    true,
+			MissingADR:       true,
 			IncomingRelCount: 2,
 		}
 		recs := generateRecommendations(elem)
 		if len(recs) < 3 {
 			t.Errorf("expected at least 3 recommendations, got %d: %v", len(recs), recs)
 		}
-
-		// Should recommend setting status and reviewing relationships
-		hasStatusRec := false
-		hasADRRec := false
-		hasRelRec := false
-		for _, rec := range recs {
-			if hasKeyword(rec, "status") {
-				hasStatusRec = true
-			}
-			if hasKeyword(rec, "ADR") {
-				hasADRRec = true
-			}
-			if hasKeyword(rec, "incoming") || hasKeyword(rec, "relationship") {
-				hasRelRec = true
-			}
-		}
-
-		if !hasStatusRec || !hasADRRec || !hasRelRec {
-			t.Errorf("missing expected recommendations. status=%v, adr=%v, rel=%v",
-				hasStatusRec, hasADRRec, hasRelRec)
-		}
+		checkRecsHaveKeywords(t, recs)
 	})
 }
 
@@ -300,21 +266,13 @@ func TestAcceptanceCriteria(t *testing.T) {
 	t.Run("AC3: Recommendations generated", func(t *testing.T) {
 		// AC: Each stale element has actionable recommendations
 		elem := StaleElement{
-			ID:             "test",
-			MissingStatus:  true,
-			MissingADR:     true,
+			ID:               "test",
+			MissingStatus:    true,
+			MissingADR:       true,
 			IncomingRelCount: 0,
 		}
 		recs := generateRecommendations(elem)
-		if len(recs) == 0 {
-			t.Error("AC3: No recommendations generated for stale element")
-		}
-
-		for _, rec := range recs {
-			if rec == "" {
-				t.Error("AC3: Empty recommendation string")
-			}
-		}
+		requireNonEmptyRecs(t, "AC3", recs)
 	})
 
 	t.Run("AC4: Output formats", func(t *testing.T) {
@@ -343,6 +301,7 @@ func TestAcceptanceCriteria(t *testing.T) {
 }
 
 // Helper functions
+
 func boolToInt(b bool) int {
 	if b {
 		return 1
@@ -352,4 +311,53 @@ func boolToInt(b bool) int {
 
 func hasKeyword(s, keyword string) bool {
 	return strings.Contains(s, keyword)
+}
+
+// checkJSONFields asserts that output is valid JSON containing the expected top-level fields.
+func checkJSONFields(t *testing.T, output string) {
+	t.Helper()
+	var parsed map[string]interface{}
+	if err := json.Unmarshal([]byte(output), &parsed); err != nil {
+		t.Errorf("output is not valid JSON: %v", err)
+		return
+	}
+	for _, field := range []string{"StaleElements", "TotalElements", "Timestamp"} {
+		if _, ok := parsed[field]; !ok {
+			t.Errorf("JSON missing %s field", field)
+		}
+	}
+}
+
+// checkRecsHaveKeywords asserts that recs contains recommendations mentioning status, ADR, and relationships.
+func checkRecsHaveKeywords(t *testing.T, recs []string) {
+	t.Helper()
+	hasStatus, hasADR, hasRel := false, false, false
+	for _, rec := range recs {
+		if hasKeyword(rec, "status") {
+			hasStatus = true
+		}
+		if hasKeyword(rec, "ADR") {
+			hasADR = true
+		}
+		if hasKeyword(rec, "incoming") || hasKeyword(rec, "relationship") {
+			hasRel = true
+		}
+	}
+	if !hasStatus || !hasADR || !hasRel {
+		t.Errorf("missing expected recommendations. status=%v, adr=%v, rel=%v", hasStatus, hasADR, hasRel)
+	}
+}
+
+// requireNonEmptyRecs asserts that recs is non-empty and all entries are non-empty strings.
+func requireNonEmptyRecs(t *testing.T, tag string, recs []string) {
+	t.Helper()
+	if len(recs) == 0 {
+		t.Errorf("%s: No recommendations generated for stale element", tag)
+		return
+	}
+	for _, rec := range recs {
+		if rec == "" {
+			t.Errorf("%s: Empty recommendation string", tag)
+		}
+	}
 }

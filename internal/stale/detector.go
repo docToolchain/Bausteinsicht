@@ -1,6 +1,7 @@
 package stale
 
 import (
+	"strings"
 	"time"
 
 	"github.com/docToolchain/Bausteinsicht/internal/model"
@@ -48,21 +49,8 @@ func Detect(m *model.BausteinsichtModel, modelPath string, config StaleConfig) (
 			continue
 		}
 
-		// Determine element's last modified time:
-		// Priority 1: explicit lastModified field in model (per-element override)
-		// Priority 2: git-based per-element search
-		// Priority 3: file-level modification date (fallback)
-		elemLastModified := fileLastModified
-		if elem.LastModified != "" {
-			if parsedTime, err := time.Parse(time.RFC3339, elem.LastModified); err == nil {
-				elemLastModified = parsedTime
-			}
-		} else {
-			// Try per-element git search
-			if gitMod, err := GetLastModifiedDateForElement(modelPath, dotPath); err == nil && !gitMod.IsZero() {
-				elemLastModified = gitMod
-			}
-		}
+		// Determine element's last modified time (priority: explicit → git → file fallback).
+		elemLastModified := resolveLastModified(elem, modelPath, dotPath, fileLastModified)
 
 		// Check staleness criteria
 		if !shouldFlag(elem, elemLastModified, config) {
@@ -115,6 +103,21 @@ func shouldFlag(elem *model.Element, lastModified time.Time, config StaleConfig)
 	return true
 }
 
+// resolveLastModified returns the best available modification time for an element.
+// Priority: explicit lastModified field → per-element git search → fallback.
+func resolveLastModified(elem *model.Element, modelPath, dotPath string, fallback time.Time) time.Time {
+	if elem.LastModified != "" {
+		if t, err := time.Parse(time.RFC3339, elem.LastModified); err == nil {
+			return t
+		}
+		return fallback
+	}
+	if gitMod, err := GetLastModifiedDateForElement(modelPath, dotPath); err == nil && !gitMod.IsZero() {
+		return gitMod
+	}
+	return fallback
+}
+
 // isExcluded checks if an element kind is in the exclusion list.
 func isExcluded(kind string, excludeKinds []string) bool {
 	for _, excluded := range excludeKinds {
@@ -140,24 +143,27 @@ func isTagExcluded(elemTags []string, excludeTags []string) bool {
 	return false
 }
 
+// matchesViewPattern returns true if dotPath matches a single include pattern.
+func matchesViewPattern(dotPath, pattern string) bool {
+	if pattern == "" {
+		return false
+	}
+	if pattern == "*" || pattern == dotPath {
+		return true
+	}
+	if !strings.HasSuffix(pattern, "*") {
+		return false
+	}
+	prefix := pattern[:len(pattern)-1]
+	return len(dotPath) > len(prefix) && strings.HasPrefix(dotPath, prefix)
+}
+
 // isViewIncluded checks if an element is explicitly included in any view.
 func isViewIncluded(dotPath string, m *model.BausteinsichtModel) bool {
 	for _, view := range m.Views {
 		for _, pattern := range view.Include {
-			// Skip empty patterns to avoid panics
-			if pattern == "" {
-				continue
-			}
-			// Simple pattern matching: exact match or wildcard
-			if pattern == "*" || pattern == dotPath {
+			if matchesViewPattern(dotPath, pattern) {
 				return true
-			}
-			// Check prefix patterns like "system.*"
-			if pattern[len(pattern)-1:] == "*" {
-				prefix := pattern[:len(pattern)-1]
-				if len(dotPath) > len(prefix) && dotPath[:len(prefix)] == prefix {
-					return true
-				}
 			}
 		}
 	}

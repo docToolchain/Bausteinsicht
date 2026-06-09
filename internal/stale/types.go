@@ -55,52 +55,63 @@ func DefaultConfig() StaleConfig {
 	}
 }
 
+// metaInt reads an int from a JSON-decoded map (JSON numbers decode as float64).
+func metaInt(m map[string]interface{}, key string, def int) int {
+	v, ok := m[key]
+	if !ok {
+		return def
+	}
+	f, ok := v.(float64)
+	if !ok {
+		return def
+	}
+	return int(f)
+}
+
+// metaStringSlice reads a []string from a JSON-decoded map.
+func metaStringSlice(m map[string]interface{}, key string) []string {
+	v, ok := m[key]
+	if !ok {
+		return nil
+	}
+	items, ok := v.([]interface{})
+	if !ok {
+		return nil
+	}
+	result := make([]string, 0, len(items))
+	for _, item := range items {
+		if s, ok := item.(string); ok {
+			result = append(result, s)
+		}
+	}
+	return result
+}
+
 // LoadConfigFromModel extracts stale detection config from model metadata.
 // Looks for a "staleDetection" key in model.Meta with optional fields:
-//   thresholdDays: int
-//   excludeKinds: []string
-//   excludeTags: []string
+//
+//	thresholdDays: int
+//	excludeKinds: []string
+//	excludeTags: []string
 func LoadConfigFromModel(m *model.BausteinsichtModel) StaleConfig {
 	config := DefaultConfig()
 	if m == nil || m.Meta == nil {
 		return config
 	}
-
-	// Look for staleDetection config in metadata
-	if staleDetVal, ok := m.Meta["staleDetection"]; ok {
-		if staleDetMap, ok := staleDetVal.(map[string]interface{}); ok {
-			// Extract thresholdDays
-			if thresholdVal, ok := staleDetMap["thresholdDays"]; ok {
-				if threshold, ok := thresholdVal.(float64); ok {
-					config.ThresholdDays = int(threshold)
-				}
-			}
-
-			// Extract excludeKinds
-			if excludeKindsVal, ok := staleDetMap["excludeKinds"]; ok {
-				if kindsSlice, ok := excludeKindsVal.([]interface{}); ok {
-					config.ExcludeKinds = make([]string, 0, len(kindsSlice))
-					for _, k := range kindsSlice {
-						if kindStr, ok := k.(string); ok {
-							config.ExcludeKinds = append(config.ExcludeKinds, kindStr)
-						}
-					}
-				}
-			}
-
-			// Extract excludeTags
-			if excludeTagsVal, ok := staleDetMap["excludeTags"]; ok {
-				if tagsSlice, ok := excludeTagsVal.([]interface{}); ok {
-					config.ExcludeTags = make([]string, 0, len(tagsSlice))
-					for _, t := range tagsSlice {
-						if tagStr, ok := t.(string); ok {
-							config.ExcludeTags = append(config.ExcludeTags, tagStr)
-						}
-					}
-				}
-			}
-		}
+	staleDetVal, ok := m.Meta["staleDetection"]
+	if !ok {
+		return config
 	}
-
+	staleDetMap, ok := staleDetVal.(map[string]interface{})
+	if !ok {
+		return config
+	}
+	config.ThresholdDays = metaInt(staleDetMap, "thresholdDays", config.ThresholdDays)
+	if kinds := metaStringSlice(staleDetMap, "excludeKinds"); kinds != nil {
+		config.ExcludeKinds = kinds
+	}
+	if tags := metaStringSlice(staleDetMap, "excludeTags"); tags != nil {
+		config.ExcludeTags = tags
+	}
 	return config
 }
