@@ -503,26 +503,31 @@ func TestApplyForward_ChildElementsUseRelativeCoordinates(t *testing.T) {
 func TestApplyForward_ScopeBoundaryExpandsForManyChildren(t *testing.T) {
 	doc := shopContainersDoc()
 	ts := minimalTemplates(t)
-	m := shopModel(map[string]model.Element{
-		"a": {Kind: "container", Title: "A"},
-		"b": {Kind: "container", Title: "B"},
-		"c": {Kind: "container", Title: "C"},
-		"d": {Kind: "container", Title: "D"},
-	})
 
-	// First sync: adds one child via the fresh-page layout engine so the page
-	// becomes non-fresh for subsequent syncs.
+	// First sync: m1 has only shop.a — fresh page places exactly one child.
+	// This makes the page non-fresh for the next sync.
+	m1 := shopModel(map[string]model.Element{
+		"a": {Kind: "container", Title: "A"},
+	})
 	cs1 := &ChangeSet{
 		ModelElementChanges: []ElementChange{
 			{ID: "shop.a", Type: Added},
 		},
 	}
-	ApplyForward(cs1, doc, ts, m)
+	ApplyForward(cs1, doc, ts, m1)
 
-	// Second sync (incremental): adds three more children in one grid row.
+	// Second sync (incremental): m2 adds b/c/d; page already has shop.a so
+	// populateNewPage takes the incremental cursor path and childCount > 0,
+	// triggering expandScopeToFitChildren.
 	// Grid col 2 → x=340, width=120, right=460; + childStartX(20) padding = 480.
 	// This exceeds the default boundary width (400), so expandScopeToFitChildren
 	// must grow the boundary.
+	m2 := shopModel(map[string]model.Element{
+		"a": {Kind: "container", Title: "A"},
+		"b": {Kind: "container", Title: "B"},
+		"c": {Kind: "container", Title: "C"},
+		"d": {Kind: "container", Title: "D"},
+	})
 	cs2 := &ChangeSet{
 		ModelElementChanges: []ElementChange{
 			{ID: "shop.b", Type: Added},
@@ -530,7 +535,7 @@ func TestApplyForward_ScopeBoundaryExpandsForManyChildren(t *testing.T) {
 			{ID: "shop.d", Type: Added},
 		},
 	}
-	ApplyForward(cs2, doc, ts, m)
+	ApplyForward(cs2, doc, ts, m2)
 
 	page := requirePage(t, doc, "view-containers")
 

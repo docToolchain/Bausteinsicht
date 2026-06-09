@@ -972,6 +972,37 @@ func subCellsFromTemplate(ts drawio.TemplateStyle) *drawio.SubCellTemplates {
 	}
 }
 
+// resolveElementFields returns the display values to write for a Modified element change.
+// When ch.Field is set, it reads current draw.io values and overrides only the one changed
+// field to avoid overwriting concurrent draw.io edits to other fields. (#109)
+func resolveElementFields(ch ElementChange, page *drawio.Page, elem *model.Element) (title, technology, description string) {
+	title = elem.Title
+	technology = elem.Technology
+	description = elem.Description
+
+	if ch.Field == "" {
+		return
+	}
+	obj := page.FindElement(ch.ID)
+	if obj == nil {
+		return
+	}
+	curTitle, curTech, curDesc := page.ReadElementFields(obj)
+	if curTooltip := obj.SelectAttrValue("tooltip", ""); curDesc == "" {
+		curDesc = curTooltip
+	}
+	title, technology, description = curTitle, curTech, curDesc
+	switch ch.Field {
+	case "title":
+		title = elem.Title
+	case "technology":
+		technology = elem.Technology
+	case "description":
+		description = elem.Description
+	}
+	return
+}
+
 // applyElementModified updates the changed field of an existing element.
 func applyElementModified(
 	ch ElementChange,
@@ -998,46 +1029,13 @@ func applyElementModified(
 		return
 	}
 
-	// When a specific field is known, read the current draw.io values and only
-	// override the changed field. This prevents overwriting draw.io-side changes
-	// to other fields during concurrent modification. (#109)
-	title := elem.Title
-	technology := elem.Technology
-	description := elem.Description
-
-	if ch.Field != "" {
-		obj := page.FindElement(ch.ID)
-		if obj != nil {
-			// Use ReadElementFields which handles both sub-cells and HTML labels.
-			curTitle, curTech, curDesc := page.ReadElementFields(obj)
-			curTooltip := obj.SelectAttrValue("tooltip", "")
-			if curDesc == "" {
-				curDesc = curTooltip
-			}
-
-			// Start from current draw.io values, override only the changed field.
-			title = curTitle
-			technology = curTech
-			description = curDesc
-
-			switch ch.Field {
-			case "title":
-				title = elem.Title
-			case "technology":
-				technology = elem.Technology
-			case "description":
-				description = elem.Description
-			}
-		}
-	}
-
-	data := drawio.ElementData{
+	title, technology, description := resolveElementFields(ch, page, elem)
+	page.UpdateElement(ch.ID, drawio.ElementData{
 		ID:          ch.ID,
 		Title:       title,
 		Technology:  technology,
 		Description: description,
-	}
-	page.UpdateElement(ch.ID, data)
+	})
 	result.ElementsUpdated++
 }
 
