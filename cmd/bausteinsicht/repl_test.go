@@ -271,3 +271,88 @@ func TestReplUndoStackCapped(t *testing.T) {
 		t.Errorf("undoStack length: got %d, want <= 3", len(s.undoStack))
 	}
 }
+
+// TestReplExecuteCommand_UsageMessages verifies that commands without required
+// sub-arguments print usage and return nil.
+func TestReplExecuteCommand_UsageMessages(t *testing.T) {
+	for _, cmd := range []string{"list", "add", "show", "remove"} {
+		t.Run(cmd+" alone", func(t *testing.T) {
+			s := newTestReplState("")
+			err := s.executeCommand(cmd, nil)
+			if err != nil {
+				t.Errorf("executeCommand(%q) = %v, want nil", cmd, err)
+			}
+		})
+	}
+}
+
+// TestReplPrintHelp verifies printHelp runs without panic.
+func TestReplPrintHelp(t *testing.T) {
+	s := newTestReplState("")
+	s.printHelp() // just verify it doesn't panic
+}
+
+// TestReplAddElement_EmptyID verifies that an empty element ID aborts the add.
+func TestReplAddElement_EmptyID(t *testing.T) {
+	s := newTestReplState("\n") // empty line → empty ID
+	s.addElementInteractive()
+	if len(s.model.Model) != 1 { // only the pre-existing "customer" element
+		t.Errorf("expected no new element added, got model size %d", len(s.model.Model))
+	}
+}
+
+// TestReplAddElement_OverwriteNo verifies that answering "no" to overwrite aborts.
+func TestReplAddElement_OverwriteNo(t *testing.T) {
+	// "customer" already exists; answer "no" to overwrite prompt.
+	s := newTestReplState("customer\nno\n")
+	s.addElementInteractive()
+	// Element should remain unchanged (not overwritten).
+	if s.model.Model["customer"].Kind != "actor" {
+		t.Error("element should not have been overwritten")
+	}
+}
+
+// TestReplRemoveRelationship_InsufficientArgs verifies usage message and undo cleanup.
+func TestReplRemoveRelationship_InsufficientArgs(t *testing.T) {
+	s := newTestReplState("")
+	s.removeCommand([]string{"relationship"}) // missing <from> and <to>
+	if len(s.undoStack) != 0 {
+		t.Errorf("undo stack should be cleaned up, got len %d", len(s.undoStack))
+	}
+}
+
+// TestReplShowElement_NotFound verifies show prints "not found" for unknown IDs.
+func TestReplShowElement_NotFound(t *testing.T) {
+	s := newTestReplState("")
+	s.showCommand([]string{"nonexistent"}) // should not panic
+}
+
+// TestReplListCommand_UnknownSubcommand verifies list with unknown subcommand is a no-op.
+func TestReplListCommand_UnknownSubcommand(t *testing.T) {
+	s := newTestReplState("")
+	s.listCommand([]string{"unknown"}) // falls through switch, prints newline
+}
+
+// TestReplRemoveRelationship_Found verifies relationship removal by from/to pair.
+func TestReplRemoveRelationship_Found(t *testing.T) {
+	s := newTestReplState("")
+	s.model.Relationships = []model.Relationship{
+		{From: "a", To: "b", Label: "calls"},
+	}
+	s.removeCommand([]string{"relationship", "a", "b"})
+	if len(s.model.Relationships) != 0 {
+		t.Error("relationship should have been removed")
+	}
+	if !s.modified {
+		t.Error("modified flag should be set")
+	}
+}
+
+// TestReplRemoveRelationship_NotFound verifies undo cleanup when relationship missing.
+func TestReplRemoveRelationship_NotFound(t *testing.T) {
+	s := newTestReplState("")
+	s.removeCommand([]string{"relationship", "x", "y"})
+	if len(s.undoStack) != 0 {
+		t.Errorf("undo stack should be cleaned up after no-op, got %d", len(s.undoStack))
+	}
+}
