@@ -14,6 +14,13 @@ import (
 // newTestReplState returns a replState with an in-memory scanner for testing.
 func newTestReplState(input string) *replState {
 	m := &model.BausteinsichtModel{
+		Specification: model.Specification{
+			Elements: map[string]model.ElementKind{
+				"actor":     {Notation: "Person"},
+				"system":    {Notation: "System", Container: true},
+				"container": {Notation: "Container"},
+			},
+		},
 		Model: map[string]model.Element{
 			"customer": {Kind: "actor", Title: "Customer"},
 			"webshop":  {Kind: "system", Title: "Webshop"},
@@ -430,7 +437,12 @@ func newFileReplState(t *testing.T, input string) (*replState, string) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "model.jsonc")
 	initial := `{
-  "specification": {"elements": {}, "relationships": {}},
+  "specification": {
+    "elements": {
+      "actor":  {"notation": "Person"},
+      "system": {"notation": "System"}
+    }
+  },
   "model": {
     "customer": {"kind": "actor", "title": "Customer"},
     "webshop": {"kind": "system", "title": "Webshop"}

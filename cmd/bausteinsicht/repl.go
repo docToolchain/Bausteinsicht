@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/docToolchain/Bausteinsicht/internal/model"
@@ -64,7 +65,13 @@ func runRepl(cmd *cobra.Command, _ []string) error {
 	for {
 		fmt.Print("> ")
 		if !state.scanner.Scan() {
-			break // EOF
+			if err := state.scanner.Err(); err != nil {
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Error reading input: %v\n", err)
+			}
+			if state.modified {
+				fmt.Println("Warning: exiting with unsaved changes (EOF)")
+			}
+			break
 		}
 
 		line := strings.TrimSpace(state.scanner.Text())
@@ -112,7 +119,7 @@ func (s *replState) executeCommand(line string, cmd *cobra.Command) error {
 		s.showCommand(parts[1:])
 	case "remove":
 		if len(parts) < 2 {
-			fmt.Println("Usage: remove element <id> | remove relationship <from> <to>")
+			fmt.Println("Usage: remove element <id> | remove relationship <from> <to> [label]")
 			return nil
 		}
 		s.removeCommand(parts[1:])
@@ -155,8 +162,8 @@ Commands:
   add element            — Add new element (guided prompts)
   add relationship       — Add new relationship (guided prompts)
   show <id>              — Show element details
-  remove element <id>    — Remove top-level element
-  remove relationship <from> <to> — Remove relationship
+  remove element <id>              — Remove top-level element
+  remove relationship <from> <to> [label] — Remove relationship
   validate               — Validate model
   save                   — Save changes to file
   undo                   — Undo last change
@@ -173,24 +180,46 @@ func (s *replState) listCommand(parts []string) {
 	switch parts[0] {
 	case "elements":
 		flat, _ := model.FlattenElements(s.model)
+		ids := make([]string, 0, len(flat))
+		for id := range flat {
+			ids = append(ids, id)
+		}
+		sort.Strings(ids)
 		fmt.Printf("\n%-30s %-15s %-40s\n", "ID", "Kind", "Title")
 		fmt.Println(strings.Repeat("-", 85))
-		for id, elem := range flat {
+		for _, id := range ids {
+			elem := flat[id]
 			fmt.Printf("%-30s %-15s %-40s\n", id, elem.Kind, elem.Title)
 		}
 
 	case "relationships":
 		fmt.Printf("\n%-20s → %-20s %-30s\n", "From", "To", "Label")
 		fmt.Println(strings.Repeat("-", 70))
-		for _, rel := range s.model.Relationships {
+		rels := make([]model.Relationship, len(s.model.Relationships))
+		copy(rels, s.model.Relationships)
+		sort.Slice(rels, func(i, j int) bool {
+			if rels[i].From != rels[j].From {
+				return rels[i].From < rels[j].From
+			}
+			if rels[i].To != rels[j].To {
+				return rels[i].To < rels[j].To
+			}
+			return rels[i].Label < rels[j].Label
+		})
+		for _, rel := range rels {
 			fmt.Printf("%-20s → %-20s %-30s\n", rel.From, rel.To, rel.Label)
 		}
 
 	case "views":
+		keys := make([]string, 0, len(s.model.Views))
+		for k := range s.model.Views {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
 		fmt.Printf("\n%-20s %-50s\n", "Key", "Title")
 		fmt.Println(strings.Repeat("-", 70))
-		for key, view := range s.model.Views {
-			fmt.Printf("%-20s %-50s\n", key, view.Title)
+		for _, key := range keys {
+			fmt.Printf("%-20s %-50s\n", key, s.model.Views[key].Title)
 		}
 	}
 	fmt.Println()
@@ -237,6 +266,12 @@ func (s *replState) addElementInteractive() {
 	if kind == "" {
 		fmt.Println("Aborted (kind must not be empty)")
 		return
+	}
+	if len(s.model.Specification.Elements) > 0 {
+		if _, ok := s.model.Specification.Elements[kind]; !ok {
+			fmt.Printf("Unknown kind %q; valid kinds: %s\n", kind, validKinds(s.model))
+			return
+		}
 	}
 
 	fmt.Print("Title: ")
@@ -292,6 +327,13 @@ func (s *replState) addRelationshipInteractive() {
 	s.scanner.Scan()
 	label := strings.TrimSpace(s.scanner.Text())
 
+	for _, r := range s.model.Relationships {
+		if r.From == from && r.To == to && r.Label == label {
+			fmt.Printf("Relationship %s → %s (label: %q) already exists\n", from, to, label)
+			return
+		}
+	}
+
 	s.saveUndo()
 	s.model.Relationships = append(s.model.Relationships, model.Relationship{
 		From:  from,
@@ -324,7 +366,13 @@ func (s *replState) removeCommand(parts []string) {
 		return
 	}
 
-	s.saveUndo()
+	pushed := s.saveUndo()
+
+	popUndo := func() {
+		if pushed && len(s.undoStack) > 0 {
+			s.undoStack = s.undoStack[:len(s.undoStack)-1]
+		}
+	}
 
 	switch parts[0] {
 	case "element":
@@ -333,7 +381,7 @@ func (s *replState) removeCommand(parts []string) {
 		// (dot-path IDs like "shop.api") must be edited in the JSONC directly.
 		if _, exists := s.model.Model[id]; !exists {
 			fmt.Printf("Element '%s' not found (nested elements must be edited in the model file)\n", id)
-			s.undoStack = s.undoStack[:len(s.undoStack)-1] // discard no-op undo entry
+			popUndo()
 			return
 		}
 		delete(s.model.Model, id)
@@ -342,15 +390,19 @@ func (s *replState) removeCommand(parts []string) {
 
 	case "relationship":
 		if len(parts) < 3 {
-			fmt.Println("Usage: remove relationship <from> <to>")
-			s.undoStack = s.undoStack[:len(s.undoStack)-1]
+			fmt.Println("Usage: remove relationship <from> <to> [label]")
+			popUndo()
 			return
 		}
 		from, to := parts[1], parts[2]
+		wantLabel := ""
+		if len(parts) >= 4 {
+			wantLabel = parts[3]
+		}
 		removed := false
 		rels := s.model.Relationships[:0]
 		for _, r := range s.model.Relationships {
-			if r.From == from && r.To == to {
+			if !removed && r.From == from && r.To == to && (wantLabel == "" || r.Label == wantLabel) {
 				removed = true
 				continue
 			}
@@ -362,7 +414,7 @@ func (s *replState) removeCommand(parts []string) {
 			fmt.Printf("✅ Removed relationship %s → %s\n", from, to)
 		} else {
 			fmt.Printf("Relationship %s → %s not found\n", from, to)
-			s.undoStack = s.undoStack[:len(s.undoStack)-1]
+			popUndo()
 		}
 	}
 }
@@ -381,6 +433,14 @@ func (s *replState) validateCommand() {
 }
 
 func (s *replState) saveCommand() error {
+	if errs := model.Validate(s.model); len(errs) > 0 {
+		fmt.Printf("❌ Model has %d validation error(s) — save aborted:\n", len(errs))
+		for _, ve := range errs {
+			fmt.Printf("  %s\n", ve.Error())
+		}
+		return nil
+	}
+
 	err := s.patchSave()
 	if err != nil {
 		// Fall back to full save (loses comments) when patch is not possible.
@@ -396,22 +456,38 @@ func (s *replState) saveCommand() error {
 }
 
 // patchSave writes only the changes between the on-disk model and the in-memory
-// model using comment-preserving patch operations. Returns an error if the diff
-// contains deletions (which require a full rewrite) or if any patch fails.
+// model using comment-preserving patch operations. Falls back by returning an error
+// whenever any existing element was modified or any relationship was removed or changed
+// (which require a full rewrite). Only pure inserts use the comment-preserving path.
 func (s *replState) patchSave() error {
 	onDisk, err := model.Load(s.modelPath)
 	if err != nil {
 		return fmt.Errorf("reading model: %w", err)
 	}
 
-	// Reject deletions — they require a full rewrite.
-	for id := range onDisk.Model {
-		if _, ok := s.model.Model[id]; !ok {
+	// Reject element deletions or modifications (value-based compare).
+	for id, onDiskElem := range onDisk.Model {
+		memElem, ok := s.model.Model[id]
+		if !ok {
 			return fmt.Errorf("element %q was deleted; full save required", id)
 		}
+		if !elementsEqual(onDiskElem, memElem) {
+			return fmt.Errorf("element %q was modified; full save required", id)
+		}
 	}
-	if len(s.model.Relationships) < len(onDisk.Relationships) {
-		return fmt.Errorf("relationships were deleted; full save required")
+
+	// Reject relationship deletions or modifications (multiset compare by full value).
+	type relSig struct{ from, to, label, kind string }
+	memRelMultiset := make(map[relSig]int, len(s.model.Relationships))
+	for _, r := range s.model.Relationships {
+		memRelMultiset[relSig{r.From, r.To, r.Label, r.Kind}]++
+	}
+	for _, r := range onDisk.Relationships {
+		sig := relSig{r.From, r.To, r.Label, r.Kind}
+		if memRelMultiset[sig] == 0 {
+			return fmt.Errorf("relationship %s→%s was removed or changed; full save required", r.From, r.To)
+		}
+		memRelMultiset[sig]--
 	}
 
 	// Insert new top-level elements.
@@ -432,14 +508,15 @@ func (s *replState) patchSave() error {
 		}
 	}
 
-	// Append new relationships.
-	type relKey struct{ from, to string }
-	onDiskRels := make(map[relKey]bool, len(onDisk.Relationships))
+	// Append only truly new relationships (those not already on disk).
+	onDiskRelMultiset := make(map[relSig]int, len(onDisk.Relationships))
 	for _, r := range onDisk.Relationships {
-		onDiskRels[relKey{r.From, r.To}] = true
+		onDiskRelMultiset[relSig{r.From, r.To, r.Label, r.Kind}]++
 	}
 	for _, rel := range s.model.Relationships {
-		if onDiskRels[relKey{rel.From, rel.To}] {
+		sig := relSig{rel.From, rel.To, rel.Label, rel.Kind}
+		if onDiskRelMultiset[sig] > 0 {
+			onDiskRelMultiset[sig]--
 			continue
 		}
 		relJSON, merr := json.Marshal(rel)
@@ -457,6 +534,17 @@ func (s *replState) patchSave() error {
 	return nil
 }
 
+// elementsEqual returns true if two Element values are semantically identical.
+// Uses JSON round-trip for a field-by-field comparison without importing reflect.
+func elementsEqual(a, b model.Element) bool {
+	aj, err1 := json.Marshal(a)
+	bj, err2 := json.Marshal(b)
+	if err1 != nil || err2 != nil {
+		return false
+	}
+	return string(aj) == string(bj)
+}
+
 func (s *replState) undoCommand() error {
 	if len(s.undoStack) == 0 {
 		fmt.Println("Nothing to undo")
@@ -470,19 +558,21 @@ func (s *replState) undoCommand() error {
 	return nil
 }
 
-func (s *replState) saveUndo() {
-	// Deep copy current model state
+// saveUndo pushes a deep copy of the current model onto the undo stack.
+// Returns true if the push succeeded (marshal did not fail).
+// Callers that need to roll back a no-op must check the return value before popping.
+func (s *replState) saveUndo() bool {
 	data, err := json.Marshal(s.model)
 	if err != nil {
-		return
+		return false
 	}
 	var copy model.BausteinsichtModel
 	_ = json.Unmarshal(data, &copy)
 
 	s.undoStack = append(s.undoStack, &copy)
 
-	// Trim undo stack to max length
 	if len(s.undoStack) > s.maxUndoLen {
 		s.undoStack = s.undoStack[1:]
 	}
+	return true
 }
