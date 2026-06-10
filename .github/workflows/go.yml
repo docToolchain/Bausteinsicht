@@ -51,7 +51,7 @@ jobs:
             else
               echo "✗ $f not found"
             fi
-          done || true
+          done
       - name: Generate test report
         id: report
         shell: bash
