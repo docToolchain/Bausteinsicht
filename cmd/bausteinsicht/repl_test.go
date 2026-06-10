@@ -357,3 +357,225 @@ func TestReplRemoveRelationship_NotFound(t *testing.T) {
 		t.Errorf("undo stack should be cleaned up after no-op, got %d", len(s.undoStack))
 	}
 }
+
+// TestReplAddElement_InvalidID verifies that an invalid ID (dots, spaces) aborts.
+func TestReplAddElement_InvalidID(t *testing.T) {
+	s := newTestReplState("foo.bar\n")
+	s.addElementInteractive()
+	if len(s.model.Model) != 2 {
+		t.Errorf("expected no new element, got model size %d", len(s.model.Model))
+	}
+}
+
+// TestReplAddElement_EmptyKind verifies that an empty kind aborts the add.
+func TestReplAddElement_EmptyKind(t *testing.T) {
+	// valid ID, then empty kind → abort
+	s := newTestReplState("newservice\n\n")
+	s.addElementInteractive()
+	if _, ok := s.model.Model["newservice"]; ok {
+		t.Error("element should not have been added (empty kind)")
+	}
+}
+
+// TestReplAddElement_EmptyTitle verifies that an empty title aborts the add.
+func TestReplAddElement_EmptyTitle(t *testing.T) {
+	// valid ID, valid kind, then empty title → abort
+	s := newTestReplState("newservice\nsystem\n\n")
+	s.addElementInteractive()
+	if _, ok := s.model.Model["newservice"]; ok {
+		t.Error("element should not have been added (empty title)")
+	}
+}
+
+// TestReplAddRelationship_EmptyFrom verifies that an empty from ID aborts.
+func TestReplAddRelationship_EmptyFrom(t *testing.T) {
+	s := newTestReplState("\n")
+	s.addRelationshipInteractive()
+	if len(s.model.Relationships) != 0 {
+		t.Error("no relationship should have been added")
+	}
+}
+
+// TestReplAddRelationship_EmptyTo verifies that an empty to ID aborts.
+func TestReplAddRelationship_EmptyTo(t *testing.T) {
+	s := newTestReplState("customer\n\n")
+	s.addRelationshipInteractive()
+	if len(s.model.Relationships) != 0 {
+		t.Error("no relationship should have been added")
+	}
+}
+
+// TestReplAddRelationship_FromNotFound verifies that an unknown from ID aborts.
+func TestReplAddRelationship_FromNotFound(t *testing.T) {
+	s := newTestReplState("unknown\nwebshop\n")
+	s.addRelationshipInteractive()
+	if len(s.model.Relationships) != 0 {
+		t.Error("no relationship should have been added for unknown from")
+	}
+}
+
+// TestReplAddRelationship_ToNotFound verifies that an unknown to ID aborts.
+func TestReplAddRelationship_ToNotFound(t *testing.T) {
+	s := newTestReplState("customer\nunknown\n")
+	s.addRelationshipInteractive()
+	if len(s.model.Relationships) != 0 {
+		t.Error("no relationship should have been added for unknown to")
+	}
+}
+
+// newFileReplState creates a replState backed by a real temp model file for
+// tests that exercise saveCommand / patchSave.
+func newFileReplState(t *testing.T, input string) (*replState, string) {
+	t.Helper()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "model.jsonc")
+	initial := `{
+  "specification": {"elements": {}, "relationships": {}},
+  "model": {
+    "customer": {"kind": "actor", "title": "Customer"},
+    "webshop": {"kind": "system", "title": "Webshop"}
+  },
+  "relationships": [],
+  "views": {}
+}`
+	if err := os.WriteFile(path, []byte(initial), 0600); err != nil {
+		t.Fatalf("write model: %v", err)
+	}
+	m, err := model.Load(path)
+	if err != nil {
+		t.Fatalf("load model: %v", err)
+	}
+	return &replState{
+		model:      m,
+		modelPath:  path,
+		undoStack:  make([]*model.BausteinsichtModel, 0),
+		maxUndoLen: 50,
+		scanner:    bufio.NewScanner(strings.NewReader(input)),
+	}, path
+}
+
+// TestReplSaveCommand_PatchSave verifies that saveCommand writes a new element
+// to the model file using the comment-preserving patch path.
+func TestReplSaveCommand_PatchSave(t *testing.T) {
+	s, path := newFileReplState(t, "")
+	// Add a new element in memory.
+	s.saveUndo()
+	s.model.Model["payments"] = model.Element{Kind: "system", Title: "Payments"}
+	s.modified = true
+
+	if err := s.saveCommand(); err != nil {
+		t.Fatalf("saveCommand: %v", err)
+	}
+
+	// Reload and verify the element was written.
+	reloaded, err := model.Load(path)
+	if err != nil {
+		t.Fatalf("reloading model: %v", err)
+	}
+	if _, ok := reloaded.Model["payments"]; !ok {
+		t.Error("payments element not found after save")
+	}
+	if s.modified {
+		t.Error("modified flag should be false after save")
+	}
+	if s.undoStack != nil {
+		t.Error("undoStack should be nil after save")
+	}
+}
+
+// TestReplSaveCommand_PatchSave_Relationship verifies that new relationships
+// are appended via the comment-preserving path.
+func TestReplSaveCommand_PatchSave_Relationship(t *testing.T) {
+	s, path := newFileReplState(t, "")
+	s.saveUndo()
+	s.model.Relationships = append(s.model.Relationships, model.Relationship{
+		From: "customer", To: "webshop", Label: "uses",
+	})
+	s.modified = true
+
+	if err := s.saveCommand(); err != nil {
+		t.Fatalf("saveCommand: %v", err)
+	}
+
+	reloaded, err := model.Load(path)
+	if err != nil {
+		t.Fatalf("reloading model: %v", err)
+	}
+	if len(reloaded.Relationships) != 1 {
+		t.Errorf("expected 1 relationship after save, got %d", len(reloaded.Relationships))
+	}
+}
+
+// TestReplSaveCommand_FallsBackOnDeletion verifies that deleting an element
+// causes saveCommand to fall back to the full model.Save path.
+func TestReplSaveCommand_FallsBackOnDeletion(t *testing.T) {
+	s, path := newFileReplState(t, "")
+	// Delete an element that was on disk.
+	s.saveUndo()
+	delete(s.model.Model, "webshop")
+	s.modified = true
+
+	if err := s.saveCommand(); err != nil {
+		t.Fatalf("saveCommand: %v", err)
+	}
+
+	reloaded, err := model.Load(path)
+	if err != nil {
+		t.Fatalf("reloading model: %v", err)
+	}
+	if _, ok := reloaded.Model["webshop"]; ok {
+		t.Error("webshop should have been removed by full save fallback")
+	}
+}
+
+// TestReplUndoSetsModified verifies that undoing all changes resets modified to false.
+func TestReplUndoSetsModified(t *testing.T) {
+	s, _ := newFileReplState(t, "")
+	// Add then undo.
+	s.saveUndo()
+	s.model.Model["tmp"] = model.Element{Kind: "system", Title: "Tmp"}
+	s.modified = true
+
+	if err := s.undoCommand(); err != nil {
+		t.Fatalf("undoCommand: %v", err)
+	}
+	if s.modified {
+		t.Error("modified should be false after undoing all changes")
+	}
+}
+
+// TestReplPatchSave_InvalidModelPath verifies patchSave returns an error when the
+// model file does not exist (triggers the model.Load error path).
+func TestReplPatchSave_InvalidModelPath(t *testing.T) {
+	s := newTestReplState("")
+	s.modelPath = "/nonexistent/path/model.jsonc"
+	if err := s.patchSave(); err == nil {
+		t.Fatal("expected error for nonexistent model path")
+	}
+}
+
+// TestReplSaveCommand_FallsBackOnRelationshipDeletion verifies that removing a
+// relationship triggers the full-save fallback (patchSave cannot delete entries).
+func TestReplSaveCommand_FallsBackOnRelationshipDeletion(t *testing.T) {
+	s, path := newFileReplState(t, "")
+	// Seed an on-disk relationship first.
+	s.model.Relationships = append(s.model.Relationships, model.Relationship{From: "customer", To: "webshop"})
+	if err := s.saveCommand(); err != nil {
+		t.Fatalf("initial save: %v", err)
+	}
+
+	// Now remove the relationship in-memory — patchSave should reject this.
+	s.model.Relationships = nil
+	s.modified = true
+	if err := s.saveCommand(); err != nil {
+		t.Fatalf("fallback save: %v", err)
+	}
+
+	reloaded, err := model.Load(path)
+	if err != nil {
+		t.Fatalf("reloading: %v", err)
+	}
+	if len(reloaded.Relationships) != 0 {
+		t.Errorf("expected 0 relationships after full-save fallback, got %d", len(reloaded.Relationships))
+	}
+}
