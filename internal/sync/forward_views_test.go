@@ -1470,3 +1470,116 @@ func TestApplyForward_NewlyIncludedElementGetsConnectors(t *testing.T) {
 		t.Error("expected connector child_a→child_b (populated, not in ChangeSet) — see #231")
 	}
 }
+
+// TestApplyForward_ChildElementAdded_IncrementalPathRelativeCoordinates is the
+// regression test for the core bug from #330: when a child is added via the
+// incremental path (page is non-fresh because a sibling was placed in a prior
+// sync), it must receive coordinates relative to its parent boundary, not
+// absolute page coordinates.
+//
+// The previous test (TestApplyForward_ChildElementsUseRelativeCoordinates) runs
+// on a fresh page and therefore exercises placeSingleElement (layout engine),
+// not applyElementAdded (incremental path). This test exercises the incremental
+// path by adding a second child after a first one is already on the page.
+func TestApplyForward_ChildElementAdded_IncrementalPathRelativeCoordinates(t *testing.T) {
+	doc := shopContainersDoc()
+	ts := minimalTemplates(t)
+
+	// Sync 1: fresh page — shop.a placed via layout engine.
+	m1 := shopModel(map[string]model.Element{
+		"a": {Kind: "container", Title: "A"},
+	})
+	ApplyForward(&ChangeSet{ModelElementChanges: []ElementChange{
+		{ID: "shop.a", Type: Added},
+	}}, doc, ts, m1)
+
+	// Sync 2: non-fresh page — shop.b must be placed via applyElementAdded
+	// (incremental path) with coordinates relative to the parent boundary.
+	m2 := shopModel(map[string]model.Element{
+		"a": {Kind: "container", Title: "A"},
+		"b": {Kind: "container", Title: "B"},
+	})
+	ApplyForward(&ChangeSet{ModelElementChanges: []ElementChange{
+		{ID: "shop.b", Type: Added},
+	}}, doc, ts, m2)
+
+	page := requirePage(t, doc, "view-containers")
+	elem := page.FindElement("shop.b")
+	if elem == nil {
+		t.Fatal("shop.b not found on page after incremental sync")
+	}
+	cell := elem.FindElement("mxCell")
+	if cell == nil {
+		t.Fatal("shop.b has no mxCell")
+	}
+	geo := cell.FindElement("mxGeometry")
+	if geo == nil {
+		t.Fatal("shop.b has no mxGeometry")
+	}
+	x, _ := strconv.ParseFloat(geo.SelectAttrValue("x", "-1"), 64)
+	y, _ := strconv.ParseFloat(geo.SelectAttrValue("y", "-1"), 64)
+	// Relative coordinates must be small (within parent boundary).
+	// Before the fix, children placed via the incremental path received
+	// absolute page coordinates (e.g. y > 1000).
+	if x < 0 || x > 600 {
+		t.Errorf("shop.b incremental: expected relative x in [0,600], got %v", x)
+	}
+	if y < 0 || y > 400 {
+		t.Errorf("shop.b incremental: expected relative y in [0,400], got %v", y)
+	}
+}
+
+// TestApplyForward_ChildElementAdded_NoStackingOnMultipleSyncs verifies that
+// three children added in three consecutive syncs (one new child each) are
+// placed at distinct positions. Before the fix, childCount was not seeded from
+// existing children, so every sync started at grid index 0 and stacked all
+// incrementally added children at the same coordinates.
+func TestApplyForward_ChildElementAdded_NoStackingOnMultipleSyncs(t *testing.T) {
+	doc := shopContainersDoc()
+	ts := minimalTemplates(t)
+
+	sync := func(m *model.BausteinsichtModel, ids ...string) {
+		changes := make([]ElementChange, len(ids))
+		for i, id := range ids {
+			changes[i] = ElementChange{ID: id, Type: Added}
+		}
+		ApplyForward(&ChangeSet{ModelElementChanges: changes}, doc, ts, m)
+	}
+
+	m1 := shopModel(map[string]model.Element{"a": {Kind: "container", Title: "A"}})
+	sync(m1, "shop.a")
+
+	m2 := shopModel(map[string]model.Element{
+		"a": {Kind: "container", Title: "A"},
+		"b": {Kind: "container", Title: "B"},
+	})
+	sync(m2, "shop.b")
+
+	m3 := shopModel(map[string]model.Element{
+		"a": {Kind: "container", Title: "A"},
+		"b": {Kind: "container", Title: "B"},
+		"c": {Kind: "container", Title: "C"},
+	})
+	sync(m3, "shop.c")
+
+	page := requirePage(t, doc, "view-containers")
+	type pos struct{ x, y float64 }
+	coords := map[string]pos{}
+	for _, id := range []string{"shop.a", "shop.b", "shop.c"} {
+		elem := page.FindElement(id)
+		if elem == nil {
+			t.Fatalf("%s not found on page", id)
+		}
+		geo := elem.FindElement("mxCell").FindElement("mxGeometry")
+		x, _ := strconv.ParseFloat(geo.SelectAttrValue("x", "0"), 64)
+		y, _ := strconv.ParseFloat(geo.SelectAttrValue("y", "0"), 64)
+		coords[id] = pos{x, y}
+	}
+
+	if coords["shop.a"] == coords["shop.b"] {
+		t.Errorf("shop.a and shop.b share position %+v", coords["shop.a"])
+	}
+	if coords["shop.b"] == coords["shop.c"] {
+		t.Errorf("shop.b and shop.c share position %+v — childCount not seeded from existing children", coords["shop.b"])
+	}
+}

@@ -327,11 +327,24 @@ func populateNewPage(
 	} else {
 		// Incremental: fall back to cursor-based placement.
 		pl := computePlacement(page)
+		// Seed childCount with children already on the page so newly added
+		// children don't stack at grid index 0 on top of existing ones (#330).
+		if scopeID != "" {
+			parentCellID := scopedCellID(viewID, scopeID)
+			for _, obj := range page.FindAllElements() {
+				if cell := obj.FindElement("mxCell"); cell != nil {
+					if cell.SelectAttrValue("parent", "") == parentCellID {
+						pl.childCount[scopeID]++
+					}
+				}
+			}
+		}
+		initialChildCount := pl.childCount[scopeID]
 		for _, id := range toPlace {
 			applyElementAdded(id, viewID, scopeID, page, templates, flat, &m.Specification, &pl, result)
 		}
-		// After placing children, expand the scope boundary so they don't overflow (#330).
-		if scopeID != "" && pl.childCount[scopeID] > 0 {
+		// Expand only when new children were added in this pass (#330).
+		if scopeID != "" && pl.childCount[scopeID] > initialChildCount {
 			expandScopeToFitChildren(page, scopeID, viewID)
 		}
 	}
@@ -528,6 +541,19 @@ func applyChangesToPage(
 	result *ForwardResult,
 ) {
 	pl := computePlacement(page)
+	// Seed childCount with children already on the page so incrementally added
+	// children don't stack at grid index 0 on top of existing ones (#330).
+	if scopeID != "" {
+		parentCellID := scopedCellID(viewID, scopeID)
+		for _, obj := range page.FindAllElements() {
+			if cell := obj.FindElement("mxCell"); cell != nil {
+				if cell.SelectAttrValue("parent", "") == parentCellID {
+					pl.childCount[scopeID]++
+				}
+			}
+		}
+	}
+	initialChildCount := pl.childCount[scopeID]
 
 	for _, ch := range cs.ModelElementChanges {
 		switch ch.Type {
@@ -633,7 +659,7 @@ func applyChangesToPage(
 	}
 
 	// Expand scope boundary to fit any children added in this pass (#330).
-	if scopeID != "" && pl.childCount[scopeID] > 0 {
+	if scopeID != "" && pl.childCount[scopeID] > initialChildCount {
 		expandScopeToFitChildren(page, scopeID, viewID)
 	}
 }
@@ -723,7 +749,8 @@ func applyElementAdded(
 	// For child elements, use relative coordinates within the parent.
 	// Position children in a grid starting at (20, 80) inside the parent boundary (#330).
 	x, y := pl.nextX, pl.nextY
-	if scopeID != "" && isChildOf(id, scopeID) {
+	isChild := scopeID != "" && isChildOf(id, scopeID)
+	if isChild {
 		childIndex := pl.childCount[scopeID]
 		x = childStartX + float64(childIndex%childGridCols)*childSpacingX
 		y = childStartY + float64(childIndex/childGridCols)*childSpacingY
@@ -736,7 +763,9 @@ func applyElementAdded(
 		return
 	}
 
-	pl.nextX += data.Width + elementGap
+	if !isChild {
+		pl.nextX += data.Width + elementGap
+	}
 	result.ElementsCreated++
 }
 
