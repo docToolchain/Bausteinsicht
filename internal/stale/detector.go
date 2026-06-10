@@ -1,6 +1,7 @@
 package stale
 
 import (
+	"sort"
 	"time"
 
 	"github.com/docToolchain/Bausteinsicht/internal/model"
@@ -10,7 +11,8 @@ import (
 // Returns a list of stale elements sorted by risk level (high to low).
 func Detect(m *model.BausteinsichtModel, modelPath string, config StaleConfig) (DetectionResult, error) {
 	result := DetectionResult{
-		Timestamp: time.Now(),
+		Timestamp:     time.Now(),
+		StaleElements: []StaleElement{},
 	}
 
 	if m == nil {
@@ -77,7 +79,24 @@ func Detect(m *model.BausteinsichtModel, modelPath string, config StaleConfig) (
 		result.StaleElements = append(result.StaleElements, staleElem)
 	}
 
+	sort.Slice(result.StaleElements, func(i, j int) bool {
+		return riskOrder(result.StaleElements[i].Risk) > riskOrder(result.StaleElements[j].Risk)
+	})
+
 	return result, nil
+}
+
+func riskOrder(r RiskLevel) int {
+	switch r {
+	case RiskHigh:
+		return 3
+	case RiskMedium:
+		return 2
+	case RiskLow:
+		return 1
+	default:
+		return 0
+	}
 }
 
 // shouldFlag returns true if an element should be flagged as stale.

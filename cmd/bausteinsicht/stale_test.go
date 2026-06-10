@@ -111,13 +111,16 @@ func TestStaleCmd_JSONFormat(t *testing.T) {
 		t.Errorf("output is not valid JSON: %v\nOutput: %s", err, out)
 	}
 
-	// Check result structure
-	if _, ok := result["StaleElements"]; !ok {
-		t.Errorf("expected 'StaleElements' in JSON, got keys: %v", result)
+	// Check result structure uses camelCase keys and staleElements is [] not null.
+	if _, ok := result["staleElements"]; !ok {
+		t.Errorf("expected 'staleElements' in JSON, got keys: %v", result)
+	}
+	if elems, ok := result["staleElements"]; !ok || elems == nil {
+		t.Errorf("expected 'staleElements' to be [] not null, got: %v", result["staleElements"])
 	}
 
-	if _, ok := result["TotalElements"]; !ok {
-		t.Errorf("expected 'TotalElements' in JSON, got keys: %v", result)
+	if _, ok := result["totalElements"]; !ok {
+		t.Errorf("expected 'totalElements' in JSON, got keys: %v", result)
 	}
 }
 

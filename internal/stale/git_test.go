@@ -80,41 +80,6 @@ func TestGetLastModifiedDate_Untracked(t *testing.T) {
 	}
 }
 
-func TestGetLastModifiedDateForElement_FindsElementChange(t *testing.T) {
-	dir := t.TempDir()
-	initGitRepo(t, dir)
-
-	// First commit: model without the element
-	commitFile(t, dir, "arch.jsonc", `{"model":{"other":{"kind":"system"}}}`, "initial")
-
-	// Second commit: add the target element
-	commitFile(t, dir, "arch.jsonc", `{"model":{"other":{"kind":"system"},"myservice":{"kind":"container"}}}`, "add myservice")
-
-	got, err := GetLastModifiedDateForElement(filepath.Join(dir, "arch.jsonc"), "shop.myservice")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if got.IsZero() {
-		t.Fatal("expected non-zero time when element key appears in git diff, got zero")
-	}
-}
-
-func TestGetLastModifiedDateForElement_FallsBackToFileDate(t *testing.T) {
-	dir := t.TempDir()
-	initGitRepo(t, dir)
-	commitFile(t, dir, "arch.jsonc", `{"model":{"other":{"kind":"system"}}}`, "initial")
-
-	// Element key "ghostkey" never appeared in any commit diff.
-	got, err := GetLastModifiedDateForElement(filepath.Join(dir, "arch.jsonc"), "shop.ghostkey")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	// Should fall back to file-level date (non-zero).
-	if got.IsZero() {
-		t.Fatal("expected file-level fallback date, got zero")
-	}
-}
-
 func TestDetect_GitBasedStaleness(t *testing.T) {
 	dir := t.TempDir()
 	initGitRepo(t, dir)

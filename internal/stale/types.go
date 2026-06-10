@@ -18,18 +18,18 @@ const (
 
 // StaleElement represents an element flagged as stale.
 type StaleElement struct {
-	ID                string
-	Title             string
-	Kind              string
-	LastModified      time.Time
-	DaysSinceModified int
-	MissingStatus     bool
-	MissingADR        bool
-	IncomingRelCount  int
-	OutgoingRelCount  int
-	IsViewIncluded    bool
-	Risk              RiskLevel
-	Recommendations   []string
+	ID                string    `json:"id"`
+	Title             string    `json:"title"`
+	Kind              string    `json:"kind"`
+	LastModified      time.Time `json:"lastModified"`
+	DaysSinceModified int       `json:"daysSinceModified"`
+	MissingStatus     bool      `json:"missingStatus"`
+	MissingADR        bool      `json:"missingAdr"`
+	IncomingRelCount  int       `json:"incomingRelCount"`
+	OutgoingRelCount  int       `json:"outgoingRelCount"`
+	IsViewIncluded    bool      `json:"isViewIncluded"`
+	Risk              RiskLevel `json:"risk"`
+	Recommendations   []string  `json:"recommendations"`
 }
 
 // StaleConfig controls stale element detection.
@@ -41,9 +41,9 @@ type StaleConfig struct {
 
 // DetectionResult holds the result of stale element detection.
 type DetectionResult struct {
-	StaleElements []StaleElement
-	TotalElements int
-	Timestamp     time.Time
+	StaleElements []StaleElement `json:"staleElements"`
+	TotalElements int            `json:"totalElements"`
+	Timestamp     time.Time      `json:"timestamp"`
 }
 
 // DefaultConfig returns the default stale detection configuration.

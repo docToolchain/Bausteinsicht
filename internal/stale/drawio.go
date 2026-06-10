@@ -9,8 +9,14 @@ import (
 	"github.com/docToolchain/Bausteinsicht/internal/overlay"
 )
 
+const (
+	originalStrokeColorAttr = "data-original-stroke-color"
+	originalStrokeWidthAttr = "data-original-stroke-width"
+	originalTooltipAttr     = "data-original-tooltip"
+)
+
 // MarkInDrawio adds visual stale indicators to elements across all diagram pages.
-// Original fill colors are preserved in a data attribute (overlay.OriginalFillAttr)
+// Original fill, stroke, and tooltip are preserved in data attributes
 // so the marking is non-destructive and can be reversed with UnmarkInDrawio.
 func MarkInDrawio(staleElements []StaleElement, drawioPath string) error {
 	doc, err := drawio.LoadDocument(drawioPath)
@@ -75,10 +81,35 @@ func UnmarkInDrawio(drawioPath string) error {
 			}
 			style := cell.SelectAttrValue("style", "")
 			style = setStyleProperty(style, "fillColor", originalFill)
-			style = removeStyleProperties(style, []string{"strokeColor", "strokeWidth"})
+
+			// Restore original stroke color: if it was absent originally, remove the key.
+			originalStroke := cell.SelectAttrValue(originalStrokeColorAttr, "")
+			if originalStroke != "" {
+				style = setStyleProperty(style, "strokeColor", originalStroke)
+			} else {
+				style = removeStyleProperties(style, []string{"strokeColor"})
+			}
+
+			// Restore original stroke width: if it was absent originally, remove the key.
+			originalWidth := cell.SelectAttrValue(originalStrokeWidthAttr, "")
+			if originalWidth != "" {
+				style = setStyleProperty(style, "strokeWidth", originalWidth)
+			} else {
+				style = removeStyleProperties(style, []string{"strokeWidth"})
+			}
+
 			cell.CreateAttr("style", style)
 			cell.RemoveAttr(overlay.OriginalFillAttr)
+			cell.RemoveAttr(originalStrokeColorAttr)
+			cell.RemoveAttr(originalStrokeWidthAttr)
+
+			// Restore original tooltip (remove the stale tooltip if none was set before).
+			originalTooltip := obj.SelectAttrValue(originalTooltipAttr, "")
 			obj.RemoveAttr("tooltip")
+			obj.RemoveAttr(originalTooltipAttr)
+			if originalTooltip != "" {
+				obj.CreateAttr("tooltip", originalTooltip)
+			}
 		}
 	}
 
@@ -101,13 +132,16 @@ func markStaleElement(obj *etree.Element, staleElem StaleElement) {
 
 	style := cell.SelectAttrValue("style", "")
 
-	// Preserve the original fill only on the first marking pass.
+	// Preserve original styling only on the first marking pass (idempotent).
 	if cell.SelectAttrValue(overlay.OriginalFillAttr, "") == "" {
 		originalFill := extractStyleProperty(style, "fillColor")
 		if originalFill == "" {
 			originalFill = "#ffffff"
 		}
 		cell.CreateAttr(overlay.OriginalFillAttr, originalFill)
+		cell.CreateAttr(originalStrokeColorAttr, extractStyleProperty(style, "strokeColor"))
+		cell.CreateAttr(originalStrokeWidthAttr, extractStyleProperty(style, "strokeWidth"))
+		obj.CreateAttr(originalTooltipAttr, obj.SelectAttrValue("tooltip", ""))
 	}
 
 	style = setStyleProperty(style, "fillColor", color)

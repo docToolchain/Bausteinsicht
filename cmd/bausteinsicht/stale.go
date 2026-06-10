@@ -36,6 +36,7 @@ Example:
 	cmd.Flags().IntP("days", "d", 90, "Consider elements stale if not modified in this many days")
 	cmd.Flags().StringP("format", "f", "text", "Output format: text or json")
 	cmd.Flags().Bool("mark-drawio", false, "Mark stale elements in draw.io diagram")
+	cmd.Flags().Bool("unmark-drawio", false, "Remove stale markers from draw.io diagram")
 	cmd.Flags().String("drawio-file", "", "Path to draw.io diagram (auto-detected if empty)")
 
 	return cmd
@@ -46,6 +47,7 @@ func runStale(cmd *cobra.Command, _ []string) error {
 	days, _ := cmd.Flags().GetInt("days")
 	format, _ := cmd.Flags().GetString("format")
 	markDrawio, _ := cmd.Flags().GetBool("mark-drawio")
+	unmarkDrawio, _ := cmd.Flags().GetBool("unmark-drawio")
 	drawioFile, _ := cmd.Flags().GetString("drawio-file")
 
 	if err := validatePathContainment(modelPath); err != nil {
@@ -68,7 +70,13 @@ func runStale(cmd *cobra.Command, _ []string) error {
 	}
 
 	config := stale.LoadConfigFromModel(m)
-	config.ThresholdDays = days
+	if cmd.Flags().Changed("days") {
+		config.ThresholdDays = days
+	}
+
+	if unmarkDrawio {
+		return applyDrawioUnmarking(absModelPath, drawioFile, cmd.ErrOrStderr())
+	}
 
 	result, err := stale.Detect(m, absModelPath, config)
 	if err != nil {
@@ -118,6 +126,31 @@ func findDrawioFile(absModelPath, drawioFile string) string {
 		}
 	}
 	return ""
+}
+
+// applyDrawioUnmarking removes stale markers from the draw.io file.
+func applyDrawioUnmarking(absModelPath, explicitDrawioFile string, stderr io.Writer) error {
+	if explicitDrawioFile != "" {
+		if err := validatePathContainment(explicitDrawioFile); err != nil {
+			return exitWithCode(fmt.Errorf("drawio-file path: %w", err), 1)
+		}
+	}
+	drawioFile := findDrawioFile(absModelPath, explicitDrawioFile)
+	if drawioFile == "" {
+		return nil
+	}
+	if _, err := os.Stat(drawioFile); err != nil {
+		if explicitDrawioFile != "" {
+			return exitWithCode(fmt.Errorf("drawio-file not found: %w", err), 1)
+		}
+		return nil
+	}
+	if err := stale.UnmarkInDrawio(drawioFile); err != nil {
+		_, _ = fmt.Fprintf(stderr, "Warning: Failed to unmark draw.io: %v\n", err)
+		return err
+	}
+	_, err := fmt.Fprintf(stderr, "Removed stale markers from %s\n", filepath.Base(drawioFile))
+	return err
 }
 
 // applyDrawioMarking marks stale elements in the draw.io file, writing status to stderr.

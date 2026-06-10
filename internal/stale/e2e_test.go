@@ -321,7 +321,7 @@ func checkJSONFields(t *testing.T, output string) {
 		t.Errorf("output is not valid JSON: %v", err)
 		return
 	}
-	for _, field := range []string{"StaleElements", "TotalElements", "Timestamp"} {
+	for _, field := range []string{"staleElements", "totalElements", "timestamp"} {
 		if _, ok := parsed[field]; !ok {
 			t.Errorf("JSON missing %s field", field)
 		}
