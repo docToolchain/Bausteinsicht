@@ -165,3 +165,95 @@ func TestMarkInDrawio_ElementNotInDiagram(t *testing.T) {
 		t.Fatalf("MarkInDrawio with unknown element ID: %v", err)
 	}
 }
+
+func TestUnmarkInDrawio_RestoresOriginalFill(t *testing.T) {
+	// Build a draw.io XML that already has stale markup applied (including data-original-fill).
+	xml := `<?xml version="1.0" encoding="UTF-8"?>` +
+		`<mxfile><diagram id="d1" name="Page"><mxGraphModel><root>` +
+		`<mxCell id="0"/><mxCell id="1" parent="0"/>` +
+		`<object bausteinsicht_id="shop.api" label="API" tooltip="⚠ STALE&#10;Last modified: 2025-01-15&#10;No status set&#10;No ADR linked">` +
+		`<mxCell id="cell1" style="rounded=1;fillColor=#FF6666;strokeColor=#FF6666;strokeWidth=2;" data-original-fill="#dae8fc" vertex="1" parent="1"/>` +
+		`</object>` +
+		`</root></mxGraphModel></diagram></mxfile>`
+	path := writeTempDrawio(t, xml)
+
+	if err := UnmarkInDrawio(path); err != nil {
+		t.Fatalf("UnmarkInDrawio: %v", err)
+	}
+
+	tree := etree.NewDocument()
+	if err := tree.ReadFromFile(path); err != nil {
+		t.Fatalf("reading saved file: %v", err)
+	}
+	obj := tree.FindElement("//object[@bausteinsicht_id='shop.api']")
+	if obj == nil {
+		t.Fatal("object element not found after unmark")
+	}
+	cell := obj.FindElement("mxCell")
+	if cell == nil {
+		t.Fatal("mxCell not found")
+	}
+	style := cell.SelectAttrValue("style", "")
+	if !strings.Contains(style, "fillColor=#dae8fc") {
+		t.Errorf("expected original fill color restored, got style: %s", style)
+	}
+	if strings.Contains(style, "strokeColor") {
+		t.Errorf("strokeColor should have been removed, got style: %s", style)
+	}
+	if strings.Contains(style, "strokeWidth") {
+		t.Errorf("strokeWidth should have been removed, got style: %s", style)
+	}
+	if cell.SelectAttrValue("data-original-fill", "") != "" {
+		t.Error("data-original-fill attribute should have been removed")
+	}
+	if obj.SelectAttrValue("tooltip", "") != "" {
+		t.Error("tooltip should have been removed")
+	}
+}
+
+func TestUnmarkInDrawio_NoMarkedElements(t *testing.T) {
+	// A file with no data-original-fill — UnmarkInDrawio should be a no-op.
+	path := writeTempDrawio(t, drawioXML("shop.api"))
+	if err := UnmarkInDrawio(path); err != nil {
+		t.Fatalf("UnmarkInDrawio on unmarked file: %v", err)
+	}
+}
+
+func TestUnmarkInDrawio_FileNotFound(t *testing.T) {
+	err := UnmarkInDrawio("/nonexistent/file.drawio")
+	if err == nil {
+		t.Fatal("expected error for missing file, got nil")
+	}
+}
+
+func TestRemoveStyleProperties_RemovesKeys(t *testing.T) {
+	style := "rounded=1;fillColor=#FF6666;strokeColor=#FF6666;strokeWidth=2;"
+	got := removeStyleProperties(style, []string{"strokeColor", "strokeWidth"})
+	if strings.Contains(got, "strokeColor") {
+		t.Errorf("strokeColor not removed from: %s", got)
+	}
+	if strings.Contains(got, "strokeWidth") {
+		t.Errorf("strokeWidth not removed from: %s", got)
+	}
+	if !strings.Contains(got, "rounded=1") {
+		t.Errorf("rounded=1 should remain: %s", got)
+	}
+	if !strings.Contains(got, "fillColor=#FF6666") {
+		t.Errorf("fillColor should remain: %s", got)
+	}
+}
+
+func TestRemoveStyleProperties_EmptyKeys(t *testing.T) {
+	style := "rounded=1;fillColor=#abc;"
+	got := removeStyleProperties(style, nil)
+	if !strings.Contains(got, "rounded=1") || !strings.Contains(got, "fillColor=#abc") {
+		t.Errorf("removeStyleProperties with no keys should be identity, got: %s", got)
+	}
+}
+
+func TestRemoveStyleProperties_EmptyStyle(t *testing.T) {
+	got := removeStyleProperties("", []string{"fillColor"})
+	if got != "" {
+		t.Errorf("expected empty string, got: %s", got)
+	}
+}

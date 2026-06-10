@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/docToolchain/Bausteinsicht/internal/stale"
 )
 
 const staleTestModel = `{
@@ -146,5 +148,113 @@ func TestStaleCmd_InvalidPathTraversal(t *testing.T) {
 	_, err := executeRootCmd("stale", "--model", "../../etc/passwd")
 	if err == nil {
 		t.Fatal("expected error for path traversal attempt")
+	}
+}
+
+func TestIsDrawioFile(t *testing.T) {
+	tests := []struct {
+		name string
+		want bool
+	}{
+		{"diagram.drawio", true},
+		{"diagram.DRAWIO", true},
+		{"diagram.DrawIO", true},
+		{"diagram.xml", false},
+		{"diagram.json", false},
+		{"", false},
+	}
+	for _, tt := range tests {
+		if got := isDrawioFile(tt.name); got != tt.want {
+			t.Errorf("isDrawioFile(%q) = %v, want %v", tt.name, got, tt.want)
+		}
+	}
+}
+
+// minimalDrawioXML returns a minimal draw.io file with one element.
+func minimalDrawioXML(bausteinsichtID string) string {
+	return `<?xml version="1.0" encoding="UTF-8"?><mxfile><diagram id="d1" name="Page"><mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/><object bausteinsicht_id="` + bausteinsichtID + `" label="API"><mxCell id="cell1" style="rounded=1;" vertex="1" parent="1"/></object></root></mxGraphModel></diagram></mxfile>`
+}
+
+func writeTempDrawioInDir(t *testing.T, dir, content string) string {
+	t.Helper()
+	path := filepath.Join(dir, "architecture.drawio")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatalf("write drawio: %v", err)
+	}
+	return path
+}
+
+func TestFindDrawioFile_ExplicitPath(t *testing.T) {
+	dir := t.TempDir()
+	drawioPath := writeTempDrawioInDir(t, dir, minimalDrawioXML("x"))
+	modelPath := filepath.Join(dir, "architecture.jsonc")
+
+	got := findDrawioFile(modelPath, drawioPath)
+	if got != drawioPath {
+		t.Errorf("findDrawioFile with explicit path: got %q, want %q", got, drawioPath)
+	}
+}
+
+func TestFindDrawioFile_AutoDetect(t *testing.T) {
+	dir := t.TempDir()
+	drawioPath := writeTempDrawioInDir(t, dir, minimalDrawioXML("x"))
+	modelPath := filepath.Join(dir, "architecture.jsonc")
+
+	got := findDrawioFile(modelPath, "")
+	if got != drawioPath {
+		t.Errorf("findDrawioFile auto-detect: got %q, want %q", got, drawioPath)
+	}
+}
+
+func TestFindDrawioFile_NoDrawioFile(t *testing.T) {
+	dir := t.TempDir()
+	modelPath := filepath.Join(dir, "architecture.jsonc")
+
+	got := findDrawioFile(modelPath, "")
+	if got != "" {
+		t.Errorf("findDrawioFile with no drawio file: got %q, want empty", got)
+	}
+}
+
+func TestApplyDrawioMarking_AutoDetect(t *testing.T) {
+	dir := t.TempDir()
+	writeTempDrawioInDir(t, dir, minimalDrawioXML("shop.api"))
+	modelPath := filepath.Join(dir, "architecture.jsonc")
+
+	elems := []stale.StaleElement{{ID: "shop.api", Risk: stale.RiskHigh}}
+	err := applyDrawioMarking(elems, modelPath, "", os.Stderr)
+	if err != nil {
+		t.Fatalf("applyDrawioMarking auto-detect: %v", err)
+	}
+}
+
+func TestApplyDrawioMarking_ExplicitMissingFile(t *testing.T) {
+	dir := t.TempDir()
+	modelPath := filepath.Join(dir, "architecture.jsonc")
+	elems := []stale.StaleElement{{ID: "x", Risk: stale.RiskLow}}
+	err := applyDrawioMarking(elems, modelPath, "/nonexistent/file.drawio", os.Stderr)
+	if err == nil {
+		t.Fatal("expected error for non-existent explicit drawio-file")
+	}
+}
+
+func TestApplyDrawioMarking_ExplicitPathTraversal(t *testing.T) {
+	dir := t.TempDir()
+	modelPath := filepath.Join(dir, "architecture.jsonc")
+	elems := []stale.StaleElement{{ID: "x", Risk: stale.RiskLow}}
+	err := applyDrawioMarking(elems, modelPath, "../../etc/passwd", os.Stderr)
+	if err == nil {
+		t.Fatal("expected error for path traversal in drawio-file")
+	}
+}
+
+func TestApplyDrawioMarking_NoDrawioFileFound(t *testing.T) {
+	dir := t.TempDir()
+	modelPath := filepath.Join(dir, "architecture.jsonc")
+	elems := []stale.StaleElement{{ID: "x", Risk: stale.RiskLow}}
+	// No drawio file in dir — should silently return nil.
+	err := applyDrawioMarking(elems, modelPath, "", os.Stderr)
+	if err != nil {
+		t.Fatalf("expected nil when no drawio file found, got: %v", err)
 	}
 }
