@@ -201,8 +201,6 @@ func (s *replState) addCommand(parts []string) {
 		return
 	}
 
-	s.saveUndo()
-
 	switch parts[0] {
 	case "element":
 		s.addElementInteractive()
@@ -219,6 +217,10 @@ func (s *replState) addElementInteractive() {
 		fmt.Println("Aborted (empty ID)")
 		return
 	}
+	if !isValidID(id) {
+		fmt.Printf("Invalid ID %q: must contain only letters, digits, hyphens, or underscores\n", id)
+		return
+	}
 
 	if _, exists := s.model.Model[id]; exists {
 		fmt.Printf("Element '%s' already exists. Overwrite? (yes/no): ", id)
@@ -232,21 +234,29 @@ func (s *replState) addElementInteractive() {
 	fmt.Print("Kind: ")
 	s.scanner.Scan()
 	kind := strings.TrimSpace(s.scanner.Text())
+	if kind == "" {
+		fmt.Println("Aborted (kind must not be empty)")
+		return
+	}
 
 	fmt.Print("Title: ")
 	s.scanner.Scan()
 	title := strings.TrimSpace(s.scanner.Text())
+	if title == "" {
+		fmt.Println("Aborted (title must not be empty)")
+		return
+	}
 
 	fmt.Print("Description (optional): ")
 	s.scanner.Scan()
 	desc := strings.TrimSpace(s.scanner.Text())
 
+	s.saveUndo()
 	s.model.Model[id] = model.Element{
 		Kind:        kind,
 		Title:       title,
 		Description: desc,
 	}
-
 	s.modified = true
 	fmt.Printf("✅ Added element '%s'\n", id)
 }
@@ -255,21 +265,39 @@ func (s *replState) addRelationshipInteractive() {
 	fmt.Print("From (element ID): ")
 	s.scanner.Scan()
 	from := strings.TrimSpace(s.scanner.Text())
+	if from == "" {
+		fmt.Println("Aborted (from must not be empty)")
+		return
+	}
 
 	fmt.Print("To (element ID): ")
 	s.scanner.Scan()
 	to := strings.TrimSpace(s.scanner.Text())
+	if to == "" {
+		fmt.Println("Aborted (to must not be empty)")
+		return
+	}
+
+	flat, _ := model.FlattenElements(s.model)
+	if _, ok := flat[from]; !ok {
+		fmt.Printf("Element '%s' not found in model\n", from)
+		return
+	}
+	if _, ok := flat[to]; !ok {
+		fmt.Printf("Element '%s' not found in model\n", to)
+		return
+	}
 
 	fmt.Print("Label (optional): ")
 	s.scanner.Scan()
 	label := strings.TrimSpace(s.scanner.Text())
 
+	s.saveUndo()
 	s.model.Relationships = append(s.model.Relationships, model.Relationship{
 		From:  from,
 		To:    to,
 		Label: label,
 	})
-
 	s.modified = true
 	fmt.Printf("✅ Added relationship %s → %s\n", from, to)
 }
@@ -353,11 +381,79 @@ func (s *replState) validateCommand() {
 }
 
 func (s *replState) saveCommand() error {
-	if err := model.Save(s.modelPath, s.model); err != nil {
-		return err
+	err := s.patchSave()
+	if err != nil {
+		// Fall back to full save (loses comments) when patch is not possible.
+		fmt.Printf("(note: comments may not be preserved — %v)\n", err)
+		if err2 := model.Save(s.modelPath, s.model); err2 != nil {
+			return err2
+		}
 	}
 	s.modified = false
+	s.undoStack = nil
 	fmt.Printf("✅ Saved to %s\n", s.modelPath)
+	return nil
+}
+
+// patchSave writes only the changes between the on-disk model and the in-memory
+// model using comment-preserving patch operations. Returns an error if the diff
+// contains deletions (which require a full rewrite) or if any patch fails.
+func (s *replState) patchSave() error {
+	onDisk, err := model.Load(s.modelPath)
+	if err != nil {
+		return fmt.Errorf("reading model: %w", err)
+	}
+
+	// Reject deletions — they require a full rewrite.
+	for id := range onDisk.Model {
+		if _, ok := s.model.Model[id]; !ok {
+			return fmt.Errorf("element %q was deleted; full save required", id)
+		}
+	}
+	if len(s.model.Relationships) < len(onDisk.Relationships) {
+		return fmt.Errorf("relationships were deleted; full save required")
+	}
+
+	// Insert new top-level elements.
+	for id, elem := range s.model.Model {
+		if _, exists := onDisk.Model[id]; exists {
+			continue
+		}
+		elemJSON, merr := json.Marshal(elem)
+		if merr != nil {
+			return fmt.Errorf("marshaling element %s: %w", id, merr)
+		}
+		capturedID := id
+		capturedJSON := string(elemJSON)
+		if perr := model.PatchInsert(s.modelPath, func(data []byte) ([]byte, error) {
+			return model.InsertObjectEntry(data, []string{"model"}, capturedID, capturedJSON)
+		}); perr != nil {
+			return fmt.Errorf("inserting element %s: %w", capturedID, perr)
+		}
+	}
+
+	// Append new relationships.
+	type relKey struct{ from, to string }
+	onDiskRels := make(map[relKey]bool, len(onDisk.Relationships))
+	for _, r := range onDisk.Relationships {
+		onDiskRels[relKey{r.From, r.To}] = true
+	}
+	for _, rel := range s.model.Relationships {
+		if onDiskRels[relKey{rel.From, rel.To}] {
+			continue
+		}
+		relJSON, merr := json.Marshal(rel)
+		if merr != nil {
+			return fmt.Errorf("marshaling relationship: %w", merr)
+		}
+		capturedJSON := string(relJSON)
+		if perr := model.PatchInsert(s.modelPath, func(data []byte) ([]byte, error) {
+			return model.AppendArrayEntry(data, []string{"relationships"}, capturedJSON)
+		}); perr != nil {
+			return fmt.Errorf("appending relationship: %w", perr)
+		}
+	}
+
 	return nil
 }
 
@@ -369,6 +465,7 @@ func (s *replState) undoCommand() error {
 
 	s.model = s.undoStack[len(s.undoStack)-1]
 	s.undoStack = s.undoStack[:len(s.undoStack)-1]
+	s.modified = len(s.undoStack) > 0
 	fmt.Println("✅ Undone")
 	return nil
 }

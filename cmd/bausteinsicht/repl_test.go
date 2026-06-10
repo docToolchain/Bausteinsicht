@@ -16,6 +16,7 @@ func newTestReplState(input string) *replState {
 	m := &model.BausteinsichtModel{
 		Model: map[string]model.Element{
 			"customer": {Kind: "actor", Title: "Customer"},
+			"webshop":  {Kind: "system", Title: "Webshop"},
 		},
 		Relationships: []model.Relationship{},
 		Views:         map[string]model.View{},
@@ -296,7 +297,7 @@ func TestReplPrintHelp(t *testing.T) {
 func TestReplAddElement_EmptyID(t *testing.T) {
 	s := newTestReplState("\n") // empty line → empty ID
 	s.addElementInteractive()
-	if len(s.model.Model) != 1 { // only the pre-existing "customer" element
+	if len(s.model.Model) != 2 { // only the pre-existing elements
 		t.Errorf("expected no new element added, got model size %d", len(s.model.Model))
 	}
 }
