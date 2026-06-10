@@ -1,6 +1,7 @@
 package sync
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 
@@ -46,6 +47,30 @@ func docWithViewPages() *drawio.Document {
 	doc.AddPage("view-context", "System Context")
 	doc.AddPage("view-containers", "Container View")
 	return doc
+}
+
+// shopContainersDoc returns a document with a single containers view page for shop tests.
+func shopContainersDoc() *drawio.Document {
+	doc := drawio.NewDocument()
+	doc.AddPage("view-containers", "Container View")
+	return doc
+}
+
+// shopModel returns a model with a shop system scope and a containers view.
+// children defines the direct children of the shop element.
+func shopModel(children map[string]model.Element) *model.BausteinsichtModel {
+	return &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"shop": {Kind: "system", Title: "Shop", Children: children},
+		},
+		Views: map[string]model.View{
+			"containers": {
+				Title:   "Container View",
+				Scope:   "shop",
+				Include: []string{"shop.*"},
+			},
+		},
+	}
 }
 
 // TestApplyForward_ElementOnCorrectViewPage verifies that elements are placed
@@ -421,6 +446,355 @@ func TestApplyForward_ScopeBoundingBox(t *testing.T) {
 		t.Error("customer should NOT be parented to scope boundary")
 	}
 }
+
+// TestApplyForward_ChildElementsUseRelativeCoordinates verifies that new child
+// elements placed inside a scope boundary receive coordinates relative to the
+// parent boundary cell, not absolute page coordinates. Regression test for #330.
+func TestApplyForward_ChildElementsUseRelativeCoordinates(t *testing.T) {
+	doc := shopContainersDoc()
+	ts := minimalTemplates(t)
+	m := shopModel(map[string]model.Element{
+		"api": {Kind: "container", Title: "API"},
+		"db":  {Kind: "container", Title: "DB"},
+	})
+
+	cs := &ChangeSet{
+		ModelElementChanges: []ElementChange{
+			{ID: "shop.api", Type: Added},
+			{ID: "shop.db", Type: Added},
+		},
+	}
+
+	ApplyForward(cs, doc, ts, m)
+
+	page := requirePage(t, doc, "view-containers")
+
+	for _, id := range []string{"shop.api", "shop.db"} {
+		elem := page.FindElement(id)
+		if elem == nil {
+			t.Fatalf("expected element %q on page", id)
+		}
+		cell := elem.FindElement("mxCell")
+		if cell == nil {
+			t.Fatalf("%q has no mxCell", id)
+		}
+		geo := cell.FindElement("mxGeometry")
+		if geo == nil {
+			t.Fatalf("%q has no mxGeometry", id)
+		}
+		x, _ := strconv.ParseFloat(geo.SelectAttrValue("x", "-1"), 64)
+		y, _ := strconv.ParseFloat(geo.SelectAttrValue("y", "-1"), 64)
+
+		// Relative coordinates must be small (within parent boundary).
+		// Before fix, children received absolute page coordinates (e.g. y > 1000).
+		if x < 0 || x > 600 {
+			t.Errorf("%q: expected relative x in [0,600], got %v", id, x)
+		}
+		if y < 0 || y > 400 {
+			t.Errorf("%q: expected relative y in [0,400], got %v", id, y)
+		}
+	}
+
+}
+
+// TestApplyForward_ScopeBoundaryExpandsForManyChildren verifies that when children
+// are added incrementally to an existing scope boundary that is too small, the
+// boundary is expanded to contain all child elements (#330).
+func TestApplyForward_ScopeBoundaryExpandsForManyChildren(t *testing.T) {
+	doc := shopContainersDoc()
+	ts := minimalTemplates(t)
+
+	// First sync: m1 has only shop.a — fresh page places exactly one child.
+	// This makes the page non-fresh for the next sync.
+	m1 := shopModel(map[string]model.Element{
+		"a": {Kind: "container", Title: "A"},
+	})
+	cs1 := &ChangeSet{
+		ModelElementChanges: []ElementChange{
+			{ID: "shop.a", Type: Added},
+		},
+	}
+	ApplyForward(cs1, doc, ts, m1)
+
+	// Second sync (incremental): m2 adds b/c/d; page already has shop.a so
+	// populateNewPage takes the incremental cursor path and childCount > 0,
+	// triggering expandScopeToFitChildren.
+	// Grid col 2 → x=340, width=120, right=460; + childStartX(20) padding = 480.
+	// This exceeds the default boundary width (400), so expandScopeToFitChildren
+	// must grow the boundary.
+	m2 := shopModel(map[string]model.Element{
+		"a": {Kind: "container", Title: "A"},
+		"b": {Kind: "container", Title: "B"},
+		"c": {Kind: "container", Title: "C"},
+		"d": {Kind: "container", Title: "D"},
+	})
+	cs2 := &ChangeSet{
+		ModelElementChanges: []ElementChange{
+			{ID: "shop.b", Type: Added},
+			{ID: "shop.c", Type: Added},
+			{ID: "shop.d", Type: Added},
+		},
+	}
+	ApplyForward(cs2, doc, ts, m2)
+
+	page := requirePage(t, doc, "view-containers")
+
+	// Scope boundary must be wide enough to contain 3 children in one row:
+	// col 2 at x=340, width=120, + childStartX(20) margin → needs >= 480.
+	scopeElem := page.FindElement("shop")
+	if scopeElem == nil {
+		t.Fatal("scope element 'shop' not found on page")
+	}
+	cell := scopeElem.FindElement("mxCell")
+	if cell == nil {
+		t.Fatal("scope element has no mxCell")
+	}
+	geo := cell.FindElement("mxGeometry")
+	if geo == nil {
+		t.Fatal("scope element has no mxGeometry")
+	}
+	w, _ := strconv.ParseFloat(geo.SelectAttrValue("width", "0"), 64)
+	if w < 480 {
+		t.Errorf("scope boundary width: got %v, want >= 480 (3 children in one row overflow default 400)", w)
+	}
+}
+
+// TestApplyForward_RelayoutClearsAndRepopulates verifies that the Relayout option
+// removes all existing managed elements and re-places them via the layout engine.
+func TestApplyForward_RelayoutClearsAndRepopulates(t *testing.T) {
+	doc := shopContainersDoc()
+	ts := minimalTemplates(t)
+	m := shopModel(map[string]model.Element{
+		"a": {Kind: "container", Title: "A"},
+		"b": {Kind: "container", Title: "B"},
+	})
+
+	// First sync: populate the page normally.
+	cs := &ChangeSet{
+		ModelElementChanges: []ElementChange{
+			{ID: "shop.a", Type: Added},
+			{ID: "shop.b", Type: Added},
+		},
+	}
+	ApplyForward(cs, doc, ts, m)
+
+	page := requirePage(t, doc, "view-containers")
+	if page.FindElement("shop.a") == nil {
+		t.Fatal("shop.a not placed after first sync")
+	}
+
+	// Second sync with Relayout=true: should clear and re-place.
+	csEmpty := &ChangeSet{}
+	ApplyForward(csEmpty, doc, ts, m, ForwardOptions{Relayout: true})
+
+	page = requirePage(t, doc, "view-containers")
+	if page.FindElement("shop.a") == nil {
+		t.Error("shop.a missing after relayout — clearPageElements removed it and layout did not re-place")
+	}
+	if page.FindElement("shop.b") == nil {
+		t.Error("shop.b missing after relayout")
+	}
+}
+
+// TestResolveElementFields_ElementNotOnPage verifies that resolveElementFields
+// falls back to model values when the element is not found on the page.
+func TestResolveElementFields_ElementNotOnPage(t *testing.T) {
+	doc := shopContainersDoc()
+	m := shopModel(map[string]model.Element{
+		"a": {Kind: "container", Title: "Model Title", Technology: "Go"},
+	})
+
+	page := requirePage(t, doc, "view-containers")
+	elem := m.Model["shop"]
+	children := elem.Children
+	child := children["a"]
+
+	ch := ElementChange{ID: "shop.a", Field: "title"}
+	title, tech, desc := resolveElementFields(ch, page, &child)
+
+	if title != "Model Title" {
+		t.Errorf("expected model title, got %q", title)
+	}
+	if tech != "Go" {
+		t.Errorf("expected model technology, got %q", tech)
+	}
+	_ = desc
+}
+
+// TestExpandScopeToFitChildren_NoChildren verifies that expandScopeToFitChildren
+// does nothing when no children are parented to the scope.
+func TestExpandScopeToFitChildren_NoChildren(t *testing.T) {
+	doc := shopContainersDoc()
+	ts := minimalTemplates(t)
+	m := shopModel(map[string]model.Element{
+		"a": {Kind: "container", Title: "A"},
+	})
+
+	cs := &ChangeSet{
+		ModelElementChanges: []ElementChange{{ID: "shop.a", Type: Added}},
+	}
+	ApplyForward(cs, doc, ts, m)
+
+	page := requirePage(t, doc, "view-containers")
+	scopeElem := page.FindElement("shop")
+	if scopeElem == nil {
+		t.Fatal("scope element not found")
+	}
+	cell := scopeElem.FindElement("mxCell")
+	if cell == nil {
+		t.Fatal("scope mxCell not found")
+	}
+	geo := cell.FindElement("mxGeometry")
+	if geo == nil {
+		t.Fatal("scope mxGeometry not found")
+	}
+	wBefore := geo.SelectAttrValue("width", "")
+
+	// Call with a scopeID that has no parented children on the page.
+	expandScopeToFitChildren(page, "shop", "view-containers-nonexistent")
+
+	// Width should be unchanged since no children match the nonexistent viewID parent.
+	wAfter := geo.SelectAttrValue("width", "")
+	if wBefore != wAfter {
+		t.Errorf("width changed unexpectedly: %s → %s", wBefore, wAfter)
+	}
+}
+
+// TestResolveElementFields_TechnologyAndDescriptionFields verifies that the
+// technology and description switch cases override only the specified field
+// while keeping the other fields from the current draw.io state.
+func TestResolveElementFields_TechnologyAndDescriptionFields(t *testing.T) {
+	doc := shopContainersDoc()
+	ts := minimalTemplates(t)
+	m := shopModel(map[string]model.Element{
+		"a": {Kind: "container", Title: "Title A", Technology: "Go", Description: "Desc A"},
+	})
+	cs := &ChangeSet{
+		ModelElementChanges: []ElementChange{{ID: "shop.a", Type: Added}},
+	}
+	ApplyForward(cs, doc, ts, m)
+
+	page := requirePage(t, doc, "view-containers")
+	flat, _ := model.FlattenElements(m)
+	elem := flat["shop.a"]
+
+	t.Run("technology", func(t *testing.T) {
+		ch := ElementChange{ID: "shop.a", Field: "technology"}
+		_, tech, _ := resolveElementFields(ch, page, elem)
+		if tech != "Go" {
+			t.Errorf("expected technology %q, got %q", "Go", tech)
+		}
+	})
+
+	t.Run("description", func(t *testing.T) {
+		ch := ElementChange{ID: "shop.a", Field: "description"}
+		_, _, desc := resolveElementFields(ch, page, elem)
+		if desc != "Desc A" {
+			t.Errorf("expected description %q, got %q", "Desc A", desc)
+		}
+	})
+}
+
+// TestApplyForward_RelayoutClearsRelationships verifies that the Relayout option
+// removes connector mxCells (rel- prefix) so they are re-placed after clearing.
+func TestApplyForward_RelayoutClearsRelationships(t *testing.T) {
+	doc := docWithViewPages()
+	ts := minimalTemplates(t)
+	m := modelWithViews()
+
+	cs := &ChangeSet{
+		ModelElementChanges: []ElementChange{
+			{ID: "customer", Type: Added},
+			{ID: "webshop", Type: Added},
+		},
+		ModelRelationshipChanges: []RelationshipChange{
+			{From: "customer", To: "webshop", Type: Added, NewValue: "uses"},
+		},
+	}
+	ApplyForward(cs, doc, ts, m)
+
+	contextPage := requirePage(t, doc, "view-context")
+	connsBefore := findConnectorCount(contextPage)
+	if connsBefore == 0 {
+		t.Fatal("expected at least one connector after first sync")
+	}
+
+	csEmpty := &ChangeSet{}
+	ApplyForward(csEmpty, doc, ts, m, ForwardOptions{Relayout: true})
+
+	contextPage = requirePage(t, doc, "view-context")
+	connsAfter := findConnectorCount(contextPage)
+	if connsAfter == 0 {
+		t.Errorf("expected connectors to be re-placed after relayout, got 0")
+	}
+}
+
+// TestApplyForward_ScopeBoundaryExpandsHeightForManyChildren verifies that when
+// children overflow the scope's default height, expandScopeToFitChildren also
+// grows the height (not just width).
+//
+// Uses a two-step sync: first sync makes the page non-fresh (1 child via layout
+// engine), then the second sync adds 7 more via the incremental path. Child index
+// 6 lands on row 2 (y=280), producing maxBottom=360 which exceeds the default
+// scope height of 300 and triggers the height-expansion branch.
+func TestApplyForward_ScopeBoundaryExpandsHeightForManyChildren(t *testing.T) {
+	doc := shopContainersDoc()
+	ts := minimalTemplates(t)
+
+	// First sync: single child makes the page non-fresh for subsequent syncs.
+	m1 := shopModel(map[string]model.Element{
+		"a": {Kind: "container", Title: "A"},
+	})
+	cs1 := &ChangeSet{
+		ModelElementChanges: []ElementChange{{ID: "shop.a", Type: Added}},
+	}
+	ApplyForward(cs1, doc, ts, m1)
+
+	// Second sync (incremental): 7 new children → childIndex 0-6 → row 2 at y=280.
+	// maxBottom = 280 + 60 (template height) + 20 (childStartX margin) = 360 > 300.
+	allChildren := map[string]model.Element{
+		"a": {Kind: "container", Title: "A"},
+		"b": {Kind: "container", Title: "B"},
+		"c": {Kind: "container", Title: "C"},
+		"d": {Kind: "container", Title: "D"},
+		"e": {Kind: "container", Title: "E"},
+		"f": {Kind: "container", Title: "F"},
+		"g": {Kind: "container", Title: "G"},
+		"h": {Kind: "container", Title: "H"},
+	}
+	m2 := shopModel(allChildren)
+	cs2 := &ChangeSet{
+		ModelElementChanges: []ElementChange{
+			{ID: "shop.b", Type: Added},
+			{ID: "shop.c", Type: Added},
+			{ID: "shop.d", Type: Added},
+			{ID: "shop.e", Type: Added},
+			{ID: "shop.f", Type: Added},
+			{ID: "shop.g", Type: Added},
+			{ID: "shop.h", Type: Added},
+		},
+	}
+	ApplyForward(cs2, doc, ts, m2)
+
+	page := requirePage(t, doc, "view-containers")
+	scopeElem := page.FindElement("shop")
+	if scopeElem == nil {
+		t.Fatal("scope element 'shop' not found")
+	}
+	cell := scopeElem.FindElement("mxCell")
+	if cell == nil {
+		t.Fatal("scope has no mxCell")
+	}
+	geo := cell.FindElement("mxGeometry")
+	if geo == nil {
+		t.Fatal("scope has no mxGeometry")
+	}
+	h, _ := strconv.ParseFloat(geo.SelectAttrValue("height", "0"), 64)
+	if h <= 300 {
+		t.Errorf("scope height not expanded: got %v, expected > 300 (row 2 overflows default 300)", h)
+	}
+}
+
 
 // TestApplyForward_DeletedElementRemovedFromViewPages verifies that when an
 // element is deleted from the model, it is removed from all view pages where
@@ -1094,5 +1468,118 @@ func TestApplyForward_NewlyIncludedElementGetsConnectors(t *testing.T) {
 	}
 	if page.FindConnector("detail--parent.child_a", "detail--parent.child_b", 2) == nil {
 		t.Error("expected connector child_a→child_b (populated, not in ChangeSet) — see #231")
+	}
+}
+
+// TestApplyForward_ChildElementAdded_IncrementalPathRelativeCoordinates is the
+// regression test for the core bug from #330: when a child is added via the
+// incremental path (page is non-fresh because a sibling was placed in a prior
+// sync), it must receive coordinates relative to its parent boundary, not
+// absolute page coordinates.
+//
+// The previous test (TestApplyForward_ChildElementsUseRelativeCoordinates) runs
+// on a fresh page and therefore exercises placeSingleElement (layout engine),
+// not applyElementAdded (incremental path). This test exercises the incremental
+// path by adding a second child after a first one is already on the page.
+func TestApplyForward_ChildElementAdded_IncrementalPathRelativeCoordinates(t *testing.T) {
+	doc := shopContainersDoc()
+	ts := minimalTemplates(t)
+
+	// Sync 1: fresh page — shop.a placed via layout engine.
+	m1 := shopModel(map[string]model.Element{
+		"a": {Kind: "container", Title: "A"},
+	})
+	ApplyForward(&ChangeSet{ModelElementChanges: []ElementChange{
+		{ID: "shop.a", Type: Added},
+	}}, doc, ts, m1)
+
+	// Sync 2: non-fresh page — shop.b must be placed via applyElementAdded
+	// (incremental path) with coordinates relative to the parent boundary.
+	m2 := shopModel(map[string]model.Element{
+		"a": {Kind: "container", Title: "A"},
+		"b": {Kind: "container", Title: "B"},
+	})
+	ApplyForward(&ChangeSet{ModelElementChanges: []ElementChange{
+		{ID: "shop.b", Type: Added},
+	}}, doc, ts, m2)
+
+	page := requirePage(t, doc, "view-containers")
+	elem := page.FindElement("shop.b")
+	if elem == nil {
+		t.Fatal("shop.b not found on page after incremental sync")
+	}
+	cell := elem.FindElement("mxCell")
+	if cell == nil {
+		t.Fatal("shop.b has no mxCell")
+	}
+	geo := cell.FindElement("mxGeometry")
+	if geo == nil {
+		t.Fatal("shop.b has no mxGeometry")
+	}
+	x, _ := strconv.ParseFloat(geo.SelectAttrValue("x", "-1"), 64)
+	y, _ := strconv.ParseFloat(geo.SelectAttrValue("y", "-1"), 64)
+	// Relative coordinates must be small (within parent boundary).
+	// Before the fix, children placed via the incremental path received
+	// absolute page coordinates (e.g. y > 1000).
+	if x < 0 || x > 600 {
+		t.Errorf("shop.b incremental: expected relative x in [0,600], got %v", x)
+	}
+	if y < 0 || y > 400 {
+		t.Errorf("shop.b incremental: expected relative y in [0,400], got %v", y)
+	}
+}
+
+// TestApplyForward_ChildElementAdded_NoStackingOnMultipleSyncs verifies that
+// three children added in three consecutive syncs (one new child each) are
+// placed at distinct positions. Before the fix, childCount was not seeded from
+// existing children, so every sync started at grid index 0 and stacked all
+// incrementally added children at the same coordinates.
+func TestApplyForward_ChildElementAdded_NoStackingOnMultipleSyncs(t *testing.T) {
+	doc := shopContainersDoc()
+	ts := minimalTemplates(t)
+
+	sync := func(m *model.BausteinsichtModel, ids ...string) {
+		changes := make([]ElementChange, len(ids))
+		for i, id := range ids {
+			changes[i] = ElementChange{ID: id, Type: Added}
+		}
+		ApplyForward(&ChangeSet{ModelElementChanges: changes}, doc, ts, m)
+	}
+
+	m1 := shopModel(map[string]model.Element{"a": {Kind: "container", Title: "A"}})
+	sync(m1, "shop.a")
+
+	m2 := shopModel(map[string]model.Element{
+		"a": {Kind: "container", Title: "A"},
+		"b": {Kind: "container", Title: "B"},
+	})
+	sync(m2, "shop.b")
+
+	m3 := shopModel(map[string]model.Element{
+		"a": {Kind: "container", Title: "A"},
+		"b": {Kind: "container", Title: "B"},
+		"c": {Kind: "container", Title: "C"},
+	})
+	sync(m3, "shop.c")
+
+	page := requirePage(t, doc, "view-containers")
+	type pos struct{ x, y float64 }
+	coords := map[string]pos{}
+	for _, id := range []string{"shop.a", "shop.b", "shop.c"} {
+		elem := page.FindElement(id)
+		if elem == nil {
+			t.Fatalf("%s not found on page", id)
+		}
+		geo := elem.FindElement("mxCell").FindElement("mxGeometry")
+		x, _ := strconv.ParseFloat(geo.SelectAttrValue("x", "0"), 64)
+		y, _ := strconv.ParseFloat(geo.SelectAttrValue("y", "0"), 64)
+		coords[id] = pos{x, y}
+	}
+
+	if coords["shop.a"] == coords["shop.b"] {
+		t.Errorf("shop.a and shop.b share position %+v", coords["shop.a"])
+	}
+	if coords["shop.b"] == coords["shop.c"] {
+		t.Errorf("shop.b and shop.c share position %+v — childCount not seeded from existing children", coords["shop.b"])
 	}
 }

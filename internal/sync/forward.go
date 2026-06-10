@@ -16,6 +16,13 @@ const (
 	elementGap       = 40.0
 	defaultWidth     = 120.0
 	defaultHeight    = 60.0
+
+	// Child element placement within a scope boundary (#330).
+	childGridCols  = 3
+	childStartX    = 20.0
+	childStartY    = 80.0
+	childSpacingX  = 160.0
+	childSpacingY  = 100.0
 )
 
 // applyTagStyles applies styles defined in tag definitions to an element's style.
@@ -320,8 +327,25 @@ func populateNewPage(
 	} else {
 		// Incremental: fall back to cursor-based placement.
 		pl := computePlacement(page)
+		// Seed childCount with children already on the page so newly added
+		// children don't stack at grid index 0 on top of existing ones (#330).
+		if scopeID != "" {
+			parentCellID := scopedCellID(viewID, scopeID)
+			for _, obj := range page.FindAllElements() {
+				if cell := obj.FindElement("mxCell"); cell != nil {
+					if cell.SelectAttrValue("parent", "") == parentCellID {
+						pl.childCount[scopeID]++
+					}
+				}
+			}
+		}
+		initialChildCount := pl.childCount[scopeID]
 		for _, id := range toPlace {
 			applyElementAdded(id, viewID, scopeID, page, templates, flat, &m.Specification, &pl, result)
+		}
+		// Expand only when new children were added in this pass (#330).
+		if scopeID != "" && pl.childCount[scopeID] > initialChildCount {
+			expandScopeToFitChildren(page, scopeID, viewID)
 		}
 	}
 }
@@ -517,6 +541,19 @@ func applyChangesToPage(
 	result *ForwardResult,
 ) {
 	pl := computePlacement(page)
+	// Seed childCount with children already on the page so incrementally added
+	// children don't stack at grid index 0 on top of existing ones (#330).
+	if scopeID != "" {
+		parentCellID := scopedCellID(viewID, scopeID)
+		for _, obj := range page.FindAllElements() {
+			if cell := obj.FindElement("mxCell"); cell != nil {
+				if cell.SelectAttrValue("parent", "") == parentCellID {
+					pl.childCount[scopeID]++
+				}
+			}
+		}
+	}
+	initialChildCount := pl.childCount[scopeID]
 
 	for _, ch := range cs.ModelElementChanges {
 		switch ch.Type {
@@ -620,6 +657,11 @@ func applyChangesToPage(
 			}
 		}
 	}
+
+	// Expand scope boundary to fit any children added in this pass (#330).
+	if scopeID != "" && pl.childCount[scopeID] > initialChildCount {
+		expandScopeToFitChildren(page, scopeID, viewID)
+	}
 }
 
 // firstPage returns the first page in doc, or nil if there are none.
@@ -633,8 +675,9 @@ func firstPage(doc *drawio.Document) *drawio.Page {
 
 // placement tracks where the next new element should be placed.
 type placement struct {
-	nextX float64
-	nextY float64
+	nextX      float64
+	nextY      float64
+	childCount map[string]int // tracks number of children per parent for grid layout (#330)
 }
 
 // computePlacement scans existing elements on a page and returns a placement
@@ -661,7 +704,11 @@ func computePlacement(page *drawio.Page) placement {
 	if maxY > 0 {
 		startY = maxY + elementGap
 	}
-	return placement{nextX: elementGap, nextY: startY}
+	return placement{
+		nextX:      elementGap,
+		nextY:      startY,
+		childCount: make(map[string]int),
+	}
 }
 
 // applyElementAdded creates a new element on page with a visual new-element marker.
@@ -693,60 +740,32 @@ func applyElementAdded(
 		return
 	}
 
-	elem, ok := flat[id]
+	elem, ts, baseStyle, ok := lookupElementStyle(id, flat, templates, spec, result)
 	if !ok {
-		result.Warnings = append(result.Warnings, "element not found in model: "+id)
 		return
 	}
-
-	ts, ok := templates.GetStyle(elem.Kind)
-	if !ok {
-		ts = drawio.TemplateStyle{Width: defaultWidth, Height: defaultHeight}
-		result.Warnings = append(result.Warnings, "no template style for kind: "+elem.Kind)
-	}
-
-	// Apply tag-based styles if any tags are defined on the element
-	baseStyle := ts.Style
-	if spec != nil && len(elem.Tags) > 0 {
-		baseStyle = applyTagStyles(elem, spec, baseStyle)
-	}
-
 	style := mergeStyles(baseStyle, newElementMarker)
 
-	width := ts.Width
-	if width == 0 {
-		width = defaultWidth
-	}
-	height := ts.Height
-	if height == 0 {
-		height = defaultHeight
-	}
-
-	data := drawio.ElementData{
-		ID:          id,
-		CellID:      scopedCellID(viewID, id),
-		Kind:        elem.Kind,
-		Title:       elem.Title,
-		Technology:  elem.Technology,
-		Description: elem.Description,
-		X:           pl.nextX,
-		Y:           pl.nextY,
-		Width:       width,
-		Height:      height,
-		SubCells:    subCellsFromTemplate(ts),
+	// For child elements, use relative coordinates within the parent.
+	// Position children in a grid starting at (20, 80) inside the parent boundary (#330).
+	x, y := pl.nextX, pl.nextY
+	isChild := scopeID != "" && isChildOf(id, scopeID)
+	if isChild {
+		childIndex := pl.childCount[scopeID]
+		x = childStartX + float64(childIndex%childGridCols)*childSpacingX
+		y = childStartY + float64(childIndex/childGridCols)*childSpacingY
+		pl.childCount[scopeID]++
 	}
 
-	// Parent children of the scope element to the boundary cell.
-	if scopeID != "" && isChildOf(id, scopeID) {
-		data.ParentID = scopedCellID(viewID, scopeID)
-	}
-
+	data := buildElementData(id, viewID, scopeID, elem, ts, x, y)
 	if err := page.CreateElement(data, style); err != nil {
 		result.Warnings = append(result.Warnings, "failed to create element "+id+": "+err.Error())
 		return
 	}
 
-	pl.nextX += width + elementGap
+	if !isChild {
+		pl.nextX += data.Width + elementGap
+	}
 	result.ElementsCreated++
 }
 
@@ -767,22 +786,9 @@ func placeSingleElement(
 		return
 	}
 
-	elem, ok := flat[id]
+	elem, ts, baseStyle, ok := lookupElementStyle(id, flat, templates, spec, result)
 	if !ok {
-		result.Warnings = append(result.Warnings, "element not found in model: "+id)
 		return
-	}
-
-	ts, ok := templates.GetStyle(elem.Kind)
-	if !ok {
-		ts = drawio.TemplateStyle{Width: defaultWidth, Height: defaultHeight}
-		result.Warnings = append(result.Warnings, "no template style for kind: "+elem.Kind)
-	}
-
-	baseStyle := ts.Style
-	// Apply tag-based styles if any tags are defined on the element
-	if spec != nil && len(elem.Tags) > 0 {
-		baseStyle = applyTagStyles(elem, spec, baseStyle)
 	}
 
 	style := baseStyle
@@ -790,33 +796,7 @@ func placeSingleElement(
 		style = mergeStyles(baseStyle, newElementMarker)
 	}
 
-	width := ts.Width
-	if width == 0 {
-		width = defaultWidth
-	}
-	height := ts.Height
-	if height == 0 {
-		height = defaultHeight
-	}
-
-	data := drawio.ElementData{
-		ID:          id,
-		CellID:      scopedCellID(viewID, id),
-		Kind:        elem.Kind,
-		Title:       elem.Title,
-		Technology:  elem.Technology,
-		Description: elem.Description,
-		X:           x,
-		Y:           y,
-		Width:       width,
-		Height:      height,
-		SubCells:    subCellsFromTemplate(ts),
-	}
-
-	if scopeID != "" && isChildOf(id, scopeID) {
-		data.ParentID = scopedCellID(viewID, scopeID)
-	}
-
+	data := buildElementData(id, viewID, scopeID, elem, ts, x, y)
 	if err := page.CreateElement(data, style); err != nil {
 		result.Warnings = append(result.Warnings, "failed to create element "+id+": "+err.Error())
 		return
@@ -843,6 +823,64 @@ func resizeScopeBoundary(page *drawio.Page, scopeID string, x, y, width, height 
 	geo.CreateAttr("y", strconv.FormatFloat(y, 'f', -1, 64))
 	geo.CreateAttr("width", strconv.FormatFloat(width, 'f', -1, 64))
 	geo.CreateAttr("height", strconv.FormatFloat(height, 'f', -1, 64))
+}
+
+// expandScopeToFitChildren resizes the scope boundary so all child elements
+// currently parented to it remain within bounds. Only expands, never shrinks (#330).
+func expandScopeToFitChildren(page *drawio.Page, scopeID, viewID string) {
+	parentCellID := scopedCellID(viewID, scopeID)
+
+	maxRight := 0.0
+	maxBottom := 0.0
+	for _, obj := range page.FindAllElements() {
+		cell := obj.FindElement("mxCell")
+		if cell == nil {
+			continue
+		}
+		if cell.SelectAttrValue("parent", "") != parentCellID {
+			continue
+		}
+		geo := cell.FindElement("mxGeometry")
+		if geo == nil {
+			continue
+		}
+		x, _ := strconv.ParseFloat(geo.SelectAttrValue("x", "0"), 64)
+		y, _ := strconv.ParseFloat(geo.SelectAttrValue("y", "0"), 64)
+		w, _ := strconv.ParseFloat(geo.SelectAttrValue("width", "0"), 64)
+		h, _ := strconv.ParseFloat(geo.SelectAttrValue("height", "0"), 64)
+		if right := x + w + childStartX; right > maxRight {
+			maxRight = right
+		}
+		if bottom := y + h + childStartX; bottom > maxBottom {
+			maxBottom = bottom
+		}
+	}
+
+	if maxRight == 0 && maxBottom == 0 {
+		return
+	}
+
+	obj := page.FindElement(scopeID)
+	if obj == nil {
+		return
+	}
+	cell := obj.FindElement("mxCell")
+	if cell == nil {
+		return
+	}
+	geo := cell.FindElement("mxGeometry")
+	if geo == nil {
+		return
+	}
+
+	currentW, _ := strconv.ParseFloat(geo.SelectAttrValue("width", "0"), 64)
+	currentH, _ := strconv.ParseFloat(geo.SelectAttrValue("height", "0"), 64)
+	if maxRight > currentW {
+		geo.CreateAttr("width", strconv.FormatFloat(maxRight, 'f', -1, 64))
+	}
+	if maxBottom > currentH {
+		geo.CreateAttr("height", strconv.FormatFloat(maxBottom, 'f', -1, 64))
+	}
 }
 
 // clearPageElements removes all managed bausteinsicht elements and connectors
@@ -883,6 +921,93 @@ func subCellsFromTemplate(ts drawio.TemplateStyle) *drawio.SubCellTemplates {
 	}
 }
 
+// resolveElementFields returns the display values to write for a Modified element change.
+// When ch.Field is set, it reads current draw.io values and overrides only the one changed
+// field to avoid overwriting concurrent draw.io edits to other fields. (#109)
+func resolveElementFields(ch ElementChange, page *drawio.Page, elem *model.Element) (title, technology, description string) {
+	title = elem.Title
+	technology = elem.Technology
+	description = elem.Description
+
+	if ch.Field == "" {
+		return
+	}
+	obj := page.FindElement(ch.ID)
+	if obj == nil {
+		return
+	}
+	curTitle, curTech, curDesc := page.ReadElementFields(obj)
+	if curTooltip := obj.SelectAttrValue("tooltip", ""); curDesc == "" {
+		curDesc = curTooltip
+	}
+	title, technology, description = curTitle, curTech, curDesc
+	switch ch.Field {
+	case "title":
+		title = elem.Title
+	case "technology":
+		technology = elem.Technology
+	case "description":
+		description = elem.Description
+	}
+	return
+}
+
+// lookupElementStyle resolves the model element, template style, and computed base style
+// for a given element ID. Returns ok=false and appends a warning if the element is unknown.
+func lookupElementStyle(
+	id string,
+	flat map[string]*model.Element,
+	templates *drawio.TemplateSet,
+	spec *model.Specification,
+	result *ForwardResult,
+) (elem *model.Element, ts drawio.TemplateStyle, baseStyle string, ok bool) {
+	e, exists := flat[id]
+	if !exists {
+		result.Warnings = append(result.Warnings, "element not found in model: "+id)
+		return nil, drawio.TemplateStyle{}, "", false
+	}
+	style, styleOk := templates.GetStyle(e.Kind)
+	if !styleOk {
+		style = drawio.TemplateStyle{Width: defaultWidth, Height: defaultHeight}
+		result.Warnings = append(result.Warnings, "no template style for kind: "+e.Kind)
+	}
+	bs := style.Style
+	if spec != nil && len(e.Tags) > 0 {
+		bs = applyTagStyles(e, spec, bs)
+	}
+	return e, style, bs, true
+}
+
+// buildElementData constructs the drawio.ElementData for placing a model element on a page.
+// Width and height default to package-level defaults when the template specifies zero.
+func buildElementData(id, viewID, scopeID string, elem *model.Element, ts drawio.TemplateStyle, x, y float64) drawio.ElementData {
+	w := ts.Width
+	if w == 0 {
+		w = defaultWidth
+	}
+	h := ts.Height
+	if h == 0 {
+		h = defaultHeight
+	}
+	data := drawio.ElementData{
+		ID:          id,
+		CellID:      scopedCellID(viewID, id),
+		Kind:        elem.Kind,
+		Title:       elem.Title,
+		Technology:  elem.Technology,
+		Description: elem.Description,
+		X:           x,
+		Y:           y,
+		Width:       w,
+		Height:      h,
+		SubCells:    subCellsFromTemplate(ts),
+	}
+	if scopeID != "" && isChildOf(id, scopeID) {
+		data.ParentID = scopedCellID(viewID, scopeID)
+	}
+	return data
+}
+
 // applyElementModified updates the changed field of an existing element.
 func applyElementModified(
 	ch ElementChange,
@@ -909,46 +1034,13 @@ func applyElementModified(
 		return
 	}
 
-	// When a specific field is known, read the current draw.io values and only
-	// override the changed field. This prevents overwriting draw.io-side changes
-	// to other fields during concurrent modification. (#109)
-	title := elem.Title
-	technology := elem.Technology
-	description := elem.Description
-
-	if ch.Field != "" {
-		obj := page.FindElement(ch.ID)
-		if obj != nil {
-			// Use ReadElementFields which handles both sub-cells and HTML labels.
-			curTitle, curTech, curDesc := page.ReadElementFields(obj)
-			curTooltip := obj.SelectAttrValue("tooltip", "")
-			if curDesc == "" {
-				curDesc = curTooltip
-			}
-
-			// Start from current draw.io values, override only the changed field.
-			title = curTitle
-			technology = curTech
-			description = curDesc
-
-			switch ch.Field {
-			case "title":
-				title = elem.Title
-			case "technology":
-				technology = elem.Technology
-			case "description":
-				description = elem.Description
-			}
-		}
-	}
-
-	data := drawio.ElementData{
+	title, technology, description := resolveElementFields(ch, page, elem)
+	page.UpdateElement(ch.ID, drawio.ElementData{
 		ID:          ch.ID,
 		Title:       title,
 		Technology:  technology,
 		Description: description,
-	}
-	page.UpdateElement(ch.ID, data)
+	})
 	result.ElementsUpdated++
 }
 
