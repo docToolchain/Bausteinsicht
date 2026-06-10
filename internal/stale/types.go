@@ -18,18 +18,18 @@ const (
 
 // StaleElement represents an element flagged as stale.
 type StaleElement struct {
-	ID                   string
-	Title                string
-	Kind                 string
-	LastModified         time.Time
-	DaysSinceModified    int
-	MissingStatus        bool
-	MissingADR           bool
-	IncomingRelCount     int
-	OutgoingRelCount     int
-	IsViewIncluded       bool
-	Risk                 RiskLevel
-	Recommendations      []string
+	ID                string
+	Title             string
+	Kind              string
+	LastModified      time.Time
+	DaysSinceModified int
+	MissingStatus     bool
+	MissingADR        bool
+	IncomingRelCount  int
+	OutgoingRelCount  int
+	IsViewIncluded    bool
+	Risk              RiskLevel
+	Recommendations   []string
 }
 
 // StaleConfig controls stale element detection.

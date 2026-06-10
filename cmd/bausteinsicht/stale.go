@@ -121,21 +121,25 @@ func findDrawioFile(absModelPath, drawioFile string) string {
 }
 
 // applyDrawioMarking marks stale elements in the draw.io file, writing status to stderr.
-func applyDrawioMarking(elements []stale.StaleElement, absModelPath, drawioFile string, stderr io.Writer) error {
-	drawioFile = findDrawioFile(absModelPath, drawioFile)
+func applyDrawioMarking(elements []stale.StaleElement, absModelPath, explicitDrawioFile string, stderr io.Writer) error {
+	if explicitDrawioFile != "" {
+		if err := validatePathContainment(explicitDrawioFile); err != nil {
+			return exitWithCode(fmt.Errorf("drawio-file path: %w", err), 1)
+		}
+	}
+	drawioFile := findDrawioFile(absModelPath, explicitDrawioFile)
 	if drawioFile == "" {
 		return nil
 	}
 	if _, err := os.Stat(drawioFile); err != nil {
-		if _, ok := err.(*os.PathError); !ok {
-			_, err = fmt.Fprintf(stderr, "Warning: Could not find draw.io file: %v\n", err)
-			return err
+		if explicitDrawioFile != "" {
+			return exitWithCode(fmt.Errorf("drawio-file not found: %w", err), 1)
 		}
-		return nil
+		return nil // silently skip auto-detected path that no longer exists
 	}
-	if err := stale.MarkInDrawio(elements, drawioFile); err != nil {
-		_, err = fmt.Fprintf(stderr, "Warning: Failed to mark draw.io: %v\n", err)
-		return err
+	if markErr := stale.MarkInDrawio(elements, drawioFile); markErr != nil {
+		_, _ = fmt.Fprintf(stderr, "Warning: Failed to mark draw.io: %v\n", markErr)
+		return markErr
 	}
 	_, err := fmt.Fprintf(stderr, "Marked %d stale elements in %s\n", len(elements), filepath.Base(drawioFile))
 	return err

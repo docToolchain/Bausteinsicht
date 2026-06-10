@@ -1,7 +1,6 @@
 package stale
 
 import (
-	"strings"
 	"time"
 
 	"github.com/docToolchain/Bausteinsicht/internal/model"
@@ -35,7 +34,7 @@ func Detect(m *model.BausteinsichtModel, modelPath string, config StaleConfig) (
 	// Check each element for staleness
 	for dotPath, elem := range flatElements {
 		// Skip archived elements
-		if elem.Status == "archived" {
+		if elem.Status == model.StatusArchived {
 			continue
 		}
 
@@ -68,7 +67,7 @@ func Detect(m *model.BausteinsichtModel, modelPath string, config StaleConfig) (
 			MissingADR:        len(elem.Decisions) == 0,
 			IncomingRelCount:  relIndex.incoming[dotPath],
 			OutgoingRelCount:  relIndex.outgoing[dotPath],
-			IsViewIncluded:    isViewIncluded(dotPath, m),
+			IsViewIncluded:    isViewIncluded(dotPath, m, flatElements),
 		}
 
 		// Assess risk
@@ -104,16 +103,15 @@ func shouldFlag(elem *model.Element, lastModified time.Time, config StaleConfig)
 }
 
 // resolveLastModified returns the best available modification time for an element.
-// Priority: explicit lastModified field → per-element git search → fallback.
-func resolveLastModified(elem *model.Element, modelPath, dotPath string, fallback time.Time) time.Time {
+// Priority: explicit lastModified field → file-level fallback.
+// Per-element git search is intentionally omitted: leaf-name matching causes
+// false negatives (elements sharing a leaf name alias each other) and runs
+// O(n) git subprocesses for large models.
+func resolveLastModified(elem *model.Element, _ string, _ string, fallback time.Time) time.Time {
 	if elem.LastModified != "" {
 		if t, err := time.Parse(time.RFC3339, elem.LastModified); err == nil {
 			return t
 		}
-		return fallback
-	}
-	if gitMod, err := GetLastModifiedDateForElement(modelPath, dotPath); err == nil && !gitMod.IsZero() {
-		return gitMod
 	}
 	return fallback
 }
@@ -143,27 +141,16 @@ func isTagExcluded(elemTags []string, excludeTags []string) bool {
 	return false
 }
 
-// matchesViewPattern returns true if dotPath matches a single include pattern.
-func matchesViewPattern(dotPath, pattern string) bool {
-	if pattern == "" {
-		return false
-	}
-	if pattern == "*" || pattern == dotPath {
-		return true
-	}
-	if !strings.HasSuffix(pattern, "*") {
-		return false
-	}
-	prefix := pattern[:len(pattern)-1]
-	return len(dotPath) > len(prefix) && strings.HasPrefix(dotPath, prefix)
-}
-
-// isViewIncluded checks if an element is explicitly included in any view.
-func isViewIncluded(dotPath string, m *model.BausteinsichtModel) bool {
+// isViewIncluded checks if an element is explicitly included in any view,
+// using model.MatchPattern for consistent semantics with the rest of the tool.
+// flatElements must contain dotPath (as returned by model.FlattenElements).
+func isViewIncluded(dotPath string, m *model.BausteinsichtModel, flatElements map[string]*model.Element) bool {
 	for _, view := range m.Views {
 		for _, pattern := range view.Include {
-			if matchesViewPattern(dotPath, pattern) {
-				return true
+			for _, id := range model.MatchPattern(flatElements, pattern) {
+				if id == dotPath {
+					return true
+				}
 			}
 		}
 	}

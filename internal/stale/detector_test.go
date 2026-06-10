@@ -132,7 +132,7 @@ func TestIsStale_TooRecent(t *testing.T) {
 
 func TestGenerateRecommendations_NoStatus_NoADR(t *testing.T) {
 	elem := StaleElement{
-		ID:           "orphan",
+		ID:            "orphan",
 		MissingStatus: true,
 		MissingADR:    true,
 	}
@@ -197,11 +197,16 @@ func TestIsViewIncluded_ExactMatch(t *testing.T) {
 			},
 		},
 	}
+	flat := map[string]*model.Element{
+		"system.api":   {Kind: "container", Title: "API"},
+		"system.db":    {Kind: "container", Title: "DB"},
+		"system.cache": {Kind: "container", Title: "Cache"},
+	}
 
-	if !isViewIncluded("system.api", m) {
+	if !isViewIncluded("system.api", m, flat) {
 		t.Error("expected system.api to be included in view")
 	}
-	if isViewIncluded("system.cache", m) {
+	if isViewIncluded("system.cache", m, flat) {
 		t.Error("expected system.cache to not be included in view")
 	}
 }
@@ -214,14 +219,19 @@ func TestIsViewIncluded_Wildcard(t *testing.T) {
 			},
 		},
 	}
+	flat := map[string]*model.Element{
+		"system.api": {Kind: "container", Title: "API"},
+		"system.db":  {Kind: "container", Title: "DB"},
+		"other.api":  {Kind: "container", Title: "Other API"},
+	}
 
-	if !isViewIncluded("system.api", m) {
+	if !isViewIncluded("system.api", m, flat) {
 		t.Error("expected system.api to match system.* pattern")
 	}
-	if !isViewIncluded("system.db", m) {
+	if !isViewIncluded("system.db", m, flat) {
 		t.Error("expected system.db to match system.* pattern")
 	}
-	if isViewIncluded("other.api", m) {
+	if isViewIncluded("other.api", m, flat) {
 		t.Error("expected other.api to not match system.* pattern")
 	}
 }
