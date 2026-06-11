@@ -251,8 +251,12 @@ func (s *replState) addElementInteractive() {
 		return
 	}
 
-	if _, exists := s.model.Model[id]; exists {
-		fmt.Printf("Element '%s' already exists. Overwrite? (yes/no): ", id)
+	if existing, exists := s.model.Model[id]; exists {
+		childCount := len(existing.Children)
+		if childCount > 0 {
+			fmt.Printf("Warning: element '%s' has %d child(ren) — they will be preserved\n", id, childCount)
+		}
+		fmt.Printf("Element '%s' already exists. Overwrite kind/title/description? (yes/no): ", id)
 		s.scanner.Scan()
 		if strings.ToLower(strings.TrimSpace(s.scanner.Text())) != "yes" {
 			fmt.Println("Aborted")
@@ -287,11 +291,11 @@ func (s *replState) addElementInteractive() {
 	desc := strings.TrimSpace(s.scanner.Text())
 
 	s.saveUndo()
-	s.model.Model[id] = model.Element{
-		Kind:        kind,
-		Title:       title,
-		Description: desc,
-	}
+	updated := s.model.Model[id] // zero value if new; existing value if overwriting
+	updated.Kind = kind
+	updated.Title = title
+	updated.Description = desc
+	s.model.Model[id] = updated
 	s.modified = true
 	fmt.Printf("✅ Added element '%s'\n", id)
 }
@@ -397,7 +401,7 @@ func (s *replState) removeCommand(parts []string) {
 		from, to := parts[1], parts[2]
 		wantLabel := ""
 		if len(parts) >= 4 {
-			wantLabel = parts[3]
+			wantLabel = strings.Join(parts[3:], " ")
 		}
 		removed := false
 		rels := s.model.Relationships[:0]
