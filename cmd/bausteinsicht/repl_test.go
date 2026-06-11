@@ -266,7 +266,7 @@ func TestReplAutoDetectFallback_AmbiguousModel(t *testing.T) {
 	}
 }
 
-// TestReplUndoStackCapped verifies the undo stack is trimmed to maxUndoLen.
+// TestReplUndoStackCapped verifies the undo stack is trimmed to exactly maxUndoLen.
 func TestReplUndoStackCapped(t *testing.T) {
 	s := newTestReplState("")
 	s.maxUndoLen = 3
@@ -275,8 +275,33 @@ func TestReplUndoStackCapped(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		s.saveUndo()
 	}
-	if len(s.undoStack) > 3 {
-		t.Errorf("undoStack length: got %d, want <= 3", len(s.undoStack))
+	if len(s.undoStack) != 3 {
+		t.Errorf("undoStack length: got %d, want 3", len(s.undoStack))
+	}
+}
+
+// TestReplEvictedModifiedFlag verifies that modified stays true after undo-stack
+// cap eviction even when all remaining entries are undone.
+func TestReplEvictedModifiedFlag(t *testing.T) {
+	s := newTestReplState("")
+	s.maxUndoLen = 2
+
+	// Push 3 entries — triggers eviction.
+	for i := 0; i < 3; i++ {
+		s.saveUndo()
+	}
+	if !s.evicted {
+		t.Fatal("expected evicted=true after exceeding maxUndoLen")
+	}
+
+	// Undo all remaining stack entries.
+	for len(s.undoStack) > 0 {
+		if err := s.undoCommand(); err != nil {
+			t.Fatalf("undoCommand: %v", err)
+		}
+	}
+	if !s.modified {
+		t.Error("modified should remain true after eviction even when undo stack is empty")
 	}
 }
 
@@ -623,18 +648,26 @@ func TestReplSaveCommand_RemoveAddEqualCount(t *testing.T) {
 
 // TestReplSaveCommand_ParallelLabelRoundtrip verifies that two relationships with
 // the same from/to but different labels are both preserved after save (regression
-// for full-signature multiset dedup in patchSave).
+// for full-signature multiset dedup in patchSave). Seeds one relationship on disk
+// first so the dedup logic for existing entries is exercised.
 func TestReplSaveCommand_ParallelLabelRoundtrip(t *testing.T) {
 	s, path := newFileReplState(t, "")
-	s.saveUndo()
+
+	// Seed "reads" on disk.
+	s.model.Relationships = []model.Relationship{{From: "customer", To: "webshop", Label: "reads"}}
+	s.modified = true
+	if err := s.saveCommand(); err != nil {
+		t.Fatalf("initial save: %v", err)
+	}
+
+	// Now add "writes" in memory — patchSave must append only the new rel, not duplicate "reads".
 	s.model.Relationships = []model.Relationship{
 		{From: "customer", To: "webshop", Label: "reads"},
 		{From: "customer", To: "webshop", Label: "writes"},
 	}
 	s.modified = true
-
 	if err := s.saveCommand(); err != nil {
-		t.Fatalf("saveCommand: %v", err)
+		t.Fatalf("second saveCommand: %v", err)
 	}
 
 	reloaded, err := model.Load(path)
@@ -642,7 +675,7 @@ func TestReplSaveCommand_ParallelLabelRoundtrip(t *testing.T) {
 		t.Fatalf("reloading: %v", err)
 	}
 	if len(reloaded.Relationships) != 2 {
-		t.Fatalf("expected 2 relationships, got %d", len(reloaded.Relationships))
+		t.Fatalf("expected exactly 2 relationships, got %d", len(reloaded.Relationships))
 	}
 	labels := map[string]bool{}
 	for _, r := range reloaded.Relationships {
@@ -654,19 +687,50 @@ func TestReplSaveCommand_ParallelLabelRoundtrip(t *testing.T) {
 }
 
 // TestReplAddElement_OverwritePreservesChildren verifies that overwriting an
-// element preserves its children, technology, tags and other fields not re-prompted.
+// element preserves its children, technology, tags and other fields not re-prompted,
+// including after save+reload from disk.
 func TestReplAddElement_OverwritePreservesChildren(t *testing.T) {
-	s := newTestReplState("shop\nyes\nsystem\nShop v2\n\n")
-	s.model.Model["shop"] = model.Element{
-		Kind:        "system",
-		Title:       "Shop",
-		Technology:  "Go",
-		Tags:        []string{"critical"},
-		Children:    map[string]model.Element{"api": {Kind: "container", Title: "API"}},
+	dir := t.TempDir()
+	path := filepath.Join(dir, "model.jsonc")
+	// Spec must declare system as container and include the container kind.
+	initial := `{
+  "specification": {
+    "elements": {
+      "actor":     {"notation": "Person"},
+      "system":    {"notation": "System", "container": true},
+      "container": {"notation": "Container"}
+    }
+  },
+  "model": {
+    "customer": {"kind": "actor", "title": "Customer"},
+    "shop": {
+      "kind": "system", "title": "Shop", "technology": "Go",
+      "tags": ["critical"],
+      "children": {"api": {"kind": "container", "title": "API"}}
+    }
+  },
+  "relationships": [],
+  "views": {}
+}`
+	if err := os.WriteFile(path, []byte(initial), 0600); err != nil {
+		t.Fatalf("write model: %v", err)
+	}
+	m, err := model.Load(path)
+	if err != nil {
+		t.Fatalf("load model: %v", err)
+	}
+	s := &replState{
+		model:      m,
+		modelPath:  path,
+		undoStack:  make([]*model.BausteinsichtModel, 0),
+		maxUndoLen: 50,
+		// Input: id=shop → overwrite=yes → kind=system → title=Shop v2 → desc=
+		scanner: bufio.NewScanner(strings.NewReader("shop\nyes\nsystem\nShop v2\n\n")),
 	}
 
 	s.addElementInteractive()
 
+	// Verify in-memory preservation.
 	elem := s.model.Model["shop"]
 	if elem.Kind != "system" || elem.Title != "Shop v2" {
 		t.Errorf("overwrite should update kind/title, got kind=%q title=%q", elem.Kind, elem.Title)
@@ -679,6 +743,22 @@ func TestReplAddElement_OverwritePreservesChildren(t *testing.T) {
 	}
 	if len(elem.Children) != 1 {
 		t.Errorf("Children should be preserved on overwrite, got %d children", len(elem.Children))
+	}
+
+	// Verify preservation after save and disk reload.
+	if err := s.saveCommand(); err != nil {
+		t.Fatalf("saveCommand after overwrite: %v", err)
+	}
+	diskModel, err := model.Load(path)
+	if err != nil {
+		t.Fatalf("final reload: %v", err)
+	}
+	diskElem := diskModel.Model["shop"]
+	if diskElem.Technology != "Go" {
+		t.Errorf("Technology not preserved on disk, got %q", diskElem.Technology)
+	}
+	if len(diskElem.Children) != 1 {
+		t.Errorf("Children not preserved on disk, got %d children", len(diskElem.Children))
 	}
 }
 

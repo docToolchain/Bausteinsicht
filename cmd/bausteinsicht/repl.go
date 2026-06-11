@@ -32,6 +32,7 @@ type replState struct {
 	modelPath  string
 	undoStack  []*model.BausteinsichtModel
 	modified   bool
+	evicted    bool // true once an undo entry was dropped due to maxUndoLen; modified can never go back to false
 	maxUndoLen int
 	scanner    *bufio.Scanner // shared scanner — multiple scanners on os.Stdin lose buffered data
 }
@@ -252,11 +253,31 @@ func (s *replState) addElementInteractive() {
 	}
 
 	if existing, exists := s.model.Model[id]; exists {
-		childCount := len(existing.Children)
-		if childCount > 0 {
-			fmt.Printf("Warning: element '%s' has %d child(ren) — they will be preserved\n", id, childCount)
+		fmt.Printf("Element '%s' already exists.\n", id)
+		fmt.Printf("  Updating:  kind, title, description\n")
+		preserved := []string{}
+		if len(existing.Children) > 0 {
+			preserved = append(preserved, fmt.Sprintf("%d child(ren)", len(existing.Children)))
 		}
-		fmt.Printf("Element '%s' already exists. Overwrite kind/title/description? (yes/no): ", id)
+		if existing.Technology != "" {
+			preserved = append(preserved, "technology")
+		}
+		if len(existing.Tags) > 0 {
+			preserved = append(preserved, "tags")
+		}
+		if existing.Status != "" {
+			preserved = append(preserved, "status")
+		}
+		if len(existing.Decisions) > 0 {
+			preserved = append(preserved, "decisions")
+		}
+		if len(existing.Metadata) > 0 {
+			preserved = append(preserved, "metadata")
+		}
+		if len(preserved) > 0 {
+			fmt.Printf("  Preserving: %s\n", strings.Join(preserved, ", "))
+		}
+		fmt.Print("Overwrite? (yes/no): ")
 		s.scanner.Scan()
 		if strings.ToLower(strings.TrimSpace(s.scanner.Text())) != "yes" {
 			fmt.Println("Aborted")
@@ -291,6 +312,9 @@ func (s *replState) addElementInteractive() {
 	desc := strings.TrimSpace(s.scanner.Text())
 
 	s.saveUndo()
+	if s.model.Model == nil {
+		s.model.Model = make(map[string]model.Element)
+	}
 	updated := s.model.Model[id] // zero value if new; existing value if overwriting
 	updated.Kind = kind
 	updated.Title = title
@@ -454,6 +478,7 @@ func (s *replState) saveCommand() error {
 		}
 	}
 	s.modified = false
+	s.evicted = false
 	s.undoStack = nil
 	fmt.Printf("✅ Saved to %s\n", s.modelPath)
 	return nil
@@ -557,26 +582,31 @@ func (s *replState) undoCommand() error {
 
 	s.model = s.undoStack[len(s.undoStack)-1]
 	s.undoStack = s.undoStack[:len(s.undoStack)-1]
-	s.modified = len(s.undoStack) > 0
+	// Once an entry was evicted from the stack, we can no longer determine whether
+	// the current in-memory state matches disk — keep modified=true in that case.
+	s.modified = s.evicted || len(s.undoStack) > 0
 	fmt.Println("✅ Undone")
 	return nil
 }
 
 // saveUndo pushes a deep copy of the current model onto the undo stack.
-// Returns true if the push succeeded (marshal did not fail).
+// Returns true if the push succeeded (both marshal and unmarshal succeeded).
 // Callers that need to roll back a no-op must check the return value before popping.
 func (s *replState) saveUndo() bool {
 	data, err := json.Marshal(s.model)
 	if err != nil {
 		return false
 	}
-	var copy model.BausteinsichtModel
-	_ = json.Unmarshal(data, &copy)
+	var snapshot model.BausteinsichtModel
+	if err := json.Unmarshal(data, &snapshot); err != nil {
+		return false
+	}
 
-	s.undoStack = append(s.undoStack, &copy)
+	s.undoStack = append(s.undoStack, &snapshot)
 
 	if len(s.undoStack) > s.maxUndoLen {
 		s.undoStack = s.undoStack[1:]
+		s.evicted = true
 	}
 	return true
 }
