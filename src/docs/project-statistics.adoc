@@ -1,0 +1,121 @@
+= Bausteinsicht — Project Statistics
+:toc: left
+:toclevels: 2
+:icons: font
+
+_Generated on 2026-06-11. Counts are based on git-tracked files only (no vendored or generated artifacts)._
+
+== Summary
+
+[cols="3,>1,>1",options="header"]
+|===
+| Category | Lines | Files
+
+| Go — source code (logic, non-test)   | 18,785 | 122
+| Go — source comments                 |  1,856 | —
+| Go — test code (logic)               | 18,728 |  86
+| Go — test comments                   |  1,243 | —
+| Documentation — AsciiDoc (.adoc)     | 12,955 |  53
+| Documentation — Markdown (.md)       |  2,573 |  14
+| Schemas & examples (JSON/JSONC)      |  8,506 |  13
+|===
+
+*Lines of Code (production Go logic):* **18,785** +
+*Lines of Comments (production Go):* **1,856** +
+*Lines of Documentation (.adoc + .md):* **15,528**
+
+== Go Code Breakdown
+
+=== Production code (non-test)
+
+[cols="3,>1,>1,>1,>1",options="header"]
+|===
+| | Code | Comment | Blank | Total
+
+| 122 files | 18,785 | 1,856 | 2,786 | 23,427
+|===
+
+Comment ratio (comments / code): **9.9 %**
+
+=== Test code
+
+[cols="3,>1,>1,>1,>1",options="header"]
+|===
+| | Code | Comment | Blank | Total
+
+| 86 files | 18,728 | 1,243 | 2,775 | 22,746
+|===
+
+Test-to-code ratio (test code / production code): **~1.00** — roughly one line of test for every line of production code.
+
+== Top Packages (production Go, by code lines)
+
+[cols="3,>1,>1,>1",options="header"]
+|===
+| Package | Code | Comments | Files
+
+| `cmd/bausteinsicht`            | 4,344 | 254 | 37
+| `internal/sync`               | 3,226 | 555 | 11
+| `scripts/test-report-generator` | 1,965 | 151 | 6
+| `internal/model`              | 1,613 | 207 | 7
+| `internal/drawio`             |   926 | 147 | 5
+| `internal/diagram`            |   922 |  60 | 7
+| `internal/importer/structurizr` | 720 |  17 | 1
+| `internal/importer/likec4`    |   625 |  13 | 1
+| `internal/lsp`                |   526 |  39 | 3
+| `internal/changelog`          |   446 |  52 | 4
+| _… 19 further packages_       |   ~3,472 | ~360 | ~40
+|===
+
+The CLI command layer (`cmd/bausteinsicht`) and the bidirectional sync engine (`internal/sync`) together account for **~40 %** of all production code. The sync engine is the most heavily commented package (555 comment lines), reflecting its role as the core, hard-to-reason-about subsystem.
+
+== Documentation Breakdown
+
+=== AsciiDoc (.adoc) — 12,955 lines across 53 files
+
+[cols="3,>1",options="header"]
+|===
+| Area | Lines
+
+| `src/docs/arc42` (architecture)        | 5,101
+| `src/docs/spec` (specifications)       | 4,221
+| `src/docs/manual` (user manual)        |   586
+| `src/docs/security` (security reports) |   496
+| E2E test reports (7 files)             | 2,058
+| `README.adoc`                          |   245
+| `src/docs/PRD` (product requirements)  |   167
+| Announcements & examples               |    83
+|===
+
+=== Markdown (.md) — 2,573 lines across 14 files
+
+Top-level docs: `CLAUDE.md`, `README` siblings, `CONTRIBUTING.md`,
+`SECURITY.md`, `BENCHMARKS.md`, `SBOM.md`, `TROUBLESHOOTING.md`, `DEADCODE.md`.
+
+== Repository At A Glance
+
+[cols="3,>1",options="header"]
+|===
+| Metric | Value
+
+| Total git-tracked files        | 367
+| Production Go files            | 122
+| Test Go files                  |  86
+| Documentation files (.adoc/.md)| 67
+| Direct Go dependencies         |   7
+| Commits                        | 101
+| Contributors                   |   4
+| Active period                  | 2026-03-30 … 2026-06-10
+|===
+
+== Notes On Methodology
+
+* "Comment" lines for Go count both `//` line comments and `/* … */` block
+  comments (including continuation lines of a block).
+* Blank lines are counted separately and excluded from both code and comment
+  totals.
+* AsciiDoc/Markdown totals are raw line counts (including blank lines:
+  3,102 blank in .adoc, 670 blank in .md). Net non-blank documentation:
+  **~11,756** lines.
+* Vendored code, build outputs (`bausteinsicht-bin`, `report.html`,
+  `deadcode-report.txt`) and other non-tracked artifacts are excluded.
