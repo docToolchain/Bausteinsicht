@@ -1,6 +1,7 @@
 package stale
 
 import (
+	"fmt"
 	"sort"
 	"time"
 
@@ -27,7 +28,10 @@ func Detect(m *model.BausteinsichtModel, modelPath string, config StaleConfig) (
 	}
 
 	// Flatten the model to get all elements
-	flatElements, _ := model.FlattenElements(m)
+	flatElements, err := model.FlattenElements(m)
+	if err != nil {
+		return result, fmt.Errorf("flattening model elements: %w", err)
+	}
 	result.TotalElements = len(flatElements)
 
 	// Build relationship index for risk assessment
@@ -187,12 +191,12 @@ func assessRisk(staleElem StaleElement) RiskLevel {
 		return RiskHigh
 	}
 
-	// Medium risk: has incoming relationships (other elements depend on it)
-	if staleElem.IncomingRelCount > 0 {
+	// Medium risk: in a view (visible in a published diagram) OR other elements depend on it
+	if staleElem.IsViewIncluded || staleElem.IncomingRelCount > 0 {
 		return RiskMedium
 	}
 
-	// Low risk: no incoming relationships
+	// Low risk: not in any view and no incoming relationships
 	return RiskLow
 }
 

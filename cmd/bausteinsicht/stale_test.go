@@ -251,6 +251,49 @@ func TestApplyDrawioMarking_ExplicitPathTraversal(t *testing.T) {
 	}
 }
 
+func TestApplyDrawioUnmarking_RemovesMarkers(t *testing.T) {
+	dir := t.TempDir()
+	// Write a pre-marked draw.io file.
+	markedXML := `<?xml version="1.0" encoding="UTF-8"?><mxfile><diagram id="d1" name="Page"><mxGraphModel><root>` +
+		`<mxCell id="0"/><mxCell id="1" parent="0"/>` +
+		`<object bausteinsicht_id="shop.api" label="API">` +
+		`<mxCell id="c1" style="fillColor=#FF6666;" data-original-fill="#dae8fc" vertex="1" parent="1"/>` +
+		`</object></root></mxGraphModel></diagram></mxfile>`
+	writeTempDrawioInDir(t, dir, markedXML)
+	modelPath := filepath.Join(dir, "architecture.jsonc")
+
+	if err := applyDrawioUnmarking(modelPath, "", os.Stderr); err != nil {
+		t.Fatalf("applyDrawioUnmarking: %v", err)
+	}
+}
+
+func TestApplyDrawioUnmarking_NoDrawioFile(t *testing.T) {
+	dir := t.TempDir()
+	modelPath := filepath.Join(dir, "architecture.jsonc")
+	// No drawio file — should silently return nil.
+	if err := applyDrawioUnmarking(modelPath, "", os.Stderr); err != nil {
+		t.Fatalf("expected nil when no drawio file, got: %v", err)
+	}
+}
+
+func TestApplyDrawioUnmarking_ExplicitMissingFile(t *testing.T) {
+	dir := t.TempDir()
+	modelPath := filepath.Join(dir, "architecture.jsonc")
+	err := applyDrawioUnmarking(modelPath, "/nonexistent/file.drawio", os.Stderr)
+	if err == nil {
+		t.Fatal("expected error for non-existent explicit drawio-file")
+	}
+}
+
+func TestApplyDrawioUnmarking_PathTraversal(t *testing.T) {
+	dir := t.TempDir()
+	modelPath := filepath.Join(dir, "architecture.jsonc")
+	err := applyDrawioUnmarking(modelPath, "../../etc/passwd", os.Stderr)
+	if err == nil {
+		t.Fatal("expected error for path traversal in drawio-file")
+	}
+}
+
 func TestApplyDrawioMarking_NoDrawioFileFound(t *testing.T) {
 	dir := t.TempDir()
 	modelPath := filepath.Join(dir, "architecture.jsonc")

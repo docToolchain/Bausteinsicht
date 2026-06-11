@@ -34,11 +34,14 @@ func FormatText(result DetectionResult) string {
 
 		// Risk assessment
 		riskIcon := riskIcon(elem.Risk)
-		if elem.IncomingRelCount > 0 {
-			fmt.Fprintf(&sb, "                     %s Has %d incoming relationships — may still be active\n",
+		switch {
+		case elem.IncomingRelCount > 0:
+			fmt.Fprintf(&sb, "                     %s Has %d incoming relationship(s) — review before archiving\n",
 				riskIcon, elem.IncomingRelCount)
-		} else {
-			fmt.Fprintf(&sb, "                     %s No incoming relationships — safe to archive\n", riskIcon)
+		case elem.IsViewIncluded:
+			fmt.Fprintf(&sb, "                     %s Included in a view — verify before archiving\n", riskIcon)
+		default:
+			fmt.Fprintf(&sb, "                     %s No incoming relationships, not in any view — safe to archive\n", riskIcon)
 		}
 
 		sb.WriteString("\n")

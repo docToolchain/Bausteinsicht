@@ -103,8 +103,8 @@ func TestRiskAssessment_ViewIncludedWithIncoming_HighRisk(t *testing.T) {
 func TestDaysSince_FutureDate(t *testing.T) {
 	future := time.Now().AddDate(0, 0, 10)
 	days := DaysSince(future)
-	if days >= 0 {
-		t.Errorf("expected negative days for future date, got %d", days)
+	if days != 0 {
+		t.Errorf("expected 0 for future date (clamped), got %d", days)
 	}
 }
 
@@ -181,8 +181,11 @@ func TestDetect_DeterministicOrder(t *testing.T) {
 			"alpha":   {Kind: "system", Title: "Alpha", LastModified: past},
 			"bravo":   {Kind: "system", Title: "Bravo", LastModified: past},
 		},
-		Relationships: []model.Relationship{},
-		Views:         map[string]model.View{},
+		Relationships: []model.Relationship{
+			// bravo has an incoming relationship → RiskMedium; others → RiskLow
+			{From: "alpha", To: "bravo", Label: "uses"},
+		},
+		Views: map[string]model.View{},
 	}
 	config := StaleConfig{ThresholdDays: 1}
 
@@ -199,13 +202,20 @@ func TestDetect_DeterministicOrder(t *testing.T) {
 				i, result1.StaleElements[i].ID, result2.StaleElements[i].ID)
 		}
 	}
-	// All same-risk → should be sorted by ID.
+
+	// bravo (RiskMedium) must come first, then alpha and charlie (RiskLow) alphabetically.
 	ids := make([]string, len(result1.StaleElements))
 	for i, e := range result1.StaleElements {
 		ids[i] = e.ID
 	}
-	if ids[0] != "alpha" || ids[1] != "bravo" || ids[2] != "charlie" {
-		t.Errorf("expected alphabetical order [alpha, bravo, charlie], got %v", ids)
+	if len(ids) != 3 {
+		t.Fatalf("expected 3 stale elements, got %d: %v", len(ids), ids)
+	}
+	if ids[0] != "bravo" {
+		t.Errorf("expected bravo (RiskMedium) first, got %q", ids[0])
+	}
+	if ids[1] != "alpha" || ids[2] != "charlie" {
+		t.Errorf("expected [alpha, charlie] after bravo, got %v", ids[1:])
 	}
 }
 

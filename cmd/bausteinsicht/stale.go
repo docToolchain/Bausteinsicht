@@ -153,9 +153,9 @@ func applyDrawioUnmarking(absModelPath, explicitDrawioFile string, stderr io.Wri
 		return err
 	}
 	if count > 0 {
-		_, err = fmt.Fprintf(stderr, "Removed stale markers from %d element(s) in %s\n", count, filepath.Base(drawioFile))
+		_, _ = fmt.Fprintf(stderr, "Removed stale markers from %d element(s) in %s\n", count, filepath.Base(drawioFile))
 	}
-	return err
+	return nil
 }
 
 // applyDrawioMarking marks stale elements in the draw.io file, writing status to stderr.
@@ -179,6 +179,6 @@ func applyDrawioMarking(elements []stale.StaleElement, absModelPath, explicitDra
 		_, _ = fmt.Fprintf(stderr, "Warning: Failed to mark draw.io: %v\n", markErr)
 		return markErr
 	}
-	_, err := fmt.Fprintf(stderr, "Marked %d stale elements in %s\n", len(elements), filepath.Base(drawioFile))
-	return err
+	_, _ = fmt.Fprintf(stderr, "Marked %d stale elements in %s\n", len(elements), filepath.Base(drawioFile))
+	return nil
 }

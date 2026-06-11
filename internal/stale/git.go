@@ -62,11 +62,16 @@ func GetLastModifiedDate(filePath string) (time.Time, error) {
 }
 
 // DaysSince calculates the number of days between a past time and now.
+// Returns 0 for future timestamps.
 func DaysSince(t time.Time) int {
 	if t.IsZero() {
 		return 0
 	}
-	return int(time.Since(t).Hours() / 24)
+	d := int(time.Since(t).Hours() / 24)
+	if d < 0 {
+		return 0
+	}
+	return d
 }
 
 // IsStale checks if a date is older than the threshold days.

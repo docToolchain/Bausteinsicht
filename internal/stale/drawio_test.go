@@ -67,10 +67,25 @@ func TestMarkStaleElement_SetsStyleAndTooltip(t *testing.T) {
 func TestMarkStaleElement_IdempotentStyle(t *testing.T) {
 	obj := etree.NewElement("object")
 	cell := obj.CreateElement("mxCell")
-	cell.CreateAttr("style", "rounded=1;fillColor=#FF6666;strokeColor=#FF6666;strokeWidth=2")
+	cell.CreateAttr("style", "rounded=1;fillColor=#dae8fc;")
 
-	elem := StaleElement{Risk: RiskMedium, LastModified: time.Now()}
-	markStaleElement(obj, elem)
+	highElem := StaleElement{Risk: RiskHigh, LastModified: time.Now()}
+	// First mark: should store original fill and apply risk color.
+	markStaleElement(obj, highElem)
+
+	originalFill := cell.SelectAttrValue("data-original-fill", "__missing__")
+	if originalFill != "#dae8fc" {
+		t.Errorf("first mark: expected original fill #dae8fc stored, got %q", originalFill)
+	}
+
+	// Second mark (different risk): data-original-fill must NOT be overwritten.
+	medElem := StaleElement{Risk: RiskMedium, LastModified: time.Now()}
+	markStaleElement(obj, medElem)
+
+	originalFillAfter := cell.SelectAttrValue("data-original-fill", "__missing__")
+	if originalFillAfter != "#dae8fc" {
+		t.Errorf("second mark overwrote data-original-fill: got %q, want #dae8fc", originalFillAfter)
+	}
 
 	style := cell.SelectAttrValue("style", "")
 	// Should not accumulate duplicate strokeWidth entries.
@@ -78,7 +93,7 @@ func TestMarkStaleElement_IdempotentStyle(t *testing.T) {
 		t.Errorf("duplicate strokeWidth in style: %s", style)
 	}
 	if !strings.Contains(style, "fillColor=#FFBB66") {
-		t.Errorf("expected medium risk color in style: %s", style)
+		t.Errorf("expected medium risk color in style after second mark: %s", style)
 	}
 }
 
