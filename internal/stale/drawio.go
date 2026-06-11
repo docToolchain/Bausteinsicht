@@ -59,12 +59,14 @@ func MarkInDrawio(staleElements []StaleElement, drawioPath string) error {
 
 // UnmarkInDrawio removes stale visual indicators from all diagram pages,
 // restoring each element's original fill color from overlay.OriginalFillAttr.
-func UnmarkInDrawio(drawioPath string) error {
+// Returns the number of elements that were actually unmarked.
+func UnmarkInDrawio(drawioPath string) (int, error) {
 	doc, err := drawio.LoadDocument(drawioPath)
 	if err != nil {
-		return fmt.Errorf("loading draw.io document: %w", err)
+		return 0, fmt.Errorf("loading draw.io document: %w", err)
 	}
 
+	count := 0
 	for _, page := range doc.Pages() {
 		root := page.Root()
 		if root == nil {
@@ -75,12 +77,17 @@ func UnmarkInDrawio(drawioPath string) error {
 			if cell == nil {
 				continue
 			}
-			originalFill := cell.SelectAttrValue(overlay.OriginalFillAttr, "")
-			if originalFill == "" {
+			originalFillAttr := cell.SelectAttr(overlay.OriginalFillAttr)
+			if originalFillAttr == nil {
 				continue
 			}
 			style := cell.SelectAttrValue("style", "")
-			style = setStyleProperty(style, "fillColor", originalFill)
+			if originalFillAttr.Value == "" {
+				// fillColor was originally absent — remove it instead of restoring a value.
+				style = removeStyleProperties(style, []string{"fillColor"})
+			} else {
+				style = setStyleProperty(style, "fillColor", originalFillAttr.Value)
+			}
 
 			// Restore original stroke color: if it was absent originally, remove the key.
 			originalStroke := cell.SelectAttrValue(originalStrokeColorAttr, "")
@@ -110,13 +117,14 @@ func UnmarkInDrawio(drawioPath string) error {
 			if originalTooltip != "" {
 				obj.CreateAttr("tooltip", originalTooltip)
 			}
+			count++
 		}
 	}
 
 	if err := drawio.SaveDocument(drawioPath, doc); err != nil {
-		return fmt.Errorf("saving draw.io document: %w", err)
+		return 0, fmt.Errorf("saving draw.io document: %w", err)
 	}
-	return nil
+	return count, nil
 }
 
 // markStaleElement applies a risk-color fill to the mxCell of an <object> element.
@@ -133,11 +141,9 @@ func markStaleElement(obj *etree.Element, staleElem StaleElement) {
 	style := cell.SelectAttrValue("style", "")
 
 	// Preserve original styling only on the first marking pass (idempotent).
-	if cell.SelectAttrValue(overlay.OriginalFillAttr, "") == "" {
+	// Store "" when fillColor was originally absent so UnmarkInDrawio can remove it.
+	if cell.SelectAttr(overlay.OriginalFillAttr) == nil {
 		originalFill := extractStyleProperty(style, "fillColor")
-		if originalFill == "" {
-			originalFill = "#ffffff"
-		}
 		cell.CreateAttr(overlay.OriginalFillAttr, originalFill)
 		cell.CreateAttr(originalStrokeColorAttr, extractStyleProperty(style, "strokeColor"))
 		cell.CreateAttr(originalStrokeWidthAttr, extractStyleProperty(style, "strokeWidth"))

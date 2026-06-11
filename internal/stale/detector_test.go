@@ -171,6 +171,44 @@ func TestIsTagExcluded_EmptyExcludeList(t *testing.T) {
 	}
 }
 
+// TestDetect_DeterministicOrder verifies that Detect returns elements in a stable
+// order (descending risk, then ascending ID) regardless of map iteration.
+func TestDetect_DeterministicOrder(t *testing.T) {
+	past := time.Now().AddDate(-1, 0, 0).Format(time.RFC3339)
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"charlie": {Kind: "system", Title: "Charlie", LastModified: past},
+			"alpha":   {Kind: "system", Title: "Alpha", LastModified: past},
+			"bravo":   {Kind: "system", Title: "Bravo", LastModified: past},
+		},
+		Relationships: []model.Relationship{},
+		Views:         map[string]model.View{},
+	}
+	config := StaleConfig{ThresholdDays: 1}
+
+	result1, _ := Detect(m, "", config)
+	result2, _ := Detect(m, "", config)
+
+	if len(result1.StaleElements) != len(result2.StaleElements) {
+		t.Fatalf("Detect returned different lengths: %d vs %d",
+			len(result1.StaleElements), len(result2.StaleElements))
+	}
+	for i := range result1.StaleElements {
+		if result1.StaleElements[i].ID != result2.StaleElements[i].ID {
+			t.Errorf("order differs at index %d: %q vs %q",
+				i, result1.StaleElements[i].ID, result2.StaleElements[i].ID)
+		}
+	}
+	// All same-risk → should be sorted by ID.
+	ids := make([]string, len(result1.StaleElements))
+	for i, e := range result1.StaleElements {
+		ids[i] = e.ID
+	}
+	if ids[0] != "alpha" || ids[1] != "bravo" || ids[2] != "charlie" {
+		t.Errorf("expected alphabetical order [alpha, bravo, charlie], got %v", ids)
+	}
+}
+
 func TestDetect_ExcludeTagsSkipsElement(t *testing.T) {
 	m := &model.BausteinsichtModel{
 		Model: map[string]model.Element{

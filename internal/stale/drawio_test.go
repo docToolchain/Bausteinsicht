@@ -177,8 +177,12 @@ func TestUnmarkInDrawio_RestoresOriginalFill(t *testing.T) {
 		`</root></mxGraphModel></diagram></mxfile>`
 	path := writeTempDrawio(t, xml)
 
-	if err := UnmarkInDrawio(path); err != nil {
+	count, err := UnmarkInDrawio(path)
+	if err != nil {
 		t.Fatalf("UnmarkInDrawio: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("UnmarkInDrawio: expected 1 unmarked element, got %d", count)
 	}
 
 	tree := etree.NewDocument()
@@ -214,15 +218,57 @@ func TestUnmarkInDrawio_RestoresOriginalFill(t *testing.T) {
 func TestUnmarkInDrawio_NoMarkedElements(t *testing.T) {
 	// A file with no data-original-fill — UnmarkInDrawio should be a no-op.
 	path := writeTempDrawio(t, drawioXML("shop.api"))
-	if err := UnmarkInDrawio(path); err != nil {
+	count, err := UnmarkInDrawio(path)
+	if err != nil {
 		t.Fatalf("UnmarkInDrawio on unmarked file: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("expected 0 unmarked elements, got %d", count)
 	}
 }
 
 func TestUnmarkInDrawio_FileNotFound(t *testing.T) {
-	err := UnmarkInDrawio("/nonexistent/file.drawio")
+	_, err := UnmarkInDrawio("/nonexistent/file.drawio")
 	if err == nil {
 		t.Fatal("expected error for missing file, got nil")
+	}
+}
+
+// TestUnmarkInDrawio_NoOriginalFillColor verifies that when fillColor was absent
+// before marking (stored as "" in data-original-fill), unmark removes fillColor
+// from the style instead of setting it to a fallback value.
+func TestUnmarkInDrawio_NoOriginalFillColor(t *testing.T) {
+	// style has no fillColor originally; mark added fillColor=#FF6666.
+	// data-original-fill="" means fillColor was absent before marking.
+	xml := `<?xml version="1.0" encoding="UTF-8"?>` +
+		`<mxfile><diagram id="d1" name="Page"><mxGraphModel><root>` +
+		`<mxCell id="0"/><mxCell id="1" parent="0"/>` +
+		`<object bausteinsicht_id="elem1" label="E1">` +
+		`<mxCell id="c1" style="rounded=1;fillColor=#FF6666;strokeColor=#FF6666;strokeWidth=2;" ` +
+		`data-original-fill="" vertex="1" parent="1"/>` +
+		`</object>` +
+		`</root></mxGraphModel></diagram></mxfile>`
+	path := writeTempDrawio(t, xml)
+
+	count, err := UnmarkInDrawio(path)
+	if err != nil {
+		t.Fatalf("UnmarkInDrawio: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("expected 1 unmarked element, got %d", count)
+	}
+
+	tree := etree.NewDocument()
+	if err := tree.ReadFromFile(path); err != nil {
+		t.Fatalf("reading saved file: %v", err)
+	}
+	cell := tree.FindElement("//mxCell[@id='c1']")
+	if cell == nil {
+		t.Fatal("mxCell not found after unmark")
+	}
+	style := cell.SelectAttrValue("style", "")
+	if strings.Contains(style, "fillColor") {
+		t.Errorf("fillColor should have been removed (was absent before marking), got style: %s", style)
 	}
 }
 

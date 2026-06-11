@@ -72,6 +72,8 @@ func runStale(cmd *cobra.Command, _ []string) error {
 	config := stale.LoadConfigFromModel(m)
 	if cmd.Flags().Changed("days") {
 		config.ThresholdDays = days
+	} else if config.ThresholdDays < 0 {
+		return exitWithCode(fmt.Errorf("meta.staleDetection.thresholdDays must be non-negative, got %d", config.ThresholdDays), 1)
 	}
 
 	if unmarkDrawio {
@@ -145,11 +147,14 @@ func applyDrawioUnmarking(absModelPath, explicitDrawioFile string, stderr io.Wri
 		}
 		return nil
 	}
-	if err := stale.UnmarkInDrawio(drawioFile); err != nil {
+	count, err := stale.UnmarkInDrawio(drawioFile)
+	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "Warning: Failed to unmark draw.io: %v\n", err)
 		return err
 	}
-	_, err := fmt.Fprintf(stderr, "Removed stale markers from %s\n", filepath.Base(drawioFile))
+	if count > 0 {
+		_, err = fmt.Fprintf(stderr, "Removed stale markers from %d element(s) in %s\n", count, filepath.Base(drawioFile))
+	}
 	return err
 }
 

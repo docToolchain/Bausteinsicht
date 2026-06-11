@@ -80,7 +80,11 @@ func Detect(m *model.BausteinsichtModel, modelPath string, config StaleConfig) (
 	}
 
 	sort.Slice(result.StaleElements, func(i, j int) bool {
-		return riskOrder(result.StaleElements[i].Risk) > riskOrder(result.StaleElements[j].Risk)
+		ri, rj := riskOrder(result.StaleElements[i].Risk), riskOrder(result.StaleElements[j].Risk)
+		if ri != rj {
+			return ri > rj
+		}
+		return result.StaleElements[i].ID < result.StaleElements[j].ID
 	})
 
 	return result, nil
