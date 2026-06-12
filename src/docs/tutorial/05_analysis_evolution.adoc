@@ -1,0 +1,155 @@
+:jbake-title: 5. Analysis and Evolution
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: tutorial
+:jbake-order: 5
+
+ifndef::imagesdir[:imagesdir: ../../images]
+
+:toc:
+
+= Analysis and Evolution
+
+A model you can query beats a diagram you can only look at. This chapter covers the commands that keep an architecture healthy over time.
+
+== Health: the one-number overview
+
+[source,bash]
+----
+bausteinsicht health --model architecture.jsonc
+----
+
+----
+Architecture Health Report
+==========================
+
+Overall Score: 100.0/100 [A+]
+Summary: Excellent architecture. Well-structured, documented, and maintainable.
+
+Model Statistics
+----------------
+Elements: 16
+Relationships: 15
+Views: 4
+
+Category Scores
+---------------
+completeness: 100.0/100 (weight: 20%)
+  Details: 16/16 elements documented
+conformance: 100.0/100 (weight: 30%)
+  Details: 0 violations found
+complexity: 100.0/100 (weight: 15%)
+...
+----
+
+The score aggregates completeness (are elements documented?), conformance (constraint violations), complexity, and more. Drop it into CI with `--format json` and alert when the grade slips.
+
+NOTE: `health`, `graph`, and `status` currently require an explicit `--model` flag — they do not auto-detect the model file like the other commands do.
+
+== Graph: cycles and dependencies
+
+[source,bash]
+----
+bausteinsicht graph --model architecture.jsonc
+----
+
+----
+Relationship Graph Analysis
+===========================
+
+Summary
+-------
+Elements: 16
+Relationships: 15
+Max Dependency Depth: 3
+Graph Type: DAG (acyclic)
+
+No cycles detected (valid DAG)
+----
+
+Circular dependencies between systems are architecture smells that hide well in diagrams and badly in graphs. This command finds them, along with dependency depth and strongly connected components.
+
+== Lint: your own architecture rules
+
+[source,bash]
+----
+bausteinsicht lint
+----
+
+----
+All constraints passed.
+----
+
+Rules live in the model itself under `constraints` — for example "nothing may depend on a deprecated element" or "UI containers must not talk to datastores directly". `lint` (and `health`, which weighs conformance at 30 %) enforce them on every run.
+
+== Stale: find the forgotten corners
+
+[source,bash]
+----
+bausteinsicht stale
+----
+
+----
+No stale elements found (16 total elements checked)
+----
+
+`stale` flags elements that no view shows, no relationship touches, or that have not been modified for longer than a threshold (90 days by default, configurable with `--days` or `meta.staleDetection.thresholdDays` in the model). In a git repository it derives last-modified dates from the history. With `--mark-drawio` it visually highlights stale elements in the diagram — and `--unmark-drawio` restores the original style.
+
+== Lifecycle status
+
+[source,bash]
+----
+bausteinsicht status --model architecture.jsonc
+----
+
+----
+Element Lifecycle Status
+==================================================
+
+proposed (0):
+design (0):
+implementation (0):
+...
+----
+
+Give elements a `status` field (`proposed` → `design` → `implementation` → `deployed` → `deprecated` → `archived`) and this command becomes your migration dashboard: what is still proposed, what is already deployed, what should have been archived long ago.
+
+== Snapshots: version the architecture, not just the file
+
+Git versions your file; snapshots version your **architecture** — semantically diffable:
+
+[source,bash]
+----
+bausteinsicht snapshot save --message "Baseline before payment rework"
+----
+
+----
+Snapshot saved: snapshot-2026-06-12T19-48-54.290531989Z
+  Timestamp: 2026-06-12T19:48:54Z
+  Elements: 17
+  Relationships: 16
+  Message: Baseline before payment rework
+----
+
+Now change the model (add the payment service, rewire relationships), and compare:
+
+[source,bash]
+----
+bausteinsicht snapshot diff snapshot-2026-06-12T19-48-54.290531989Z
+----
+
+----
+Architecture Differences (Total Changes: 1)
+==================================================
+
+Added Elements (1):
+  + onlineshop.audit
+----
+
+The diff speaks architecture — added elements, removed relationships, changed kinds — not JSON lines. `snapshot list --format json` shows what you have, `snapshot restore` brings a state back, `snapshot delete` cleans up. Snapshots live in `.bausteinsicht-snapshots/`.
+
+== As-is vs. to-be
+
+For planned architectures, the model can carry `asIs` and `toBe` sections; `bausteinsicht diff` then reports the gap between today and the target as a structured change list — the same idea as snapshots, but for states you model deliberately side by side.
+
+Continue with link:06_ai_workflows.adoc[6. AI and Automation Workflows].

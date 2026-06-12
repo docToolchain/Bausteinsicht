@@ -1,0 +1,170 @@
+:jbake-title: 2. Modeling Your Architecture
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: tutorial
+:jbake-order: 2
+
+ifndef::imagesdir[:imagesdir: ../../images]
+
+:toc:
+
+= Modeling Your Architecture
+
+The model file has three main sections. Understand them once and the rest of the tool falls into place.
+
+== The three sections of architecture.jsonc
+
+[source,jsonc]
+----
+{
+  // 1. SPECIFICATION — your vocabulary.
+  // Which element kinds and relationship kinds exist in this model?
+  "specification": {
+    "elements": {
+      "actor":     { "notation": "Actor" },
+      "system":    { "notation": "Software System", "container": true },
+      "container": { "notation": "Container", "container": true },
+      "datastore": { "notation": "Data Store" }
+    },
+    "relationships": {
+      "uses": { "notation": "uses" }
+    }
+  },
+
+  // 2. MODEL — your elements, nested as deep as you like.
+  "model": {
+    "customer": { "kind": "actor", "title": "Customer" },
+    "onlineshop": {
+      "kind": "system",
+      "title": "Online Shop",
+      "children": {
+        "api": { "kind": "container", "title": "REST API", "technology": "Go" },
+        "db":  { "kind": "datastore", "title": "Database", "technology": "PostgreSQL" }
+      },
+      "relationships": [
+        { "from": "customer", "to": "onlineshop", "label": "browses & orders", "kind": "uses" }
+      ]
+    }
+  },
+
+  // 3. VIEWS — which slice of the model each diagram page shows.
+  "views": {
+    "context": {
+      "title": "System Context",
+      "include": ["customer", "onlineshop"]
+    }
+  }
+}
+----
+
+Three rules carry the whole system:
+
+1. **Element IDs are dot-paths.** The nesting position _is_ the identity: `onlineshop.api` is the `api` child of `onlineshop`. These IDs are the anchors that synchronization hangs on to — choose them like variable names and treat renames as refactorings.
+2. **The specification is yours.** Bausteinsicht does not hardcode the four C4 levels. Define `actor`, `system`, `microservice`, `bounded-context`, `lambda` — whatever your organization speaks. Kinds with `"container": true` may have children. The order of kinds also drives the auto-layout: first kind on top, last at the bottom.
+3. **Views are filters, not copies.** A view lists what to `include` (wildcards like `"onlineshop.*"` work) and becomes one draw.io page. The same element can appear in many views; it exists only once in the model.
+
+Comments are first-class: the file is JSONC, so document your decisions right where they live.
+
+== Edit by hand — or by command
+
+You can edit `architecture.jsonc` in any editor. For scripted or careful edits, the `add` family does the same thing with validation and without disturbing your comments:
+
+[source,bash]
+----
+bausteinsicht add element --id searchservice --kind container \
+  --title "Search Service" --technology "Go / OpenSearch" \
+  --description "Full-text product search" --parent onlineshop
+----
+
+----
+Added element 'onlineshop.searchservice' (kind: container) to model.
+----
+
+[source,bash]
+----
+bausteinsicht add relationship --from onlineshop.api \
+  --to onlineshop.searchservice --label "queries" --kind uses
+----
+
+----
+Added relationship: onlineshop.api -> onlineshop.searchservice (queries)
+----
+
+The `--kind` must exist in your specification — a typo like `usess` is rejected with the list of valid kinds instead of silently corrupting the model.
+
+== Create a view for your new slice
+
+[source,bash]
+----
+bausteinsicht add view search-view --title "Search Slice" \
+  --include "onlineshop.api" --include "onlineshop.searchservice" \
+  --include customer
+----
+
+----
+View 'search-view' added to model
+  Title: Search Slice
+  Includes: [onlineshop.api onlineshop.searchservice customer]
+----
+
+Then render everything:
+
+[source,bash]
+----
+bausteinsicht sync
+----
+
+----
+Forward (model → draw.io): 4 added, 0 updated, 0 deleted
+----
+
+Open `architecture.drawio`: a new **Search Slice** page exists, laid out automatically, with your three elements and their relationships.
+
+== More than boxes: the optional element fields
+
+Elements carry more than kind and title when you need it:
+
+[cols="1,3"]
+|===
+| Field | What it is for
+
+| `technology`
+| Tech stack label, rendered in the diagram ("Go", "PostgreSQL 16").
+
+| `tags`
+| Free-form labels. Views can filter on them, and tag-based styles can color elements.
+
+| `status`
+| Lifecycle stage: `proposed`, `design`, `implementation`, `deployed`, `deprecated`, `archived`. Query it with `bausteinsicht status --model architecture.jsonc`.
+
+| `decisions`
+| Links to the ADRs that shaped this element.
+
+| `metadata`
+| Anything else — owner, cost center, repository URL.
+|===
+
+== Checkpoint
+
+Run the validator after every editing session — it catches dangling relationship endpoints, unknown kinds, and lifecycle violations:
+
+[source,bash]
+----
+bausteinsicht validate
+----
+
+If you prefer machine-readable output (you will, in CI):
+
+[source,bash]
+----
+bausteinsicht validate --format json
+----
+
+----
+{
+  "valid": true,
+  "errors": []
+}
+----
+
+Continue with link:03_drawio_roundtrip.adoc[3. The draw.io Round-Trip].

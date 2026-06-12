@@ -1,0 +1,159 @@
+:jbake-title: 1. Getting Started
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: tutorial
+:jbake-order: 1
+
+ifndef::imagesdir[:imagesdir: ../../images]
+
+:toc:
+
+= Getting Started
+
+This tutorial takes you from an empty directory to a living architecture model: you will model a system, sync it with draw.io, analyze it, version it, and drive it from an AI agent. Every command and every output shown here was executed against the current build — what you see is what you get.
+
+== What Bausteinsicht is
+
+Bausteinsicht keeps your software architecture in a structured JSONC model and renders it as draw.io diagrams — with bidirectional synchronization. Change the model, and the diagrams follow. Rename an element in draw.io, and the model follows. The single source of truth is a text file that lives in git, diffs cleanly, and is readable by humans, IDEs, and LLMs alike.
+
+== Installation
+
+You need the `bausteinsicht` binary. Pick one of three ways:
+
+**From a release** — download the archive for your platform from the https://github.com/docToolchain/Bausteinsicht/releases[releases page] and unpack it:
+
+[source,bash]
+----
+tar -xzf bausteinsicht_*_linux_amd64.tar.gz
+sudo mv bausteinsicht /usr/local/bin/
+----
+
+**With Go** (1.25 or newer):
+
+[source,bash]
+----
+go install github.com/docToolchain/Bausteinsicht/cmd/bausteinsicht@latest
+----
+
+**From source:**
+
+[source,bash]
+----
+git clone https://github.com/docToolchain/Bausteinsicht.git
+cd Bausteinsicht
+make build        # produces ./bausteinsicht
+----
+
+Verify the installation:
+
+[source,bash]
+----
+bausteinsicht --version
+----
+
+You will also want the https://www.drawio.com/[draw.io desktop app] to view and edit the diagrams. Everything except opening diagrams and PNG/PDF export works without it.
+
+== Create your first project
+
+Make an empty directory and initialize it:
+
+[source,bash]
+----
+mkdir my-architecture && cd my-architecture
+bausteinsicht init
+----
+
+----
+Initialized Bausteinsicht project:
+  - architecture.jsonc
+  - template.drawio
+  - architecture.drawio
+  - .bausteinsicht-sync
+
+Next steps:
+  1. Edit architecture.jsonc to define your architecture
+  2. Run 'bausteinsicht sync' to update the draw.io diagram
+  3. Open architecture.drawio in draw.io to arrange elements
+----
+
+Four files appear, each with a clear job:
+
+[cols="1,3"]
+|===
+| File | Purpose
+
+| `architecture.jsonc`
+| **Your model.** JSON with comments — the single source of truth. This is the file you edit, review, and commit.
+
+| `architecture.drawio`
+| **The generated diagrams.** One draw.io page per view. You arrange and fine-tune here; structural truth stays in the model.
+
+| `template.drawio`
+| **The visual style library.** One styled shape per element kind. Copy it, restyle it, pass it with `--template` (see link:03_drawio_roundtrip.adoc[chapter 3]).
+
+| `.bausteinsicht-sync`
+| **Sync memory.** A checksummed snapshot of the last synced state, so the next sync knows what changed on which side. Commit it together with the other files.
+|===
+
+The scaffolded model is not empty — it ships a complete example: an online shop with a customer, a back-office user, web and mobile frontends, an API with components, database, cache, message queue, and two external systems (payment provider, e-mail service). That gives you something real to explore before you replace it with your own architecture.
+
+== Look around
+
+Validate the model:
+
+[source,bash]
+----
+bausteinsicht validate
+----
+
+----
+Model is valid.
+----
+
+Show a single element with everything the model knows about it:
+
+[source,bash]
+----
+bausteinsicht show customer
+----
+
+----
+Element: customer
+=================
+Kind:          actor
+Title:         Customer
+Description:   End user who browses products and places orders
+
+Relationships:
+  → onlineshop.frontend             "browses & orders"  [uses]
+  → onlineshop.mobile-app           "browses & orders"  [uses]
+
+Views: containers, context
+----
+
+Search across the whole model:
+
+[source,bash]
+----
+bausteinsicht find shop
+----
+
+----
+Search results for "shop" (27 matches)
+======================================
+
+Elements (11):
+  onlineshop                   [system    ]  "Online Shop"      score: 6
+  onlineshop.api               [container ]  "REST API"         technology: Go  score: 3
+  ...
+----
+
+== Open the diagrams
+
+Open `architecture.drawio` in draw.io. You will find three pages — **System Context**, **Container View**, and **API Components** — each generated from a _view_ defined in the model. Elements link to each other across pages: click a system in the context view to drill down into its container view; a generated back-navigation button takes you up again.
+
+== Where you are now
+
+You have a valid model, generated diagrams, and the tools to inspect both. Next, you will change the model and watch the diagrams follow.
+
+Continue with link:02_modeling.adoc[2. Modeling Your Architecture].

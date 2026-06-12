@@ -1,0 +1,140 @@
+:jbake-title: 6. AI and Automation Workflows
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: tutorial
+:jbake-order: 6
+
+ifndef::imagesdir[:imagesdir: ../../images]
+
+:toc:
+
+= AI and Automation Workflows
+
+LLM friendliness is a declared quality goal of Bausteinsicht: the model is plain JSONC an agent can read, and the CLI is the safe way for an agent to write.
+
+== Every command speaks JSON
+
+The global `--format json` flag turns any command into an API:
+
+[source,bash]
+----
+bausteinsicht validate --format json
+----
+
+----
+{
+  "valid": true,
+  "errors": []
+}
+----
+
+[source,bash]
+----
+bausteinsicht sync --format json
+----
+
+Errors come back as structured JSON on stderr (`{"error": "...", "code": 1}`), and the exit codes are stable: `0` success, `1` operation error, `2` usage/file error. That is everything a tool-calling agent needs.
+
+== The agent editing loop
+
+Instead of letting an agent rewrite `architecture.jsonc` wholesale — risking your comments and formatting — give it the CLI verbs:
+
+[source,bash]
+----
+bausteinsicht add element --id payments --kind container \
+  --title "Payment Service" --parent onlineshop \
+  --description "Handles checkout payments" --format json
+bausteinsicht add relationship --from onlineshop.api \
+  --to onlineshop.payments --label "delegates payment" --kind uses --format json
+bausteinsicht validate --format json
+bausteinsicht sync --format json
+----
+
+Each `add` validates against your specification (unknown kinds and dangling IDs are rejected), patches the JSONC file **without destroying comments**, and reports the result as JSON. A typical agent prompt then is simply:
+
+____
+"Add a payment service to the online shop, connect it to the API, validate, and sync. Use the bausteinsicht CLI; check the JSON output of every command."
+____
+
+== The REPL: guided editing for humans and agents
+
+[source,bash]
+----
+bausteinsicht repl
+----
+
+----
+Bausteinsicht REPL — architecture.jsonc (5 elements)
+Type 'help' for commands, 'exit' to quit
+> list elements
+
+ID                             Kind            Title
+-------------------------------------------------------------------
+customer                       actor           Customer
+onlineshop                     system          Online Shop
+onlineshop.api                 container       REST API
+...
+> add element
+ID: reporting
+Kind: container
+Title: Reporting Service
+Description (optional): Monthly sales reports
+> save
+> exit
+----
+
+The REPL keeps the model in memory across commands, validates before every save, supports `undo`, and warns when you exit with unsaved changes. Saves are surgical: pure additions are patched into the file with comments preserved; only modifications and deletions fall back to a full rewrite — and the REPL tells you when that happens.
+
+== Import: bring your existing model
+
+If your architecture already lives in Structurizr DSL or LikeC4, you do not start over:
+
+[source,bash]
+----
+bausteinsicht import workspace.dsl --from structurizr
+----
+
+----
+Imported model written to architecture.jsonc
+----
+
+The importer maps people, systems, containers, and relationships into the Bausteinsicht format — including a generated specification — and the result is immediately syncable:
+
+[source,jsonc]
+----
+"model": {
+  "sys": {
+    "kind": "system",
+    "title": "Billing System",
+    "children": {
+      "api": { "kind": "container", "title": "Billing API", ... }
+    }
+  }
+}
+----
+
+`--from likec4` does the same for LikeC4 `.c4` files. Use `--dry-run` to preview and `--force` to overwrite an existing model file.
+
+== CI: the architecture gate
+
+Everything above composes into a pipeline step:
+
+[source,yaml]
+----
+- name: Architecture checks
+  run: |
+    bausteinsicht validate --format json
+    bausteinsicht lint
+    bausteinsicht graph --model architecture.jsonc --format json
+    bausteinsicht health --model architecture.jsonc --format json
+----
+
+A pull request that introduces a dependency cycle, breaks a constraint, or lets the health grade slip fails before any human reviews it.
+
+== Where to go from here
+
+* The link:../spec/02_cli_specification.adoc[CLI specification] documents commands in depth.
+* The link:../spec/05_sync_specification.adoc[sync specification] explains the synchronization algorithm precisely.
+* The link:../arc42/arc42.adoc[architecture documentation] shows Bausteinsicht documented with Bausteinsicht.
+
+You now have the full loop: model in text, diagrams in draw.io, analysis in CI, and agents as co-architects. Replace the sample shop with your own system — `bausteinsicht init` in a fresh directory is all it takes.
