@@ -25,6 +25,9 @@
       },
       "type": "array"
     },
+    "meta": {
+      "type": "object"
+    },
     "model": {
       "type": "object"
     },

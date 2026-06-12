@@ -2,12 +2,12 @@ package model
 
 // Element lifecycle status values
 const (
-	StatusProposed      = "proposed"
-	StatusDesign        = "design"
-	StatusImplementing  = "implementation"
-	StatusDeployed      = "deployed"
-	StatusDeprecated    = "deprecated"
-	StatusArchived      = "archived"
+	StatusProposed     = "proposed"
+	StatusDesign       = "design"
+	StatusImplementing = "implementation"
+	StatusDeployed     = "deployed"
+	StatusDeprecated   = "deprecated"
+	StatusArchived     = "archived"
 )
 
 var ValidStatuses = []string{
@@ -97,16 +97,17 @@ type ModelSnapshot struct {
 
 // BausteinsichtModel is the top-level model file
 type BausteinsichtModel struct {
-	Schema        string             `json:"$schema,omitempty"`
-	Config        Config             `json:"config,omitempty"`
-	Specification Specification      `json:"specification"`
-	Model         map[string]Element `json:"model"`
-	Relationships []Relationship     `json:"relationships"`
-	Views         map[string]View    `json:"views"`
-	DynamicViews  []DynamicView      `json:"dynamicViews,omitempty"`
-	Constraints   []Constraint       `json:"constraints,omitempty"`
-	AsIs          *ModelSnapshot     `json:"asIs,omitempty"`
-	ToBe          *ModelSnapshot     `json:"toBe,omitempty"`
+	Schema        string                 `json:"$schema,omitempty"`
+	Config        Config                 `json:"config,omitempty"`
+	Meta          map[string]interface{} `json:"meta,omitempty"` // Project metadata (staleDetection config, etc.)
+	Specification Specification          `json:"specification"`
+	Model         map[string]Element     `json:"model"`
+	Relationships []Relationship         `json:"relationships"`
+	Views         map[string]View        `json:"views"`
+	DynamicViews  []DynamicView          `json:"dynamicViews,omitempty"`
+	Constraints   []Constraint           `json:"constraints,omitempty"`
+	AsIs          *ModelSnapshot         `json:"asIs,omitempty"`
+	ToBe          *ModelSnapshot         `json:"toBe,omitempty"`
 
 	// ElementOrder stores the definition order of element kinds from
 	// specification.elements. Used by the layout engine for layer assignment.
@@ -216,8 +217,8 @@ type DecisionRecord struct {
 }
 
 type Specification struct {
-	Elements      map[string]ElementKind      `json:"elements"`
-	Relationships map[string]RelationshipKind `json:"relationships,omitempty"`
+	Elements      map[string]ElementKind       `json:"elements"`
+	Relationships map[string]RelationshipKind  `json:"relationships,omitempty"`
 	Tags          []TagDefinition              `json:"tags,omitempty"`
 	Patterns      map[string]PatternDefinition `json:"patterns,omitempty"`
 	Decisions     []DecisionRecord             `json:"decisions,omitempty"`
@@ -235,15 +236,16 @@ type RelationshipKind struct {
 }
 
 type Element struct {
-	Kind        string             `json:"kind"`
-	Title       string             `json:"title"`
-	Description string             `json:"description,omitempty"`
-	Technology  string             `json:"technology,omitempty"`
-	Tags        []string           `json:"tags,omitempty"`
-	Status      string             `json:"status,omitempty"`
-	Decisions   []string           `json:"decisions,omitempty"`
-	Children    map[string]Element `json:"children,omitempty"`
-	Metadata    map[string]string  `json:"metadata,omitempty"`
+	Kind         string             `json:"kind"`
+	Title        string             `json:"title"`
+	Description  string             `json:"description,omitempty"`
+	Technology   string             `json:"technology,omitempty"`
+	Tags         []string           `json:"tags,omitempty"`
+	Status       string             `json:"status,omitempty"`       // e.g., "deployed", "deprecated", "archived"
+	Decisions    []string           `json:"decisions,omitempty"`    // ADR IDs linked to this element
+	LastModified string             `json:"lastModified,omitempty"` // RFC3339 timestamp (optional override for git-based staleness detection)
+	Children     map[string]Element `json:"children,omitempty"`
+	Metadata     map[string]string  `json:"metadata,omitempty"`
 }
 
 type Relationship struct {
@@ -262,7 +264,7 @@ type View struct {
 	Scope       string   `json:"scope,omitempty"`
 	Include     []string `json:"include,omitempty"`
 	Exclude     []string `json:"exclude,omitempty"`
-	FilterTags  []string `json:"filter-tags,omitempty"` // Include only elements with ALL of these tags
+	FilterTags  []string `json:"filter-tags,omitempty"`  // Include only elements with ALL of these tags
 	ExcludeTags []string `json:"exclude-tags,omitempty"` // Exclude elements with ANY of these tags
 	Description string   `json:"description,omitempty"`
 	Layout      string   `json:"layout,omitempty"`

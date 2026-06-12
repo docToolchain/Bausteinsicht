@@ -45,13 +45,15 @@ jobs:
         shell: bash
         run: |
           echo "Checking if source files are readable..."
-          find internal -name "*.go" -type f | head -5 | while read f; do
+          _n=0
+          while IFS= read -r f && [ "$_n" -lt 5 ]; do
+            _n=$((_n+1))
             if [ -f "$f" ]; then
               echo "✓ $f ($(wc -l < "$f") lines)"
             else
               echo "✗ $f not found"
             fi
-          done
+          done < <(find internal -name "*.go" -type f)
       - name: Generate test report
         id: report
         shell: bash
