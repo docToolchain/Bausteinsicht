@@ -1,0 +1,126 @@
+:jbake-title: 3. The draw.io Round-Trip
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: tutorial
+:jbake-order: 3
+
+ifndef::imagesdir[:imagesdir: ../../images]
+
+:toc:
+
+= The draw.io Round-Trip
+
+This is the heart of Bausteinsicht: the model and the diagrams stay in sync — in both directions.
+
+== Forward: model → draw.io
+
+Every `bausteinsicht sync` compares the model against the last synced state and applies the difference to the diagram:
+
+* New elements are added to every view that includes them, placed by the auto-layout (actors on top, then systems, containers, datastores — following your specification order).
+* Changed titles, descriptions, and technologies update the existing shapes **without touching your manual arrangement**.
+* Elements removed from the model disappear from the diagram.
+
+Your hand-tuned positions survive. Sync moves nothing you have arranged; it only places what is new.
+
+== Reverse: draw.io → model
+
+Open `architecture.drawio`, double-click the "Search Service" shape, and rename it to "Product Search". Save, then:
+
+[source,bash]
+----
+bausteinsicht sync
+----
+
+----
+Reverse (draw.io → model): 0 added, 1 updated, 0 deleted
+----
+
+Look into `architecture.jsonc`:
+
+[source,jsonc]
+----
+"searchservice": {
+  "kind": "container",
+  "title": "Product Search",
+  ...
+}
+----
+
+The rename traveled back into the model. Reverse sync covers the text people naturally edit in a diagram — titles, descriptions, technology labels — and newly drawn shapes and connectors. Structural truth (hierarchy, kinds, views) stays model-driven.
+
+You can even create elements in draw.io: draw a shape, give it a title, sync — it appears in the model with a sanitized ID and the alphabetically first kind from your specification, ready for you to adjust.
+
+== When both sides change: the model wins
+
+If the same element changed in the model **and** in the diagram since the last sync, Bausteinsicht resolves the conflict deterministically: **the model wins**. You get a warning showing both values and the last-synced value, the model value goes into the diagram, and nothing is lost silently. The rule of thumb: treat the model as the source of truth, the diagram as the place for layout and quick text fixes.
+
+== Watch mode: continuous sync
+
+Instead of running `sync` after every change:
+
+[source,bash]
+----
+bausteinsicht watch
+----
+
+----
+Watching architecture.jsonc and architecture.drawio...
+----
+
+Now keep `architecture.jsonc` open in your editor and `architecture.drawio` in draw.io. Save on either side; the other follows within a moment (changes are debounced for 300 ms). Stop with `Ctrl+C`.
+
+NOTE: draw.io does not auto-reload a changed file — use *File → Synchronize* (or reopen) after the model side changed.
+
+== Styling with templates
+
+Visual styles do not live in code — they live in `template.drawio`. Each shape in that file carries a `bausteinsicht_template` attribute naming the element kind it styles. When sync creates a new element, it clones the template shape for that kind: colors, fonts, geometry, everything.
+
+To restyle your architecture:
+
+1. Open `template.drawio` in draw.io.
+2. Restyle the shape of the kind you care about (say, make containers green).
+3. Sync **with the template flag**:
+
+[source,bash]
+----
+bausteinsicht sync --template template.drawio
+----
+
+[IMPORTANT]
+====
+Without `--template`, sync uses a built-in default template and your `template.drawio` is **not** picked up (see https://github.com/docToolchain/Bausteinsicht/issues/418[#418]). Until that changes, always pass `--template template.drawio` when you customize styles — in watch mode too.
+====
+
+Templates only affect **newly created** shapes. Existing shapes keep their look — restyle them in draw.io directly, or remove them from the diagram and sync again.
+
+== Layout control
+
+Each view can choose its layout in the model:
+
+[source,jsonc]
+----
+"context": {
+  "title": "System Context",
+  "include": ["customer", "onlineshop"],
+  "layout": "layered"     // layered (default) | grid | none
+}
+----
+
+* `layered` — rows by element kind, in specification order; related elements grouped.
+* `grid` — a simple grid, useful for overview pages.
+* `none` — sync places nothing automatically; you own the layout completely.
+
+If a page has grown messy, regenerate its layout once:
+
+[source,bash]
+----
+bausteinsicht sync --relayout
+----
+
+This re-places all elements of the synced views — deliberately destructive to manual arrangement, so use it when you want a fresh start.
+
+== Drill-down navigation
+
+Views form a hierarchy through their `scope`: a view scoped to `onlineshop` shows its children inside the system boundary. Sync generates page links between the levels — click a system in the context view to jump to its container view, and use the generated back-button to return. The result reads like an interactive C4 model inside plain draw.io.
+
+Continue with link:04_exports.adoc[4. Sharing: Exports].
