@@ -75,7 +75,7 @@ func TestReplExitCommand(t *testing.T) {
 }
 
 // TestReplExitWithUnsavedChanges verifies that "exit" with unsaved changes
-// prompts and respects "yes" confirmation.
+// prompts and respects "yes" confirmation, including with surrounding whitespace.
 func TestReplExitWithUnsavedChanges(t *testing.T) {
 	// Answer "yes" to the "Exit anyway?" prompt.
 	s := newTestReplState("yes\n")
@@ -83,6 +83,13 @@ func TestReplExitWithUnsavedChanges(t *testing.T) {
 	err := s.executeCommand("exit", nil)
 	if err != errReplExit {
 		t.Errorf("exit yes: got error %v, want errReplExit", err)
+	}
+
+	// Answer "yes " (trailing space) — should still exit.
+	s3 := newTestReplState("yes \n")
+	s3.modified = true
+	if err := s3.executeCommand("exit", nil); err != errReplExit {
+		t.Errorf("exit 'yes ': got error %v, want errReplExit", err)
 	}
 
 	// Answer "no" to the prompt — should not exit.

@@ -148,7 +148,7 @@ func (s *replState) exitCommand() error {
 		return errReplExit
 	}
 	fmt.Print("Model has unsaved changes. Exit anyway? (yes/no): ")
-	if s.scanner.Scan() && strings.ToLower(s.scanner.Text()) == "yes" {
+	if s.scanner.Scan() && strings.ToLower(strings.TrimSpace(s.scanner.Text())) == "yes" {
 		return errReplExit
 	}
 	return nil
