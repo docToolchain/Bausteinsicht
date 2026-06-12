@@ -82,6 +82,13 @@ jobs:
           EOF
           fi
 
+      # Deploy-only web analytics (GoatCounter). No-op when the secret is unset
+      # (forks, local builds), so the snippet never ends up in the templates.
+      - name: Inject analytics
+        env:
+          GOATCOUNTER_ENDPOINT: ${{ secrets.GOATCOUNTER_ENDPOINT }}
+        run: ./scripts/injectAnalytics.sh build/microsite/output
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
         with:
