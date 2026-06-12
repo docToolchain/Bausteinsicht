@@ -62,7 +62,8 @@
                         </h4>
                         <p class="card-text">
                             JSON model format that LLMs read and write natively.
-                            CLI commands let AI agents modify your architecture.
+                            CLI commands and an interactive REPL let AI agents
+                            and humans modify your architecture.
                             IDE autocompletion via JSON Schema — no plugin needed.
                         </p>
                     </div>
@@ -130,13 +131,69 @@
             </div>
         </div>
 
-        <!-- Comparison -->
+        <!-- More than diagrams -->
+        <h2 style="text-align: center; margin-bottom: 2rem; color: #1a365d;">More than diagrams</h2>
+
+        <div class="row row-cols-1 row-cols-md-3 mb-4">
+            <div class="col mb-4">
+                <div class="card h-100 shadow-sm border-0" style="border-left: 4px solid #2d5a87 !important;">
+                    <div class="card-body">
+                        <h4 class="card-title" style="color: #1a365d;">
+                            <span style="font-size: 1.5rem; margin-right: 0.5rem;">&#128737;&#65039;</span>
+                            Governance
+                        </h4>
+                        <p class="card-text">
+                            <code>lint</code> checks your architecture constraints,
+                            <code>health</code> scores the model,
+                            <code>graph</code> finds dependency cycles, and
+                            <code>stale</code> detects forgotten elements.
+                            Architecture Decision Records managed right next to the model.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="col mb-4">
+                <div class="card h-100 shadow-sm border-0" style="border-left: 4px solid #2d5a87 !important;">
+                    <div class="card-body">
+                        <h4 class="card-title" style="color: #1a365d;">
+                            <span style="font-size: 1.5rem; margin-right: 0.5rem;">&#128200;</span>
+                            Evolution
+                        </h4>
+                        <p class="card-text">
+                            Versioned snapshots with <code>diff</code> and <code>restore</code>.
+                            Compare as-is and to-be architectures.
+                            Generate an architecture changelog between any two points in time.
+                            Your architecture history becomes first-class.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="col mb-4">
+                <div class="card h-100 shadow-sm border-0" style="border-left: 4px solid #2d5a87 !important;">
+                    <div class="card-body">
+                        <h4 class="card-title" style="color: #1a365d;">
+                            <span style="font-size: 1.5rem; margin-right: 0.5rem;">&#128268;</span>
+                            Interop &amp; Export
+                        </h4>
+                        <p class="card-text">
+                            Import from Structurizr DSL and LikeC4.
+                            Export to C4-PlantUML, Mermaid, DOT, D2, Structurizr DSL,
+                            sequence diagrams, AsciiDoc/Markdown tables, and PNG/SVG —
+                            plus metric heatmap overlays on your diagrams.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Migration -->
         <div class="text-center mb-4 p-4">
-            <h4 style="color: #1a365d;">Inspired by the best, built for draw.io</h4>
+            <h4 style="color: #1a365d;">Migrating from Structurizr or LikeC4?</h4>
             <p class="text-muted">
                 Bausteinsicht takes the best ideas from
                 <strong>Structurizr</strong> and <strong>LikeC4</strong>
-                and combines them with the world's most popular free diagramming tool.
+                and combines them with the world's most popular free diagramming tool —
+                and <code>bausteinsicht import</code> brings your existing model along.
             </p>
         </div>
 

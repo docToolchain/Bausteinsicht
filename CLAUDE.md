@@ -135,9 +135,10 @@ The security report at `src/docs/security/2026-03-01-security-review.adoc` is a 
 - Automated tool results change
 
 ### Future Ideas (Out of Scope for v1)
-- As-Is / To-Be architecture comparison
-- Structurizr/LikeC4 import
 - CI/CD validation pipeline
+- XMI import from Enterprise Architect (issue #401)
+
+(As-Is/To-Be comparison and Structurizr/LikeC4 import are implemented — see the `diff` and `import` commands.)
 
 ## Risk Radar Assessment
 
