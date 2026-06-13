@@ -6,11 +6,11 @@ description: >
   'review': verifies that docs, implementation, and tests are consistent before merge.
 license: MIT
 compatibility:
-  os: [linux, macos, windows]
+  os: [linux, macos]
   tools: []
 metadata:
   author: docToolchain
-  version: "1.0"
+  version: "1.1"
 allowed-tools: Bash Read Write Edit Glob Grep
 argument-hint: "start [#<issue-number>] | review"
 ---
@@ -26,7 +26,7 @@ spec and architecture documents are always kept in sync with implementation and 
 |------|---------|--------------|
 | `src/docs/spec/01_use_cases.adoc` | User-facing use cases | New CLI command or user-visible behavior added |
 | `src/docs/spec/02_cli_specification.adoc` | CLI command reference | Any `--flag`, command name, or output format changes |
-| `src/docs/spec/03_data_models.adoc` | JSONC model schema | `internal/model/types.go` changes |
+| `src/docs/spec/03_data_models.adoc` | JSONC model schema | `internal/model/types.go` or `schemas/bausteinsicht.schema.json` changes |
 | `src/docs/spec/04_acceptance_criteria.adoc` | Acceptance criteria per feature | New feature scope |
 | `src/docs/spec/05_sync_specification.adoc` | Sync engine behavior spec | `internal/sync/` changes |
 | `src/docs/arc42/chapters/05_building_block_view.adoc` | Package/component structure | New package added or renamed |
@@ -42,17 +42,29 @@ spec and architecture documents are always kept in sync with implementation and 
 
 1. **Gather scope**
    - If an issue number was given: read it with `gh issue view <N> --json title,body,labels`
+     - If the body is empty, infer scope from title + labels + branch name
    - If no issue: use `git branch --show-current` and `git log main...HEAD --oneline` to infer scope from branch name and commits
+   - Check if implementation commits already exist on this branch: `git diff main...HEAD --name-only -- '*.go' ':!*_test.go'`
+     - If Go files are already changed: note "running start post-implementation (catch-up mode)" — proceed normally but skip the docs-first claim
    - Summarize in one sentence what will change
 
 2. **Map scope to docs** — for each doc in the table above, decide: **needs update / no change needed / unsure**
-   Use these rules:
-   - New or changed `cmd/bausteinsicht/*.go` file → check spec/02, spec/01
-   - Changes to `internal/model/types.go` or schema → check spec/03
-   - Changes to `internal/sync/` → check spec/05
-   - New `internal/<pkg>/` directory → check arc42/05 and arc42/06
-   - A new user-facing behavior without an existing acceptance criterion → check spec/04
-   - A significant design tradeoff (new library, new format, new algorithm) → new ADR
+
+   Use these rules (apply **all** that match, not just the first):
+
+   | If the scope touches… | Check these docs |
+   |----------------------|-----------------|
+   | New or changed `cmd/bausteinsicht/*.go` | spec/01, spec/02 |
+   | `internal/model/types.go` or `schemas/bausteinsicht.schema.json` or `internal/schema/` | spec/03 |
+   | `internal/sync/` | spec/05 |
+   | Any other existing `internal/<pkg>/` with user-visible output change | spec/01, spec/02 |
+   | New `internal/<pkg>/` directory | arc42/05, arc42/06 |
+   | New user-facing behavior without an existing acceptance criterion | spec/04 |
+   | A significant design tradeoff (new library, new format, new algorithm) | new ADR |
+
+   **Catch-all:** Any change to an existing `internal/` package that alters CLI-visible behavior,
+   output format, or public API → check spec/01 and spec/02. When in doubt, flag as "unsure"
+   rather than "no change needed."
 
 3. **For each doc that needs update:**
    - Read the current content of that doc
@@ -72,9 +84,9 @@ spec and architecture documents are always kept in sync with implementation and 
 5. **Commit** all doc changes with:
    ```
    docs: update spec/architecture for <scope>
-
-   Closes (partial): #<issue>
    ```
+   If an issue number is known, append: `Closes (partial): #<issue>`
+   Omit the trailer if no issue number was provided.
 
 ## Mode: `review`
 
@@ -94,23 +106,34 @@ spec and architecture documents are always kept in sync with implementation and 
    - `impl`: changed `.go` files (non-test)
    - `tests`: changed `_test.go` files
    - `docs`: changed files under `src/docs/`
-   - `schema`: changed `schemas/`
+   - `schema`: changed files under `schemas/` or `internal/schema/`
 
 3. **Check consistency** — answer each question:
 
    **A. Implementation coverage in docs**
-   For each changed impl file: is there a doc that describes the new/changed behavior?
-   - `cmd/bausteinsicht/*.go` → look for matching content in `spec/02_cli_specification.adoc`
-   - `internal/model/types.go` → look for matching content in `spec/03_data_models.adoc`
-   - `internal/sync/*.go` → look for matching content in `spec/05_sync_specification.adoc`
-   - `internal/<new-pkg>/` → look for matching content in `arc42/05_building_block_view.adoc`
+   For each changed impl file and each changed schema file: is there a doc that describes the new/changed behavior?
+   - `cmd/bausteinsicht/*.go` → look for matching content in `spec/02_cli_specification.adoc` and `spec/01_use_cases.adoc`
+   - `internal/model/types.go` or `schemas/bausteinsicht.schema.json` or `internal/schema/` → look in `spec/03_data_models.adoc`
+   - `internal/sync/*.go` → look in `spec/05_sync_specification.adoc`
+   - Any other `internal/<pkg>/*.go` that adds/removes/renames a user-visible output or CLI flag → look in `spec/01` and `spec/02`
+   - New `internal/<pkg>/` directory → look in `arc42/05_building_block_view.adoc`
 
    **B. Doc coverage in tests**
    For each new acceptance criterion or spec section added in docs: is there a test exercising it?
-   - Grep the test files for the feature name or flag name mentioned in the doc change
+   - Grep the test files for the feature name or flag name mentioned in the doc change:
+     ```bash
+     grep -rn "<feature-name>" --include="*_test.go" .
+     ```
 
-   **C. No stale docs**
-   For each deleted or renamed symbol (function, flag, struct) in impl: is the old name still referenced in docs?
+   **C. No stale docs** — check for renamed/deleted symbols still referenced in docs:
+   ```bash
+   # Find deleted/renamed exported symbols
+   git diff main...HEAD -- '*.go' ':!*_test.go' | grep '^-' | grep -oE '(func|type|const) [A-Z][A-Za-z]+' | awk '{print $2}' | sort -u
+   # Then grep docs for each name
+   grep -rn "<OldSymbolName>" src/docs/
+   ```
+   A stale reference to a removed/renamed symbol in docs is always ❌.
+   A changed-but-undocumented symbol is ⚠️ — unless it is a CLI flag, command name, or public schema field, in which case it is ❌.
 
 4. **Output a review report:**
 

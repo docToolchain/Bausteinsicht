@@ -30,12 +30,14 @@ Closes #XXX
   - Ran `make check` locally
   - No new warnings/errors
   
-- [ ] **Documentation** — run `/doc-check review` to verify, or answer manually:
-  - [ ] `src/docs/spec/02_cli_specification.adoc` — updated if CLI flags/commands changed, or N/A
-  - [ ] `src/docs/spec/03_data_models.adoc` — updated if `internal/model/types.go` changed, or N/A
-  - [ ] `src/docs/spec/05_sync_specification.adoc` — updated if `internal/sync/` changed, or N/A
-  - [ ] `src/docs/arc42/chapters/05_building_block_view.adoc` — updated if new package added, or N/A
-  - [ ] New ADR created if a significant design decision was made, or N/A
+- [ ] **Documentation** — run `/doc-check review` for automated check, or fill in manually:
+  - [ ] `spec/01_use_cases.adoc` — updated / N/A (reason: )
+  - [ ] `spec/02_cli_specification.adoc` — updated / N/A (reason: ) ← required if any `--flag` or command changed
+  - [ ] `spec/03_data_models.adoc` — updated / N/A (reason: ) ← required if `types.go` or schema changed
+  - [ ] `spec/04_acceptance_criteria.adoc` — updated / N/A (reason: )
+  - [ ] `spec/05_sync_specification.adoc` — updated / N/A (reason: ) ← required if `internal/sync/` changed
+  - [ ] `arc42/05_building_block_view.adoc` — updated / N/A (reason: ) ← required if new package added
+  - [ ] New ADR created / N/A (reason: )
 
 ## Testing
 <!-- How was this tested? -->
