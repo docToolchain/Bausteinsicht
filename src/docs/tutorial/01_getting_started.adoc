@@ -152,6 +152,26 @@ Elements (11):
 
 Open `architecture.drawio` in draw.io. You will find three pages — **System Context**, **Container View**, and **API Components** — each generated from a _view_ defined in the model. Elements link to each other across pages: click a system in the context view to drill down into its container view; a generated back-navigation button takes you up again.
 
+The **System Context** view of the sample model looks like this — generated entirely from the JSONC, no manual drawing:
+
+[plantuml, tutorial-context, png]
+....
+@startuml
+!include <C4/C4_Context>
+
+Person(backoffice_user, "Back-Office User", "Internal staff managing inventory and processing orders")
+Person(customer, "Customer", "End user who browses products and places orders")
+System_Ext(email_service, "E-Mail Service", "SMTP", "Delivers transactional emails to customers")
+System(onlineshop, "Online Shop", "E-commerce platform for selling products online")
+System_Ext(payment_provider, "Payment Provider", "Stripe API", "Processes credit card and bank transfer payments")
+
+Rel(customer, onlineshop, "browses & orders")
+Rel(backoffice_user, onlineshop, "manages inventory")
+Rel(onlineshop, payment_provider, "charges payment")
+Rel(onlineshop, email_service, "sends emails")
+@enduml
+....
+
 == Where you are now
 
 You have a valid model, generated diagrams, and the tools to inspect both. Next, you will change the model and watch the diagrams follow.

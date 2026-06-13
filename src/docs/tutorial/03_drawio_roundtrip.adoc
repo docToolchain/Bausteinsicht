@@ -22,6 +22,41 @@ Every `bausteinsicht sync` compares the model against the last synced state and 
 
 Your hand-tuned positions survive. Sync moves nothing you have arranged; it only places what is new.
 
+The **Container View** drills one level deeper — the containers inside the Online Shop boundary, with the external systems they talk to. This, too, comes straight from the model:
+
+[plantuml, tutorial-containers, png]
+....
+@startuml
+!include <C4/C4_Container>
+
+Person(backoffice_user, "Back-Office User", "Internal staff managing inventory and processing orders")
+Person(customer, "Customer", "End user who browses products and places orders")
+System_Ext(email_service, "E-Mail Service", "SMTP", "Delivers transactional emails to customers")
+System_Ext(payment_provider, "Payment Provider", "Stripe API", "Processes credit card and bank transfer payments")
+System_Boundary(onlineshop, "Online Shop") {
+  Container(onlineshop_api, "REST API", "Go", "Backend service handling business logic")
+  Container(onlineshop_cache, "Cache", "Redis", "Caches product catalog for fast read access")
+  ContainerDb(onlineshop_db, "Database", "PostgreSQL", "Stores products, orders and customer data")
+  Container(onlineshop_export_storage, "Export Storage", "S3", "Stores generated reports and export files")
+  Container(onlineshop_frontend, "Web Frontend", "React", "Single-page application for browsing and ordering")
+  ContainerQueue(onlineshop_message_queue, "Message Queue", "RabbitMQ", "Asynchronous event bus for order and notification events")
+  Container(onlineshop_mobile_app, "Mobile App", "React Native", "Native mobile app for iOS and Android")
+}
+
+Rel(customer, onlineshop_frontend, "browses & orders")
+Rel(backoffice_user, onlineshop_api, "manages inventory")
+Rel(onlineshop_frontend, onlineshop_api, "REST/JSON")
+Rel(onlineshop_api, onlineshop_db, "reads/writes")
+Rel(onlineshop_api, onlineshop_cache, "reads")
+Rel(onlineshop_api, payment_provider, "charges payment")
+Rel(onlineshop_api, email_service, "sends emails")
+Rel(customer, onlineshop_mobile_app, "browses & orders")
+Rel(onlineshop_mobile_app, onlineshop_api, "REST/JSON")
+Rel(onlineshop_api, onlineshop_message_queue, "publishes order events")
+Rel(onlineshop_api, onlineshop_export_storage, "writes reports")
+@enduml
+....
+
 == Reverse: draw.io → model
 
 Open `architecture.drawio`, double-click the "Search Service" shape, and rename it to "Product Search". Save, then:
