@@ -30,10 +30,12 @@ Closes #XXX
   - Ran `make check` locally
   - No new warnings/errors
   
-- [ ] **Documentation**
-  - Updated README if new feature
-  - Updated arc42 if architecture changed
-  - Added/updated code comments where needed
+- [ ] **Documentation** — run `/doc-check review` to verify, or answer manually:
+  - [ ] `src/docs/spec/02_cli_specification.adoc` — updated if CLI flags/commands changed, or N/A
+  - [ ] `src/docs/spec/03_data_models.adoc` — updated if `internal/model/types.go` changed, or N/A
+  - [ ] `src/docs/spec/05_sync_specification.adoc` — updated if `internal/sync/` changed, or N/A
+  - [ ] `src/docs/arc42/chapters/05_building_block_view.adoc` — updated if new package added, or N/A
+  - [ ] New ADR created if a significant design decision was made, or N/A
 
 ## Testing
 <!-- How was this tested? -->
