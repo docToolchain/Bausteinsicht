@@ -95,6 +95,31 @@ participant "REST API" as onlineshop_api
 customer -> onlineshop_mobile_app : 1. tap 'Place Order'
 ----
 
+Rendered, the sample model's checkout flow becomes a full sequence diagram — the same `dynamicViews` steps, now readable at a glance:
+
+[plantuml, tutorial-checkout, png]
+....
+@startuml
+title Checkout Flow
+
+participant "Customer" as customer
+participant "Mobile App" as onlineshop_mobile_app
+participant "REST API" as onlineshop_api
+participant "Order Processing" as onlineshop_api_orders
+participant "Payment Provider" as payment_provider
+participant "Database" as onlineshop_db
+participant "Message Queue" as onlineshop_message_queue
+
+customer -> onlineshop_mobile_app : 1. tap 'Place Order'
+onlineshop_mobile_app -> onlineshop_api : 2. POST /orders
+onlineshop_api_orders -> payment_provider : 3. charge(amount)
+payment_provider --> onlineshop_api_orders : 4. chargeResult
+onlineshop_api_orders -> onlineshop_db : 5. persist order
+onlineshop_api_orders ->> onlineshop_message_queue : 6. OrderPlaced event
+onlineshop_api --> onlineshop_mobile_app : 7. 201 Created + orderId
+@enduml
+....
+
 `--diagram-format mermaid` produces the Mermaid `sequenceDiagram` equivalent.
 
 == Tables for the spreadsheet people
