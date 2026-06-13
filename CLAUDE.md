@@ -127,6 +127,8 @@ internal/watcher/      # File-system watcher (fsnotify) for --watch mode
 When starting work on a ticket:
 1. Run `/doc-check start #<issue>` — identifies which spec/architecture docs need updating and applies them before implementation begins (docs-first approach)
 
+> `/doc-check` is a Claude Code skill. Without Claude Code, use the Documentation checklist in the PR template as the manual fallback.
+
 ### PR Merge Policy
 Before merging any PR:
 1. **Doc check** — run `/doc-check review` to verify spec/architecture is consistent with implementation and tests

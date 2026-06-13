@@ -10,7 +10,7 @@ compatibility:
   tools: []
 metadata:
   author: docToolchain
-  version: "1.1"
+  version: "1.2"
 allowed-tools: Bash Read Write Edit Glob Grep
 argument-hint: "start [#<issue-number>] | review"
 ---
@@ -20,18 +20,21 @@ argument-hint: "start [#<issue-number>] | review"
 You are a documentation consistency guardian for the Bausteinsicht project. You ensure that
 spec and architecture documents are always kept in sync with implementation and tests.
 
+**Requires Claude Code.** If running manually (no Claude Code), use the PR template checklist
+as the fallback — it covers the same doc gates.
+
 ## Project Doc Structure
 
 | Path | Content | Update when… |
 |------|---------|--------------|
 | `src/docs/spec/01_use_cases.adoc` | User-facing use cases | New CLI command or user-visible behavior added |
-| `src/docs/spec/02_cli_specification.adoc` | CLI command reference | Any `--flag`, command name, or output format changes |
+| `src/docs/spec/02_cli_specification.adoc` | CLI command reference | Any `--flag`, command name, subcommand rename, or output format changes |
 | `src/docs/spec/03_data_models.adoc` | JSONC model schema | `internal/model/types.go` or `schemas/bausteinsicht.schema.json` changes |
 | `src/docs/spec/04_acceptance_criteria.adoc` | Acceptance criteria per feature | New feature scope |
 | `src/docs/spec/05_sync_specification.adoc` | Sync engine behavior spec | `internal/sync/` changes |
 | `src/docs/arc42/chapters/05_building_block_view.adoc` | Package/component structure | New package added or renamed |
-| `src/docs/arc42/chapters/06_runtime_view.adoc` | Data flows and runtime behavior | New data flow or runtime path |
-| `src/docs/arc42/chapters/08_concepts.adoc` | Cross-cutting concepts | New cross-cutting pattern |
+| `src/docs/arc42/chapters/06_runtime_view.adoc` | Data flows and runtime behavior | New data flow or runtime path within existing or new packages |
+| `src/docs/arc42/chapters/08_concepts.adoc` | Cross-cutting concepts | New cross-cutting pattern (error handling, caching, etc.) |
 | `src/docs/arc42/ADRs/` | Architecture decisions | New significant design decision |
 
 ## Mode: `start`
@@ -44,36 +47,40 @@ spec and architecture documents are always kept in sync with implementation and 
    - If an issue number was given: read it with `gh issue view <N> --json title,body,labels`
      - If the body is empty, infer scope from title + labels + branch name
    - If no issue: use `git branch --show-current` and `git log main...HEAD --oneline` to infer scope from branch name and commits
-   - Check if implementation commits already exist on this branch: `git diff main...HEAD --name-only -- '*.go' ':!*_test.go'`
-     - If Go files are already changed: note "running start post-implementation (catch-up mode)" — proceed normally but skip the docs-first claim
+   - Check if implementation commits already exist on this branch:
+     ```bash
+     git diff main...HEAD --name-only -- '*.go' ':!*_test.go'
+     ```
+     If Go files are already changed: note "running start post-implementation (catch-up mode)" — proceed normally but skip the docs-first claim
    - Summarize in one sentence what will change
 
 2. **Map scope to docs** — for each doc in the table above, decide: **needs update / no change needed / unsure**
 
-   Use these rules (apply **all** that match, not just the first):
+   Apply **all** rules that match (not just the first):
 
    | If the scope touches… | Check these docs |
    |----------------------|-----------------|
-   | New or changed `cmd/bausteinsicht/*.go` | spec/01, spec/02 |
+   | New or changed `cmd/bausteinsicht/*.go` (non-test) | spec/01, spec/02 |
    | `internal/model/types.go` or `schemas/bausteinsicht.schema.json` or `internal/schema/` | spec/03 |
    | `internal/sync/` | spec/05 |
-   | Any other existing `internal/<pkg>/` with user-visible output change | spec/01, spec/02 |
    | New `internal/<pkg>/` directory | arc42/05, arc42/06 |
+   | New runtime data flow within an existing package | arc42/06 |
+   | New cross-cutting pattern (error handling, logging, concurrency model) | arc42/08 |
+   | Any other existing `internal/<pkg>/` with user-visible output change | spec/01, spec/02 |
    | New user-facing behavior without an existing acceptance criterion | spec/04 |
    | A significant design tradeoff (new library, new format, new algorithm) | new ADR |
 
    **Catch-all:** Any change to an existing `internal/` package that alters CLI-visible behavior,
-   output format, or public API → check spec/01 and spec/02. When in doubt, flag as "unsure"
+   output format, or exported API → check spec/01 and spec/02. When in doubt, flag as "unsure"
    rather than "no change needed."
 
 3. **For each doc that needs update:**
    - Read the current content of that doc
    - Write the specific section that needs to change (add/update only the affected section — do not rewrite the whole doc)
    - Keep AsciiDoc format; follow existing heading levels and style
-   - Note: if an ADR is needed, create `src/docs/arc42/ADRs/ADR-NNN-Name.adoc` using Nygard format with a Weighted Pugh Matrix
+   - If an ADR is needed, create `src/docs/arc42/ADRs/ADR-NNN-Name.adoc` using Nygard format with a Weighted Pugh Matrix
 
 4. **Report**
-   Print a table:
    ```
    | Doc | Status | Change made |
    |-----|--------|-------------|
@@ -111,29 +118,43 @@ spec and architecture documents are always kept in sync with implementation and 
 3. **Check consistency** — answer each question:
 
    **A. Implementation coverage in docs**
-   For each changed impl file and each changed schema file: is there a doc that describes the new/changed behavior?
-   - `cmd/bausteinsicht/*.go` → look for matching content in `spec/02_cli_specification.adoc` and `spec/01_use_cases.adoc`
-   - `internal/model/types.go` or `schemas/bausteinsicht.schema.json` or `internal/schema/` → look in `spec/03_data_models.adoc`
-   - `internal/sync/*.go` → look in `spec/05_sync_specification.adoc`
-   - Any other `internal/<pkg>/*.go` that adds/removes/renames a user-visible output or CLI flag → look in `spec/01` and `spec/02`
-   - New `internal/<pkg>/` directory → look in `arc42/05_building_block_view.adoc`
+   Apply the same routing table as `start` step 2 to each changed impl/schema file:
+   - `cmd/bausteinsicht/*.go` → `spec/02` and `spec/01`
+   - `internal/model/types.go` / `schemas/` / `internal/schema/` → `spec/03`
+   - `internal/sync/*.go` → `spec/05`
+   - New `internal/<pkg>/` directory → `arc42/05`, `arc42/06`
+   - New runtime data flow in existing package → `arc42/06`
+   - New cross-cutting pattern → `arc42/08`
+   - Any other `internal/<pkg>/` with user-visible change → `spec/01`, `spec/02`
+   - Significant design tradeoff → new ADR in `src/docs/arc42/ADRs/`
 
    **B. Doc coverage in tests**
-   For each new acceptance criterion or spec section added in docs: is there a test exercising it?
-   - Grep the test files for the feature name or flag name mentioned in the doc change:
-     ```bash
-     grep -rn "<feature-name>" --include="*_test.go" .
-     ```
-
-   **C. No stale docs** — check for renamed/deleted symbols still referenced in docs:
+   For each new acceptance criterion or spec section added: is there a test covering it?
    ```bash
-   # Find deleted/renamed exported symbols
-   git diff main...HEAD -- '*.go' ':!*_test.go' | grep '^-' | grep -oE '(func|type|const) [A-Z][A-Za-z]+' | awk '{print $2}' | sort -u
-   # Then grep docs for each name
-   grep -rn "<OldSymbolName>" src/docs/
+   grep -rn "<feature-name>" --include="*_test.go" .
    ```
-   A stale reference to a removed/renamed symbol in docs is always ❌.
-   A changed-but-undocumented symbol is ⚠️ — unless it is a CLI flag, command name, or public schema field, in which case it is ❌.
+
+   **C. No stale docs** — check for renamed/deleted exported symbols still referenced in docs.
+
+   Two-pass extraction (handles both top-level funcs and methods):
+   ```bash
+   # Pass 1: top-level func/type/const (e.g. "func ParseV2(")
+   git diff main...HEAD -- '*.go' ':!*_test.go' \
+     | grep '^-' \
+     | grep -E '^-\s*(func|type|const)\s+[A-Z]' \
+     | grep -oE '\b[A-Z][A-Za-z0-9_]+' | sort -u
+
+   # Pass 2: methods (e.g. "func (r *Receiver) MethodName(")
+   git diff main...HEAD -- '*.go' ':!*_test.go' \
+     | grep '^-' \
+     | grep -E '^-\s*func\s+\(' \
+     | grep -oE '\)\s+[A-Z][A-Za-z0-9_]+' \
+     | grep -oE '[A-Z][A-Za-z0-9_]+' | sort -u
+   ```
+   Then for each extracted symbol: `grep -rn "<Symbol>" src/docs/`
+
+   - Stale reference to a removed/renamed symbol in docs → always ❌
+   - Changed-but-undocumented symbol → ⚠️, **except**: CLI flag, command name, public schema field → ❌
 
 4. **Output a review report:**
 
@@ -157,7 +178,7 @@ spec and architecture documents are always kept in sync with implementation and 
 
    Verdict rules:
    - **PASS**: no ❌ findings
-   - **NEEDS DOCS**: only ⚠️ gaps (suggest doc updates but do not block)
-   - **FAIL**: any ❌ inconsistency found — list exactly what needs to be fixed
+   - **NEEDS DOCS**: only ⚠️ gaps (suggest updates but do not block)
+   - **FAIL**: any ❌ found — list exactly what needs to be fixed
 
 5. If verdict is **NEEDS DOCS** or **FAIL**: offer to fix the gaps immediately.
