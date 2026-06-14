@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -136,6 +137,20 @@ func TestResolveDrawioBinary_FlagPathNotFound(t *testing.T) {
 	_, err := ResolveDrawioBinary(missing)
 	if err == nil {
 		t.Error("expected error when --drawio-path points at a missing file")
+	}
+}
+
+// TestResolveDrawioBinary_PathIsDirectory verifies that an explicit --drawio-path
+// pointing at a directory (a common misconfiguration) returns a clear error
+// rather than treating the directory as an executable. (#420)
+func TestResolveDrawioBinary_PathIsDirectory(t *testing.T) {
+	dir := t.TempDir()
+	_, err := ResolveDrawioBinary(dir)
+	if err == nil {
+		t.Fatal("expected error when --drawio-path points at a directory")
+	}
+	if !strings.Contains(err.Error(), "directory") {
+		t.Errorf("error should mention it is a directory, got: %v", err)
 	}
 }
 
