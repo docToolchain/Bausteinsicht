@@ -19,7 +19,10 @@ func newChangelogCmd() *cobra.Command {
 	cmd.Flags().String("model", "architecture.jsonc", "Model file path")
 	cmd.Flags().String("since", "", "Starting git ref or snapshot ID (default: previous tag)")
 	cmd.Flags().String("until", "HEAD", "Ending git ref or snapshot ID")
-	cmd.Flags().String("format", "markdown", "Output format: markdown, asciidoc, or json")
+	// Use a dedicated flag name (not the global --format, which only accepts
+	// text|json) so the markdown/asciidoc defaults are not rejected by the
+	// root command's global format validation (#425).
+	cmd.Flags().String("changelog-format", "markdown", "Output format: markdown, asciidoc, or json")
 	cmd.Flags().String("output", "", "Output file path (default: stdout)")
 
 	return cmd
@@ -29,7 +32,7 @@ func runChangelog(cmd *cobra.Command, _ []string) error {
 	modelPath, _ := cmd.Flags().GetString("model")
 	since, _ := cmd.Flags().GetString("since")
 	until, _ := cmd.Flags().GetString("until")
-	format, _ := cmd.Flags().GetString("format")
+	format, _ := cmd.Flags().GetString("changelog-format")
 	output, _ := cmd.Flags().GetString("output")
 
 	if err := validatePathContainment(modelPath); err != nil {

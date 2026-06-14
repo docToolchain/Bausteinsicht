@@ -140,6 +140,52 @@ func TestSnapshotDiffCmdJSON(t *testing.T) {
 	}
 }
 
+// TestSnapshotDiffCmdNilModel verifies that diffing snapshots whose stored
+// model is nil exits with an error instead of panicking (bug #425).
+func TestSnapshotDiffCmdNilModel(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	manager := snapshot.NewManager(tmpDir)
+	// NewSnapshot with a nil model produces a snapshot whose Model field is nil.
+	snap1 := snapshot.NewSnapshot("nil model", nil)
+	if err := manager.Save(snap1); err != nil {
+		t.Fatalf("failed to save first snapshot: %v", err)
+	}
+
+	time.Sleep(1 * time.Second) // Ensure different snapshot IDs
+
+	snap2 := snapshot.NewSnapshot("nil model 2", nil)
+	if err := manager.Save(snap2); err != nil {
+		t.Fatalf("failed to save second snapshot: %v", err)
+	}
+
+	cmd := newSnapshotDiffCmd()
+	cmd.SetArgs([]string{snap1.ID, snap2.ID, "--format", "text"})
+
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+
+	originalWd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get current directory: %v", err)
+	}
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("failed to change directory: %v", err)
+	}
+	defer func() {
+		_ = os.Chdir(originalWd)
+	}()
+
+	err = cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error for snapshot with nil model, got nil")
+	}
+	if !bytes.Contains([]byte(err.Error()), []byte("snapshot")) {
+		t.Fatalf("expected a clear 'snapshot' error message, got: %v", err)
+	}
+}
+
 func TestSnapshotDiffCmdNotFound(t *testing.T) {
 	tmpDir := t.TempDir()
 

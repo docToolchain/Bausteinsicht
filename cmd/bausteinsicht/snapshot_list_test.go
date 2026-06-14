@@ -35,7 +35,7 @@ func TestSnapshotListCmd(t *testing.T) {
 	}
 
 	cmd := newSnapshotListCmd()
-	cmd.SetArgs([]string{"--format", "table"})
+	cmd.SetArgs([]string{"--output-format", "table"})
 
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -114,7 +114,7 @@ func TestSnapshotListCmdJSON(t *testing.T) {
 	}
 
 	cmd := newSnapshotListCmd()
-	cmd.SetArgs([]string{"--format", "json"})
+	cmd.SetArgs([]string{"--output-format", "json"})
 
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
