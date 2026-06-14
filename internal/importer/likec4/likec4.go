@@ -646,7 +646,7 @@ func slugify(s string) string {
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
-const schemaURL = "https://raw.githubusercontent.com/docToolchain/Bausteinsicht/main/schema/bausteinsicht.schema.json"
+const schemaURL = "https://raw.githubusercontent.com/docToolchain/Bausteinsicht/main/schemas/bausteinsicht.schema.json"
 
 // Import reads the LikeC4 DSL file at path and returns an ImportResult.
 func Import(path string) (*importer.ImportResult, error) {

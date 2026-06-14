@@ -676,7 +676,7 @@ func slugify(s string) string {
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
-const schemaURL = "https://raw.githubusercontent.com/docToolchain/Bausteinsicht/main/schema/bausteinsicht.schema.json"
+const schemaURL = "https://raw.githubusercontent.com/docToolchain/Bausteinsicht/main/schemas/bausteinsicht.schema.json"
 
 // ImportSource parses a Structurizr DSL string directly (useful for testing).
 func ImportSource(src string) (*importer.ImportResult, error) {
