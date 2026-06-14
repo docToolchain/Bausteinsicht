@@ -29,6 +29,9 @@
       "type": "object"
     },
     "model": {
+      "additionalProperties": {
+        "$ref": "#/definitions/Element"
+      },
       "type": "object"
     },
     "relationships": {
@@ -44,6 +47,9 @@
       "$ref": "#/definitions/ModelSnapshot"
     },
     "views": {
+      "additionalProperties": {
+        "$ref": "#/definitions/View"
+      },
       "type": "object"
     }
   },
@@ -53,8 +59,10 @@
     "relationships",
     "views"
   ],
+  "additionalProperties": false,
   "definitions": {
     "Config": {
+      "additionalProperties": false,
       "properties": {
         "author": {
           "type": "string"
@@ -72,6 +80,7 @@
       "type": "object"
     },
     "Constraint": {
+      "additionalProperties": false,
       "properties": {
         "description": {
           "type": "string"
@@ -118,6 +127,7 @@
       "type": "object"
     },
     "DecisionRecord": {
+      "additionalProperties": false,
       "properties": {
         "date": {
           "type": "string"
@@ -143,6 +153,7 @@
       "type": "object"
     },
     "DynamicView": {
+      "additionalProperties": false,
       "properties": {
         "description": {
           "type": "string"
@@ -167,9 +178,83 @@
       ],
       "type": "object"
     },
+    "Element": {
+      "additionalProperties": false,
+      "properties": {
+        "children": {
+          "additionalProperties": {
+            "$ref": "#/definitions/Element"
+          },
+          "type": "object"
+        },
+        "decisions": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "description": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "lastModified": {
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "status": {
+          "type": "string"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "technology": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "title"
+      ],
+      "type": "object"
+    },
+    "ElementKind": {
+      "additionalProperties": false,
+      "properties": {
+        "container": {
+          "type": "boolean"
+        },
+        "description": {
+          "type": "string"
+        },
+        "notation": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "notation"
+      ],
+      "type": "object"
+    },
     "ModelSnapshot": {
+      "additionalProperties": false,
       "properties": {
         "elements": {
+          "additionalProperties": {
+            "$ref": "#/definitions/Element"
+          },
           "type": "object"
         },
         "relationships": {
@@ -185,7 +270,99 @@
       ],
       "type": "object"
     },
+    "PatternDefinition": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "elements": {
+          "items": {
+            "$ref": "#/definitions/PatternElement"
+          },
+          "type": "array"
+        },
+        "relationships": {
+          "items": {
+            "$ref": "#/definitions/PatternRelationship"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "elements"
+      ],
+      "type": "object"
+    },
+    "PatternElement": {
+      "additionalProperties": false,
+      "properties": {
+        "children": {
+          "items": {
+            "$ref": "#/definitions/PatternElement"
+          },
+          "type": "array"
+        },
+        "description": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "technology": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "title"
+      ],
+      "type": "object"
+    },
+    "PatternRelationship": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "from": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "from",
+        "to"
+      ],
+      "type": "object"
+    },
     "Relationship": {
+      "additionalProperties": false,
       "properties": {
         "cardinality": {
           "type": "string"
@@ -221,7 +398,23 @@
       ],
       "type": "object"
     },
+    "RelationshipKind": {
+      "additionalProperties": false,
+      "properties": {
+        "dashed": {
+          "type": "boolean"
+        },
+        "notation": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "notation"
+      ],
+      "type": "object"
+    },
     "SequenceStep": {
+      "additionalProperties": false,
       "properties": {
         "from": {
           "type": "string"
@@ -248,6 +441,7 @@
       "type": "object"
     },
     "Specification": {
+      "additionalProperties": false,
       "properties": {
         "decisions": {
           "items": {
@@ -256,12 +450,21 @@
           "type": "array"
         },
         "elements": {
+          "additionalProperties": {
+            "$ref": "#/definitions/ElementKind"
+          },
           "type": "object"
         },
         "patterns": {
+          "additionalProperties": {
+            "$ref": "#/definitions/PatternDefinition"
+          },
           "type": "object"
         },
         "relationships": {
+          "additionalProperties": {
+            "$ref": "#/definitions/RelationshipKind"
+          },
           "type": "object"
         },
         "tags": {
@@ -277,6 +480,7 @@
       "type": "object"
     },
     "TagDefinition": {
+      "additionalProperties": false,
       "properties": {
         "description": {
           "type": "string"
@@ -290,6 +494,51 @@
       },
       "required": [
         "id"
+      ],
+      "type": "object"
+    },
+    "View": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "exclude": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "exclude-tags": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "filter-tags": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "include": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "layout": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "title"
       ],
       "type": "object"
     }
