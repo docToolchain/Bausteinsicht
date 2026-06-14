@@ -166,7 +166,9 @@ func TestGenerateTemplate_ContainsAllKinds(t *testing.T) {
 
 	kinds := []string{"person", "system", "database", "external_system"}
 	for _, kind := range kinds {
-		if !strings.Contains(content, "["+kind+"]") {
+		// Kinds are carried as bausteinsicht_template attributes — the anchor
+		// the sync engine reads, not a decorative "[kind]" label.
+		if !strings.Contains(content, `bausteinsicht_template="`+kind+`"`) {
 			t.Errorf("expected kind %q in template", kind)
 		}
 	}
