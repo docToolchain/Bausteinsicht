@@ -116,9 +116,12 @@ Each tagged version produces compressed archives for all target platforms via Go
 
 | Windows amd64
 | `bausteinsicht_{Version}_windows_amd64.zip`
+
+| Windows arm64
+| `bausteinsicht_{Version}_windows_arm64.zip`
 |===
 
-Each archive also ships with an SBOM (SPDX-JSON and CycloneDX-JSON); a `checksums.txt` covers all artifacts.
+GoReleaser produces one archive per supported OS/architecture combination in the build matrix ({Linux, macOS, Windows} × {amd64, arm64}, plus Linux arm v7); the table above lists the primary targets and is not exhaustive. Each archive also ships with an SBOM (SPDX-JSON and CycloneDX-JSON); a `checksums.txt` covers all artifacts.
 
 ==== Installation
 
@@ -129,6 +132,7 @@ Each archive also ships with an SBOM (SPDX-JSON and CycloneDX-JSON); a `checksum
 curl -L https://github.com/docToolchain/Bausteinsicht/releases/download/v1.2.3/bausteinsicht_1.2.3_linux_amd64.tar.gz -o bausteinsicht.tar.gz
 tar -xzf bausteinsicht.tar.gz
 chmod +x bausteinsicht
+sudo mv bausteinsicht /usr/local/bin/   # install onto PATH
 
 # Or via Go install
 go install github.com/docToolchain/Bausteinsicht/cmd/bausteinsicht@latest

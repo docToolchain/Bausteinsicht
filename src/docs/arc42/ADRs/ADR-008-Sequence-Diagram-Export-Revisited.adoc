@@ -48,7 +48,7 @@ Weights are revised against ADR-004: *Usefulness of output* is raised, *Implemen
 | 0
 | 0
 
-| *Single source of truth (structure + behaviour)*
+| *Single source of truth (structure + behavior)*
 | 3
 | 0
 | +1
@@ -88,6 +88,7 @@ Weights are revised against ADR-004: *Usefulness of output* is raised, *Implemen
 | Renderability (×3)                     | 0   | +3  | 0   | 0
 | Single source of truth (×3)            | 0   | +3  | -3  | 0
 | LLM friendliness (×2)                  | 0   | +2  | +2  | 0
+| Implementation effort (×2)             | 0   | 0   | 0   | 0
 | Model complexity (×2)                  | 0   | -2  | 0   | 0
 | *Total*                                | *-5* | *+11* | *+4* | *0*
 |===
@@ -104,7 +105,7 @@ This keeps a single source of truth for both structural and behavioral views, wh
 
 === Positive
 
-* One model now describes both structure and behaviour
+* One model now describes both structure and behavior
 * Sequence diagrams render in any PlantUML/Mermaid pipeline (GitHub, Confluence, AsciiDoc)
 * `dynamicViews` steps are plain JSONC — readable and writable by LLM agents
 
