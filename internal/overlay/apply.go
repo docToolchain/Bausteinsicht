@@ -8,7 +8,12 @@ import (
 	"github.com/beevik/etree"
 )
 
-const OriginalFillAttr = "data-original-fill"
+const (
+	OriginalFillAttr = "data-original-fill"
+	styleAttr        = "style"
+	fillColorAttr    = "fillColor"
+	fillColorPrefix  = "fillColor="
+)
 
 func LoadMetricsFile(path string) (*MetricsFile, error) {
 	data, err := os.ReadFile(path)
@@ -70,10 +75,10 @@ func Remove(drawioPath string) error {
 		if originalFill != "" {
 			geometry := cell.FindElement("mxGeometry")
 			if geometry != nil {
-				style := geometry.SelectAttrValue("style", "")
+				style := geometry.SelectAttrValue(styleAttr, "")
 				if style != "" {
 					style = updateStyleFill(style, originalFill)
-					geometry.CreateAttr("style", style)
+					geometry.CreateAttr(styleAttr, style)
 				}
 			}
 			cell.RemoveAttr(OriginalFillAttr)
@@ -94,8 +99,8 @@ func applyColor(cell *etree.Element, normalized float64, scheme ColorScheme) {
 		return
 	}
 
-	style := geometry.SelectAttrValue("style", "")
-	originalFill := geometry.SelectAttrValue("fillColor", "")
+	style := geometry.SelectAttrValue(styleAttr, "")
+	originalFill := geometry.SelectAttrValue(fillColorAttr, "")
 
 	if originalFill == "" {
 		originalFill = "#ffffff"
@@ -105,19 +110,19 @@ func applyColor(cell *etree.Element, normalized float64, scheme ColorScheme) {
 	}
 
 	style = updateStyleFill(style, color)
-	geometry.CreateAttr("style", style)
+	geometry.CreateAttr(styleAttr, style)
 }
 
 func updateStyleFill(style, color string) string {
 	if style == "" {
-		return "fillColor=" + color
+		return fillColorPrefix + color
 	}
 
 	result := ""
 	hasKey := false
 	for _, part := range parseStyleParts(style) {
-		if len(part) > 0 && startsWithKey(part, "fillColor") {
-			result += "fillColor=" + color + ";"
+		if len(part) > 0 && startsWithKey(part, fillColorAttr) {
+			result += fillColorPrefix + color + ";"
 			hasKey = true
 		} else {
 			if part != "" {
@@ -126,7 +131,7 @@ func updateStyleFill(style, color string) string {
 		}
 	}
 	if !hasKey {
-		result += "fillColor=" + color + ";"
+		result += fillColorPrefix + color + ";"
 	}
 	return result
 }
