@@ -84,7 +84,7 @@ These flags are available on all subcommands via persistent flags on the root co
 | `text`
 
 | `--model <path>`
-| Path to the model file (`.jsonc`). When omitted, auto-detection scans the current directory for `*.jsonc` files and uses the first match.
+| Path to the model file (`.jsonc`). When omitted, auto-detection scans the current directory for a single `*.jsonc` file; if more than one is present, the command aborts and asks for `--model` (see Auto-Detection Behavior).
 | auto-detect
 
 | `--template <path>`
@@ -103,8 +103,9 @@ NOTE: `--version` is a root-level flag only, not a global flag. It is used as `b
 When `--model` is not specified, all commands that require a model file invoke auto-detection:
 
 1. The current working directory is scanned for files matching `*.jsonc`.
-2. If one or more `.jsonc` files are found, the first match (alphabetically) is used.
-3. If no `.jsonc` file is found, the command exits with code 2 and an error message.
+2. If exactly one `.jsonc` file is found, it is used.
+3. If more than one `.jsonc` file is found, the command **aborts** with exit code 2 and the message `multiple .jsonc files in <dir> — use --model to select one`. It does **not** silently pick one, because the tool mutates files and synchronizes — operating on the wrong model must never happen by accident.
+4. If no `.jsonc` file is found, the command exits with code 2 and an error message.
 
 === Exit Codes
 
@@ -128,7 +129,9 @@ When `--model` is not specified, all commands that require a model file invoke a
 
 Initializes a new Bausteinsicht project in the current directory by creating a sample model, a default template, an initial draw.io diagram, and the sync state file.
 
-**Flags:** No command-specific flags. Uses global flags only.
+**Flags:**
+
+* `--generate-template` -- Generate the template from the model's specification instead of writing the built-in default template.
 
 **Created files:**
 
@@ -219,6 +222,8 @@ Runs one bidirectional synchronization cycle between the architecture model and 
 **Flags:**
 
 * `--relayout` -- Re-apply auto-layout to all view pages, resetting element positions to the layout engine's computed positions. Without this flag, existing element positions are preserved.
+* `--mermaid` -- Also write Mermaid diagrams of the views to a Markdown file after syncing.
+* `--mermaid-output <path>` -- Output file for the Mermaid diagrams (default `architecture.md`). Implies `--mermaid`.
 
 **Behavior:**
 
@@ -283,7 +288,10 @@ $ bausteinsicht sync --format json
 
 Watches the model and draw.io files for changes and automatically runs a sync cycle on each detected change.
 
-**Flags:** No command-specific flags. Uses global flags only.
+**Flags:**
+
+* `--mermaid` -- Also write Mermaid diagrams of the views to a Markdown file after each sync.
+* `--mermaid-output <path>` -- Output file for the Mermaid diagrams (default `architecture.md`). Implies `--mermaid`.
 
 **Behavior:**
 
@@ -666,6 +674,11 @@ Exports draw.io diagram views to image files (PNG or SVG) using the draw.io CLI.
 | No
 | `.` (current directory)
 
+| `--scale`
+| Export scale factor (e.g. `2.0` for retina, `3.0` for print). Values greater than 1 require a hardware GPU.
+| No
+| `1`
+
 | `--embed-diagram`
 | Embed the draw.io XML source in the exported image file.
 | No
@@ -677,15 +690,14 @@ Exports draw.io diagram views to image files (PNG or SVG) using the draw.io CLI.
 * Loads the model and draw.io document to determine which pages to export.
 * Detects the draw.io CLI binary automatically. Exits with code 2 if not found.
 * Creates the output directory if it does not exist.
-* Output files are named `<view-key>.<format>` (e.g., `context.png`).
+* Output files are named `architecture-<view-key>.<format>` (e.g., `architecture-context.png`).
 * Each view page is exported individually; partial failures are reported.
 
-**JSON output structure:**
+**JSON output structure** (the `errors` array is present only on partial failure):
 [source,json]
 ----
 {
-  "files": ["./context.png", "./container.png"],
-  "errors": [],
+  "files": ["architecture-context.png", "architecture-container.png"],
   "success": true
 }
 ----
@@ -735,9 +747,9 @@ Exports element attributes as an AsciiDoc or Markdown table per view or as a com
 | `adoc`
 
 | `--output`
-| Output directory for exported files.
+| Output directory for exported files. When omitted, the table is written to **stdout**.
 | No
-| `.` (current directory)
+| (stdout)
 
 | `--combined`
 | Export a single combined table with elements from all views, deduplicated.
@@ -750,48 +762,49 @@ Exports element attributes as an AsciiDoc or Markdown table per view or as a com
 * Loads the model and resolves view elements.
 * For each view, generates a table with columns: ID, Kind, Title, Technology, Description.
 * Elements are sorted alphabetically by ID within each table.
-* Output files are named `<view-key>.adoc` or `<view-key>.md` (e.g., `context.adoc`).
-* With `--combined`, produces a single file `combined.adoc` (or `.md`) containing all elements across views, deduplicated by ID.
+* Without `--output`, the table(s) are written to stdout. With `--output <dir>`, files are written there and the output filenames depend on the selection:
+** A single view (`--view <key>`) → `<view-key>-elements.adoc` (or `.md`).
+** All views, no `--combined` → one file `all-views-elements.adoc` (or `.md`) covering every view.
+** `--combined` → one deduplicated file `elements.adoc` (or `.md`).
 * Creates the output directory if it does not exist.
 
-**JSON output structure:**
+**JSON output structure** — `--format json` emits an array of element rows (not a file list):
 [source,json]
 ----
-{
-  "files": ["./context.adoc", "./container.adoc"],
-  "success": true
-}
+[
+  { "id": "customer", "title": "Customer", "kind": "actor", "description": "..." },
+  { "id": "webshop.api", "title": "REST API", "kind": "container", "technology": "Go", "description": "..." }
+]
 ----
 
 **Exit codes:**
 
-* `0` -- all tables exported successfully
+* `0` -- table(s) exported successfully
 * `1` -- one or more exports failed (partial failure)
 * `2` -- model file not found, invalid format, or no views to export
 
 **Example:**
 [source,bash]
 ----
-$ bausteinsicht export-table
-Exported: ./context.adoc
-Exported: ./container.adoc
+$ bausteinsicht export-table --view context        # writes to stdout
+=== System Context
+...
 
 $ bausteinsicht export-table --table-format md --output docs/tables --view context
-Exported: docs/tables/context.md
+Exported: docs/tables/context-elements.md
 
 $ bausteinsicht export-table --combined --output docs/tables
-Exported: docs/tables/combined.adoc
+Exported: docs/tables/elements.adoc
 
-$ bausteinsicht export-table --format json
-{
-  "files": ["./context.adoc"],
-  "success": true
-}
+$ bausteinsicht export-table --view context --format json
+[
+  { "id": "customer", "title": "Customer", "kind": "actor", "description": "..." }
+]
 ----
 
 ==== `bausteinsicht export-diagram`
 
-Exports views as PlantUML C4 or Mermaid C4 text diagrams.
+Exports views as text diagrams in one of several formats (C4-PlantUML, Mermaid, Graphviz DOT, D2, standalone HTML, or Structurizr DSL).
 
 **Flags:**
 
@@ -800,61 +813,63 @@ Exports views as PlantUML C4 or Mermaid C4 text diagrams.
 | Flag | Description | Required | Default
 
 | `--view`
-| Export only a specific view by its key. When omitted, all views are exported.
+| Export only a specific view by its key. When omitted, all views are exported. Not supported with `--diagram-format structurizr` (which always exports the whole workspace).
 | No
 | (all views)
 
 | `--diagram-format`
-| Diagram output format: `plantuml` or `mermaid`.
+| Diagram output format: `plantuml`, `mermaid`, `dot`, `d2`, `html`, or `structurizr`.
 | No
 | `plantuml`
 
 | `--output`
-| Output directory for exported files.
+| Output directory for exported files. When omitted, the diagram is written to **stdout**.
 | No
-| `.` (current directory)
+| (stdout)
 |===
 
 **Behavior:**
 
 * Loads the model and resolves view elements and relationships.
 * Auto-detects the C4 level (Context, Container, or Component) from the view content.
-* Generates C4 diagram source using the appropriate macros (`Person`, `System`, `System_Ext`, `Container`, `Component`, `System_Boundary`, `Container_Boundary`).
+* Generates diagram source in the requested format. C4-PlantUML uses the stdlib include syntax (`!include <C4/C4_Context>`, etc.).
 * Relationships are filtered to those visible in the view. Endpoints are lifted to visible ancestor elements when the original endpoints are not included in the view.
-* PlantUML output uses the local stdlib include syntax (`!include <C4/C4_Context>`, etc.).
-* Output files are named `<view-key>.puml` (PlantUML) or `<view-key>.mmd` (Mermaid).
+* Without `--output`, the diagram(s) are written to stdout. With `--output <dir>`, per-view files are named `<view-key>.<ext>`, where `<ext>` is `puml`, `mmd`, `dot`, `d2`, or `html`.
+* `--diagram-format structurizr` is special: it exports the entire workspace as a single `workspace.dsl` file and rejects `--view` (exit code 1).
 * Creates the output directory if it does not exist.
 
-**JSON output structure:**
+**JSON output structure** — `--format json` emits an array of one object per exported view (not a file list):
 [source,json]
 ----
-{
-  "files": ["./context.puml", "./container.puml"],
-  "success": true
-}
+[
+  { "view": "context", "format": "plantuml", "source": "@startuml\n!include <C4/C4_Context>\n..." }
+]
 ----
 
 **Exit codes:**
 
 * `0` -- all diagrams exported successfully
-* `1` -- one or more exports failed (partial failure)
+* `1` -- one or more exports failed, or `--view` used with `structurizr`
 * `2` -- model file not found, invalid format, or no views to export
 
 **Example:**
 [source,bash]
 ----
-$ bausteinsicht export-diagram
-Exported: ./context.puml
-Exported: ./container.puml
+$ bausteinsicht export-diagram --view context        # writes to stdout
+@startuml
+!include <C4/C4_Context>
+...
 
 $ bausteinsicht export-diagram --diagram-format mermaid --output docs/diagrams --view context
 Exported: docs/diagrams/context.mmd
 
-$ bausteinsicht export-diagram --format json
-{
-  "files": ["./context.puml"],
-  "success": true
-}
+$ bausteinsicht export-diagram --diagram-format structurizr --output docs
+Exported: docs/workspace.dsl
+
+$ bausteinsicht export-diagram --view context --format json
+[
+  { "view": "context", "format": "plantuml", "source": "@startuml\n..." }
+]
 ----
 
 ==== `bausteinsicht export-sequence`
