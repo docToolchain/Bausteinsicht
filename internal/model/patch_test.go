@@ -241,6 +241,62 @@ func TestAppendArrayEntry_PreservesComments(t *testing.T) {
 	}
 }
 
+func TestInsertObjectEntry_TrailingLineComment(t *testing.T) {
+	// Regression test for #399: comma must be placed before a trailing // comment,
+	// not appended after it (which would produce invalid JSONC).
+	input := `{
+  "model": {
+    "webshop": { "kind": "system", "title": "Webshop" } // main system
+  }
+}`
+	got, err := InsertObjectEntry([]byte(input), []string{"model"}, "api", `{ "kind": "system" }`)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	result := string(got)
+
+	// Comment must still be present and unchanged.
+	if !strings.Contains(result, "// main system") {
+		t.Errorf("trailing comment was removed:\n%s", result)
+	}
+	// The comma must appear before the comment, not after it.
+	if strings.Contains(result, "// main system,") {
+		t.Errorf("comma placed after trailing comment (file corruption):\n%s", result)
+	}
+	// New entry must be present.
+	if !strings.Contains(result, `"api"`) {
+		t.Errorf("new entry missing:\n%s", result)
+	}
+}
+
+func TestAppendArrayEntry_TrailingLineComment(t *testing.T) {
+	// Regression test for #399: same trailing-comment corruption in arrays.
+	input := `{
+  "specification": { "elements": { "system": { "notation": "System" } } },
+  "model": {},
+  "relationships": [
+    { "from": "a", "to": "b", "label": "calls" } // initial rel
+  ],
+  "views": {}
+}`
+	got, err := AppendArrayEntry([]byte(input), []string{"relationships"}, `{ "from": "c", "to": "d", "label": "uses" }`)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	result := string(got)
+
+	if !strings.Contains(result, "// initial rel") {
+		t.Errorf("trailing comment was removed:\n%s", result)
+	}
+	if strings.Contains(result, "// initial rel,") {
+		t.Errorf("comma placed after trailing comment (file corruption):\n%s", result)
+	}
+	if !strings.Contains(result, `"from": "c"`) {
+		t.Errorf("new entry missing:\n%s", result)
+	}
+}
+
+
 func TestPatchValue_WithBlockComments(t *testing.T) {
 	input := `{
   /* block comment */
