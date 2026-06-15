@@ -336,19 +336,11 @@ func InsertObjectEntry(data []byte, objectPath []string, key, valueJSON string) 
 			lastContent--
 		}
 
-		// If the last entry's line has a trailing // comment, the comma must go
-		// before the comment — not after it — to avoid corrupting the JSONC file.
-		commaAfter := lastContent
 		lineStart := lastContent
 		for lineStart > start && data[lineStart-1] != '\n' {
 			lineStart--
 		}
-		if cp := findLineComment(data, lineStart, lastContent+1); cp >= 0 {
-			commaAfter = cp - 1
-			for commaAfter > lineStart && (data[commaAfter] == ' ' || data[commaAfter] == '\t') {
-				commaAfter--
-			}
-		}
+		commaAfter := commaInsertPoint(data, lastContent, lineStart)
 
 		comma := ""
 		if commaAfter > start && data[commaAfter] != ',' {
@@ -358,7 +350,6 @@ func InsertObjectEntry(data []byte, objectPath []string, key, valueJSON string) 
 		result := make([]byte, 0, len(data)+len(comma)+len(newEntry))
 		result = append(result, data[:commaAfter+1]...)
 		result = append(result, []byte(comma)...)
-		// Preserve any trailing comment text between commaAfter and lastContent.
 		result = append(result, data[commaAfter+1:lastContent+1]...)
 		result = append(result, []byte(newEntry)...)
 		result = append(result, data[closeBrace:]...)
@@ -379,7 +370,7 @@ func findLineComment(data []byte, from, to int) int {
 	i := from
 	for i < to {
 		if data[i] == '"' {
-			i = skipString(data, i, len(data))
+			i = skipString(data, i, to)
 			continue
 		}
 		if i+1 < to && data[i] == '/' && data[i+1] == '/' {
@@ -388,6 +379,23 @@ func findLineComment(data []byte, from, to int) int {
 		i++
 	}
 	return -1
+}
+
+// commaInsertPoint returns the position after which a trailing comma should be
+// inserted for the last entry ending at lastContent. When the entry's line ends
+// with a // comment, the returned position is the last non-whitespace byte
+// before the comment so the comma lands before it; otherwise lastContent is
+// returned unchanged.
+func commaInsertPoint(data []byte, lastContent, lineStart int) int {
+	cp := findLineComment(data, lineStart, lastContent+1)
+	if cp < 0 {
+		return lastContent
+	}
+	pos := cp - 1
+	for pos > lineStart && (data[pos] == ' ' || data[pos] == '\t') {
+		pos--
+	}
+	return pos
 }
 
 // AppendArrayEntry appends a new value to the array at the given path.
@@ -426,18 +434,11 @@ func AppendArrayEntry(data []byte, arrayPath []string, valueJSON string) ([]byte
 			lastContent--
 		}
 
-		// Same trailing-comment guard as InsertObjectEntry.
-		commaAfter := lastContent
 		lineStart := lastContent
 		for lineStart > start && data[lineStart-1] != '\n' {
 			lineStart--
 		}
-		if cp := findLineComment(data, lineStart, lastContent+1); cp >= 0 {
-			commaAfter = cp - 1
-			for commaAfter > lineStart && (data[commaAfter] == ' ' || data[commaAfter] == '\t') {
-				commaAfter--
-			}
-		}
+		commaAfter := commaInsertPoint(data, lastContent, lineStart)
 
 		comma := ""
 		if commaAfter > start && data[commaAfter] != ',' {
