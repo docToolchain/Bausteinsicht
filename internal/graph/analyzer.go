@@ -65,24 +65,21 @@ func (a *Analyzer) Analyze() *GraphAnalysis {
 	return result
 }
 
-// findCycles detects all cycles using Tarjan's algorithm.
-func (a *Analyzer) findCycles() []Cycle {
-	var cycles []Cycle
+// tarjanSCCs runs Tarjan's strongly-connected-components algorithm over graph,
+// calling onSCC once per discovered SCC. seeds controls which vertices to start
+// from; passing every key in graph gives full coverage.
+func tarjanSCCs(graph map[string][]string, seeds []string, onSCC func([]string)) {
 	index := 0
 	stack := []string{}
 	nodeInfo := make(map[string]*NodeInfo)
 
 	var strongconnect func(string)
 	strongconnect = func(v string) {
-		nodeInfo[v] = &NodeInfo{
-			index:   index,
-			lowlink: index,
-			onStack: true,
-		}
+		nodeInfo[v] = &NodeInfo{index: index, lowlink: index, onStack: true}
 		index++
 		stack = append(stack, v)
 
-		for _, w := range a.graph[v] {
+		for _, w := range graph[v] {
 			if _, ok := nodeInfo[w]; !ok {
 				strongconnect(w)
 				nodeInfo[v].lowlink = min(nodeInfo[v].lowlink, nodeInfo[w].lowlink)
@@ -102,21 +99,63 @@ func (a *Analyzer) findCycles() []Cycle {
 					break
 				}
 			}
-
-			// A cycle is an SCC with more than one element
-			if len(component) > 1 {
-				cycles = append(cycles, Cycle{Elements: component, Length: len(component)})
-			}
+			onSCC(component)
 		}
 	}
 
-	for v := range a.graph {
+	for _, v := range seeds {
 		if _, ok := nodeInfo[v]; !ok {
 			strongconnect(v)
 		}
 	}
+}
 
+// findCycles detects all cycles using Tarjan's algorithm.
+func (a *Analyzer) findCycles() []Cycle {
+	var cycles []Cycle
+	seeds := make([]string, 0, len(a.graph))
+	for v := range a.graph {
+		seeds = append(seeds, v)
+	}
+	tarjanSCCs(a.graph, seeds, func(component []string) {
+		if len(component) > 1 {
+			cycles = append(cycles, Cycle{Elements: component, Length: len(component)})
+		}
+	})
 	return cycles
+}
+
+// betweennessScore returns the simplified betweenness: fraction of other
+// elements reachable from id via any path.
+func (a *Analyzer) betweennessScore(id string, flatElems map[string]*model.Element) float64 {
+	count := 0
+	for target := range flatElems {
+		if target != id && a.hasPath(id, target) {
+			count++
+		}
+	}
+	if n := len(flatElems) - 1; n > 0 {
+		return float64(count) / float64(n)
+	}
+	return 0
+}
+
+// closenessScore returns the simplified closeness: inverse of average shortest
+// path distance to all reachable elements.
+func (a *Analyzer) closenessScore(id string, flatElems map[string]*model.Element) float64 {
+	totalDist, reachable := 0, 0
+	for target := range flatElems {
+		if target != id {
+			if dist := a.shortestPath(id, target); dist > 0 {
+				totalDist += dist
+				reachable++
+			}
+		}
+	}
+	if reachable > 0 {
+		return 1.0 / (1.0 + float64(totalDist)/float64(reachable))
+	}
+	return 0
 }
 
 // calculateCentrality computes centrality metrics for all elements.
@@ -125,103 +164,39 @@ func (a *Analyzer) calculateCentrality() []Centrality {
 	var results []Centrality
 
 	for id := range flatElems {
-		c := Centrality{
-			ID:        id,
-			InDegree:  len(a.reverse[id]),
-			OutDegree: len(a.graph[id]),
-		}
-
-		// Betweenness (simplified): count elements that depend on this element
-		betweenness := 0
-		for target := range flatElems {
-			if target != id && a.hasPath(id, target) {
-				betweenness++
-			}
-		}
-		c.Betweenness = float64(betweenness) / float64(len(flatElems)-1)
-
-		// Closeness (simplified): inverse of average distance
-		totalDist := 0
-		reachable := 0
-		for target := range flatElems {
-			if target != id {
-				if dist := a.shortestPath(id, target); dist > 0 {
-					totalDist += dist
-					reachable++
-				}
-			}
-		}
-		if reachable > 0 {
-			c.Closeness = 1.0 / (1.0 + float64(totalDist)/float64(reachable))
-		}
-
-		results = append(results, c)
+		results = append(results, Centrality{
+			ID:          id,
+			InDegree:    len(a.reverse[id]),
+			OutDegree:   len(a.graph[id]),
+			Betweenness: a.betweennessScore(id, flatElems),
+			Closeness:   a.closenessScore(id, flatElems),
+		})
 	}
 
-	// Sort by ID for consistent output
 	sort.Slice(results, func(i, j int) bool {
 		return results[i].ID < results[j].ID
 	})
-
 	return results
 }
 
 // findStronglyConnectedComponents finds all SCCs in the graph.
 func (a *Analyzer) findStronglyConnectedComponents() []Component {
 	var components []Component
-	index := 0
-	stack := []string{}
-	nodeInfo := make(map[string]*NodeInfo)
 	componentID := 0
-
-	var strongconnect func(string)
-	strongconnect = func(v string) {
-		nodeInfo[v] = &NodeInfo{
-			index:   index,
-			lowlink: index,
-			onStack: true,
-		}
-		index++
-		stack = append(stack, v)
-
-		for _, w := range a.graph[v] {
-			if _, ok := nodeInfo[w]; !ok {
-				strongconnect(w)
-				nodeInfo[v].lowlink = min(nodeInfo[v].lowlink, nodeInfo[w].lowlink)
-			} else if nodeInfo[w].onStack {
-				nodeInfo[v].lowlink = min(nodeInfo[v].lowlink, nodeInfo[w].index)
-			}
-		}
-
-		if nodeInfo[v].lowlink == nodeInfo[v].index {
-			var component []string
-			for {
-				w := stack[len(stack)-1]
-				stack = stack[:len(stack)-1]
-				nodeInfo[w].onStack = false
-				component = append(component, w)
-				if w == v {
-					break
-				}
-			}
-
-			sort.Strings(component)
-			components = append(components, Component{
-				ID:       componentID,
-				Elements: component,
-				IsCycle:  len(component) > 1,
-			})
-			componentID++
-		}
-	}
-
 	flatElems, _ := model.FlattenElements(a.model)
+	seeds := make([]string, 0, len(flatElems))
 	for v := range flatElems {
-		if _, ok := nodeInfo[v]; !ok {
-			strongconnect(v)
-		}
+		seeds = append(seeds, v)
 	}
-
+	tarjanSCCs(a.graph, seeds, func(component []string) {
+		sort.Strings(component)
+		components = append(components, Component{
+			ID:       componentID,
+			Elements: component,
+			IsCycle:  len(component) > 1,
+		})
+		componentID++
+	})
 	return components
 }
 
