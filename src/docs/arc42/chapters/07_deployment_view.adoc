@@ -131,8 +131,7 @@ The authoritative build matrix is `.goreleaser.yml`: `goos: [linux, darwin, wind
 # then download, unpack, and install (example: Linux amd64, release v1.2.3)
 curl -L https://github.com/docToolchain/Bausteinsicht/releases/download/v1.2.3/bausteinsicht_1.2.3_linux_amd64.tar.gz -o bausteinsicht.tar.gz
 tar -xzf bausteinsicht.tar.gz
-chmod +x bausteinsicht
-sudo mv bausteinsicht /usr/local/bin/   # install onto PATH
+sudo install -m 0755 bausteinsicht /usr/local/bin/bausteinsicht
 
 # Or via Go install
 go install github.com/docToolchain/Bausteinsicht/cmd/bausteinsicht@latest
