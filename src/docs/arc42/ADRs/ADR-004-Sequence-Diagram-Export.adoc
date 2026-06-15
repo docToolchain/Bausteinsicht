@@ -8,7 +8,9 @@
 
 == Status
 
-Rejected
+Superseded by link:ADR-008-Sequence-Diagram-Export-Revisited.adoc[ADR-008]
+
+NOTE: This ADR rejected dynamic views / sequence export for v1. The decision was *reversed* in 2026-05 (link:https://github.com/docToolchain/Bausteinsicht/issues/282[#282], link:https://github.com/docToolchain/Bausteinsicht/issues/321[#321]) when the `dynamicViews` model section and the `export-sequence` command were implemented — i.e. Option B below, which this ADR scored lowest. See link:ADR-008-Sequence-Diagram-Export-Revisited.adoc[ADR-008] for the superseding decision and its corrected weighting. The analysis below is retained unchanged as historical record.
 
 == Context
 

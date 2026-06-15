@@ -20,7 +20,7 @@ For the complete risk register, sensitivity point analysis, and tradeoff analysi
 
 === Top Risks
 
-[cols=”1,2,1,1,3”]
+[cols="1,2,1,1,3"]
 |===
 | ID | Risk | Likelihood | Impact | Mitigation
 
