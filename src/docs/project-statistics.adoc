@@ -1,3 +1,9 @@
+:jbake-title: Project Statistics
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: Development
+:jbake-order: 20
+
 = Bausteinsicht — Project Statistics
 :toc: left
 :toclevels: 2
