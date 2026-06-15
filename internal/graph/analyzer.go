@@ -65,6 +65,21 @@ func (a *Analyzer) Analyze() *GraphAnalysis {
 	return result
 }
 
+// popSCC pops elements from stack until v is reached and returns them as one SCC.
+func popSCC(stack *[]string, nodeInfo map[string]*NodeInfo, v string) []string {
+	var component []string
+	for {
+		w := (*stack)[len(*stack)-1]
+		*stack = (*stack)[:len(*stack)-1]
+		nodeInfo[w].onStack = false
+		component = append(component, w)
+		if w == v {
+			break
+		}
+	}
+	return component
+}
+
 // tarjanSCCs runs Tarjan's strongly-connected-components algorithm over graph,
 // calling onSCC once per discovered SCC. seeds controls which vertices to start
 // from; passing every key in graph gives full coverage.
@@ -89,17 +104,7 @@ func tarjanSCCs(graph map[string][]string, seeds []string, onSCC func([]string))
 		}
 
 		if nodeInfo[v].lowlink == nodeInfo[v].index {
-			var component []string
-			for {
-				w := stack[len(stack)-1]
-				stack = stack[:len(stack)-1]
-				nodeInfo[w].onStack = false
-				component = append(component, w)
-				if w == v {
-					break
-				}
-			}
-			onSCC(component)
+			onSCC(popSCC(&stack, nodeInfo, v))
 		}
 	}
 
