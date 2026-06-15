@@ -121,7 +121,7 @@ Each tagged version produces compressed archives for all target platforms via Go
 | `bausteinsicht_{Version}_windows_arm64.zip`
 |===
 
-GoReleaser produces one archive per supported OS/architecture combination in the build matrix ({Linux, macOS, Windows} × {amd64, arm64}, plus Linux arm v7); the table above lists the primary targets and is not exhaustive. Each archive also ships with an SBOM (SPDX-JSON and CycloneDX-JSON); a `checksums.txt` covers all artifacts.
+The authoritative build matrix is `.goreleaser.yml`: `goos: [linux, darwin, windows]` × `goarch: [amd64, arm64, arm]` (with `goarm: 7`). GoReleaser produces one archive per combination Go actually supports, skipping the rest (e.g. `darwin/arm`); the table above lists the primary targets and is not exhaustive. Each archive also ships with an SBOM (SPDX-JSON and CycloneDX-JSON); a `checksums.txt` covers all artifacts.
 
 ==== Installation
 
