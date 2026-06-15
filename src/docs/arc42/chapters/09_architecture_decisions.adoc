@@ -21,16 +21,41 @@ All ADRs are located in `src/docs/arc42/ADRs/`.
 
 | link:../ADRs/ADR-001-DSL-Format.adoc[ADR-001]
 | Choice of DSL Format
-| Proposed
+| Accepted
 | JSON with JSON Schema (JSONC) chosen over TypeScript DSL and Custom DSL (Langium). Scored highest on learnability, IDE support, LLM friendliness, and bidirectional sync suitability.
 
 | link:../ADRs/ADR-002-Implementation-Language.adoc[ADR-002]
 | Choice of Implementation Language
-| Proposed
+| Accepted
 | Go chosen over Python and Kotlin/JVM. Single-binary distribution, LLM-friendly code generation, compile-time type safety, and dedicated mxGraph library support.
 
 | link:../ADRs/ADR-003-Risk-Classification.adoc[ADR-003]
 | Risk Classification
 | Accepted
 | Tier 2 (Extended Assurance) — determined by Code Type = 2 (Business Logic). Existing toolchain covers most mitigations. Guides AI-assisted development quality requirements.
+
+| link:../ADRs/ADR-004-Sequence-Diagram-Export.adoc[ADR-004]
+| Sequence Diagram Export
+| Superseded by ADR-008
+| Originally rejected `dynamicViews` / sequence export for v1. Reversed in 2026-05; see ADR-008.
+
+| link:../ADRs/ADR-005-Auto-Layout-Engine.adoc[ADR-005]
+| Auto-Layout Engine for New Diagram Pages
+| Accepted
+| Layered/grid/none placement modes for fresh diagram pages. Relationship-aware BFS ordering within scopes; manual positions preserved on incremental sync.
+
+| link:../ADRs/ADR-006-CLI-Add-Command-Strategy.adoc[ADR-006]
+| CLI Add Command Strategy
+| Accepted
+| `add` subcommands merge into existing items rather than replacing them, for safe LLM- and script-driven editing.
+
+| link:../ADRs/ADR-007-Testing-Strategy.adoc[ADR-007]
+| Testing Strategy
+| Accepted
+| Unit / integration / E2E classification, plus property-based tests (pgregory.net/rapid). Tests trace to issues and use cases.
+
+| link:../ADRs/ADR-008-Sequence-Diagram-Export-Revisited.adoc[ADR-008]
+| Sequence Diagram Export (Revisited)
+| Accepted
+| Reverses ADR-004: implements `dynamicViews` + `export-sequence` (PlantUML/Mermaid). Behavioral views kept in one model with structure; sync engine ignores the section.
 |===

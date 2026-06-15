@@ -1,0 +1,125 @@
+:jbake-title: ADR-008: Sequence Diagram Export (Revisited)
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: Development
+:jbake-order: 8
+
+= ADR-008: Sequence Diagram Export from Architecture Model (Revisited)
+
+== Status
+
+Accepted
+
+Supersedes link:ADR-004-Sequence-Diagram-Export.adoc[ADR-004], which rejected this feature for v1.
+
+== Context
+
+link:ADR-004-Sequence-Diagram-Export.adoc[ADR-004] evaluated four approaches to sequence-diagram support and *rejected* the feature for Bausteinsicht's core, recommending an out-of-scope LLM Skill instead. Its Pugh matrix scored "Dynamic Views" (Option B) lowest (-9), driven by heavy penalties on model complexity, implementation effort, and alignment with a structural-only focus.
+
+Experience after ADR-004 changed three of those assumptions:
+
+* *Behavioral architecture is not merely supplementary.* Architects repeatedly need to show *how* the system behaves at runtime, not only *what* exists. Treating sequence views as a second-class concern left a real gap (link:https://github.com/docToolchain/Bausteinsicht/issues/282[#282]).
+* *The implementation proved contained.* `dynamicViews` turned out to be a single model array plus a text renderer — delivered in one PR (link:https://github.com/docToolchain/Bausteinsicht/issues/321[#321]), far below the effort ADR-004 assumed.
+* *Sequence diagrams render everywhere.* PlantUML and Mermaid sequence output drops straight into GitHub, Confluence, and AsciiDoc pipelines, multiplying the value of keeping the source in the model.
+
+This ADR re-evaluates the same options with corrected weights and scores, and reverses the decision.
+
+== Weighted Pugh Matrix
+
+Rating scale: -1 = worse than reference, 0 = same, +1 = better. Reference option: *D (Out of scope)*.
+
+Weights are revised against ADR-004: *Usefulness of output* is raised, *Implementation effort* and *Model complexity* are lowered (the feature shipped cheaply), and *Renderability* and *Single source of truth* are added as criteria.
+
+[cols="4,1,1,1,1,1"]
+|===
+| Criterion | Weight | A: Auto-derive | B: Dynamic Views | C: LLM Skill | D: Out of scope (Ref)
+
+| *Usefulness of output*
+| 5
+| -1
+| +1
+| +1
+| 0
+
+| *Renderability (PlantUML/Mermaid ecosystem)*
+| 3
+| 0
+| +1
+| 0
+| 0
+
+| *Single source of truth (structure + behaviour)*
+| 3
+| 0
+| +1
+| -1
+| 0
+
+| *LLM friendliness (JSONC steps)*
+| 2
+| 0
+| +1
+| +1
+| 0
+
+| *Implementation effort (revised: contained)*
+| 2
+| 0
+| 0
+| 0
+| 0
+
+| *Model complexity*
+| 2
+| 0
+| -1
+| 0
+| 0
+
+|===
+
+=== Weighted Results
+
+[cols="3,1,1,1,1"]
+|===
+| Criterion | A: Auto-derive | B: Dynamic Views | C: LLM Skill | D: Out of scope (Ref)
+
+| Usefulness of output (×5)              | -5  | +5  | +5  | 0
+| Renderability (×3)                     | 0   | +3  | 0   | 0
+| Single source of truth (×3)            | 0   | +3  | -3  | 0
+| LLM friendliness (×2)                  | 0   | +2  | +2  | 0
+| Model complexity (×2)                  | 0   | -2  | 0   | 0
+| *Total*                                | *-5* | *+11* | *+4* | *0*
+|===
+
+== Decision
+
+**Accepted — implement Option B (Dynamic Views).**
+
+Bausteinsicht gains a `dynamicViews` section in the JSONC model and an `export-sequence` command that renders PlantUML and Mermaid sequence diagrams. Steps reference existing model elements and are validated against the model: referenced elements must exist, step indices are unique per view, and the step kind is restricted to `sync|async|return`.
+
+This keeps a single source of truth for both structural and behavioral views, while the structural model and draw.io sync remain unchanged — `dynamicViews` is a separate, optional section that the sync engine ignores.
+
+== Consequences
+
+=== Positive
+
+* One model now describes both structure and behaviour
+* Sequence diagrams render in any PlantUML/Mermaid pipeline (GitHub, Confluence, AsciiDoc)
+* `dynamicViews` steps are plain JSONC — readable and writable by LLM agents
+
+=== Negative
+
+* The model schema carries a behavioral section users must keep in sync with reality by hand
+* A second view type to validate and document
+
+=== Risk
+
+The added behavioral-model surface and the `export-sequence` renderer create no new Chapter 11 risk: `export-sequence` is read-only text generation with no file mutation and no draw.io sync involvement (low blast radius). This consequence is therefore *explicitly accepted without a tracked Chapter 11 risk*.
+
+=== Implementation
+
+* Model types: `internal/model/types.go` (`DynamicView`, `SequenceStep`)
+* Renderer: `internal/diagram/sequence.go` (PlantUML + Mermaid)
+* CLI: `cmd/bausteinsicht/export_sequence.go`
+* Validation: `internal/model/validate.go`
