@@ -2,6 +2,7 @@ package templates_test
 
 import (
 	"encoding/xml"
+	"os"
 	"strings"
 	"testing"
 
@@ -43,6 +44,27 @@ func TestSampleModelValidJSON(t *testing.T) {
 	if !strings.HasPrefix(s, "{") || !strings.HasSuffix(s, "}") {
 		t.Fatalf("SampleModel does not look like a JSON object: starts=%q ends=%q",
 			s[:min(20, len(s))], s[max(0, len(s)-20):])
+	}
+}
+
+// TestSampleModelSchemaURLPathExists guards against the $schema URL drifting
+// from the actual repo directory layout. The bug (#414) was that the embedded
+// sample model referenced ".../main/schema/..." (singular) while the repo
+// directory is "schemas/" (plural), so the scaffolded $schema URL 404'd and
+// out-of-the-box IDE support broke. This test pins the URL's path component to
+// the real on-disk schema file so the two cannot diverge again.
+func TestSampleModelSchemaURLPathExists(t *testing.T) {
+	content := string(templates.SampleModel)
+	if !strings.Contains(content, "/schemas/bausteinsicht.schema.json") {
+		t.Fatalf("SampleModel $schema URL does not reference /schemas/bausteinsicht.schema.json; content head:\n%s",
+			content[:min(200, len(content))])
+	}
+	if strings.Contains(content, "/main/schema/") {
+		t.Fatal("SampleModel $schema URL references singular /main/schema/ which 404s; must be /main/schemas/")
+	}
+	// The path component the URL points at must actually exist in the repo.
+	if _, err := os.Stat("../schemas/bausteinsicht.schema.json"); err != nil {
+		t.Fatalf("schemas/bausteinsicht.schema.json does not exist in repo: %v", err)
 	}
 }
 
