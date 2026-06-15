@@ -91,9 +91,7 @@ func MergeModels(loaded []LoadedModel) (*model.BausteinsichtModel, error) {
 			merged.DynamicViews = append(merged.DynamicViews, remappedDV)
 		}
 
-		for _, constraint := range lm.Model.Constraints {
-			merged.Constraints = append(merged.Constraints, constraint)
-		}
+		merged.Constraints = append(merged.Constraints, lm.Model.Constraints...)
 	}
 
 	return merged, nil
