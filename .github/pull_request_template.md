@@ -30,10 +30,16 @@ Closes #XXX
   - Ran `make check` locally
   - No new warnings/errors
   
-- [ ] **Documentation**
-  - Updated README if new feature
-  - Updated arc42 if architecture changed
-  - Added/updated code comments where needed
+- [ ] **Documentation** — run `/doc-check review` (Claude Code) or fill in manually:
+  - [ ] `spec/01_use_cases.adoc` — updated / N/A (reason: )
+  - [ ] `spec/02_cli_specification.adoc` — updated / N/A (reason: ) ← required if any `--flag`, command, subcommand rename, or output format changed
+  - [ ] `spec/03_data_models.adoc` — updated / N/A (reason: ) ← required if `types.go` or `schemas/bausteinsicht.schema.json` changed
+  - [ ] `spec/04_acceptance_criteria.adoc` — updated / N/A (reason: )
+  - [ ] `spec/05_sync_specification.adoc` — updated / N/A (reason: ) ← required if `internal/sync/` changed
+  - [ ] `arc42/05_building_block_view.adoc` — updated / N/A (reason: ) ← required if new package added
+  - [ ] `arc42/06_runtime_view.adoc` — updated / N/A (reason: ) ← required if new data flow or runtime path added
+  - [ ] `arc42/08_concepts.adoc` — updated / N/A (reason: ) ← required if new cross-cutting pattern introduced
+  - [ ] New ADR created / N/A (reason: )
 
 ## Testing
 <!-- How was this tested? -->
