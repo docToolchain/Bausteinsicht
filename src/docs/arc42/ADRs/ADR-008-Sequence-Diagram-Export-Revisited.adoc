@@ -10,11 +10,11 @@
 
 Accepted
 
-Supersedes link:ADR-004-Sequence-Diagram-Export.adoc[ADR-004], which rejected this feature for v1.
+Supersedes link:ADR-004-Sequence-Diagram-Export.html[ADR-004], which rejected this feature for v1.
 
 == Context
 
-link:ADR-004-Sequence-Diagram-Export.adoc[ADR-004] evaluated four approaches to sequence-diagram support and *rejected* the feature for Bausteinsicht's core, recommending an out-of-scope LLM Skill instead. Its Pugh matrix scored "Dynamic Views" (Option B) lowest (-9), driven by heavy penalties on model complexity, implementation effort, and alignment with a structural-only focus.
+link:ADR-004-Sequence-Diagram-Export.html[ADR-004] evaluated four approaches to sequence-diagram support and *rejected* the feature for Bausteinsicht's core, recommending an out-of-scope LLM Skill instead. Its Pugh matrix scored "Dynamic Views" (Option B) lowest (-9), driven by heavy penalties on model complexity, implementation effort, and alignment with a structural-only focus.
 
 Experience after ADR-004 changed three of those assumptions:
 

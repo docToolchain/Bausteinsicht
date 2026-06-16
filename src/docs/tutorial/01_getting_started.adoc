@@ -89,7 +89,7 @@ Four files appear, each with a clear job:
 | **The generated diagrams.** One draw.io page per view. You arrange and fine-tune here; structural truth stays in the model.
 
 | `template.drawio`
-| **The visual style library.** One styled shape per element kind. Copy it, restyle it, pass it with `--template` (see link:03_drawio_roundtrip.adoc[chapter 3]).
+| **The visual style library.** One styled shape per element kind. Copy it, restyle it, pass it with `--template` (see link:03_drawio_roundtrip.html[chapter 3]).
 
 | `.bausteinsicht-sync`
 | **Sync memory.** A checksummed snapshot of the last synced state, so the next sync knows what changed on which side. Commit it together with the other files.
@@ -176,4 +176,4 @@ Rel(onlineshop, email_service, "sends emails")
 
 You have a valid model, generated diagrams, and the tools to inspect both. Next, you will change the model and watch the diagrams follow.
 
-Continue with link:02_modeling.adoc[2. Modeling Your Architecture].
+Continue with link:02_modeling.html[2. Modeling Your Architecture].

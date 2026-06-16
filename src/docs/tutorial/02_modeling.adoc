@@ -167,4 +167,4 @@ bausteinsicht validate --format json
 }
 ----
 
-Continue with link:03_drawio_roundtrip.adoc[3. The draw.io Round-Trip].
+Continue with link:03_drawio_roundtrip.html[3. The draw.io Round-Trip].

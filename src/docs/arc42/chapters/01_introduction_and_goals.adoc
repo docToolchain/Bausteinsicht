@@ -41,7 +41,7 @@ Bausteinsicht addresses the gap between structured architecture models and widel
 | Templates are draw.io files containing styled example elements. Users create and customize templates entirely within draw.io.
 |===
 
-See link:../../PRD/PRD-001-Bausteinsicht.adoc[PRD-001] for the full product requirements.
+See link:../../PRD/PRD-001-Bausteinsicht.html[PRD-001] for the full product requirements.
 
 === Quality Goals
 
@@ -111,4 +111,4 @@ The following projects solve similar or overlapping problems:
 |===
 
 Bausteinsicht's differentiator is **bidirectional synchronization** between a text model (JSONC) and draw.io diagrams — edits in either direction are merged.
-See link:../../arc42/ADRs/ADR-001-DSL-Format.adoc[ADR-001] for a detailed comparison of DSL formats.
+See link:../../arc42/ADRs/ADR-001-DSL-Format.html[ADR-001] for a detailed comparison of DSL formats.

@@ -10,7 +10,7 @@ ifndef::imagesdir[:imagesdir: ../../images]
 
 == CLI Specification
 
-See link:01_use_cases.adoc[Use Cases] for the functional overview of all CLI commands.
+See link:01_use_cases.html[Use Cases] for the functional overview of all CLI commands.
 
 === Command Overview
 

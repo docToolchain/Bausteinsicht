@@ -18,10 +18,10 @@ ifndef::imagesdir[:imagesdir: ../../images]
 | Constraint | Description
 
 | Go as implementation language
-| The tool is implemented in Go to enable single-binary distribution without runtime dependencies. See link:../ADRs/ADR-002-Implementation-Language.adoc[ADR-002].
+| The tool is implemented in Go to enable single-binary distribution without runtime dependencies. See link:../ADRs/ADR-002-Implementation-Language.html[ADR-002].
 
 | JSON as model format
-| The architecture model uses JSON (JSONC) with JSON Schema for validation. See link:../ADRs/ADR-001-DSL-Format.adoc[ADR-001].
+| The architecture model uses JSON (JSONC) with JSON Schema for validation. See link:../ADRs/ADR-001-DSL-Format.html[ADR-001].
 
 | draw.io XML as output format
 | The visual representation uses draw.io's mxGraph XML format. This constrains layout capabilities to what draw.io supports.

@@ -203,8 +203,8 @@ Overall target: **≥85% package coverage** for critical paths, **≥70% for CLI
 
 == Related Decision Records
 
-- link:ADR-002-Implementation-Language.adoc[ADR-002] — Go as implementation language (influences test frameworks)
-- link:ADR-003-Risk-Classification.adoc[ADR-003] — Risk tier (influences coverage targets)
+- link:ADR-002-Implementation-Language.html[ADR-002] — Go as implementation language (influences test frameworks)
+- link:ADR-003-Risk-Classification.html[ADR-003] — Risk tier (influences coverage targets)
 
 == References
 

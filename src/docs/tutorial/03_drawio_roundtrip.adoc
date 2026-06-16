@@ -158,4 +158,4 @@ This re-places all elements of the synced views — deliberately destructive to 
 
 Views form a hierarchy through their `scope`: a view scoped to `onlineshop` shows its children inside the system boundary. Sync generates page links between the levels — click a system in the context view to jump to its container view, and use the generated back-button to return. The result reads like an interactive C4 model inside plain draw.io.
 
-Continue with link:04_exports.adoc[4. Sharing: Exports].
+Continue with link:04_exports.html[4. Sharing: Exports].

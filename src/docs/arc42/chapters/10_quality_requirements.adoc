@@ -52,7 +52,7 @@ ifndef::imagesdir[:imagesdir: ../../images]
 | Within 30 minutes, the developer has created a valid architecture model with at least 3 elements, 2 relationships, and 1 draw.io view — using only the documentation and IDE autocompletion.
 |===
 
-Driven by: link:../ADRs/ADR-001-DSL-Format.adoc[ADR-001] (JSON chosen for universal familiarity and IDE support).
+Driven by: link:../ADRs/ADR-001-DSL-Format.html[ADR-001] (JSON chosen for universal familiarity and IDE support).
 
 ==== QS-2: IDE Support
 
@@ -68,7 +68,7 @@ Driven by: link:../ADRs/ADR-001-DSL-Format.adoc[ADR-001] (JSON chosen for univer
 | The editor provides autocompletion for property names, validates values against allowed types, and shows hover documentation for each field — without any Bausteinsicht-specific plugin installed. Only the JSON Schema association is required.
 |===
 
-Driven by: link:../ADRs/ADR-001-DSL-Format.adoc[ADR-001] (JSON Schema provides free IDE support via SchemaStore).
+Driven by: link:../ADRs/ADR-001-DSL-Format.html[ADR-001] (JSON Schema provides free IDE support via SchemaStore).
 
 ==== QS-3: LLM Friendliness
 
@@ -84,7 +84,7 @@ Driven by: link:../ADRs/ADR-001-DSL-Format.adoc[ADR-001] (JSON Schema provides f
 | The agent successfully adds the element with title, description, technology, and relationships, then runs `bausteinsicht sync` — all without human intervention and without producing invalid JSON.
 |===
 
-Driven by: link:../ADRs/ADR-001-DSL-Format.adoc[ADR-001] (JSON is the native output format of LLMs).
+Driven by: link:../ADRs/ADR-001-DSL-Format.html[ADR-001] (JSON is the native output format of LLMs).
 
 ==== QS-4: Sync Reliability
 
@@ -114,7 +114,7 @@ Driven by: link:../ADRs/ADR-001-DSL-Format.adoc[ADR-001] (JSON is the native out
 | The tool runs immediately without installing Go, Python, Node.js, Java, or any other runtime. Total time from download to first successful command is under 1 minute.
 |===
 
-Driven by: link:../ADRs/ADR-002-Implementation-Language.adoc[ADR-002] (Go chosen for single-binary distribution).
+Driven by: link:../ADRs/ADR-002-Implementation-Language.html[ADR-002] (Go chosen for single-binary distribution).
 
 ==== QS-6: Flexible Hierarchy
 
