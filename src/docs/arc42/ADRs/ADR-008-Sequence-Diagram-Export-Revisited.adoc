@@ -1,7 +1,7 @@
 :jbake-title: ADR-008: Sequence Diagram Export (Revisited)
 :jbake-type: page_toc
 :jbake-status: published
-:jbake-menu: Development
+:jbake-menu: ADR
 :jbake-order: 8
 
 = ADR-008: Sequence Diagram Export from Architecture Model (Revisited)

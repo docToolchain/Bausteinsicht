@@ -1,8 +1,8 @@
 :jbake-title: ADR-005: Auto-Layout Engine
 :jbake-type: page_toc
 :jbake-status: published
-:jbake-menu: Development
-:jbake-order: 6
+:jbake-menu: ADR
+:jbake-order: 5
 
 = ADR-005: Auto-Layout Engine for New Diagram Pages
 

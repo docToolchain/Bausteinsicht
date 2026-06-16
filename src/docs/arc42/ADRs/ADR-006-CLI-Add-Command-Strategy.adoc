@@ -1,8 +1,8 @@
 :jbake-title: ADR-006: CLI Add Command Strategy
 :jbake-type: page_toc
 :jbake-status: published
-:jbake-menu: Development
-:jbake-order: 7
+:jbake-menu: ADR
+:jbake-order: 6
 
 = ADR-006: CLI Add Command Strategy — Merge vs. Replace for Existing Items
 

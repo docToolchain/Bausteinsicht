@@ -1,7 +1,7 @@
 :jbake-title: ADR-007: Testing Strategy
 :jbake-type: page_toc
 :jbake-status: published
-:jbake-menu: Development
+:jbake-menu: ADR
 :jbake-order: 7
 
 = ADR-007: Testing Strategy — Unit/Integration/E2E Classification
