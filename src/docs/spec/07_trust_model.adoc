@@ -2,7 +2,7 @@
 :jbake-type: page_toc
 :jbake-status: published
 :jbake-menu: Specification
-:jbake-order: 7
+:jbake-order: 8
 
 = Trust Model
 
@@ -13,11 +13,17 @@ It operates entirely on the local filesystem with the permissions of the invokin
 
 == Trust Boundaries
 
-=== Fully Trusted: CLI Flags
+=== Path-Validated: CLI Flags
 
-CLI flags (`--model`, `--template`, `--output`) are provided directly by the user.
-Like other file-processing CLIs (`cat`, `jq`, `sed`), Bausteinsicht accepts arbitrary file paths by design.
-There is no path restriction — the user has full filesystem access.
+CLI flags (`--model`, `--template`, `--output`) are provided by the user, but their paths are **validated** before use: `validatePathContainment` (`cmd/bausteinsicht/root.go`) rejects paths containing `..` or otherwise escaping the working directory, returning exit code 2 (SEC-001 / SEC-016). This guards against an automated agent with untrusted input reading or writing outside the intended directory. Absolute paths and ordinary relative paths within the tree are accepted; directory-traversal sequences are not.
+
+=== Resource Limits
+
+To bound large or pathological input, regardless of source:
+
+* **Model size** — files larger than 10 MB are rejected (`internal/model/loader.go`).
+* **Hierarchy depth** — element nesting deeper than `MaxElementDepth` (50) is rejected (`internal/model/resolve.go`, SEC-007).
+* **Ambiguous auto-detection** — multiple `.jsonc` files in the working directory abort the command rather than silently selecting one.
 
 === Semi-Trusted: Model and Template Files
 
@@ -42,11 +48,22 @@ When Bausteinsicht runs inside an AI agent loop or CI pipeline, the caller shoul
 There is no built-in `--restrict-to-dir` flag.
 The trust model assumes the user (or their agent framework) controls filesystem boundaries.
 
+== External Processes
+
+Bausteinsicht is not a pure in-process transformer — some commands invoke external binaries, resolved from `PATH`:
+
+* **draw.io** — `export` (PNG/SVG) launches the draw.io CLI (`internal/export`).
+* **git** — `stale` and `changelog` shell out to `git log` to derive element history (`internal/stale`, `internal/changelog`).
+* **bausteinsicht (self)** — the LSP server re-executes the `bausteinsicht` binary for diagnostics (`internal/lsp/diagnostics.go`).
+
+These binaries are trusted and located via `PATH`; model and template *content* never determines which process runs or supplies its arguments. In a hardened environment, control `PATH` so only the intended binaries are resolved.
+
 == Non-Threats
 
 * **No network access** — Bausteinsicht makes no HTTP calls, DNS lookups, or socket connections.
-* **No code execution** — The model format (JSONC) and template format (draw.io XML) cannot trigger
-  arbitrary code execution.
+* **No code execution from input** — The model format (JSONC) and template format (draw.io XML) cannot trigger
+  arbitrary code execution; input content is parsed as data, never evaluated. (The tool does spawn the trusted
+  external binaries listed above, but never ones named or parameterized by model/template content.)
 * **No credential handling** — Bausteinsicht does not read, store, or transmit credentials.
 
 == Related Documents

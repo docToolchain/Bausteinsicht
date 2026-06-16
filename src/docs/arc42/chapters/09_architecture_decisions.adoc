@@ -58,4 +58,9 @@ All ADRs are located in `src/docs/arc42/ADRs/`.
 | Sequence Diagram Export (Revisited)
 | Accepted
 | Reverses ADR-004: implements `dynamicViews` + `export-sequence` (PlantUML/Mermaid). Behavioral views kept in one model with structure; sync engine ignores the section.
+
+| link:../ADRs/ADR-009-Drill-Down-Navigation.adoc[ADR-009]
+| Drill-Down Navigation
+| Accepted
+| Page-based drill-down (one draw.io page per view + cross-page links + back button) over single-page semantic zoom. Uses native draw.io pages; keeps bidirectional sync simple.
 |===

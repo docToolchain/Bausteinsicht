@@ -284,7 +284,7 @@ Feature: LLM-driven model manipulation
 
 === Navigation and Drill-Down (UC-7)
 
-==== AC-7.1: Zoom-based navigation
+==== AC-7.1: Page-based drill-down navigation
 
 [source,gherkin]
 ----
@@ -294,14 +294,14 @@ Feature: Drill-down navigation in draw.io
     Given a model with system "webshop" containing containers "api" and "db"
     And views exist for both context and container level
     When "bausteinsicht sync" generates the draw.io file
-    Then the "webshop" element in the context view contains a link
-    And clicking the link navigates to the container view area
+    Then each view is rendered as its own draw.io page
+    And the "webshop" element in the context view page carries a link
+    And clicking the link navigates to the container view page
 
-  Scenario: Parent view visible after drill-down
-    Given views at context and container level on a single draw.io page
-    When the user navigates from context to container level
-    Then the context view remains visible (smaller) above the container view
-    And clicking the context view navigates back
+  Scenario: Navigate back to the parent view
+    Given the user has drilled down from the context page to the container page
+    When the user clicks the generated back-navigation button
+    Then draw.io returns to the context view page
 ----
 
 === Export Command (UC-8)

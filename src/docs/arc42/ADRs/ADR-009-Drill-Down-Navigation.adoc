@@ -1,0 +1,111 @@
+:jbake-title: ADR-009: Drill-Down Navigation
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: Development
+:jbake-order: 9
+
+= ADR-009: Page-Based Drill-Down Navigation
+
+== Status
+
+Accepted
+
+== Context
+
+Bausteinsicht renders views as draw.io diagrams and lets architects navigate between abstraction levels (context → container → component). Early specification text (UC-7, AC-7.1) and a Key Design Decision in `CLAUDE.md` described this as *single-page semantic zoom*: all views on one draw.io canvas, where zooming in reveals the next level of detail and the parent view stays visible (smaller) above for orientation.
+
+The implementation went a different way: *one draw.io page per view*, with sync-generated cross-page links on elements that have a deeper view, and a generated "back" button to return to the parent. This ADR records that the page-based approach is the accepted design and explains why, resolving the contradiction the documentation audit (#422) surfaced.
+
+== Evaluated Approaches
+
+==== Approach A: Single-page semantic zoom (the original vision)
+
+All views laid out on one canvas; drilling down is zooming; the parent stays on screen.
+
+* Keeps the parent visible for orientation
+* draw.io has **no native semantic zoom / level-of-detail** — this would require simulating it by scaling and positioning nested content, a fragile hack
+* Fights bidirectional sync: a single canvas mixing all levels is hard to diff and reconcile against the model
+
+==== Approach B: One page per view + cross-page links (implemented)
+
+Each view is its own draw.io page; sync adds page links to drill-down elements and a back-navigation button.
+
+* draw.io pages and page links are **native** features
+* Each page maps cleanly to one view, which the sync engine already resolves — diff/reconcile stays simple
+* Leaving the page loses the "parent visible" orientation (mitigated by the generated back button)
+
+== Weighted Pugh Matrix
+
+Rating scale: -1 = worse than reference, 0 = same, +1 = better. Reference option: *A (single-page zoom)*.
+
+[cols="4,1,1,1"]
+|===
+| Criterion | Weight | A: Single-page zoom (Ref) | B: Page-based
+
+| *Native draw.io support*
+| 5
+| 0
+| +1
+
+| *Bidirectional-sync robustness*
+| 4
+| 0
+| +1
+
+| *Implementation effort*
+| 4
+| 0
+| +1
+
+| *Orientation (parent visible while drilling)*
+| 3
+| 0
+| -1
+
+| *Per-level export/print*
+| 2
+| 0
+| +1
+
+|===
+
+=== Weighted Results
+
+[cols="3,1,1"]
+|===
+| Criterion | A: Single-page zoom (Ref) | B: Page-based
+
+| Native draw.io support (×5)            | 0 | +5
+| Bidirectional-sync robustness (×4)     | 0 | +4
+| Implementation effort (×4)             | 0 | +4
+| Orientation (×3)                       | 0 | -3
+| Per-level export/print (×2)            | 0 | +2
+| *Total*                                | *0* | *+12*
+|===
+
+== Decision
+
+**Accepted — page-based drill-down (Approach B).**
+
+Each view is rendered as its own draw.io page. Sync generates a cross-page link on every element that has a deeper view, and a "back" navigation button on child pages. This works with draw.io's native page model instead of against it, and keeps the bidirectional sync simple (one page ↔ one view).
+
+== Consequences
+
+=== Positive
+
+* Uses native draw.io pages and links — no fragile semantic-zoom emulation
+* Clean page ↔ view mapping keeps forward/reverse sync tractable
+* Each level exports and prints as a self-contained page
+
+=== Negative
+
+* The parent view is not visible while viewing a child level; orientation relies on the generated back button and the page list
+
+=== Risk
+
+The lost "parent visible" orientation is a usability trade-off, not a correctness or security concern; it creates no new Chapter 11 risk and is *explicitly accepted without a tracked risk*.
+
+=== Implementation
+
+* Page per view and cross-page links: `internal/sync/forward.go` (`pageID := "view-" + viewID`, `data:page/id,` links)
+* Back-navigation button: `internal/sync/forward.go` (generated `nav-back-` cell)
