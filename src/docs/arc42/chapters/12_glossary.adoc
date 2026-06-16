@@ -42,13 +42,97 @@ See https://docs.arc42.org/section-12/[Glossary] in the arc42 documentation.
 ****
 endif::arc42help[]
 
-[cols="e,2e" options="header"]
+The terms below form Bausteinsicht's _ubiquitous language_ — the same words are used in this documentation, the specification, and the source code.
+
+=== Model concepts
+
+[cols="1,3" options="header"]
 |===
 |Term |Definition
 
-|<Term-1>
-|<definition-1>
+|Element
+|A node in the architecture model — a system, container, component, actor, datastore, and so on. Elements are nested arbitrarily deep and keyed by a dot-separated path that doubles as their unique ID (e.g. `onlineshop.api.catalog`).
 
-|<Term-2>
-|<definition-2>
+|Element kind
+|The type of an element (`actor`, `system`, `container`, `component`, …). Kinds are not hardcoded; each model defines its own set in the specification. A kind may be marked as a container (allowed to have children).
+
+|Relationship
+|A directed connection between two elements, with a `from`, a `to`, a label, and a kind (e.g. `uses`). Stored on the element and rendered as a connector.
+
+|View
+|A named filter over the model that becomes one draw.io page. A view lists what to `include`/`exclude` (wildcards allowed) and optionally a scope and layout. The same element can appear in many views; it exists once in the model.
+
+|Scope
+|The element a view drills into. A scoped view shows that element's children inside its boundary and powers page-based drill-down navigation.
+
+|Dynamic view
+|A behavioral view: an ordered list of interaction `steps` between elements, rendered by `export-sequence` as a PlantUML/Mermaid sequence diagram. See link:../ADRs/ADR-008-Sequence-Diagram-Export-Revisited.html[ADR-008].
+
+|Specification
+|The model section that defines the vocabulary: which element kinds and relationship kinds exist, plus tags, patterns, and decision records.
+
+|Lifecycle status
+|An optional element field tracking its stage: `proposed`, `design`, `implementation`, `deployed`, `deprecated`, `archived`. Queryable via `status`.
+
+|Pattern
+|A reusable element/relationship template that `add from-pattern` instantiates into the model.
+|===
+
+=== Synchronization
+
+[cols="1,3" options="header"]
+|===
+|Term |Definition
+
+|Forward sync
+|Applying model changes to the draw.io diagram (model → draw.io).
+
+|Reverse sync
+|Applying draw.io edits (titles, descriptions, technology, new shapes/connectors) back to the model (draw.io → model).
+
+|Model-wins
+|The conflict-resolution policy: when the same element changed on both sides since the last sync, the model value is kept and a warning is shown — never a silent overwrite.
+
+|Sync state
+|The checksummed JSON snapshot of the last synchronized state, stored in `.bausteinsicht-sync`, so the next sync can tell what changed on each side.
+
+|`bausteinsicht_id`
+|The attribute carried by every synced draw.io cell that anchors it to its model element — the link between the two file formats.
+
+|Endpoint lifting
+|When a relationship's endpoint is not directly visible in a view, the connector is attached to the nearest visible ancestor element instead.
+
+|Boundary
+|A container shape in draw.io that visually encloses a scoped element's children; it auto-expands to fit them.
+
+|Drill-down navigation
+|Page-based navigation between abstraction levels: one draw.io page per view, with sync-generated cross-page links and a back button. See link:../ADRs/ADR-009-Drill-Down-Navigation.html[ADR-009].
+|===
+
+=== Tooling & styling
+
+[cols="1,3" options="header"]
+|===
+|Term |Definition
+
+|Template
+|A draw.io file whose shapes carry a `bausteinsicht_template` attribute naming the element kind they style. Sync clones the matching shape for each new element. Templates are versioned (`bausteinsicht_template_version`).
+
+|Overlay
+|A metric heatmap applied on top of a diagram (e.g. coloring elements by a metric), added/removed by the `overlay` command without altering the underlying model.
+
+|Badge
+|A small visual marker attached to an element in the diagram (e.g. a decision badge).
+
+|Snapshot
+|A versioned capture of the whole architecture model, stored under `.bausteinsicht-snapshots/`, semantically diffable via `snapshot diff`.
+
+|Stale element
+|An element flagged by the `stale` command as possibly forgotten — shown in no view, touched by no relationship, or unchanged for longer than a threshold (derived from git history).
+
+|Workspace
+|A multi-model grouping that lets several Bausteinsicht models be validated and related together.
+
+|REPL
+|The interactive shell (`bausteinsicht repl`) for guided, validated model editing; pure additions are patched into the JSONC preserving comments.
 |===
