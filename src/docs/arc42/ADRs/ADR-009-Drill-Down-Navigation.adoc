@@ -1,7 +1,7 @@
 :jbake-title: ADR-009: Drill-Down Navigation
 :jbake-type: page_toc
 :jbake-status: published
-:jbake-menu: Development
+:jbake-menu: ADR
 :jbake-order: 9
 
 = ADR-009: Page-Based Drill-Down Navigation
