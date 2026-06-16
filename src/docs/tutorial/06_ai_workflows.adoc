@@ -133,8 +133,8 @@ A pull request that introduces a dependency cycle, breaks a constraint, or lets 
 
 == Where to go from here
 
-* The link:../spec/02_cli_specification.adoc[CLI specification] documents commands in depth.
-* The link:../spec/05_sync_specification.adoc[sync specification] explains the synchronization algorithm precisely.
-* The link:../arc42/arc42.adoc[architecture documentation] shows Bausteinsicht documented with Bausteinsicht.
+* The link:../spec/02_cli_specification.html[CLI specification] documents commands in depth.
+* The link:../spec/05_sync_specification.html[sync specification] explains the synchronization algorithm precisely.
+* The link:../arc42/arc42.html[architecture documentation] shows Bausteinsicht documented with Bausteinsicht.
 
 You now have the full loop: model in text, diagrams in draw.io, analysis in CI, and agents as co-architects. Replace the sample shop with your own system — `bausteinsicht init` in a fresh directory is all it takes.
