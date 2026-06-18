@@ -33,12 +33,12 @@ Bausteinsicht works with three data formats that must be kept in sync:
 
 === JSON Model Structure
 
-The model consists of five top-level sections:
+The model has these top-level sections. `specification`, `model`, `relationships`, and `views` are the core; the rest are optional: `$schema` (points the IDE at the JSON Schema for validation and autocompletion), `config` (project metadata/legend), `meta` (e.g. `staleDetection` settings), `dynamicViews` (sequence diagrams), `constraints` (lint rules), and `asIs`/`toBe` (for the `diff` command).
 
 [source,jsonc]
 ----
 {
-  "$schema": "https://raw.githubusercontent.com/docToolchain/Bausteinsicht/main/schema/bausteinsicht.schema.json",
+  "$schema": "https://raw.githubusercontent.com/docToolchain/Bausteinsicht/main/schemas/bausteinsicht.schema.json",
 
   // Define available element and relationship kinds
   "specification": {
@@ -184,6 +184,21 @@ The model consists of five top-level sections:
 | no
 | Tags for filtering and styling
 
+| `status`
+| string
+| no
+| Lifecycle status: `proposed`, `design`, `implementation`, `deployed`, `deprecated`, or `archived` (see <<element-lifecycle,Element Lifecycle>>)
+
+| `decisions`
+| string[]
+| no
+| ADR IDs that govern this element
+
+| `lastModified`
+| string
+| no
+| RFC3339 timestamp; overrides git-derived last-modified for stale detection
+
 | `children`
 | object
 | no
@@ -197,6 +212,31 @@ The model consists of five top-level sections:
 
 The **key** of each element in the model object (e.g., `"customer"`, `"api"`) serves as its unique ID.
 Nested elements are referenced using dot notation: `"webshop.api.auth"`.
+
+[[element-lifecycle]]
+==== Element Lifecycle
+
+An element's optional `status` follows this intended progression (the `status` command groups elements by it):
+
+[plantuml, element-lifecycle, png]
+....
+@startuml
+hide empty description
+[*] --> proposed
+proposed --> design
+design --> implementation
+implementation --> deployed
+deployed --> deprecated
+deprecated --> archived
+archived --> [*]
+@enduml
+....
+
+The transitions themselves are not enforced — `status` is a plain string — but validation does check the following:
+
+* An unknown `status` value (not one of the six above) produces a warning listing the valid values.
+* An **archived** element should have no outgoing relationships (archived elements are no longer active).
+* A **deprecated** element should have an outgoing relationship to a deployed successor *of the same kind* (a migration target); otherwise a warning is emitted.
 
 ==== Relationship Properties
 
@@ -228,6 +268,21 @@ Nested elements are referenced using dot notation: `"webshop.api.auth"`.
 | string
 | no
 | Detailed description
+
+| `decisions`
+| string[]
+| no
+| ADR IDs that govern this relationship
+
+| `cardinality`
+| string
+| no
+| One of `1:1`, `1:N`, `N:N`
+
+| `dataFlow`
+| string
+| no
+| One of `sync`, `async`, `request/response`, `publish/subscribe`
 |===
 
 ==== View Properties
@@ -255,6 +310,16 @@ Nested elements are referenced using dot notation: `"webshop.api.auth"`.
 | string[]
 | no
 | Element IDs to exclude from the view (supports wildcard patterns, see <<Wildcard Patterns>>)
+
+| `filter-tags`
+| string[]
+| no
+| Include only elements that carry *all* of these tags
+
+| `exclude-tags`
+| string[]
+| no
+| Exclude elements that carry *any* of these tags
 
 | `description`
 | string
@@ -640,17 +705,26 @@ Element cell IDs are **page-scoped** using `<viewID>--<elementID>` to ensure fil
 ----
 // Top-level model file
 type BausteinsichtModel struct {
-    Schema        string                  `json:"$schema,omitempty"`
-    Specification Specification           `json:"specification"`
-    Model         map[string]Element      `json:"model"`
-    Relationships []Relationship          `json:"relationships"`
-    Views         map[string]View         `json:"views"`
+    Schema        string                 `json:"$schema,omitempty"`
+    Config        Config                 `json:"config,omitempty"`
+    Meta          map[string]interface{} `json:"meta,omitempty"`
+    Specification Specification          `json:"specification"`
+    Model         map[string]Element     `json:"model"`
+    Relationships []Relationship         `json:"relationships"`
+    Views         map[string]View        `json:"views"`
+    DynamicViews  []DynamicView          `json:"dynamicViews,omitempty"`
+    Constraints   []Constraint           `json:"constraints,omitempty"`
+    AsIs          *ModelSnapshot         `json:"asIs,omitempty"`
+    ToBe          *ModelSnapshot         `json:"toBe,omitempty"`
 }
 
 // Specification defines available element and relationship kinds
 type Specification struct {
-    Elements      map[string]ElementKind      `json:"elements"`
-    Relationships map[string]RelationshipKind `json:"relationships,omitempty"`
+    Elements      map[string]ElementKind       `json:"elements"`
+    Relationships map[string]RelationshipKind  `json:"relationships,omitempty"`
+    Tags          []TagDefinition              `json:"tags,omitempty"`
+    Patterns      map[string]PatternDefinition `json:"patterns,omitempty"`
+    Decisions     []DecisionRecord             `json:"decisions,omitempty"`
 }
 
 type ElementKind struct {
@@ -666,22 +740,28 @@ type RelationshipKind struct {
 
 // Element represents an architecture building block
 type Element struct {
-    Kind        string              `json:"kind"`
-    Title       string              `json:"title"`
-    Description string              `json:"description,omitempty"`
-    Technology  string              `json:"technology,omitempty"`
-    Tags        []string            `json:"tags,omitempty"`
-    Children    map[string]Element  `json:"children,omitempty"`
-    Metadata    map[string]string   `json:"metadata,omitempty"`
+    Kind         string             `json:"kind"`
+    Title        string             `json:"title"`
+    Description  string             `json:"description,omitempty"`
+    Technology   string             `json:"technology,omitempty"`
+    Tags         []string           `json:"tags,omitempty"`
+    Status       string             `json:"status,omitempty"`       // proposed|design|implementation|deployed|deprecated|archived
+    Decisions    []string           `json:"decisions,omitempty"`    // linked ADR IDs
+    LastModified string             `json:"lastModified,omitempty"` // RFC3339; overrides git-based staleness
+    Children     map[string]Element `json:"children,omitempty"`
+    Metadata     map[string]string  `json:"metadata,omitempty"`
 }
 
 // Relationship connects two elements
 type Relationship struct {
-    From        string `json:"from"`
-    To          string `json:"to"`
-    Label       string `json:"label,omitempty"`
-    Kind        string `json:"kind,omitempty"`
-    Description string `json:"description,omitempty"`
+    From        string   `json:"from"`
+    To          string   `json:"to"`
+    Label       string   `json:"label,omitempty"`
+    Kind        string   `json:"kind,omitempty"`
+    Description string   `json:"description,omitempty"`
+    Decisions   []string `json:"decisions,omitempty"`   // linked ADR IDs
+    Cardinality string   `json:"cardinality,omitempty"` // 1:1|1:N|N:N
+    DataFlow    string   `json:"dataFlow,omitempty"`    // sync|async|request/response|publish/subscribe
 }
 
 // View defines which elements appear in a diagram
@@ -690,7 +770,10 @@ type View struct {
     Scope       string   `json:"scope,omitempty"`
     Include     []string `json:"include,omitempty"`
     Exclude     []string `json:"exclude,omitempty"`
+    FilterTags  []string `json:"filter-tags,omitempty"`  // include only elements with ALL of these tags
+    ExcludeTags []string `json:"exclude-tags,omitempty"` // exclude elements with ANY of these tags
     Description string   `json:"description,omitempty"`
+    Layout      string   `json:"layout,omitempty"` // layered (default)|grid|none
 }
 
 // DynamicView describes a sequence diagram scenario
@@ -718,13 +801,17 @@ const (
     StepReturn StepType = "return"
 )
 
-// BausteinsichtModel — updated top-level struct (includes DynamicViews)
-type BausteinsichtModel struct {
-    Schema        string                  `json:"$schema,omitempty"`
-    Specification Specification           `json:"specification"`
-    Model         map[string]Element      `json:"model"`
-    Relationships []Relationship          `json:"relationships"`
-    Views         map[string]View         `json:"views"`
-    DynamicViews  []DynamicView           `json:"dynamicViews,omitempty"`
+// Config holds top-level configuration for diagram generation
+type Config struct {
+    Metadata *bool  `json:"metadata,omitempty"`
+    Legend   *bool  `json:"legend,omitempty"`
+    Author   string `json:"author,omitempty"`
+    Repo     string `json:"repo,omitempty"`
+}
+
+// ModelSnapshot is an as-is or to-be capture used by the diff command
+type ModelSnapshot struct {
+    Elements      map[string]Element `json:"elements"`
+    Relationships []Relationship     `json:"relationships"`
 }
 ----
