@@ -61,6 +61,9 @@ Copy this table into the test report:
 | 6. CLI Add Commands | 30 | | |
 | 7. Watch Mode | 8 | | |
 | 8. Export | 12 | | |
+| 8b. Export-Diagram | 6 | | |
+| 8c. Export-Table | 5 | | |
+| 8d. Export-Sequence | 4 | | |
 | 9. Draw.io File Integrity | 5 | | |
 | 10. Security / Injection Testing | 9 | | |
 | 11. CLI Flag Interactions | 9 | | |
@@ -68,7 +71,11 @@ Copy this table into the test report:
 | 13. Model File Edge Cases | 7 | | |
 | 14. Template Handling | 6 | | |
 | 15. Error Output Formatting | 8 | | |
-| **Total** | **204** | | |
+| 16. Analysis & Inspection | 12 | | |
+| 17. Evolution & Snapshots | 9 | | |
+| 18. Model Tooling & Import | 11 | | |
+| 19. Interactive, Overlay & ADR | 7 | | |
+| **Total** | **258** | | |
 |===
 ----
 
@@ -453,11 +460,11 @@ Covers `lint`, `health`, `graph`, `stale`, `status`, `find`, `show`.
 | 16.2 | Lint reports a violation | `lint` on a model breaking a defined constraint | Exit 1, violation listed with constraint ID
 | 16.3 | Health score | `health --model architecture.jsonc` | Completeness/conformance/complexity score
 | 16.4 | Health requires `--model` | `health` with no `--model` | Error (health does not auto-detect — deviates from the global convention)
-| 16.5 | Graph analysis | `graph` | Cycles, centrality, dependency depth reported
-| 16.6 | Graph `--format json` | `graph --format json` | Machine-readable graph metrics
+| 16.5 | Graph analysis | `graph --model architecture.jsonc` | Cycles and dependency depth reported (centrality only with `--centrality`); `graph` requires `--model` (exit 2 if missing)
+| 16.6 | Graph `--format json` | `graph --model architecture.jsonc --format json` | Machine-readable graph metrics
 | 16.7 | Stale with threshold | `stale --days 90` | Elements older than 90 days without status/ADR flagged
 | 16.8 | Stale outside git | `stale` outside a git repo, no `lastModified` | Graceful: nothing flagged
-| 16.9 | Status grouping | `status` | Elements grouped/sorted by lifecycle status
+| 16.9 | Status grouping | `status --model architecture.jsonc` | Elements grouped/sorted by lifecycle status (`status` reads `--model` directly and does not auto-detect)
 | 16.10 | Find full-text | `find api` | Matching elements/relationships/views
 | 16.11 | Show element details | `show webshop.api` | All fields of the element
 | 16.12 | Show non-existent element | `show nope` | Error: element not found
@@ -530,8 +537,8 @@ Record each test execution here:
 
 | 2026-03-01 | 1+2 | 73 | 18 (#107-#124) | `e2e-test-report-2026-03-01.adoc`
 | 2026-03-02 | 3 | 221 | 12 (#140-#151) | `e2e-test-report-2026-03-02.adoc`
-| 2026-03-02 | 4 | 147 | 5 (#165–#169) | `e2e-test-report-2026-03-02-round4.adoc`
-| 2026-03-02 | 5 | 204 | 4 (#175–#178) | `e2e-test-report-2026-03-02-round5.adoc`
-| 2026-03-02 | 6 | 211 | 7 (#183–#189) | `e2e-test-report-2026-03-02-round6.adoc`
-| 2026-03-05 | 7 | 215 | 6 (#236–#241) | `e2e-test-report-2026-03-05.adoc`
+| 2026-03-02 | 4 | 147 | 5 (#165-#169) | `e2e-test-report-2026-03-02-round4.adoc`
+| 2026-03-02 | 5 | 204 | 4 (#175-#178) | `e2e-test-report-2026-03-02-round5.adoc`
+| 2026-03-02 | 6 | 211 | 7 (#183-#189) | `e2e-test-report-2026-03-02-round6.adoc`
+| 2026-03-05 | 7 | 215 | 6 (#236-#241) | `e2e-test-report-2026-03-05.adoc`
 |===
