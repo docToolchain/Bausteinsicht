@@ -57,9 +57,35 @@ Rel(onlineshop_api, onlineshop_export_storage, "writes reports")
 @enduml
 ....
 
+== Working in draw.io
+
+The generated `architecture.drawio` is a normal draw.io file — but a few things are specific to how Bausteinsicht builds it. This is where you spend your "human" time, so it's worth knowing the moves.
+
+=== Navigating
+
+Each **view is its own page** — use the page tabs along the bottom of the draw.io window to switch between System Context, Container View, and so on. You also navigate by **drilling down**: click a system in the context view and draw.io follows the generated link to that system's container page; a generated *back* button returns you to the parent. Browsing the architecture is mostly clicking, like an interactive C4 model.
+
+=== Selecting and moving an element
+
+Here's the one thing that trips people up. Each element is a draw.io **container**: the shape plus its **title and description as child cells**. It is *not* a locked group, so a single click does not always grab "the whole box":
+
+* Click the **shape body** (the colored area, away from the text) → selects the whole element. Drag it and the title/description move with it.
+* Click directly on the **title or description text** → selects just that text cell. Good for editing, not for moving the element.
+* The reliable way to grab a complete element — especially a small one whose text covers most of the body — is a **rubber-band selection**: press on empty canvas and drag a box around the element. To reposition a whole row at once, rubber-band around all of them and drag together.
+
+TIP: if you grabbed only the label, press `Escape` and try again on the shape body, or just rubber-band around the element.
+
+=== Editing text (this flows back to the model)
+
+Double-click an element's **title** and type to rename it; double-click the **description** to edit it. On the next `sync` these travel back into the model (see Reverse, below). Editing an element's **position or size changes nothing in the model** — layout is yours to keep.
+
+=== Lay it out once
+
+New elements arrive stacked by the auto-layout and marked (a red dashed border) so you can spot them. You arrange them by hand the first time — and **only** the first time. After that, sync **never moves what you have placed**; it only positions the *next* new element. So manual layout is a one-time cost per element, not a tax you pay on every sync. (If you ever want to start the arrangement over, `sync --relayout` re-runs the auto-layout — see Layout control below.)
+
 == Reverse: draw.io → model
 
-Open `architecture.drawio`, double-click the "Search Service" shape, and rename it to "Product Search". Save, then:
+Open `architecture.drawio`, double-click the "Search Service" title, and rename it to "Product Search". Save, then:
 
 [source,bash]
 ----

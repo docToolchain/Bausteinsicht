@@ -12,9 +12,19 @@ ifndef::imagesdir[:imagesdir: ../../images]
 
 This tutorial takes you from an empty directory to a living architecture model: you will model a system, sync it with draw.io, analyze it, version it, and drive it from an AI agent. Every command and every output shown here was executed against the current build — what you see is what you get.
 
-== What Bausteinsicht is
+== What Bausteinsicht is — and why
 
-Bausteinsicht keeps your software architecture in a structured JSONC model and renders it as draw.io diagrams — with bidirectional synchronization. Change the model, and the diagrams follow. Rename an element in draw.io, and the model follows. The single source of truth is a text file that lives in git, diffs cleanly, and is readable by humans, IDEs, and LLMs alike.
+Architecture documentation rots. The diagram in the wiki drifts from the system, and nobody trusts it after a few months. Bausteinsicht attacks that from a specific angle: it splits *what the architecture is* from *how it looks*.
+
+Humans and LLMs want different things from architecture. **You** want a picture — boxes and lines you can take in at a glance and point at in a review. An **LLM** wants structured text — something it can read precisely, reason about, and edit without misunderstanding a diagram's pixels. Bausteinsicht gives each side what it's good with and keeps them in lockstep:
+
+* The **source of truth is a JSONC model** — a structured text file that lives in git, diffs cleanly, validates against a schema, and is trivially readable and writable by an LLM.
+* From that one model, Bausteinsicht **generates draw.io diagrams** — the visual, human-facing view, in a tool you already know.
+* Synchronization runs **both ways**: change the model and the diagrams follow; rename or redraw in draw.io and the model follows.
+
+That bridge is the point. An LLM can confidently restructure the model — add a service, rewire a dependency, validate the result — because it works in text, not pixels. You review and arrange the *diagram*, where humans are fast. Neither side has to work in the other's awkward medium, and because the model is the single source of truth, the picture can't quietly drift from reality. The model stays LLM-readable; the diagrams stay human-readable; the two never disagree.
+
+The rest of this tutorial walks that loop end to end — model it, see it in draw.io, arrange it once, then let model and diagram evolve together.
 
 == Installation
 
