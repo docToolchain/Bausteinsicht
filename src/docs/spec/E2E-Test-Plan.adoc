@@ -28,7 +28,7 @@ Test reports are stored as: `src/docs/e2e-test-report-YYYY-MM-DD.adoc`
 
 IMPORTANT: Before executing the tests, check whether new commands, flags, or features have been added since the last update of this document.
 
-. Run `./bausteinsicht --help` and compare all listed commands against Section 3–15 of this document.
+. Run `./bausteinsicht --help` and compare all listed commands against Sections 1–19 of this document.
 . For each command, run `./bausteinsicht <command> --help` and compare all flags against the test sections.
 . If a new command or flag exists that has NO corresponding test section or test case:
   .. Add a new section or extend an existing section with test cases for the missing functionality.
@@ -332,7 +332,7 @@ Copy this table into the test report:
 | 8d.1 | Export dynamic view as PlantUML | `export-sequence --view login-flow` | PlantUML sequence on stdout
 | 8d.2 | Export as Mermaid | `export-sequence --view login-flow --diagram-format mermaid` | Mermaid sequence on stdout
 | 8d.3 | Unknown dynamic view | `export-sequence --view nope` | Error: dynamic view not found
-| 8d.4 | Model without dynamicViews | `export-sequence` on a model with no dynamic views | Clear message, non-zero exit
+| 8d.4 | Model without dynamicViews | `export-sequence` on a model with no dynamic views | "No dynamic views defined in model." on stderr, exit 0
 |===
 
 == 9. Draw.io File Integrity (5 tests)
@@ -455,7 +455,7 @@ Covers `lint`, `health`, `graph`, `stale`, `status`, `find`, `show`.
 | 16.4 | Health requires `--model` | `health` with no `--model` | Error (health does not auto-detect — deviates from the global convention)
 | 16.5 | Graph analysis | `graph` | Cycles, centrality, dependency depth reported
 | 16.6 | Graph `--format json` | `graph --format json` | Machine-readable graph metrics
-| 16.7 | Stale with threshold | `stale --threshold 90` | Elements older than 90 days without status/ADR flagged
+| 16.7 | Stale with threshold | `stale --days 90` | Elements older than 90 days without status/ADR flagged
 | 16.8 | Stale outside git | `stale` outside a git repo, no `lastModified` | Graceful: nothing flagged
 | 16.9 | Status grouping | `status` | Elements grouped/sorted by lifecycle status
 | 16.10 | Find full-text | `find api` | Matching elements/relationships/views
@@ -471,12 +471,12 @@ Covers `snapshot` (save/list/diff/restore/delete), `diff`, `changelog`.
 |===
 | # | Test | Command | Expected
 
-| 17.1 | Save snapshot | `snapshot save v1` | Snapshot written to `.bausteinsicht-snapshots/`
-| 17.2 | List snapshots | `snapshot list` | Saved snapshots listed
-| 17.3 | Diff snapshots | `snapshot diff v1 v2` | Element/relationship changes between snapshots
-| 17.4 | Restore snapshot | `snapshot restore v1 --output restored.jsonc` | Model restored to snapshot state
-| 17.5 | Restore without `--force` over existing | `snapshot restore v1` onto existing output | Error: output exists (use `--force`)
-| 17.6 | Delete snapshot | `snapshot delete v1` | Snapshot removed
+| 17.1 | Save snapshot | `snapshot save --message "before refactor"` | Snapshot written to `.bausteinsicht-snapshots/` with an auto-generated timestamp ID (`save` takes no id, only `--message`)
+| 17.2 | List snapshots | `snapshot list` | Saved snapshots listed with their timestamp IDs
+| 17.3 | Diff snapshots | `snapshot diff <id1> <id2>` (IDs from `snapshot list`) | Element/relationship changes between snapshots
+| 17.4 | Restore snapshot | `snapshot restore <id> restored.jsonc` (output path is positional, not a flag) | Model restored to snapshot state
+| 17.5 | Restore over existing output | `snapshot restore <id> existing.jsonc` onto an existing file | Exit 2: output exists (use `--force`)
+| 17.6 | Delete snapshot | `snapshot delete <id>` | Snapshot removed
 | 17.7 | Diff as-is vs to-be | `diff` on a model with `asIs`/`toBe` | Differences reported
 | 17.8 | Diff without sections | `diff` on a model lacking `asIs`/`toBe` | Error: model does not contain asIs and toBe sections
 | 17.9 | Changelog | `changelog` in a git repo | Architecture changelog between versions (git-based)
@@ -515,12 +515,10 @@ Covers `repl`, `overlay` (apply/list/remove), `adr` (list/show).
 | 19.2 | REPL exit with unsaved changes | `repl`, edit, `exit` | Confirmation prompt before quitting
 | 19.3 | Overlay list metrics | `overlay list metrics.json` | Available metrics listed
 | 19.4 | Overlay apply | `overlay apply metrics.json --model architecture.jsonc` | Heatmap overlaid; output next to the model
-| 19.5 | Overlay requires `--model` | `overlay apply metrics.json` with no `--model` | Error (overlay does not auto-detect)
+| 19.5 | Overlay with no model | `overlay apply metrics.json` with no `--model` | Error loading model (overlay reads `--model` and does not auto-detect, so the empty default path fails to load)
 | 19.6 | ADR list | `adr list` | Linked ADRs listed
 | 19.7 | ADR show / filter | `adr show ADR-001`, `adr list --element webshop.api` | ADR details / ADRs for that element
 |===
-
-NOTE: The `--drawio-path` error scenarios (8.9, 15.4) depend on #420 being resolved before they can be executed reliably.
 
 == Test History
 
