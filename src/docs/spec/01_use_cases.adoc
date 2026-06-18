@@ -40,8 +40,8 @@ ifndef::imagesdir[:imagesdir: ../../images]
 ==== Main Success Scenario
 
 1. The architect runs `bausteinsicht init` in an empty project directory.
-2. Bausteinsicht creates the default specification (actor, system, container, component kinds).
-3. Bausteinsicht creates an example model with sample elements.
+2. Bausteinsicht creates the sample specification — eight element kinds: `actor`, `system`, `external_system`, `container`, `datastore`, `ui`, `queue`, `component`.
+3. Bausteinsicht creates an example model with sample elements using those kinds.
 4. Bausteinsicht creates the default draw.io template (`template.drawio`).
 5. Bausteinsicht runs an initial forward sync to generate `architecture.drawio`.
 6. Bausteinsicht writes the `.bausteinsicht-sync` state file.
@@ -73,13 +73,13 @@ stop
 
 ==== Extensions
 
-1a. One or more of the target files already exist: Bausteinsicht aborts with exit code 2 and writes nothing — no file is overwritten.
+1a. One of `architecture.jsonc`, `architecture.drawio`, or `template.drawio` already exists: Bausteinsicht aborts with exit code 2 (an existing `.bausteinsicht-sync` is not checked).
 
 ==== Postconditions
 
 *Success guarantee:* A valid model (`architecture.jsonc`), a template (`template.drawio`), an initial diagram (`architecture.drawio`), and a `.bausteinsicht-sync` state file exist; the generated sample satisfies BR-032 and BR-033.
 
-*Minimal guarantee:* If any target file already exists, nothing is created or overwritten.
+*Minimal guarantee:* If any of `architecture.jsonc`, `architecture.drawio`, or `template.drawio` already exists, none of those three is created or overwritten.
 
 === UC-2: Define Architecture Elements
 
@@ -125,7 +125,7 @@ stop
 
 ==== Extensions
 
-2a. The chosen element ID already exists: the IDE flags a duplicate key via the schema; the architect picks a different ID (BR-005 requires a non-empty ID).
+2a. The chosen ID duplicates an existing element key: JSON object keys must be unique, so the editor/JSON tooling flags the collision (plain JSON would silently keep only the last); the architect picks a different ID. (BR-005 separately requires IDs to be non-empty.)
 4a. A relationship references a non-existent element: `bausteinsicht validate` (and sync) reports it as an error (BR-007, BR-008).
 
 ==== Postconditions
@@ -143,14 +143,14 @@ stop
 
 ==== Preconditions
 * A valid architecture model exists
-* A draw.io template exists
+* (Optional) A draw.io template — `template.drawio` next to the model or `--template <path>`; otherwise the embedded default template is used
 * (Optional) Existing draw.io diagrams with manual layout
 
 ==== Main Success Scenario
 
 1. The architect runs `bausteinsicht sync`.
-2. Bausteinsicht reads and validates the model (JSON Schema plus the business rules).
-3. Bausteinsicht reads the template for element styling.
+2. Bausteinsicht reads the model and runs validation (the business rules; JSON Schema validation is IDE-side, not part of the CLI sync).
+3. Bausteinsicht resolves the template for element styling (`--template` > local `template.drawio` > embedded default).
 4. For an existing diagram, it matches elements by `bausteinsicht_id`, updates changed titles/descriptions, adds new elements (visually marked), removes deleted ones, and preserves the existing layout.
 5. Bausteinsicht adds and updates relationship connectors with centered attachment.
 6. Bausteinsicht writes the draw.io XML and prints a summary of changes.
@@ -196,15 +196,15 @@ stop
 ==== Extensions
 
 2a. The model is invalid: validation errors are displayed and the sync aborts with exit code 1 (BR-001–BR-026).
-3a. The template file is missing: Bausteinsicht reports an error with instructions to create one.
-4a. The draw.io file is missing or empty: Bausteinsicht recreates it from the template and places all elements side by side (#149).
-6a. The draw.io file is locked by another process: Bausteinsicht warns and leaves it unchanged.
+3a. No local `template.drawio` and no `--template`: Bausteinsicht uses the embedded default template (not an error).
+4a. The draw.io file is missing or empty: Bausteinsicht prints a warning, recreates it from the template, and lays the elements out with the layout engine (default `layered`).
+6a. Writing the draw.io file fails (e.g. the path is not writable): Bausteinsicht reports an error and exits with code 2.
 
 ==== Postconditions
 
 *Success guarantee:* The draw.io file reflects the current model state; existing element positions are preserved; new elements are visually marked for manual positioning; relationship connectors attach to element centers.
 
-*Minimal guarantee:* On a validation error or a locked file, the existing diagram is left unchanged.
+*Minimal guarantee:* On a validation error, the existing diagram is left unchanged.
 
 === UC-4: Edit in draw.io and Reverse Sync
 
@@ -349,8 +349,8 @@ stop
 
 ==== Extensions
 
+2a. The file watcher cannot be created or started: Bausteinsicht reports an error and exits — there is no polling fallback. (A watched file that is removed and later recreated is automatically re-watched.)
 3a, 4a. Rapid successive changes: events are debounced (300 ms) to avoid conflicting syncs.
-2a. The file watcher fails (e.g. on a network drive): Bausteinsicht falls back to polling with a warning.
 
 ==== Postconditions
 
