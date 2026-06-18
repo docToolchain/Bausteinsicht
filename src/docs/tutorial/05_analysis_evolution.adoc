@@ -146,7 +146,7 @@ Added Elements (1):
   + onlineshop.audit
 ----
 
-The diff speaks architecture — added elements, removed relationships, changed kinds — not JSON lines. `snapshot list --format json` shows what you have, `snapshot restore` brings a state back, `snapshot delete` cleans up. Snapshots live in `.bausteinsicht-snapshots/`.
+The diff speaks architecture — added elements, removed relationships, changed kinds — not JSON lines. `snapshot list --output-format json` shows what you have, `snapshot restore` brings a state back, `snapshot delete` cleans up. Snapshots live in `.bausteinsicht-snapshots/`.
 
 == As-is vs. to-be
 

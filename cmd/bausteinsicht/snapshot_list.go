@@ -17,13 +17,16 @@ func newSnapshotListCmd() *cobra.Command {
 		RunE:  runSnapshotList,
 	}
 
-	cmd.Flags().String("format", "table", "Output format: table or json")
+	// Use a dedicated flag name (not the global --format, which only accepts
+	// text|json) so the table default is not rejected by the root command's
+	// global format validation (#425).
+	cmd.Flags().String("output-format", "table", "Output format: table or json")
 
 	return cmd
 }
 
 func runSnapshotList(cmd *cobra.Command, _ []string) error {
-	format, _ := cmd.Flags().GetString("format")
+	format, _ := cmd.Flags().GetString("output-format")
 
 	manager := snapshot.NewManager(".")
 	snapshots, err := manager.List()

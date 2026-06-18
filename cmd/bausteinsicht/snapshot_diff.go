@@ -40,6 +40,9 @@ func runSnapshotDiff(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return exitWithCode(fmt.Errorf("loading snapshot %s: %w", snapshotID1, err), 2)
 	}
+	if snap1 == nil || snap1.Model == nil {
+		return exitWithCode(fmt.Errorf("snapshot %s contains no model data", snapshotID1), 1)
+	}
 
 	var model2 *model.BausteinsichtModel
 
@@ -52,6 +55,9 @@ func runSnapshotDiff(cmd *cobra.Command, args []string) error {
 		snap2, err := manager.Load(snapshotID2)
 		if err != nil {
 			return exitWithCode(fmt.Errorf("loading snapshot %s: %w", snapshotID2, err), 2)
+		}
+		if snap2 == nil || snap2.Model == nil {
+			return exitWithCode(fmt.Errorf("snapshot %s contains no model data", snapshotID2), 1)
 		}
 		model2 = snap2.Model
 	} else {
