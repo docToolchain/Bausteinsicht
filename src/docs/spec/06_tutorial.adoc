@@ -68,6 +68,8 @@ The model contains:
 * **Views**: System Context, Container View, API Components
 * **Dynamic views** (sequence diagrams): Checkout Flow and Catalog Browse
 
+NOTE: The **E-Mail Service** above is an *external* system the shop talks to. In Step 4 you will add a separate *internal* Email Service container — they are different elements that happen to have similar names.
+
 === Step 3: Open the Diagram
 
 Open `architecture.drawio` in draw.io. You'll see three tabs (pages):
@@ -246,7 +248,7 @@ This makes Bausteinsicht ideal for AI-assisted architecture work — an LLM can 
 | `bausteinsicht export`
 | Export diagram views as PNG or SVG images (flags: `--image-format` png/svg, `--view`, `--output`, `--embed-diagram`)
 
-| `bausteinsicht add view` / `add specification`
+| `bausteinsicht add view` / `bausteinsicht add specification`
 | Create a view or extend the specification (LLM-friendly)
 
 | `bausteinsicht export-diagram`
@@ -273,13 +275,13 @@ This makes Bausteinsicht ideal for AI-assisted architecture work — an LLM can 
 | `bausteinsicht graph`
 | Analyse the relationship graph: cycles, centrality, dependency depth
 
-| `bausteinsicht stale` / `status` / `find` / `show`
+| `bausteinsicht stale` / `bausteinsicht status` / `bausteinsicht find` / `bausteinsicht show`
 | Inspect the model: flag stale elements, list by lifecycle status, full-text search, show one element
 
-| `bausteinsicht snapshot` / `diff` / `changelog`
+| `bausteinsicht snapshot` / `bausteinsicht diff` / `bausteinsicht changelog`
 | Versioned snapshots, as-is/to-be comparison, and architecture changelog
 
-| `bausteinsicht generate-template` / `layout` / `schema` / `workspace` / `overlay` / `adr`
+| `bausteinsicht generate-template` / `bausteinsicht layout` / `bausteinsicht schema` / `bausteinsicht workspace` / `bausteinsicht overlay` / `bausteinsicht adr`
 | Generate a template from the spec, lay out a diagram, generate the JSON Schema, merge multi-model workspaces, overlay metric heatmaps, and list ADRs
 |===
 
