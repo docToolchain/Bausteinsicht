@@ -61,9 +61,14 @@ Output: `Model is valid.`
 
 The model contains:
 
-* **Elements**: Customer (actor), Online Shop (system) with Frontend, REST API, and Database containers
-* **Relationships**: Customer uses Frontend, Frontend calls API, API reads/writes Database
+* **Actors**: Customer and Back-Office User
+* **System**: Online Shop, containing a Web Frontend, a Mobile App, a REST API (with Product Catalog, Order Processing, and Notification Service components), a Database, a Cache, a Message Queue, and Export Storage
+* **External systems**: Payment Provider and E-Mail Service
+* **Relationships**: e.g. the Customer uses the Web Frontend, the REST API reads/writes the Database, the Order Processing component charges the Payment Provider, and the Notification Service sends email asynchronously via the E-Mail Service
 * **Views**: System Context, Container View, API Components
+* **Dynamic views** (sequence diagrams): Checkout Flow and Catalog Browse
+
+NOTE: The **E-Mail Service** above is an *external* system the shop talks to. In Step 4 you will add a separate *internal* Email Service container — they are different elements that happen to have similar names.
 
 === Step 3: Open the Diagram
 
@@ -242,7 +247,45 @@ This makes Bausteinsicht ideal for AI-assisted architecture work — an LLM can 
 
 | `bausteinsicht export`
 | Export diagram views as PNG or SVG images (flags: `--image-format` png/svg, `--view`, `--output`, `--embed-diagram`)
+
+| `bausteinsicht add view` / `bausteinsicht add specification`
+| Create a view or extend the specification (LLM-friendly)
+
+| `bausteinsicht export-diagram`
+| Export views as C4 text diagrams: PlantUML, Mermaid, DOT, D2, HTML, or Structurizr DSL (`--diagram-format`)
+
+| `bausteinsicht export-table`
+| Export element attributes per view as an AsciiDoc or Markdown table (`--table-format adoc\|md`)
+
+| `bausteinsicht export-sequence`
+| Export dynamic views as PlantUML or Mermaid sequence diagrams
+
+| `bausteinsicht import`
+| Import a model from Structurizr DSL or LikeC4 (`--from structurizr\|likec4`)
+
+| `bausteinsicht repl`
+| Interactive shell for editing the model (add/remove/list/show/validate/undo/save)
+
+| `bausteinsicht lint`
+| Check the model against its architectural constraints
+
+| `bausteinsicht health`
+| Compute an architecture health score (completeness, conformance, complexity)
+
+| `bausteinsicht graph`
+| Analyse the relationship graph: cycles, centrality, dependency depth
+
+| `bausteinsicht stale` / `bausteinsicht status` / `bausteinsicht find` / `bausteinsicht show`
+| Inspect the model: flag stale elements, list by lifecycle status, full-text search, show one element
+
+| `bausteinsicht snapshot` / `bausteinsicht diff` / `bausteinsicht changelog`
+| Versioned snapshots, as-is/to-be comparison, and architecture changelog
+
+| `bausteinsicht generate-template` / `bausteinsicht layout` / `bausteinsicht schema` / `bausteinsicht workspace` / `bausteinsicht overlay` / `bausteinsicht adr`
+| Generate a template from the spec, lay out a diagram, generate the JSON Schema, merge multi-model workspaces, overlay metric heatmaps, and list ADRs
 |===
+
+For the complete flag-by-flag reference of every command, see link:02_cli_specification.html[CLI Specification].
 
 === Global Flags
 
