@@ -82,6 +82,8 @@ image::arc42/architecture-context.png[System Context,width=80%]
 
 include::context-elements.adoc[]
 
+NOTE: The generated diagram above is itself produced from a Bausteinsicht model and shows the principal technical partners (developer, draw.io, IDE). The table below is the authoritative, complete set of communication partners — including the human architect, LLM agents, and git, which act on the system rather than appearing inside its own context view.
+
 [cols="1,2,2"]
 |===
 | Communication Partner | Input | Output
@@ -140,4 +142,24 @@ include::context-elements.adoc[]
 | JSON Schema
 | Published schema file (local or SchemaStore.org)
 | Enables IDE support without Bausteinsicht-specific plugins.
+
+| draw.io CLI
+| External process (auto-detected on `PATH`)
+| `export` invokes the headless draw.io binary to render diagram pages to PNG/SVG.
+
+| Git
+| External process (`git log`)
+| `stale` and `changelog` read element history from the repository; optional (graceful degradation outside git).
+
+| Import / export formats
+| Files on filesystem
+| In: Structurizr DSL (`.dsl`), LikeC4 (`.c4`). Out: C4-PlantUML, Mermaid, DOT, D2, HTML, Structurizr DSL, sequence diagrams, AsciiDoc/Markdown tables.
+
+| Language Server (LSP)
+| JSON-RPC over stdio
+| The `bausteinsicht-lsp` binary serves diagnostics and code lenses to editors (e.g. the VS Code extension).
+
+| Snapshot store
+| Files on filesystem (`.bausteinsicht-snapshots/`)
+| Versioned model captures written and read by the `snapshot` commands.
 |===
