@@ -14,7 +14,6 @@ import (
 	"github.com/docToolchain/Bausteinsicht/internal/drawio"
 	"github.com/docToolchain/Bausteinsicht/internal/model"
 	bsync "github.com/docToolchain/Bausteinsicht/internal/sync"
-	"github.com/docToolchain/Bausteinsicht/templates"
 	"github.com/spf13/cobra"
 )
 
@@ -105,13 +104,9 @@ func runSync(cmd *cobra.Command, _ []string) error {
 		}
 	}
 
-	// Load template.
-	var tmpl *drawio.TemplateSet
-	if templatePath != "" {
-		tmpl, err = drawio.LoadTemplate(templatePath)
-	} else {
-		tmpl, err = drawio.LoadTemplateFromBytes(templates.DefaultTemplate)
-	}
+	// Load template: explicit --template flag > local template.drawio next to the
+	// model > embedded default (#418).
+	tmpl, err := resolveTemplate(templatePath, dir)
 	if err != nil {
 		return exitWithCode(fmt.Errorf("loading template: %w", err), 2)
 	}
