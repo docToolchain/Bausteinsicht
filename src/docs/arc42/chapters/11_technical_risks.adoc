@@ -13,80 +13,88 @@ ifndef::imagesdir[:imagesdir: ../../images]
 [[section-technical-risks]]
 == Risks and Technical Debts
 
+This is the project's living risk register. Its risk IDs (`R-n`) and debt IDs (`D-n`) are local to this chapter. The link:../2026-03-06-architecture-review.html[ATAM Architecture Review (2026-03-06)] was the original input and remains the point-in-time analysis with its own separate numbering (sensitivity/tradeoff points); do not assume `R-5` here equals `R-5` there.
 
-The canonical risk analysis for Bausteinsicht is the link:../2026-03-06-architecture-review.html[ATAM Architecture Review (2026-03-06)], which identifies 8 risks, 5 sensitivity points, and 6 tradeoff points.
-This section summarizes the top risks.
-For the complete risk register, sensitivity point analysis, and tradeoff analysis, refer to the full ATAM review.
+=== Risks
 
-=== Top Risks
+Priority is derived from likelihood × impact. The table is ordered by priority, resolved items last.
 
-[cols="1,2,1,1,3"]
+[cols="1,3,1,1,1,3"]
 |===
-| ID | Risk | Likelihood | Impact | Mitigation
-
-| R-1
-| Path traversal via `--model` / `--template` CLI flags — an automated agent with untrusted input could read/write outside the intended directory.
-| Medium
-| Medium
-| Document trust model. Consider optional `--restrict-to-dir` flag for agent use cases. (Priority: *before release*)
-
-| R-2
-| Sync state file (`.bausteinsicht-sync`) corruption — a corrupted file causes the next sync to treat everything as new, potentially duplicating elements.
-| Low
-| High
-| State file is committed to Git (recoverable). Add integrity check with clear error message. (Priority: *after release*)
+| ID | Risk | Likelihood | Impact | Priority | Mitigation / Status
 
 | R-3
-| draw.io XML format changes — the XML format is not formally versioned; breaking changes could break the sync engine.
-| Medium
-| High
-| Custom `bausteinsicht_id` attributes are unlikely to conflict. Pin tested draw.io version in docs. (Priority: *after release*)
-
-| R-4
-| Large model performance — sync engine processes all elements on every run with O(n*m) element-view matching.
-| Low
-| Medium
-| Go performance makes this unlikely below ~1000 elements. Profile with 500-element model. (Priority: *v2*)
-
-| R-5
-| LSP server crashes or hangs — VS Code extension depends on LSP availability for autocompletion and validation.
-| Medium
-| Medium
-| Implement health checks, restart logic, and timeout handling. Add telemetry for crash detection. (Priority: *post-release*)
+| draw.io XML format changes — the format is not formally versioned; a breaking change could break the sync engine.
+| Medium | High | High
+| Custom `bausteinsicht_id` attributes are unlikely to conflict; templates carry `bausteinsicht_template_version`. The draw.io version is pinned in the devcontainer. *Open.*
 
 | R-6
-| DSL import parsing errors — Structurizr DSL and LikeC4 parsers may fail on valid but unexpected DSL syntax, losing data on import.
-| Medium
-| High
-| Add comprehensive error messages and validation warnings. Implement roundtrip tests (import → export → import). (Priority: *after release*)
+| DSL import parsing errors — Structurizr DSL / LikeC4 parsers may fail on valid-but-unexpected syntax, losing data on import.
+| Medium | High | High
+| Comprehensive error messages + validation warnings; add roundtrip tests (import → export → import). *Open.* Burdens `internal/importer`.
+
+| R-5
+| LSP server crashes or hangs — editor integration depends on its availability.
+| Medium | Medium | Medium
+| Health checks, restart logic, timeout handling. *Open.* Burdens `internal/lsp`.
+
+| R-9
+| Headless draw.io dependency — PNG/SVG export drives the draw.io Electron app via xvfb + dbus; a fragile setup that fails silently in unusual environments.
+| Medium | Medium | Medium
+| Text exports (`export-diagram`/`-sequence`/`-table`) need no draw.io; the devcontainer pins the setup. *Open.* Burdens `internal/export`.
+
+| R-10
+| Auto-layout quality — the engine is a layered heuristic, not crossing-minimization; dense diagrams still need manual cleanup.
+| Medium | Low | Low
+| `none` layout mode + draw.io editing as escape hatch; see link:../ADRs/ADR-005-Auto-Layout-Engine.html[ADR-005]. *Open.* Burdens `internal/layout`.
+
+| R-4
+| Large-model sync performance — O(n·m) element/view matching on every run.
+| Low | Medium | Low
+| Go keeps this acceptable below ~1000 elements; profile with a 500-element model. *Open (v2).*
 
 | R-7
-| Large model export performance — exporting 1000+ element models to Mermaid or Structurizr DSL could be slow.
-| Low
-| Medium
-| Add streaming export for large models. Profile with 500-element export. (Priority: *v2*)
+| Large-model export performance — exporting 1000+ elements to text/DSL could be slow.
+| Low | Medium | Low
+| Streaming export for large models; profile at 500 elements. *Open (v2).*
 
 | R-8
-| Search result completeness — element search with pattern matching might miss results due to regex escaping or scope filtering.
-| Low
-| Low
-| Add property-based tests for search patterns. Test edge cases: special characters, deep nesting, circular references. (Priority: *post-release*)
+| Search completeness — pattern matching might miss results due to escaping or scope filtering.
+| Low | Low | Low
+| Property-based tests for search patterns; edge cases (special chars, deep nesting). *Open.* Burdens `internal/search`.
+
+| R-11
+| Supply chain (SEC-014) — the Dockerfile downloads install scripts without checksum verification.
+| Low | Medium | Low
+| Deferred; see the link:../../security/2026-03-01-security-review.html[security review]. Affects the dev/CI image only, not the released binary.
+
+| R-1
+| Path traversal via `--model` / `--template` / `--output` — an agent with untrusted input could read/write outside the working directory.
+| — | — | *Resolved*
+| `validatePathContainment` rejects `..`/escaping paths (exit 2), SEC-001/SEC-016; documented in the link:../../spec/07_trust_model.html[trust model].
+
+| R-2
+| Sync-state file corruption — a corrupt `.bausteinsicht-sync` could make the next sync treat everything as new.
+| — | — | *Resolved*
+| The state file carries a SHA-256 checksum verified on load (`internal/sync/state.go`); it is also committed to git (recoverable).
 |===
 
 === Technical Debts
 
-* *No auto-layout (TP-1):* First sync produces a flat row of elements. Users must arrange manually in draw.io. Acceptable for v1; evaluate hierarchical auto-layout as opt-in post-release.
-* *Single template style (TP-6):* `bausteinsicht init` ships a default template, but only one style. Consider additional template styles or a template gallery post-release.
-* *E2E test coverage:* 26 of 215 tests are skipped (mostly environment-related). Reduce skip count in CI to improve confidence.
-* *LSP editor support (TP-7):* LSP server implemented but only VS Code integration complete. Extend to other editors (Neovim, Sublime, Emacs) post-release.
-* *Import roundtrip completeness (TP-8):* Structurizr DSL and LikeC4 imports work but may lose custom metadata on export-import cycle. Document lossy fields and plan full roundtrip support for v2.
+Each item names the building block it burdens (see link:05_building_block_view.html[Chapter 5]).
+
+* *D-1 — Auto-layout is heuristic* (`internal/layout`, `internal/sync`): layered/grid placement, not edge-crossing minimization. Adequate for typical C4 diagrams; a force-directed engine remains a future option (link:../ADRs/ADR-005-Auto-Layout-Engine.html[ADR-005]). _(Replaces the former "no auto-layout" debt — auto-layout now ships.)_
+* *D-2 — REPL full-save loses JSONC comments* (`cmd/bausteinsicht` repl, `internal/model` patch): pure additions are patched comment-preserving, but any modification/deletion falls back to a full rewrite that drops comments (with a visible warning). Tracked in link:https://github.com/docToolchain/Bausteinsicht/issues/410[#410].
+* *D-3 — LSP editor support* (`internal/lsp`): the server works but only the VS Code integration is complete; extend to Neovim/Sublime/Emacs.
+* *D-4 — Import/export roundtrip is lossy* (`internal/importer`, `internal/exporter`): Structurizr/LikeC4 import and Structurizr export may drop custom metadata on a full cycle; document lossy fields, plan full roundtrip for v2.
+* *D-5 — Coverage gate friction* (CI): the SonarCloud new-code-coverage gate (80%) blocks refactors touching untested legacy code while the baseline is ~70%; see link:https://github.com/docToolchain/Bausteinsicht/issues/449[#449].
 
 === Non-Risks
 
-The following areas were explicitly evaluated and confirmed safe (see link:../2026-03-06-architecture-review.adoc#_non_risks[ATAM Non-Risks]):
+The following were evaluated and confirmed not to be threats (see link:../2026-03-06-architecture-review.html#_non_risks[ATAM Non-Risks]):
 
-* XXE / XML bomb attacks — parser does not expand entities
-* JSON deserialization attacks — Go's `encoding/json` is safe
-* Command injection — no `os/exec` calls in the codebase
-* Supply chain — no npm; Go module verification passes; 5 direct dependencies with no CVEs
-* Regression safety — 188 passing E2E tests, property-based tests, pre-commit hooks
+* *XXE / XML-bomb* — the draw.io XML parser does not expand external entities.
+* *JSON deserialization* — Go's `encoding/json` is memory-safe.
+* *Command injection from input* — the tool *does* invoke external binaries (`internal/export` → draw.io, `internal/stale` & `internal/changelog` → `git`, `internal/lsp` re-exec), but they are resolved from `PATH` and their names/arguments are never derived from model or template content, so untrusted input cannot inject a command. Harden `PATH` in restricted environments.
+* *Supply chain* — the product binary uses no npm and only 4 direct Go modules (`beevik/etree`, `fsnotify`, `cobra`, `pgregory.net/rapid`), with module verification; the optional VS Code extension is a separate TypeScript/npm artifact, not part of the CLI.
+* *Regression safety* — 863 test functions (9 skipped), property-based tests (`pgregory.net/rapid`), and pre-commit hooks guard the build.
