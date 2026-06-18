@@ -106,6 +106,38 @@ See link:01_use_cases.html[Use Cases] for the functional overview of all CLI com
 | Generate an architecture changelog between two versions
 | Implemented
 
+| `bausteinsicht import`
+| Import a model from Structurizr DSL or LikeC4
+| Implemented
+
+| `bausteinsicht generate-template`
+| Generate a draw.io template from the specification
+| Implemented
+
+| `bausteinsicht layout`
+| Compute hierarchical layout and write positions back to draw.io
+| Implemented
+
+| `bausteinsicht overlay`
+| Apply/list/remove metric heatmap overlays on the diagram
+| Implemented
+
+| `bausteinsicht repl`
+| Interactive shell for editing the model
+| Implemented
+
+| `bausteinsicht adr`
+| List and show Architecture Decision Records linked to elements
+| Implemented
+
+| `bausteinsicht workspace`
+| List, merge, and validate multi-model workspaces
+| Implemented
+
+| `bausteinsicht schema`
+| Generate the JSON Schema from the Go model types
+| Implemented
+
 | `bausteinsicht --version`
 | Display version number
 | Implemented
@@ -1177,3 +1209,124 @@ Generates a human-readable changelog between two versions of the model.
 |===
 
 **Behavior:** loads the model at each git ref (via `git rev-parse` / `git show`) and reports the architecture changes between them. Only git refs are supported — snapshot IDs are not (yet) resolved, and an empty `--since` fails to resolve. (Note: changelog uses `--changelog-format`, not the global `--format`.)
+
+==== `bausteinsicht import`
+
+Imports an architecture model from an external DSL and writes a Bausteinsicht `.jsonc` file.
+
+**Arguments:** `<input-file>` (required) — the source DSL file.
+
+**Flags:**
+
+[cols="2,3,1,1"]
+|===
+| Flag | Description | Required | Default
+
+| `--from` | Source format: `structurizr` (`.dsl`) or `likec4` (`.c4`). | Yes | (none)
+| `--output` | Output model file path. | No | `architecture.jsonc`
+| `--dry-run` | Print the generated model to stdout instead of writing the file. | No | `false`
+| `--force` | Overwrite the output file if it already exists. | No | `false`
+|===
+
+**Behavior:** parses the source DSL, maps people/systems/containers and relationships, and generates a matching specification. Exit `2` if the output exists without `--force`, `1` on a parse error.
+
+==== `bausteinsicht generate-template`
+
+Generates a draw.io template with a styled shape for each element kind in the specification.
+
+**Flags:**
+
+[cols="2,3,1,1"]
+|===
+| Flag | Description | Required | Default
+
+| `--style` | Visual preset: `default`, `c4`, `minimal`, or `dark`. | No | `default`
+| `--output` | Output template file. | No | `architecture-template.drawio`
+| `--model` | Model file (auto-detected if omitted). | No | (auto-detect)
+|===
+
+**Behavior:** the generated file carries the `bausteinsicht_template` attributes the sync engine needs, so it works directly as a `--template`.
+
+==== `bausteinsicht layout`
+
+Computes a hierarchical layout for the diagram and writes the element positions back to the draw.io file.
+
+**Flags:**
+
+[cols="2,3,1,1"]
+|===
+| Flag | Description | Required | Default
+
+| `--algorithm` | Layout algorithm (currently only `hierarchical`). | No | `hierarchical`
+| `--rank-dir` | Ranking direction: `TB` (top-to-bottom) or `LR` (left-to-right). | No | `TB`
+| `--preserve-pinned` | Do not move elements marked `bausteinsicht-pinned=true`. | No | `true`
+|===
+
+==== `bausteinsicht overlay`
+
+Loads external metrics (error rate, coverage, …) from a JSON file and overlays them as a heatmap on draw.io elements; original styles are preserved.
+
+**Subcommands:**
+
+[cols="1,3"]
+|===
+| Subcommand | Description
+
+| `apply <metrics-file>` | Apply a metric heatmap (`--metric <key>`, default: first available; `--output`, default `architecture.drawio`).
+| `list <metrics-file>` | List the metrics available in the file.
+| `remove` | Remove the overlay and restore original colors (`--output`).
+|===
+
+==== `bausteinsicht repl`
+
+Starts an interactive shell for editing the model.
+
+**Flags:** none beyond the global flags.
+
+**Behavior:** keeps the model in memory; supports `add`/`remove`/`list`/`undo`/`save`. Validates before every save; pure additions are patched comment-preserving, modifications/deletions fall back to a full rewrite (with a warning). Warns on exit with unsaved changes; `Ctrl-D` (EOF) exits cleanly.
+
+==== `bausteinsicht adr`
+
+Lists and shows Architecture Decision Records linked to model elements (the `decisions` field).
+
+**Subcommands:**
+
+[cols="1,3"]
+|===
+| Subcommand | Description
+
+| `list` | List all ADRs, or only those linked to one element (`--element <id>`).
+| `show <adr-id>` | Show details of a specific ADR.
+|===
+
+**Flags:** `--model`, `-m` (default `architecture.jsonc`) and the global `--format`.
+
+==== `bausteinsicht workspace`
+
+Works with multi-model workspaces that combine several architecture models.
+
+**Subcommands:**
+
+[cols="1,3"]
+|===
+| Subcommand | Description
+
+| `list <config-file>` | List the models in a workspace configuration.
+| `merge <config-file> <output-file>` | Merge the configured models into one unified model.
+| `validate <config-file>` | Validate a workspace configuration.
+|===
+
+==== `bausteinsicht schema`
+
+Manages the JSON Schema for Bausteinsicht models.
+
+**Subcommands:**
+
+[cols="1,3"]
+|===
+| Subcommand | Description
+
+| `generate` | Generate the JSON Schema from the Go model types.
+|===
+
+**Behavior:** the schema is generated from `internal/model` types, so it stays in sync with the model definitions.
