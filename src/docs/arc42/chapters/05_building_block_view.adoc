@@ -17,9 +17,11 @@ image::arc42/architecture-containers.png[Container View,width=80%]
 
 ==== Motivation
 
-The system decomposes into four internal packages plus a thin CLI layer. The key separation is between `model` (JSON world) and `drawio` (XML world), with `sync` as the mediator. This ensures changes to one format never leak into the other package.
+At the centre sits a small **core engine** — `model` (the JSONC world), `drawio` (the XML world), and `sync` as the mediator between them, so changes to one format never leak into the other package. Around this core, a set of **feature packages** add analysis, evolution, interop, and styling, and a **thin CLI layer** (`cmd/bausteinsicht`) wires commands to them. A second binary (`cmd/bausteinsicht-lsp`) reuses the same library code to serve editors over the Language Server Protocol.
 
-==== Building Blocks
+In total the system is **two binaries over ~23 production packages** (plus two test-only helper packages). The complete map is in the Package Map below; the core engine is decomposed further in the Level 2 sections.
+
+==== Building Blocks (core)
 
 include::containers-elements.adoc[]
 
@@ -44,8 +46,8 @@ include::containers-elements.adoc[]
 | `drawio.LoadTemplate(path) → TemplateSet`
 | Reads a template file and extracts styles keyed by `bausteinsicht_template` kind.
 
-| `sync.Run(model, document, state, templates) → Result`
-| Executes one full bidirectional sync cycle. Returns a result describing all changes and conflicts.
+| `sync.Run(model, document, lastState, templates, newPageIDs, ...opts) → *SyncResult`
+| Executes one full bidirectional sync cycle — a pure function with no I/O. `newPageIDs` marks pages created in this run (so their elements are not mistaken for deletions); `opts` are optional `ForwardOptions` (e.g. relayout). Returns a `SyncResult` describing all changes and conflicts.
 
 | `sync.LoadState(path) → SyncState`
 | Reads the `.bausteinsicht-sync` state file.
@@ -53,6 +55,78 @@ include::containers-elements.adoc[]
 | `sync.SaveState(path, SyncState)`
 | Writes the updated sync state after successful sync.
 |===
+
+
+==== Package Map (all building blocks)
+
+Every production package, grouped by role. Each row is a Level-1 building block: its responsibility and its source location. The core three (`model`, `drawio`, `sync`) are decomposed further in the Level 2 sections below.
+
+.Core engine
+[cols="1,3,1"]
+|===
+| Package | Responsibility | Source
+
+| `model` | DSL types, JSONC loader (comment-preserving patch + full save), validation, ID/wildcard resolution | `internal/model/`
+| `drawio` | Read/write draw.io XML: document, element, connector, template, HTML label | `internal/drawio/`
+| `sync` | Bidirectional sync: diff, forward/reverse apply, conflict resolution, state, layout, badges, metadata | `internal/sync/`
+| `watcher` | fsnotify file watcher driving `--watch` mode (300 ms debounce) | `internal/watcher/`
+|===
+
+.Analysis
+[cols="1,3,1"]
+|===
+| Package | Responsibility | Source
+
+| `constraints` | Evaluate architectural rules from the model (`lint`) | `internal/constraints/`
+| `graph` | Relationship-graph analysis: cycles, dependency depth, centrality (`graph`) | `internal/graph/`
+| `health` | Architecture health score across weighted categories (`health`) | `internal/health/`
+| `stale` | Detect unused/forgotten elements, using git history (`stale`) | `internal/stale/`
+| `search` | Full-text search over elements, relationships, views (`find`) | `internal/search/`
+| `workspace` | Group, merge, and validate multiple models together as one workspace (`workspace`) | `internal/workspace/`
+|===
+
+.Evolution
+[cols="1,3,1"]
+|===
+| Package | Responsibility | Source
+
+| `snapshot` | Versioned model captures, semantically diffable (`snapshot`) | `internal/snapshot/`
+| `diff` | As-is vs. to-be model comparison (`diff`) | `internal/diff/`
+| `changelog` | Architecture changelog between two git points (`changelog`) | `internal/changelog/`
+|===
+
+.Layout & styling
+[cols="1,3,1"]
+|===
+| Package | Responsibility | Source
+
+| `layout` | Hierarchical auto-layout engine (`layout`, `sync --relayout`) | `internal/layout/`
+| `template` | Generate a draw.io template from the specification (`generate-template`) | `internal/template/`
+| `overlay` | Apply/remove metric heatmap overlays on diagrams (`overlay`) | `internal/overlay/`
+|===
+
+.Interop & export
+[cols="1,3,1"]
+|===
+| Package | Responsibility | Source
+
+| `importer` | Import models from Structurizr DSL and LikeC4 (`import`) | `internal/importer/` (`structurizr/`, `likec4/`)
+| `exporter` | Export the model as Structurizr DSL | `internal/exporter/structurizr/`
+| `diagram` | Render views as text diagrams: C4-PlantUML, Mermaid, DOT, D2, HTML, sequence (`export-diagram`, `export-sequence`) | `internal/diagram/`
+| `table` | Render element attributes as AsciiDoc/Markdown tables (`export-table`) | `internal/table/`
+| `export` | Export diagram pages to PNG/SVG via headless draw.io (`export`) | `internal/export/`
+| `schema` | Generate the JSON Schema from the Go model types (`schema`) | `internal/schema/`
+|===
+
+.IDE integration
+[cols="1,3,1"]
+|===
+| Package | Responsibility | Source
+
+| `lsp` | Language Server Protocol server: diagnostics, code lenses; backs the `cmd/bausteinsicht-lsp` binary and the VS Code extension | `internal/lsp/`
+|===
+
+NOTE: `internal/chaos` (fault-injection helper) and `internal/benchmarks` are **test-only** utilities, not production building blocks.
 
 
 === Level 2: Sync Engine
@@ -91,49 +165,30 @@ include::model-components-elements.adoc[]
 
 === Go Package Layout
 
-The following directory structure maps directly to the building blocks above:
+The directory structure maps directly to the building blocks above (packages, not every file):
 
 ....
 bausteinsicht/
 ├── cmd/
-│   └── bausteinsicht/
-│       ├── main.go              // Entry point
-│       ├── root.go              // Root command, global flags
-│       ├── init.go              // bausteinsicht init
-│       ├── sync.go              // bausteinsicht sync
-│       ├── validate.go          // bausteinsicht validate
-│       ├── watch.go             // bausteinsicht watch
-│       ├── add_element.go       // bausteinsicht add element
-│       └── add_relationship.go  // bausteinsicht add relationship
+│   ├── bausteinsicht/      // main CLI — one file per command (init, sync, add, repl, export*, …)
+│   └── bausteinsicht-lsp/  // Language Server Protocol binary
 ├── internal/
-│   ├── model/
-│   │   ├── types.go             // BausteinsichtModel, Element, ...
-│   │   ├── loader.go            // JSONC read/write
-│   │   ├── resolve.go           // ID resolution, wildcards
-│   │   └── validate.go          // Model validation
-│   ├── drawio/
-│   │   ├── document.go          // mxfile/diagram parsing
-│   │   ├── element.go           // <object> + <mxCell> CRUD
-│   │   ├── connector.go         // Edge/connector CRUD
-│   │   ├── template.go          // Template loading
-│   │   └── label.go             // HTML label gen/parse
-│   ├── sync/
-│   │   ├── engine.go            // Main sync orchestration
-│   │   ├── forward.go           // Model → draw.io
-│   │   ├── reverse.go           // draw.io → Model
-│   │   ├── state.go             // .bausteinsicht-sync I/O
-│   │   ├── diff.go              // Change detection
-│   │   └── conflict.go          // Conflict resolution
-│   └── watcher/
-│       └── watcher.go           // fsnotify file watcher
+│   ├── model/  drawio/  sync/  watcher/                          // core engine
+│   ├── constraints/  graph/  health/  stale/  search/            // analysis
+│   ├── snapshot/  diff/  changelog/                              // evolution
+│   ├── layout/  template/  overlay/                              // layout & styling
+│   ├── importer/  exporter/  diagram/  table/  export/  schema/  // interop & export
+│   ├── lsp/                                                      // IDE integration
+│   └── chaos/  benchmarks/                                       // test-only helpers
 ├── go.mod
 └── go.sum
 ....
 
 ==== Conventions
 
-* `cmd/bausteinsicht/` contains only CLI wiring — no business logic
-* `internal/` ensures packages cannot be imported by external code
-* Each package has a clear single responsibility
-* Cross-package dependencies flow inward: `cmd → sync → model + drawio`
-* The `model` and `drawio` packages never depend on each other
+* `cmd/bausteinsicht/` contains only CLI wiring — no business logic; all logic lives in `internal/` packages (so the LSP binary can reuse it).
+* `internal/` ensures packages cannot be imported by external code.
+* Each package has a clear single responsibility (see the Package Map).
+* Cross-package dependencies flow inward toward the core: `cmd → feature packages → sync → model + drawio`.
+* The `model` and `drawio` packages never depend on each other — `sync` is the only mediator.
+* `chaos` and `benchmarks` are imported only from `_test.go` files, so production code never depends on them.
