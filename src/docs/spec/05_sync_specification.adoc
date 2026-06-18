@@ -608,6 +608,35 @@ Relationship connectors also use template styles. The connector template is iden
 
 NOTE: Unlike element templates which use `<object>` wrappers, the connector template is a bare `<mxCell>` since connectors do not need custom metadata attributes.
 
+=== Layout Modes
+
+Each view chooses how new elements are placed via its `layout` field (BR-014). `computeLayout` (`internal/sync/layout.go`) dispatches on it:
+
+* `layered` (the default, also used when `layout` is empty) — elements are arranged in horizontal rows grouped by kind, following the specification's element order, with related elements placed near each other.
+* `grid` — all elements are placed in a simple grid; useful for overview pages.
+* `none` — the legacy horizontal-row placement; sync does not arrange beyond a single row, leaving layout to the user.
+
+Sync only *places* elements that are new to a page; it never moves elements already positioned (see <<Placement Strategy for New Elements>>). The `sync --relayout` flag (`ForwardOptions.Relayout`) overrides this: it clears and re-lays-out **all** view pages from scratch — deliberately destructive to manual arrangement.
+
+=== Status and Decision Badges
+
+When an element carries `decisions` (linked ADR IDs), forward sync renders one **decision badge** per decision as a child cell in the element's top-right corner (`AddDecisionBadges`, `internal/sync/badge.go`). Each badge is coloured by the referenced ADR's status (`DecisionBadgeColor`: blue = active, yellow = proposed, grey = superseded/deprecated) and carries a `bausteinsicht_decision_id` attribute.
+
+NOTE: A **status badge** renderer (`AddStatusBadge`, coloured by the element's lifecycle `status` via `StatusColor`) is implemented and unit-tested but is **not currently wired into forward sync** — no production code calls it. Whether to wire it up (render a lifecycle badge alongside decision badges) or remove it is an open decision; until then, element `status` is validated (BR-029–BR-031) but not visualised.
+
+=== Tag-Based Styling
+
+An element's `tags` can drive its visual style. For each tag, `applyTagStyles` (`internal/sync/forward.go`) looks up the matching `TagDefinition` in `specification.tags` and merges its `style` properties into the element's draw.io style string. Tag styles layer on top of the template style, so a tag can override fill colour, stroke, or font without changing the template. Tags that resolve to no `TagDefinition`, or definitions without a `style`, leave the base style unchanged.
+
+=== Metadata and Legend Boxes
+
+Forward sync can add two informational boxes to each view page:
+
+* a **metadata box** (`createMetadata`) showing the model path, the sync timestamp, and the `config.author` / `config.repo` values;
+* a **legend** (`createLegend`) showing the element kinds used in the view.
+
+Both are enabled by default and switched off per model via `config.metadata: false` and `config.legend: false` — the gate is `Config.Metadata == nil || *Config.Metadata`, so an unset value means on. The boxes are keyed by `metadata-<viewID>` / `legend-<viewID>` cell IDs and are updated in place on subsequent syncs rather than duplicated.
+
 === Edge Cases
 
 ==== Element appears in multiple views
