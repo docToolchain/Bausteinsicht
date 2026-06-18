@@ -120,6 +120,24 @@ func validateElement(m *BausteinsichtModel, path string, elem Element, depth int
 	return errs
 }
 
+// validCardinalities and validDataFlows as lookup maps avoid repeated linear
+// searches inside the hot relationship-validation loop.
+var validCardinalities = func() map[string]bool {
+	m := make(map[string]bool, len(ValidCardinalities))
+	for _, c := range ValidCardinalities {
+		m[c] = true
+	}
+	return m
+}()
+
+var validDataFlows = func() map[string]bool {
+	m := make(map[string]bool, len(ValidDataFlows))
+	for _, df := range ValidDataFlows {
+		m[df] = true
+	}
+	return m
+}()
+
 func validateRelationships(m *BausteinsichtModel) []ValidationError {
 	var errs []ValidationError
 	// Track seen relationships keyed by "from->to->kind->label" to allow
@@ -152,39 +170,17 @@ func validateRelationships(m *BausteinsichtModel) []ValidationError {
 				})
 			}
 		}
-
-		// Validate cardinality
-		if rel.Cardinality != "" {
-			valid := false
-			for _, c := range ValidCardinalities {
-				if rel.Cardinality == c {
-					valid = true
-					break
-				}
-			}
-			if !valid {
-				errs = append(errs, ValidationError{
-					Path:    path,
-					Message: fmt.Sprintf("invalid cardinality %q (valid: %v)", rel.Cardinality, ValidCardinalities),
-				})
-			}
+		if rel.Cardinality != "" && !validCardinalities[rel.Cardinality] {
+			errs = append(errs, ValidationError{
+				Path:    path,
+				Message: fmt.Sprintf("invalid cardinality %q (valid: %v)", rel.Cardinality, ValidCardinalities),
+			})
 		}
-
-		// Validate data flow
-		if rel.DataFlow != "" {
-			valid := false
-			for _, df := range ValidDataFlows {
-				if rel.DataFlow == df {
-					valid = true
-					break
-				}
-			}
-			if !valid {
-				errs = append(errs, ValidationError{
-					Path:    path,
-					Message: fmt.Sprintf("invalid dataFlow %q (valid: %v)", rel.DataFlow, ValidDataFlows),
-				})
-			}
+		if rel.DataFlow != "" && !validDataFlows[rel.DataFlow] {
+			errs = append(errs, ValidationError{
+				Path:    path,
+				Message: fmt.Sprintf("invalid dataFlow %q (valid: %v)", rel.DataFlow, ValidDataFlows),
+			})
 		}
 
 		// Detect fully duplicate relationships (same from, to, kind, and label). (#117, #142)
