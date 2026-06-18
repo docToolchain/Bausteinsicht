@@ -79,7 +79,7 @@ See link:01_use_cases.html[Use Cases] for the functional overview of all CLI com
 | Implemented
 
 | `bausteinsicht stale`
-| Detect unused or forgotten elements (using git history)
+| Flag elements that are old (beyond a threshold) and carry neither a lifecycle status nor an ADR link
 | Implemented
 
 | `bausteinsicht status`
@@ -1028,7 +1028,7 @@ Evaluates the architectural constraints defined in the model and reports violati
 
 **Flags:** none beyond the global flags.
 
-**Behavior:** loads the model, evaluates each constraint, and prints the violations (or "All constraints passed."). Use in CI as an architecture gate.
+**Behavior:** loads the model and evaluates each constraint. Prints `All constraints passed.` when constraints exist with no violations, `No constraints defined.` when the model declares none, or the list of violations otherwise. Use in CI as an architecture gate.
 
 ==== `bausteinsicht health`
 
@@ -1065,7 +1065,7 @@ Analyzes the relationship graph: cycle detection, dependency depth, and centrali
 
 ==== `bausteinsicht stale`
 
-Detects elements that look forgotten — unreferenced by any view or relationship, or unmodified for longer than a threshold (derived from git history).
+Flags elements that look forgotten. An element is reported only when **all three** hold: its last modification is older than the threshold, it has no lifecycle `status`, and it links no ADR (`decisions` is empty). Archived elements are skipped.
 
 **Flags:**
 
@@ -1081,7 +1081,7 @@ Detects elements that look forgotten — unreferenced by any view or relationshi
 | `--format`, `-f` | Output format: `text` or `json`. | No | `text`
 |===
 
-**Behavior:** outside a git repository the history lookup degrades gracefully, falling back to the view/relationship membership checks. Output is deterministically ordered.
+**Behavior:** the last-modified date comes from per-element git history, or from the element's explicit `lastModified` field if set. Outside a git repository, elements without an explicit `lastModified` have no known date and are therefore **not** flagged by age. Output is deterministically ordered (by risk, then ID).
 
 ==== `bausteinsicht status`
 
@@ -1134,9 +1134,9 @@ Manages versioned model snapshots stored in `.bausteinsicht-snapshots/`.
 | Subcommand | Description
 
 | `save` | Capture the current model as a snapshot (`--message` adds a note).
-| `list` | List saved snapshots (`--format json`).
-| `diff <id>` | Diff a snapshot against another snapshot or the current model.
-| `restore <id>` | Restore a snapshot to a file.
+| `list` | List saved snapshots (`--output-format table\|json`).
+| `diff <id1> [id2]` | Diff snapshot `id1` against `id2`, or against the current model if `id2` is omitted (`--format text\|json`).
+| `restore <id> <output-path>` | Restore a snapshot to a file (`--force` to overwrite).
 | `delete <id>` | Delete a snapshot.
 |===
 
@@ -1153,7 +1153,7 @@ Reports the gap between the model's `asIs` and `toBe` sections.
 | Flag | Description | Required | Default
 
 | `--model` | Model file path. | No | `architecture.jsonc`
-| `--view` | Show the diff for one view only. | No | (all)
+| `--view` | Accepted for forward compatibility but currently has **no effect** (per-view diff is not yet implemented). | No | (all)
 | `--format` | Output format: `text` or `json`. | No | `text`
 |===
 
@@ -1169,11 +1169,11 @@ Generates a human-readable changelog between two versions of the model.
 |===
 | Flag | Description | Required | Default
 
-| `--since` | Starting git ref or snapshot ID. | No | previous tag
-| `--until` | Ending git ref or snapshot ID. | No | `HEAD`
+| `--since` | Starting git ref (commit SHA or tag). Must be provided — there is no implemented default. | Yes (in practice) | (none)
+| `--until` | Ending git ref. | No | `HEAD`
 | `--model` | Model file path. | No | `architecture.jsonc`
 | `--changelog-format` | Output format: `markdown`, `asciidoc`, or `json`. | No | `markdown`
 | `--output` | Write to a file instead of stdout. | No | (stdout)
 |===
 
-**Behavior:** resolves the two versions from git refs or snapshots, then reports the architecture changes between them. (Note: changelog uses `--changelog-format`, not the global `--format`.)
+**Behavior:** loads the model at each git ref (via `git rev-parse` / `git show`) and reports the architecture changes between them. Only git refs are supported — snapshot IDs are not (yet) resolved, and an empty `--since` fails to resolve. (Note: changelog uses `--changelog-format`, not the global `--format`.)
