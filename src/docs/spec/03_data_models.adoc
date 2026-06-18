@@ -31,6 +31,66 @@ Bausteinsicht works with three data formats that must be kept in sync:
 | `*.drawio` files in project directory (uncompressed XML)
 |===
 
+=== Entity Model
+
+The JSON model is a tree of entities rooted at `BausteinsichtModel`. The diagram shows composition (filled diamond — the parent owns the child) and references (dashed arrow — one entity refers to another **by ID**). Cardinalities use UML notation.
+
+[plantuml, model-entity-model, png]
+....
+@startuml
+hide circle
+hide empty members
+skinparam classAttributeIconSize 0
+
+class BausteinsichtModel
+class Specification
+class ElementKind
+class RelationshipKind
+class TagDefinition
+class PatternDefinition
+class DecisionRecord
+class Element
+class Relationship
+class View
+class DynamicView
+class SequenceStep
+class ModelSnapshot
+
+BausteinsichtModel *-- "1" Specification
+BausteinsichtModel *-- "0..*" Element : model
+BausteinsichtModel *-- "0..*" Relationship
+BausteinsichtModel *-- "0..*" View
+BausteinsichtModel *-- "0..*" DynamicView
+BausteinsichtModel *-- "0..1" ModelSnapshot : asIs
+BausteinsichtModel *-- "0..1" ModelSnapshot : toBe
+
+Specification *-- "0..*" ElementKind
+Specification *-- "0..*" RelationshipKind
+Specification *-- "0..*" TagDefinition
+Specification *-- "0..*" PatternDefinition
+Specification *-- "0..*" DecisionRecord
+
+Element *-- "0..*" Element : children
+Element ..> ElementKind : kind
+Element ..> DecisionRecord : decisions
+
+Relationship ..> Element : from / to
+Relationship ..> RelationshipKind : kind
+Relationship ..> DecisionRecord : decisions
+
+View ..> Element : scope / include / exclude
+View ..> TagDefinition : filter-tags / exclude-tags
+
+DynamicView *-- "1..*" SequenceStep
+SequenceStep ..> Element : from / to
+
+ModelSnapshot *-- "0..*" Element
+ModelSnapshot *-- "0..*" Relationship
+@enduml
+....
+
+The element ID (the key in the `model` map, dot-pathed for nested children) is the model's primary key: relationships, view `scope`, and dynamic-view steps reference elements by that ID, while a view's `include`/`exclude` match element IDs by literal value **or wildcard pattern** (e.g. `webshop.*`, `**`). The `kind`, `decisions`, and tag references must resolve to entries defined in the `specification`. These referential constraints are enforced at validation time — see <<validation-rules,Validation Rules>>.
+
 === JSON Model Structure
 
 The model has these top-level sections. `specification`, `model`, `relationships`, and `views` are the core; the rest are optional: `$schema` (points the IDE at the JSON Schema for validation and autocompletion), `config` (project metadata/legend), `meta` (e.g. `staleDetection` settings), `dynamicViews` (sequence diagrams), `constraints` (lint rules), and `asIs`/`toBe` (for the `diff` command).
@@ -425,6 +485,19 @@ Model files use the JSONC (JSON with Comments) format. Both comment styles are s
 
 * `//` — single-line comments
 * `/\* ... */` — block comments (can span multiple lines)
+
+[[validation-rules]]
+=== Validation Rules
+
+`bausteinsicht validate` enforces the model's integrity constraints. The complete, code-traceable catalogue — each rule's exact statement, severity, and source function — is in the Business Rules section of link:01_use_cases.html#business-rules[01_use_cases] (BR-001–BR-033). The constraints on the data model group as follows:
+
+* **Structural (errors):** required fields — `kind`/`title` on elements, `title` on views, `key`/`title` on dynamic views, and at least one step per dynamic view (BR-001, BR-004, BR-013, BR-018, BR-019, BR-020); known kinds (BR-002, BR-009, BR-024, BR-025); container nesting and depth limit (BR-003, BR-006); non-empty element IDs (BR-005).
+* **Referential integrity (errors):** relationship `from`/`to`, view `scope`, non-wildcard `include`/`exclude`, `filter-tags`/`exclude-tags`, dynamic-view step `from`/`to`, and `decisions` references all resolve into the model or specification (BR-007, BR-008, BR-015, BR-016, BR-017, BR-021, BR-026).
+* **Enumerations (errors):** `cardinality`, `dataFlow`, view `layout`, and step `type` take only their fixed defined values (BR-010, BR-011, BR-014, BR-022).
+* **Uniqueness (errors):** no fully-duplicate relationships; unique step indices (BR-012, BR-023).
+* **Lifecycle & advisory (warnings):** valid `status`, archived/deprecated lifecycle rules, orphan and superseded decision references, and empty-model checks (BR-027–BR-033).
+
+Errors abort the command (exit code 1); warnings are reported with a `WARNING:` prefix and are non-blocking (exit code 0).
 
 === draw.io XML Structure
 
