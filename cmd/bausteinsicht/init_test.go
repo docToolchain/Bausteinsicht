@@ -287,10 +287,11 @@ func TestInitGenerateTemplateContainsAllKinds(t *testing.T) {
 	}
 	content := string(data)
 
-	// The default model should have certain kinds
+	// The default model should have certain kinds, carried as
+	// bausteinsicht_template attributes (the sync anchor).
 	expectedKinds := []string{"actor", "system", "container"}
 	for _, kind := range expectedKinds {
-		if !strings.Contains(content, "["+kind+"]") {
+		if !strings.Contains(content, `bausteinsicht_template="`+kind+`"`) {
 			t.Errorf("generated template missing kind %q", kind)
 		}
 	}
