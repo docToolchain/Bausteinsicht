@@ -3,6 +3,8 @@ package schema
 import (
 	"encoding/json"
 	"testing"
+
+	"github.com/docToolchain/Bausteinsicht/internal/model"
 )
 
 // TestStructure for testing schema generation
@@ -13,10 +15,10 @@ type TestConfig struct {
 }
 
 type TestModel struct {
-	Title       string      `json:"title"`
-	Description string      `json:"description,omitempty"`
-	Config      TestConfig  `json:"config"`
-	Tags        []string    `json:"tags,omitempty"`
+	Title       string            `json:"title"`
+	Description string            `json:"description,omitempty"`
+	Config      TestConfig        `json:"config"`
+	Tags        []string          `json:"tags,omitempty"`
 	Metadata    map[string]string `json:"metadata,omitempty"`
 }
 
@@ -122,5 +124,106 @@ func TestGeneratorArrayType(t *testing.T) {
 
 	if tagsMap["type"] != "array" {
 		t.Errorf("expected array type, got %v", tagsMap["type"])
+	}
+}
+
+// asMap is a small helper that fails the test if v is not a JSON object.
+func asMap(t *testing.T, v interface{}, ctx string) map[string]interface{} {
+	t.Helper()
+	m, ok := v.(map[string]interface{})
+	if !ok {
+		t.Fatalf("%s: expected object, got %T", ctx, v)
+	}
+	return m
+}
+
+// TestMapPropertyHasValueSchema guards issue #421: map-typed fields such as
+// model (map[string]Element) and views (map[string]View) must carry an
+// additionalProperties schema referencing the value type, otherwise the IDE
+// has nothing to complete or validate inside model/views.
+func TestMapPropertyHasValueSchema(t *testing.T) {
+	gen := NewGenerator()
+	s := gen.Generate(model.BausteinsichtModel{})
+
+	cases := map[string]string{
+		"model": "Element",
+		"views": "View",
+	}
+	for prop, def := range cases {
+		propSchema := asMap(t, s.Properties[prop], prop)
+		ap, ok := propSchema["additionalProperties"]
+		if !ok {
+			t.Fatalf("%s: missing additionalProperties (no element/view completion)", prop)
+		}
+		apMap := asMap(t, ap, prop+".additionalProperties")
+		wantRef := "#/definitions/" + def
+		if apMap["$ref"] != wantRef {
+			t.Errorf("%s: additionalProperties.$ref = %v, want %v", prop, apMap["$ref"], wantRef)
+		}
+	}
+}
+
+// TestStructsRejectUnknownFields guards that struct definitions set
+// additionalProperties:false so a typo (e.g. "titel" instead of "title")
+// is rejected by schema validation instead of passing silently.
+func TestStructsRejectUnknownFields(t *testing.T) {
+	gen := NewGenerator()
+	s := gen.Generate(model.BausteinsichtModel{})
+
+	if s.AdditionalProperties {
+		t.Error("top-level schema must set additionalProperties:false")
+	}
+
+	for _, name := range []string{"Element", "View", "Relationship", "DynamicView", "SequenceStep", "Specification"} {
+		def, ok := s.Definitions[name]
+		if !ok {
+			t.Errorf("definition %q not found", name)
+			continue
+		}
+		defMap := asMap(t, def, name)
+		ap, ok := defMap["additionalProperties"]
+		if !ok {
+			t.Errorf("%s: missing additionalProperties (typos pass silently)", name)
+			continue
+		}
+		if b, _ := ap.(bool); b {
+			t.Errorf("%s: additionalProperties must be false, got %v", name, ap)
+		}
+	}
+}
+
+// TestElementDefinitionHasProperties guards that the Element definition
+// actually exposes its fields (title, kind, children) for completion, and
+// that children recurses back into Element.
+func TestElementDefinitionHasProperties(t *testing.T) {
+	gen := NewGenerator()
+	s := gen.Generate(model.BausteinsichtModel{})
+
+	elem := asMap(t, s.Definitions["Element"], "Element")
+	props := asMap(t, elem["properties"], "Element.properties")
+
+	for _, field := range []string{"kind", "title", "children"} {
+		if _, ok := props[field]; !ok {
+			t.Errorf("Element definition missing property %q", field)
+		}
+	}
+
+	children := asMap(t, props["children"], "Element.children")
+	childAP := asMap(t, children["additionalProperties"], "Element.children.additionalProperties")
+	if childAP["$ref"] != "#/definitions/Element" {
+		t.Errorf("Element.children should recurse into Element, got %v", childAP["$ref"])
+	}
+}
+
+// TestFreeFormMapStaysOpen guards that genuinely free-form maps
+// (map[string]interface{}, e.g. the top-level meta field) are NOT locked
+// down with a value schema, so arbitrary project metadata remains valid.
+func TestFreeFormMapStaysOpen(t *testing.T) {
+	gen := NewGenerator()
+	s := gen.Generate(model.BausteinsichtModel{})
+
+	meta := asMap(t, s.Properties["meta"], "meta")
+	if _, locked := meta["additionalProperties"]; locked {
+		t.Error("meta (map[string]interface{}) must stay an open object")
 	}
 }

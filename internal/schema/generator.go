@@ -7,13 +7,14 @@ import (
 
 // JSONSchema represents a JSON Schema Draft 7 schema
 type JSONSchema struct {
-	Schema      string                 `json:"$schema"`
-	Title       string                 `json:"title"`
-	Description string                 `json:"description,omitempty"`
-	Type        string                 `json:"type"`
-	Properties  map[string]interface{} `json:"properties,omitempty"`
-	Required    []string               `json:"required,omitempty"`
-	Definitions map[string]interface{} `json:"definitions,omitempty"`
+	Schema               string                 `json:"$schema"`
+	Title                string                 `json:"title"`
+	Description          string                 `json:"description,omitempty"`
+	Type                 string                 `json:"type"`
+	Properties           map[string]interface{} `json:"properties,omitempty"`
+	Required             []string               `json:"required,omitempty"`
+	AdditionalProperties bool                   `json:"additionalProperties"`
+	Definitions          map[string]interface{} `json:"definitions,omitempty"`
 }
 
 // Generator generates JSON Schema from Go types
@@ -31,12 +32,13 @@ func NewGenerator() *Generator {
 // Generate generates JSON Schema for a given type
 func (g *Generator) Generate(v interface{}) *JSONSchema {
 	schema := &JSONSchema{
-		Schema:      "http://json-schema.org/draft-07/schema#",
-		Title:       "Bausteinsicht Model",
-		Description: "Architecture model in Bausteinsicht format",
-		Type:        "object",
-		Properties:  make(map[string]interface{}),
-		Definitions: g.definitions,
+		Schema:               "http://json-schema.org/draft-07/schema#",
+		Title:                "Bausteinsicht Model",
+		Description:          "Architecture model in Bausteinsicht format",
+		Type:                 "object",
+		Properties:           make(map[string]interface{}),
+		AdditionalProperties: false,
+		Definitions:          g.definitions,
 	}
 
 	// Generate properties from struct fields
@@ -89,8 +91,19 @@ func (g *Generator) generateFieldSchema(t reflect.Type) interface{} {
 			"items": g.generateFieldSchema(t.Elem()),
 		}
 	case reflect.Map:
+		// A map serializes to a JSON object whose values all share the
+		// element type. Emit additionalProperties so the schema validates
+		// each entry (e.g. map[string]Element validates every element).
+		valueType := t.Elem()
+		// map[string]interface{} stays an open free-form object.
+		if valueType.Kind() == reflect.Interface {
+			return map[string]interface{}{
+				"type": "object",
+			}
+		}
 		return map[string]interface{}{
-			"type": "object",
+			"type":                 "object",
+			"additionalProperties": g.generateFieldSchema(valueType),
 		}
 	case reflect.Struct:
 		return g.generateObjectSchema(t)
@@ -112,9 +125,16 @@ func (g *Generator) generateObjectSchema(t reflect.Type) interface{} {
 	}
 
 	schema := map[string]interface{}{
-		"type":       "object",
-		"properties": make(map[string]interface{}),
+		"type":                 "object",
+		"properties":           make(map[string]interface{}),
+		"additionalProperties": false,
 	}
+
+	// Register the definition before recursing into fields so that
+	// self-referential types (e.g. Element.Children map[string]Element)
+	// resolve to a $ref instead of recursing forever. The schema map is a
+	// reference type, so later mutations are reflected in the registry.
+	g.definitions[typeName] = schema
 
 	properties := schema["properties"].(map[string]interface{})
 	required := []string{}
@@ -142,7 +162,6 @@ func (g *Generator) generateObjectSchema(t reflect.Type) interface{} {
 		schema["required"] = required
 	}
 
-	g.definitions[typeName] = schema
 	return map[string]interface{}{"$ref": "#/definitions/" + typeName}
 }
 
