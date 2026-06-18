@@ -48,3 +48,11 @@ coverage/
 /bausteinsicht-lsp
 /bausteinsicht-lsp.exe
 coverage/
+
+# MCP server caches
+# .playwright-mcp/ holds the Playwright MCP server's session data (logs,
+# screenshots, browser profiles). Pure cache — never commit it.
+# Note: .serena/ is intentionally NOT ignored — Serena commits its own
+# .serena/.gitignore (which excludes /cache and /project.local.yml) plus the
+# shared .serena/project.yml config.
+.playwright-mcp/
