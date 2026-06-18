@@ -33,12 +33,12 @@ Bausteinsicht works with three data formats that must be kept in sync:
 
 === JSON Model Structure
 
-The model consists of five top-level sections:
+The model has these top-level sections. `specification`, `model`, `relationships`, and `views` are the core; the rest are optional: `config` (project metadata/legend), `meta` (e.g. `staleDetection` settings), `dynamicViews` (sequence diagrams), `constraints` (lint rules), and `asIs`/`toBe` (for the `diff` command).
 
 [source,jsonc]
 ----
 {
-  "$schema": "https://raw.githubusercontent.com/docToolchain/Bausteinsicht/main/schema/bausteinsicht.schema.json",
+  "$schema": "https://raw.githubusercontent.com/docToolchain/Bausteinsicht/main/schemas/bausteinsicht.schema.json",
 
   // Define available element and relationship kinds
   "specification": {
@@ -184,6 +184,21 @@ The model consists of five top-level sections:
 | no
 | Tags for filtering and styling
 
+| `status`
+| string
+| no
+| Lifecycle status: `proposed`, `design`, `implementation`, `deployed`, `deprecated`, or `archived` (see <<Element Lifecycle>>)
+
+| `decisions`
+| string[]
+| no
+| ADR IDs that govern this element
+
+| `lastModified`
+| string
+| no
+| RFC3339 timestamp; overrides git-derived last-modified for stale detection
+
 | `children`
 | object
 | no
@@ -197,6 +212,30 @@ The model consists of five top-level sections:
 
 The **key** of each element in the model object (e.g., `"customer"`, `"api"`) serves as its unique ID.
 Nested elements are referenced using dot notation: `"webshop.api.auth"`.
+
+[[Element Lifecycle]]
+==== Element Lifecycle
+
+An element's optional `status` follows this intended progression (the `status` command groups elements by it):
+
+[plantuml, element-lifecycle, png]
+....
+@startuml
+hide empty description
+[*] --> proposed
+proposed --> design
+design --> implementation
+implementation --> deployed
+deployed --> deprecated
+deprecated --> archived
+archived --> [*]
+@enduml
+....
+
+The transitions themselves are not enforced — `status` is a plain string — but two lifecycle rules are checked during validation:
+
+* An **archived** element should have no outgoing relationships (archived elements are no longer active).
+* A **deprecated** element should have a deployed successor of the same kind (so consumers have a migration target); otherwise a warning is emitted.
 
 ==== Relationship Properties
 
@@ -228,6 +267,21 @@ Nested elements are referenced using dot notation: `"webshop.api.auth"`.
 | string
 | no
 | Detailed description
+
+| `decisions`
+| string[]
+| no
+| ADR IDs that govern this relationship
+
+| `cardinality`
+| string
+| no
+| One of `1:1`, `1:N`, `N:N`
+
+| `dataFlow`
+| string
+| no
+| One of `sync`, `async`, `request/response`, `publish/subscribe`
 |===
 
 ==== View Properties
@@ -255,6 +309,16 @@ Nested elements are referenced using dot notation: `"webshop.api.auth"`.
 | string[]
 | no
 | Element IDs to exclude from the view (supports wildcard patterns, see <<Wildcard Patterns>>)
+
+| `filter-tags`
+| string[]
+| no
+| Include only elements that carry *all* of these tags
+
+| `exclude-tags`
+| string[]
+| no
+| Exclude elements that carry *any* of these tags
 
 | `description`
 | string
