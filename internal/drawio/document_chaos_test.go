@@ -11,10 +11,10 @@ func TestLoadCorruptXML(t *testing.T) {
 	tc := chaos.NewTestChaos(t)
 
 	testCases := map[string]string{
-		"not-xml": "this is not xml at all",
-		"incomplete-tag": "<mxfile><diagram",
+		"not-xml":         "this is not xml at all",
+		"incomplete-tag":  "<mxfile><diagram",
 		"invalid-nesting": "<mxfile></diagram></mxfile>",
-		"empty-file": "",
+		"empty-file":      "",
 	}
 
 	for name, content := range testCases {

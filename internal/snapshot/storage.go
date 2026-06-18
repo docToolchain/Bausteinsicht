@@ -10,10 +10,10 @@ import (
 )
 
 const (
-	snapshotDir   = ".bausteinsicht-snapshots"
-	indexFile     = "index.json"
+	snapshotDir     = ".bausteinsicht-snapshots"
+	indexFile       = "index.json"
 	snapshotDir0755 = 0o755
-	fileMode0644  = 0o644
+	fileMode0644    = 0o644
 )
 
 // Manager handles snapshot storage and retrieval

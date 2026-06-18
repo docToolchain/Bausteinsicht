@@ -331,7 +331,6 @@ func TestAppendArrayEntry_TrailingLineComment(t *testing.T) {
 	}
 }
 
-
 func TestPatchValue_WithBlockComments(t *testing.T) {
 	input := `{
   /* block comment */

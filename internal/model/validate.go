@@ -579,4 +579,3 @@ func validateSupersededDecisions(m *BausteinsichtModel) []ValidationWarning {
 
 	return warnings
 }
-

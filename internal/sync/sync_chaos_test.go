@@ -129,7 +129,7 @@ func TestSyncStatePartialWrite(t *testing.T) {
 	if tc.FileExists(stateFile) {
 		tc.CorruptFilePartial(stateFile, `{
 			"model_hash": "abc123",
-			"diagram_hash"`)  // Incomplete JSON
+			"diagram_hash"`) // Incomplete JSON
 	}
 
 	// Try to load the partially written state

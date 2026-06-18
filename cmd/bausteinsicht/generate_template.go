@@ -52,10 +52,10 @@ func runGenerateTemplate(cmd *cobra.Command, _ []string) error {
 
 	// Validate style
 	validStyles := map[string]bool{
-		"default":  true,
-		"c4":       true,
-		"minimal":  true,
-		"dark":     true,
+		"default": true,
+		"c4":      true,
+		"minimal": true,
+		"dark":    true,
 	}
 	if !validStyles[style] {
 		return exitWithCode(fmt.Errorf("unknown style %q: valid values are default, c4, minimal, dark", style), 2)

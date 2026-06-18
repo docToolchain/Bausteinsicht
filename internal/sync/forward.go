@@ -18,11 +18,11 @@ const (
 	defaultHeight    = 60.0
 
 	// Child element placement within a scope boundary (#330).
-	childGridCols  = 3
-	childStartX    = 20.0
-	childStartY    = 80.0
-	childSpacingX  = 160.0
-	childSpacingY  = 100.0
+	childGridCols = 3
+	childStartX   = 20.0
+	childStartY   = 80.0
+	childSpacingX = 160.0
+	childSpacingY = 100.0
 )
 
 // applyTagStyles applies styles defined in tag definitions to an element's style.

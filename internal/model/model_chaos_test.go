@@ -12,10 +12,10 @@ func TestLoadCorruptJSONC(t *testing.T) {
 
 	testCases := []string{
 		"{invalid json}",
-		"{\"model\": }",  // incomplete
+		"{\"model\": }", // incomplete
 		"[not an object]",
-		"",               // empty
-		"{\"spec\": ",    // truncated
+		"",            // empty
+		"{\"spec\": ", // truncated
 	}
 
 	for _, invalid := range testCases {

@@ -28,13 +28,13 @@ func (r *Report) DetectPerformanceRegression(slowThreshold float64) []SlowTest {
 
 // TrendData holds historical trend information across multiple reports
 type TrendData struct {
-	Timestamp     string    `json:"timestamp"`
-	PassRate      float64   `json:"pass_rate"`
-	Coverage      float64   `json:"coverage"`
-	AvgTestTime   float64   `json:"avg_test_time"`
-	FailureCount  int       `json:"failure_count"`
-	TotalTests    int       `json:"total_tests"`
-	RegressionPct float64   `json:"regression_pct"`
+	Timestamp     string  `json:"timestamp"`
+	PassRate      float64 `json:"pass_rate"`
+	Coverage      float64 `json:"coverage"`
+	AvgTestTime   float64 `json:"avg_test_time"`
+	FailureCount  int     `json:"failure_count"`
+	TotalTests    int     `json:"total_tests"`
+	RegressionPct float64 `json:"regression_pct"`
 }
 
 // ExtractTrend extracts trend data from a report
@@ -104,8 +104,8 @@ func GenerateTrendMarkdown(trends []TrendData) string {
 
 // AnalyzeTrendBreakpoints identifies significant changes in trend data
 type TrendBreakpoint struct {
-	Type      string  // "regression" or "improvement"
-	Metric    string  // "pass_rate", "coverage", "performance"
+	Type      string // "regression" or "improvement"
+	Metric    string // "pass_rate", "coverage", "performance"
 	Change    float64
 	Timestamp string
 }

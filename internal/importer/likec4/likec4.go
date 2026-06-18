@@ -389,15 +389,15 @@ func (p *dslParser) collectArgs() []string {
 // ─── Mapper ──────────────────────────────────────────────────────────────────
 
 type lc4State struct {
-	kinds           map[string]bool // known element kind names from specification
-	kindsContainer  map[string]bool // kinds that have children in the model
-	spec            map[string]model.ElementKind
-	elements        map[string]model.Element
-	varToPath       map[string]string
-	pendingRels     []pendingRel
-	views           map[string]model.View
-	viewKeys        map[string]int
-	warnings        []string
+	kinds          map[string]bool // known element kind names from specification
+	kindsContainer map[string]bool // kinds that have children in the model
+	spec           map[string]model.ElementKind
+	elements       map[string]model.Element
+	varToPath      map[string]string
+	pendingRels    []pendingRel
+	views          map[string]model.View
+	viewKeys       map[string]int
+	warnings       []string
 }
 
 type pendingRel struct {

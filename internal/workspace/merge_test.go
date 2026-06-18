@@ -50,13 +50,13 @@ func TestMergeModels(t *testing.T) {
 	model1 := &model.BausteinsichtModel{
 		Specification: model.Specification{
 			Elements: map[string]model.ElementKind{
-				"system": {Notation: "box", Container: true},
+				"system":  {Notation: "box", Container: true},
 				"service": {Notation: "component"},
 			},
 		},
 		Model: map[string]model.Element{
 			"backend": {Kind: "system", Title: "Backend System"},
-			"cache": {Kind: "service", Title: "Cache Service"},
+			"cache":   {Kind: "service", Title: "Cache Service"},
 		},
 		Relationships: []model.Relationship{
 			{From: "backend", To: "cache", Label: "uses"},

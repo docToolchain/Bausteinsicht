@@ -7,24 +7,24 @@ import (
 
 // Report represents a comprehensive test and coverage report
 type Report struct {
-	Timestamp       string                     `json:"timestamp"`
-	Tests           TestStats                  `json:"tests"`
-	Coverage        map[string]*CoverageInfo   `json:"coverage"`
-	Delta           *ReportDelta               `json:"delta,omitempty"`
-	LowCoverageList []string                   `json:"low_coverage_packages,omitempty"`
-	SlowestTests    []SlowTest                 `json:"slowest_tests,omitempty"`
-	RegressionTests *RegressionTestStats       `json:"regression_tests,omitempty"`
-	Details         *CoverageDetails           `json:"coverage_details,omitempty"`
+	Timestamp       string                   `json:"timestamp"`
+	Tests           TestStats                `json:"tests"`
+	Coverage        map[string]*CoverageInfo `json:"coverage"`
+	Delta           *ReportDelta             `json:"delta,omitempty"`
+	LowCoverageList []string                 `json:"low_coverage_packages,omitempty"`
+	SlowestTests    []SlowTest               `json:"slowest_tests,omitempty"`
+	RegressionTests *RegressionTestStats     `json:"regression_tests,omitempty"`
+	Details         *CoverageDetails         `json:"coverage_details,omitempty"`
 }
 
 // TestStats aggregates test results
 type TestStats struct {
-	Total     int                    `json:"total"`
-	Passed    int                    `json:"passed"`
-	Failed    int                    `json:"failed"`
-	Skipped   int                    `json:"skipped"`
-	PassRate  float64                `json:"pass_rate"`
-	TotalTime float64                `json:"total_time_seconds"`
+	Total     int                      `json:"total"`
+	Passed    int                      `json:"passed"`
+	Failed    int                      `json:"failed"`
+	Skipped   int                      `json:"skipped"`
+	PassRate  float64                  `json:"pass_rate"`
+	TotalTime float64                  `json:"total_time_seconds"`
 	ByPackage map[string]*PackageStats `json:"by_package"`
 	ByType    map[string]*TypeStats    `json:"by_type"`
 }
@@ -59,20 +59,20 @@ type SlowTest struct {
 
 // RegressionTestStats tracks regression tests
 type RegressionTestStats struct {
-	Total  int     `json:"total"`
-	Passed int     `json:"passed"`
-	Failed int     `json:"failed"`
-	Skipped int    `json:"skipped"`
+	Total    int     `json:"total"`
+	Passed   int     `json:"passed"`
+	Failed   int     `json:"failed"`
+	Skipped  int     `json:"skipped"`
 	PassRate float64 `json:"pass_rate"`
 }
 
 // ReportDelta represents changes from previous report
 type ReportDelta struct {
-	PassRateChange   float64 `json:"pass_rate_change"` // e.g., +2.5 or -1.0
-	CoverageChange   float64 `json:"coverage_change"`
+	PassRateChange    float64 `json:"pass_rate_change"` // e.g., +2.5 or -1.0
+	CoverageChange    float64 `json:"coverage_change"`
 	PerformanceChange float64 `json:"performance_change"` // % faster/slower
-	NewFailures      int     `json:"new_failures"`
-	ResolvedFailures int     `json:"resolved_failures"`
+	NewFailures       int     `json:"new_failures"`
+	ResolvedFailures  int     `json:"resolved_failures"`
 }
 
 // computeDerivedFields computes fields like low coverage list and slowest tests

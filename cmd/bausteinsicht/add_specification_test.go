@@ -17,11 +17,11 @@ func TestIsValidSpecKey(t *testing.T) {
 		{"my_component", true},
 		{"my-component", true},
 		{"custom123", true},
-		{"_invalid", false},    // starts with underscore
-		{"123invalid", false},  // starts with digit
-		{"Component", false},   // uppercase
+		{"_invalid", false},     // starts with underscore
+		{"123invalid", false},   // starts with digit
+		{"Component", false},    // uppercase
 		{"my component", false}, // space
-		{"", false},            // empty
+		{"", false},             // empty
 	}
 
 	for _, tt := range tests {

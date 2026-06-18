@@ -5,18 +5,18 @@ import (
 )
 
 type MetricsFile struct {
-	Meta    MetaInfo       `json:"meta"`
+	Meta    MetaInfo        `json:"meta"`
 	Metrics []ElementMetric `json:"metrics"`
 }
 
 type MetaInfo struct {
-	Generated           string            `json:"generated"`
-	Source              string            `json:"source"`
-	MetricDescriptions  map[string]string `json:"metric_descriptions"`
+	Generated          string            `json:"generated"`
+	Source             string            `json:"source"`
+	MetricDescriptions map[string]string `json:"metric_descriptions"`
 }
 
 type ElementMetric struct {
-	ElementID string             `json:"elementId"`
+	ElementID string `json:"elementId"`
 	Values    map[string]float64
 }
 

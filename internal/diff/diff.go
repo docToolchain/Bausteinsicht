@@ -80,10 +80,10 @@ func compareRelationships(asIsRels, toBeRels []model.Relationship, result *DiffR
 		if !exists {
 			// Relationship removed
 			result.Relationships = append(result.Relationships, RelationshipChange{
-				From:   asIsRel.From,
-				To:     asIsRel.To,
-				Type:   ChangeRemoved,
-				AsIs:   &asIsRel,
+				From: asIsRel.From,
+				To:   asIsRel.To,
+				Type: ChangeRemoved,
+				AsIs: &asIsRel,
 			})
 			continue
 		}
@@ -91,11 +91,11 @@ func compareRelationships(asIsRels, toBeRels []model.Relationship, result *DiffR
 		// Check if changed (e.g., label changed)
 		if asIsRel.Label != toBeRel.Label {
 			result.Relationships = append(result.Relationships, RelationshipChange{
-				From:   asIsRel.From,
-				To:     asIsRel.To,
-				Type:   ChangeChanged,
-				AsIs:   &asIsRel,
-				ToBe:   &toBeRel,
+				From: asIsRel.From,
+				To:   asIsRel.To,
+				Type: ChangeChanged,
+				AsIs: &asIsRel,
+				ToBe: &toBeRel,
 			})
 		}
 	}
@@ -104,10 +104,10 @@ func compareRelationships(asIsRels, toBeRels []model.Relationship, result *DiffR
 	for key, toBeRel := range toBeMap {
 		if _, exists := asIsMap[key]; !exists {
 			result.Relationships = append(result.Relationships, RelationshipChange{
-				From:   toBeRel.From,
-				To:     toBeRel.To,
-				Type:   ChangeAdded,
-				ToBe:   &toBeRel,
+				From: toBeRel.From,
+				To:   toBeRel.To,
+				Type: ChangeAdded,
+				ToBe: &toBeRel,
 			})
 		}
 	}

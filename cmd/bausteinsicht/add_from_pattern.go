@@ -152,18 +152,18 @@ func runListPatterns(cmd *cobra.Command) error {
 	if format == "json" {
 		// Output as JSON
 		type patternInfo struct {
-			ID            string `json:"id"`
-			Description   string `json:"description"`
-			ElementCount  int    `json:"elementCount"`
-			RelationshipCount int `json:"relationshipCount"`
+			ID                string `json:"id"`
+			Description       string `json:"description"`
+			ElementCount      int    `json:"elementCount"`
+			RelationshipCount int    `json:"relationshipCount"`
 		}
 		var patterns []patternInfo
 		for _, id := range patternIDs {
 			p := m.Specification.Patterns[id]
 			patterns = append(patterns, patternInfo{
-				ID:            id,
-				Description:   p.Description,
-				ElementCount:  len(p.Elements),
+				ID:                id,
+				Description:       p.Description,
+				ElementCount:      len(p.Elements),
 				RelationshipCount: len(p.Relationships),
 			})
 		}

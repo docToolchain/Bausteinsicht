@@ -7,10 +7,10 @@ import (
 // HierarchicalLayout computes layer assignments via longest-path algorithm,
 // then positions elements in layers with horizontal alignment.
 type HierarchicalLayout struct {
-	model     *model.BausteinsichtModel
-	rankDir   string // TB or LR
-	spacing   float64
-	layerGap  float64
+	model    *model.BausteinsichtModel
+	rankDir  string // TB or LR
+	spacing  float64
+	layerGap float64
 }
 
 // NewHierarchicalLayout creates a hierarchical layout engine.

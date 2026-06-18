@@ -2,14 +2,14 @@ package diff
 
 // DrawIO color definitions for diff visualization
 const (
-	ColorAdded   = "#d5e8d4"    // green
-	ColorRemoved = "#f8cecc"    // red
-	ColorChanged = "#ffe6cc"    // orange
-	ColorUnchanged = "#ffffff"  // white (default)
+	ColorAdded     = "#d5e8d4" // green
+	ColorRemoved   = "#f8cecc" // red
+	ColorChanged   = "#ffe6cc" // orange
+	ColorUnchanged = "#ffffff" // white (default)
 
-	StrokeAdded   = "#82b366"   // dark green
-	StrokeRemoved = "#b85450"   // dark red
-	StrokeChanged = "#d6b656"   // dark orange
+	StrokeAdded   = "#82b366" // dark green
+	StrokeRemoved = "#b85450" // dark red
+	StrokeChanged = "#d6b656" // dark orange
 )
 
 // AppliedChangeStyle returns the fill and stroke colors for a changed element
