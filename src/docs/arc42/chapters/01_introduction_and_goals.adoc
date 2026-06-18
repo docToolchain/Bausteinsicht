@@ -39,6 +39,18 @@ Bausteinsicht addresses the gap between structured architecture models and widel
 
 | Template System
 | Templates are draw.io files containing styled example elements. Users create and customize templates entirely within draw.io.
+
+| Architecture Analysis
+| Commands assess the model: constraint checking (`lint`), a health score (`health`), dependency-graph analysis (`graph`), stale-element detection (`stale`), lifecycle status (`status`), and full-text search (`find`).
+
+| Architecture Evolution
+| The architecture is versioned and comparable over time: snapshots with semantic diff (`snapshot`), as-is/to-be comparison (`diff`), and an architecture changelog (`changelog`).
+
+| Interoperability & Export
+| Models import from Structurizr DSL and LikeC4 (`import`) and export to C4-PlantUML, Mermaid, DOT, D2, HTML, Structurizr DSL, sequence diagrams, tables, and PNG/SVG.
+
+| IDE Integration
+| A Language Server (the separate `bausteinsicht-lsp` binary) and a VS Code extension provide in-editor diagnostics and code lenses for model files.
 |===
 
 See link:../../PRD/PRD-001-Bausteinsicht.html[PRD-001] for the full product requirements.

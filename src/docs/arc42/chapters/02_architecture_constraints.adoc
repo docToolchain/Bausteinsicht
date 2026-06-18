@@ -26,11 +26,17 @@ ifndef::imagesdir[:imagesdir: ../../images]
 | draw.io XML as output format
 | The visual representation uses draw.io's mxGraph XML format. This constrains layout capabilities to what draw.io supports.
 
-| No JavaScript/Node.js
-| JavaScript and Node.js are excluded from the technology stack due to security concerns with npm package managers.
+| No JavaScript/Node.js in the product
+| The CLI and its libraries use no JavaScript/Node.js, avoiding npm supply-chain risk. Exception: the optional VS Code extension (`vscode-extension/`) is a separate TypeScript/npm artifact, not part of the released binary.
 
 | Cross-platform
 | The tool must run on Linux, macOS, and Windows.
+
+| Headless draw.io for image export
+| `export` (PNG/SVG) shells out to the draw.io desktop CLI; it must be installed (in containers: via xvfb + dbus). The text exports need no draw.io.
+
+| Git for history-based commands
+| `stale` and `changelog` invoke the `git` binary to derive element history; outside a git repository they degrade gracefully.
 |===
 
 === Organizational Constraints
