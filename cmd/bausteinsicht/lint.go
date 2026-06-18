@@ -54,8 +54,8 @@ func runLint(cmd *cobra.Command, _ []string) error {
 
 func lintOutputJSON(cmd *cobra.Command, r constraints.Result) error {
 	type jsonResult struct {
-		Passed     bool                 `json:"passed"`
-		Total      int                  `json:"total"`
+		Passed     bool                    `json:"passed"`
+		Total      int                     `json:"total"`
 		Violations []constraints.Violation `json:"violations"`
 	}
 

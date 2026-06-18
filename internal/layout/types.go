@@ -11,10 +11,10 @@ const (
 
 // Config holds layout computation parameters.
 type Config struct {
-	Algorithm     Algorithm
-	View          string // if empty, layout all views
+	Algorithm      Algorithm
+	View           string // if empty, layout all views
 	PreservePinned bool
-	RankDir       string // TB (top-to-bottom) or LR (left-to-right)
+	RankDir        string // TB (top-to-bottom) or LR (left-to-right)
 }
 
 // ElementPosition represents a positioned element.

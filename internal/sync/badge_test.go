@@ -28,7 +28,7 @@ func TestAddStatusBadge_CreatesChildCell(t *testing.T) {
 
 func TestAddStatusBadge_CorrectColor(t *testing.T) {
 	tests := []struct {
-		status       string
+		status        string
 		expectedColor string
 	}{
 		{model.StatusProposed, "#fff2cc"},

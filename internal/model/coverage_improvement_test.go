@@ -35,7 +35,7 @@ func TestValidateConstraints(t *testing.T) {
 	m := &BausteinsichtModel{
 		Specification: Specification{
 			Elements: map[string]ElementKind{
-				"system": {Notation: "box"},
+				"system":  {Notation: "box"},
 				"service": {Notation: "component"},
 			},
 		},
@@ -110,8 +110,8 @@ func TestDynamicViewStepTypes(t *testing.T) {
 
 func TestElementKindConfig(t *testing.T) {
 	tests := []struct {
-		name      string
-		kind      ElementKind
+		name            string
+		kind            ElementKind
 		canHaveChildren bool
 	}{
 		{"container", ElementKind{Notation: "box", Container: true}, true},
@@ -153,7 +153,7 @@ func TestRelationshipKindConfig(t *testing.T) {
 				"system": {Notation: "box"},
 			},
 			Relationships: map[string]RelationshipKind{
-				"sync": {Notation: "arrow", Dashed: false},
+				"sync":  {Notation: "arrow", Dashed: false},
 				"async": {Notation: "arrow", Dashed: true},
 			},
 		},
@@ -177,9 +177,9 @@ func TestComplexHierarchy(t *testing.T) {
 	m := &BausteinsichtModel{
 		Specification: Specification{
 			Elements: map[string]ElementKind{
-				"system": {Notation: "box", Container: true},
+				"system":  {Notation: "box", Container: true},
 				"service": {Notation: "component", Container: true},
-				"module": {Notation: "box", Container: false},
+				"module":  {Notation: "box", Container: false},
 			},
 		},
 		Model: map[string]Element{
@@ -192,7 +192,7 @@ func TestComplexHierarchy(t *testing.T) {
 						Title: "Backend",
 						Children: map[string]Element{
 							"auth": {Kind: "module", Title: "Auth"},
-							"api": {Kind: "module", Title: "API"},
+							"api":  {Kind: "module", Title: "API"},
 						},
 					},
 					"frontend": {

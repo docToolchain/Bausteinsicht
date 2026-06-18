@@ -508,7 +508,7 @@ func (r *Report) renderLineLevelCoverage() string {
 						<summary class="file-header">
 							<span class="file-name">` + importPath + `</span>
 							<span class="file-coverage-badge ` + badgeClass + `">` +
-				fmt.Sprintf("%.1f%%", fc.Coverage) + `</span>
+			fmt.Sprintf("%.1f%%", fc.Coverage) + `</span>
 						</summary>
 						<div class="code-viewer">
 							<table class="code-table">

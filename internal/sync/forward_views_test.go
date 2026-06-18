@@ -795,7 +795,6 @@ func TestApplyForward_ScopeBoundaryExpandsHeightForManyChildren(t *testing.T) {
 	}
 }
 
-
 // TestApplyForward_DeletedElementRemovedFromViewPages verifies that when an
 // element is deleted from the model, it is removed from all view pages where
 // it previously appeared. Regression test for #85.

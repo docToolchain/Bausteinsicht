@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/docToolchain/Bausteinsicht/internal/model"
 	"github.com/docToolchain/Bausteinsicht/internal/diagram"
+	"github.com/docToolchain/Bausteinsicht/internal/model"
 	"github.com/docToolchain/Bausteinsicht/internal/table"
 )
 

@@ -7,22 +7,22 @@ import (
 
 func IsMetricBetter(metricName string) bool {
 	goodMetrics := map[string]bool{
-		"coverage":       true,
-		"uptime":         true,
-		"deploy_freq":    true,
-		"success_rate":   true,
-		"availability":   true,
+		"coverage":     true,
+		"uptime":       true,
+		"deploy_freq":  true,
+		"success_rate": true,
+		"availability": true,
 	}
 	badMetrics := map[string]bool{
-		"error_rate":     true,
-		"latency":        true,
-		"p99":            true,
-		"p99_ms":         true,
-		"response_time":  true,
-		"cpu_usage":      true,
-		"memory_usage":   true,
-		"error_count":    true,
-		"failures":       true,
+		"error_rate":    true,
+		"latency":       true,
+		"p99":           true,
+		"p99_ms":        true,
+		"response_time": true,
+		"cpu_usage":     true,
+		"memory_usage":  true,
+		"error_count":   true,
+		"failures":      true,
 	}
 
 	if goodMetrics[metricName] {

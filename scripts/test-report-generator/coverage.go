@@ -80,8 +80,9 @@ func parseCoverageFile(path string) (map[string]*CoverageInfo, error) {
 
 // extractPackage extracts the Go package name from a file path
 // Examples:
-//   github.com/docToolchain/Bausteinsicht/internal/sync/forward.go -> github.com/docToolchain/Bausteinsicht/internal/sync
-//   github.com/docToolchain/Bausteinsicht/cmd/bausteinsicht/root.go -> github.com/docToolchain/Bausteinsicht/cmd/bausteinsicht
+//
+//	github.com/docToolchain/Bausteinsicht/internal/sync/forward.go -> github.com/docToolchain/Bausteinsicht/internal/sync
+//	github.com/docToolchain/Bausteinsicht/cmd/bausteinsicht/root.go -> github.com/docToolchain/Bausteinsicht/cmd/bausteinsicht
 func extractPackage(filePath string) string {
 	if idx := strings.LastIndex(filePath, "/"); idx != -1 {
 		return filePath[:idx]
@@ -101,13 +102,13 @@ type CoverageBlock struct {
 
 // FileCoverage holds per-file coverage: block list + aggregated stats
 type FileCoverage struct {
-	ImportPath  string           `json:"import_path"`
-	LocalPath   string           `json:"local_path"`
-	StmtTotal   int              `json:"stmt_total"`
-	StmtCovered int              `json:"stmt_covered"`
-	Coverage    float64          `json:"coverage"`
-	Blocks      []CoverageBlock  `json:"blocks"`
-	SourceLines []string         `json:"source_lines,omitempty"`
+	ImportPath  string          `json:"import_path"`
+	LocalPath   string          `json:"local_path"`
+	StmtTotal   int             `json:"stmt_total"`
+	StmtCovered int             `json:"stmt_covered"`
+	Coverage    float64         `json:"coverage"`
+	Blocks      []CoverageBlock `json:"blocks"`
+	SourceLines []string        `json:"source_lines,omitempty"`
 }
 
 // CoverageDetails holds file-level coverage information

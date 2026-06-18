@@ -87,9 +87,9 @@ func TestAnalyzerCentrality(t *testing.T) {
 			},
 		},
 		Model: map[string]model.Element{
-			"hub":    {Kind: "component", Title: "Hub"},
-			"dep1":   {Kind: "component", Title: "Dep1"},
-			"dep2":   {Kind: "component", Title: "Dep2"},
+			"hub":  {Kind: "component", Title: "Hub"},
+			"dep1": {Kind: "component", Title: "Dep1"},
+			"dep2": {Kind: "component", Title: "Dep2"},
 		},
 		Relationships: []model.Relationship{
 			{From: "hub", To: "dep1"},

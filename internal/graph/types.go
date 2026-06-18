@@ -8,11 +8,11 @@ type Cycle struct {
 
 // Centrality metrics for an element.
 type Centrality struct {
-	ID        string  `json:"id"`
-	InDegree  int     `json:"inDegree"`  // number of incoming relationships
-	OutDegree int     `json:"outDegree"` // number of outgoing relationships
+	ID          string  `json:"id"`
+	InDegree    int     `json:"inDegree"`    // number of incoming relationships
+	OutDegree   int     `json:"outDegree"`   // number of outgoing relationships
 	Betweenness float64 `json:"betweenness"` // how many shortest paths pass through this node
-	Closeness float64 `json:"closeness"` // average distance to all other nodes
+	Closeness   float64 `json:"closeness"`   // average distance to all other nodes
 }
 
 // Component represents a strongly connected component in the graph.
@@ -24,13 +24,13 @@ type Component struct {
 
 // GraphAnalysis contains results from relationship graph analysis.
 type GraphAnalysis struct {
-	ElementCount    int           `json:"elementCount"`
-	RelationshipCount int         `json:"relationshipCount"`
-	Cycles          []Cycle       `json:"cycles"`
-	Centrality      []Centrality  `json:"centrality"`
-	Components      []Component   `json:"components"`
-	IDAGValid       bool          `json:"idagValid"` // true if graph is acyclic
-	MaxDepth        int           `json:"maxDepth"`  // longest dependency path
+	ElementCount      int          `json:"elementCount"`
+	RelationshipCount int          `json:"relationshipCount"`
+	Cycles            []Cycle      `json:"cycles"`
+	Centrality        []Centrality `json:"centrality"`
+	Components        []Component  `json:"components"`
+	IDAGValid         bool         `json:"idagValid"` // true if graph is acyclic
+	MaxDepth          int          `json:"maxDepth"`  // longest dependency path
 }
 
 // NodeInfo holds temporary computation data for graph algorithms.

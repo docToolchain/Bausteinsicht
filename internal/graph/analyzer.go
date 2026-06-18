@@ -8,8 +8,8 @@ import (
 
 // Analyzer performs graph analysis on model relationships.
 type Analyzer struct {
-	model *model.BausteinsichtModel
-	graph map[string][]string // element ID → list of outgoing relationship targets
+	model   *model.BausteinsichtModel
+	graph   map[string][]string // element ID → list of outgoing relationship targets
 	reverse map[string][]string // reverse graph: target → list of incoming sources
 }
 

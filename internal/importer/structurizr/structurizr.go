@@ -18,8 +18,8 @@ import (
 type tokKind int
 
 const (
-	tokEOF tokKind = iota
-	tokNewline // statement separator — emitted for each (group of) newline(s)
+	tokEOF     tokKind = iota
+	tokNewline         // statement separator — emitted for each (group of) newline(s)
 	tokString
 	tokIdent
 	tokLBrace

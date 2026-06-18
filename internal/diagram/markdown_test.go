@@ -7,11 +7,11 @@ import (
 
 func TestWrapDiagramsInMarkdown(t *testing.T) {
 	diagrams := map[string]string{
-		"context": "C4Context\n    title Context View\n    Person(user, \"User\")",
+		"context":   "C4Context\n    title Context View\n    Person(user, \"User\")",
 		"container": "C4Container\n    title Container View\n    Container(api, \"API\")",
 	}
 	viewTitles := map[string]string{
-		"context": "System Context",
+		"context":   "System Context",
 		"container": "Container Architecture",
 	}
 	viewKeys := []string{"context", "container"}

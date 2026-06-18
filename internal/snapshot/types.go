@@ -9,9 +9,9 @@ import (
 
 // Snapshot represents a point-in-time capture of the architecture model
 type Snapshot struct {
-	ID        string                 `json:"id"`
-	Timestamp time.Time              `json:"timestamp"`
-	Message   string                 `json:"message,omitempty"`
+	ID        string                    `json:"id"`
+	Timestamp time.Time                 `json:"timestamp"`
+	Message   string                    `json:"message,omitempty"`
 	Model     *model.BausteinsichtModel `json:"model"`
 }
 
@@ -26,9 +26,9 @@ type SnapshotMetadata struct {
 
 // SnapshotIndex holds the list of all snapshots
 type SnapshotIndex struct {
-	Version   int                  `json:"version"`
-	Snapshots []SnapshotMetadata   `json:"snapshots"`
-	UpdatedAt time.Time            `json:"updatedAt"`
+	Version   int                `json:"version"`
+	Snapshots []SnapshotMetadata `json:"snapshots"`
+	UpdatedAt time.Time          `json:"updatedAt"`
 }
 
 // NewSnapshot creates a snapshot from a model

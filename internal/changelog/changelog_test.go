@@ -198,11 +198,11 @@ func TestElementChanges_FilterByKind(t *testing.T) {
 	ec := ElementChanges{
 		Added: []diff.ElementChange{
 			{
-				ID: "api",
+				ID:   "api",
 				ToBe: &model.Element{Kind: "container", Title: "API"},
 			},
 			{
-				ID: "db",
+				ID:   "db",
 				ToBe: &model.Element{Kind: "storage", Title: "Database"},
 			},
 		},

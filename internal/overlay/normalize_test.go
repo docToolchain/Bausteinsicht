@@ -63,10 +63,10 @@ func TestColorForValue(t *testing.T) {
 		normalized float64
 		expected   string
 	}{
-		{0.1, "#d5e8d4"},  // Green
-		{0.3, "#fff2cc"},  // Yellow
-		{0.6, "#ffe6cc"},  // Orange
-		{0.9, "#f8cecc"},  // Red
+		{0.1, "#d5e8d4"}, // Green
+		{0.3, "#fff2cc"}, // Yellow
+		{0.6, "#ffe6cc"}, // Orange
+		{0.9, "#f8cecc"}, // Red
 	}
 
 	for _, tc := range tests {

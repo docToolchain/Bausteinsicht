@@ -70,10 +70,10 @@ func newOverlayApplyCmd() *cobra.Command {
 			format, _ := cmd.Flags().GetString("format")
 			if format == "json" {
 				out, _ := json.Marshal(map[string]interface{}{
-					"status":  "applied",
-					"metric":  metricKey,
-					"file":    drawioPath,
-					"model":   m.Specification,
+					"status": "applied",
+					"metric": metricKey,
+					"file":   drawioPath,
+					"model":  m.Specification,
 				})
 				_, _ = fmt.Fprintln(cmd.OutOrStdout(), string(out))
 			} else {

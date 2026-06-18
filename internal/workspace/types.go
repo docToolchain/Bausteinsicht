@@ -4,10 +4,10 @@ import "github.com/docToolchain/Bausteinsicht/internal/model"
 
 // Config defines a multi-model workspace configuration
 type Config struct {
-	Workspace WorkspaceMetadata          `json:"workspace"`
-	Models    []ModelRef                 `json:"models"`
-	Views     map[string]WorkspaceView   `json:"views,omitempty"`
-	CrossRels []CrossModelRelationship   `json:"crossModelRelationships,omitempty"`
+	Workspace WorkspaceMetadata        `json:"workspace"`
+	Models    []ModelRef               `json:"models"`
+	Views     map[string]WorkspaceView `json:"views,omitempty"`
+	CrossRels []CrossModelRelationship `json:"crossModelRelationships,omitempty"`
 }
 
 // WorkspaceMetadata contains workspace identification and metadata
@@ -35,12 +35,12 @@ type CrossModelRelationship struct {
 
 // WorkspaceView filters and displays elements from multiple models
 type WorkspaceView struct {
-	Title              string   `json:"title"`
-	IncludeFrom        []string `json:"include-from,omitempty"`
-	IncludeKinds       []string `json:"include-kinds,omitempty"`
-	ExcludeKinds       []string `json:"exclude-kinds,omitempty"`
-	Description        string   `json:"description,omitempty"`
-	Layout             string   `json:"layout,omitempty"`
+	Title        string   `json:"title"`
+	IncludeFrom  []string `json:"include-from,omitempty"`
+	IncludeKinds []string `json:"include-kinds,omitempty"`
+	ExcludeKinds []string `json:"exclude-kinds,omitempty"`
+	Description  string   `json:"description,omitempty"`
+	Layout       string   `json:"layout,omitempty"`
 }
 
 // LoadedModel holds a loaded model with its reference metadata
