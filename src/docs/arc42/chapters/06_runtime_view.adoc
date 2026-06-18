@@ -52,10 +52,10 @@ activate state
 state --> cmd : SyncState
 deactivate state
 
-cmd -> engine : Run(model, document, state, templates, opts)
+cmd -> engine : Run(model, document, state, templates, newPageIDs, opts)
 activate engine
 
-engine -> diff : DetectChanges(model, document, state)
+engine -> diff : DetectChanges(model, document, state, newPageIDs)
 activate diff
 diff --> engine : ChangeSet
 deactivate diff
@@ -78,7 +78,8 @@ deactivate rev
 engine --> cmd : SyncResult
 deactivate engine
 
-cmd -> loader : Save(model.jsonc, updatedModel)
+cmd -> loader : PatchSave(model.jsonc) — full Save fallback
+note right of loader : Comment-preserving patch when\nonly fields changed; full rewrite\notherwise
 cmd -> doc : SaveDocument(arch.drawio, updatedDoc)
 cmd -> state : SaveState(.bausteinsicht-sync, newState)
 
@@ -208,3 +209,174 @@ note right: Separate command to\nupdate draw.io diagram
 ==== Design Decision: Separate Add and Sync
 
 The `add` commands only modify the JSON model. They do **not** trigger a sync automatically. This keeps commands predictable (single responsibility) and allows LLMs to batch multiple model changes before syncing.
+
+=== Import from Structurizr / LikeC4
+
+Shows how an existing model is brought into Bausteinsicht (`bausteinsicht import <file> --from structurizr|likec4`).
+
+[plantuml, runtime-import, png]
+....
+@startuml
+skinparam shadowing false
+
+actor User
+participant "cmd/import" as cmd
+participant "importer" as imp
+participant "model/loader" as loader
+
+User -> cmd : bausteinsicht import workspace.dsl\n--from structurizr [--dry-run]
+activate cmd
+
+cmd -> imp : Import(file, format)
+activate imp
+note right of imp : Parse the source DSL,\nmap people/systems/containers\n+ relationships, generate a\nmatching specification
+imp --> cmd : ImportResult{Model, Warnings}
+deactivate imp
+
+alt --dry-run
+  cmd --> User : print generated JSONC to stdout
+else write
+  alt architecture.jsonc exists and no --force
+    cmd --> User : exit 2 "use --force to overwrite"
+  else
+    cmd -> loader : Save(architecture.jsonc, model)
+    cmd --> User : "Imported model written" + warnings
+  end
+end
+
+deactivate cmd
+@enduml
+....
+
+The result is immediately syncable with `bausteinsicht sync`. The importer never touches draw.io — it only produces the model.
+
+=== REPL Save: Patch vs. Full-Save Fallback
+
+The REPL keeps the model in memory and, on `save`, chooses how to persist so JSONC comments survive when possible. This is the key data-integrity flow.
+
+[plantuml, runtime-repl-save, png]
+....
+@startuml
+skinparam shadowing false
+
+actor User
+participant "cmd/repl" as repl
+participant "model/validate" as val
+participant "model/patch" as patch
+participant "model/loader" as loader
+
+User -> repl : add / remove / edit ... then `save`
+activate repl
+
+repl -> val : Validate(in-memory model)
+alt model invalid
+  repl --> User : "save aborted — N validation error(s)"
+else valid
+  alt only pure additions since load
+    repl -> patch : PatchInsert / AppendArrayEntry
+    note right of patch : Surgical text insert —\ncomments preserved
+    patch --> repl : patched JSONC
+  else any modification or deletion
+    repl -> loader : Save(model.jsonc)  (full rewrite)
+    note right of loader : Falls back to full save;\nprints "comments may not be preserved"
+    loader --> repl : rewritten JSONC
+  end
+  repl --> User : "Saved"
+end
+
+deactivate repl
+@enduml
+....
+
+==== Key Observations
+
+* Validation runs **before** any write — an invalid model is never persisted.
+* Pure additions take the comment-preserving patch path; modifications/deletions conservatively fall back to a full rewrite **with a visible warning** about comment loss.
+* The same patch primitives back the non-interactive `add` commands.
+
+=== Stale Detection
+
+Shows how `bausteinsicht stale` flags forgotten elements using git history.
+
+[plantuml, runtime-stale, png]
+....
+@startuml
+skinparam shadowing false
+
+actor User
+participant "cmd/stale" as cmd
+participant "model/loader" as loader
+participant "stale/detector" as det
+participant "stale/git" as git
+
+User -> cmd : bausteinsicht stale [--days N]
+activate cmd
+cmd -> loader : Load(model.jsonc)
+cmd -> det : Detect(model, threshold)
+activate det
+
+loop each element
+  det -> det : referenced by a view? by a relationship?
+  det -> git : last-modified date (git log --follow)
+  activate git
+  git --> det : date (or "no history")
+  deactivate git
+  det -> det : assess risk\n(unreferenced and/or older than threshold)
+end
+
+det --> cmd : stale elements (deterministically sorted)
+deactivate det
+cmd --> User : report (text / json)
+deactivate cmd
+@enduml
+....
+
+When run outside a git repository the git lookups degrade gracefully (no date), and detection falls back to the view/relationship membership checks.
+
+=== Error & Recovery: Failed Write During Sync
+
+The contract requires at least one error/recovery scenario. This shows why a failed or interrupted sync never corrupts the working files.
+
+[plantuml, runtime-recovery, png]
+....
+@startuml
+skinparam shadowing false
+
+actor User
+participant "cmd/sync" as cmd
+participant "sync/engine" as engine
+participant "drawio/document" as doc
+participant "sync/state" as state
+
+User -> cmd : bausteinsicht sync
+activate cmd
+cmd -> engine : Run(...)  (pure, in-memory)
+engine --> cmd : SyncResult
+
+group atomic writes (temp file + rename)
+  cmd -> doc : SaveDocument(arch.drawio)
+  alt write fails (disk full / crash)
+    doc --> cmd : error
+    cmd --> User : exit 1, error — original files intact
+    note over state : SaveState NOT reached →\n.bausteinsicht-sync unchanged
+  else write succeeds
+    cmd -> state : SaveState(.bausteinsicht-sync)\n(SHA-256 checksummed)
+    cmd --> User : summary
+  end
+end
+deactivate cmd
+
+== next run recovers ==
+User -> cmd : bausteinsicht sync
+activate cmd
+note over cmd : State unchanged from the failed run,\nso DetectChanges re-finds the same delta\nand re-applies it — no manual repair
+cmd --> User : completes the interrupted change
+deactivate cmd
+@enduml
+....
+
+==== Key Observations
+
+* The engine computes everything in memory first; files are written only afterwards, each via a temp-file-plus-rename so a partial write cannot truncate a real file.
+* The state file is written **last**. If any earlier write fails, the state is left untouched, so the next run re-detects the same change and retries — the operation is effectively idempotent and self-healing.
+* The state file carries a SHA-256 checksum, so external tampering or truncation is detected on load rather than silently trusted.
