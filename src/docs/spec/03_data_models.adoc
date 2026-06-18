@@ -63,7 +63,7 @@ BausteinsichtModel *-- "0..*" View
 BausteinsichtModel *-- "0..*" DynamicView
 BausteinsichtModel *-- "0..1" ModelSnapshot : asIs / toBe
 
-Specification *-- "1..*" ElementKind
+Specification *-- "0..*" ElementKind
 Specification *-- "0..*" RelationshipKind
 Specification *-- "0..*" TagDefinition
 Specification *-- "0..*" PatternDefinition
@@ -490,7 +490,7 @@ Model files use the JSONC (JSON with Comments) format. Both comment styles are s
 
 `bausteinsicht validate` enforces the model's integrity constraints. The complete, code-traceable catalogue — each rule's exact statement, severity, and source function — is the Business Rules in link:01_use_cases.html#business-rules[01_use_cases (Business Rules)] (BR-001–BR-033). The constraints on the data model group as follows:
 
-* **Structural (errors):** required fields — `kind`/`title` on elements, `title` on views, `key`/`title` on dynamic views (BR-001, BR-004, BR-013, BR-018, BR-019); known kinds (BR-002, BR-009, BR-024, BR-025); container nesting and depth limit (BR-003, BR-006); non-empty element IDs (BR-005).
+* **Structural (errors):** required fields — `kind`/`title` on elements, `title` on views, `key`/`title` on dynamic views, and at least one step per dynamic view (BR-001, BR-004, BR-013, BR-018, BR-019, BR-020); known kinds (BR-002, BR-009, BR-024, BR-025); container nesting and depth limit (BR-003, BR-006); non-empty element IDs (BR-005).
 * **Referential integrity (errors):** relationship `from`/`to`, view `scope`, non-wildcard `include`/`exclude`, dynamic-view step `from`/`to`, and `decisions` references all resolve (BR-007, BR-008, BR-015, BR-016, BR-021, BR-026).
 * **Enumerations (errors):** `cardinality`, `dataFlow`, view `layout`, step `type`, and tag references take only their defined values (BR-010, BR-011, BR-014, BR-017, BR-022).
 * **Uniqueness (errors):** no fully-duplicate relationships; unique step indices (BR-012, BR-023).
