@@ -25,14 +25,14 @@ Maintainers, contributors, and adopters evaluating Bausteinsicht for use in thei
 
 === Input Artifacts
 
-* link:chapters/10_quality_requirements.adoc[Chapter 10 — Quality Requirements] (QS-1 through QS-6)
-* link:ADRs/ADR-001-DSL-Format.adoc[ADR-001 — DSL Format (JSONC)]
-* link:ADRs/ADR-002-Implementation-Language.adoc[ADR-002 — Implementation Language (Go)]
-* link:ADRs/ADR-003-Risk-Classification.adoc[ADR-003 — Risk Classification]
-* link:ADRs/ADR-004-Sequence-Diagram-Export.adoc[ADR-004 — Sequence Diagram Export (Rejected)]
-* link:../spec/05_sync_specification.adoc[Sync Specification]
-* link:../security/2026-03-01-security-review.adoc[Security Review 2026-03-01]
-* link:../e2e-test-report-2026-03-05.adoc[E2E Test Report 2026-03-05]
+* link:chapters/10_quality_requirements.html[Chapter 10 — Quality Requirements] (QS-1 through QS-6)
+* link:ADRs/ADR-001-DSL-Format.html[ADR-001 — DSL Format (JSONC)]
+* link:ADRs/ADR-002-Implementation-Language.html[ADR-002 — Implementation Language (Go)]
+* link:ADRs/ADR-003-Risk-Classification.html[ADR-003 — Risk Classification]
+* link:ADRs/ADR-004-Sequence-Diagram-Export.html[ADR-004 — Sequence Diagram Export (Rejected)]
+* link:../spec/05_sync_specification.html[Sync Specification]
+* link:../security/2026-03-01-security-review.html[Security Review 2026-03-01]
+* link:../e2e-test-report-2026-03-05.html[E2E Test Report 2026-03-05]
 
 
 == Business and Architecture Drivers
@@ -125,7 +125,7 @@ Seven architectural approaches were identified and analyzed.
 
 === AP-1: JSONC with JSON Schema
 
-_Reference: link:ADRs/ADR-001-DSL-Format.adoc[ADR-001]_
+_Reference: link:ADRs/ADR-001-DSL-Format.html[ADR-001]_
 
 The architecture model is defined in JSONC (JSON with Comments) and validated against a JSON Schema.
 JSONC provides universal IDE support via SchemaStore, is natively readable by LLMs, and requires no custom parser.
@@ -135,7 +135,7 @@ The schema serves as living documentation and enables autocompletion without plu
 
 === AP-2: Go Single Binary
 
-_Reference: link:ADRs/ADR-002-Implementation-Language.adoc[ADR-002]_
+_Reference: link:ADRs/ADR-002-Implementation-Language.html[ADR-002]_
 
 The tool is implemented in Go, producing a statically linked binary with no runtime dependencies.
 Go provides compile-time type safety, fast startup (<10 ms), cross-compilation from a single build machine, and a minimal supply chain (no post-install script execution).
@@ -368,7 +368,7 @@ Tradeoff points are architectural decisions where improving one quality attribut
 [[TP-2]]
 === TP-2: JSONC vs. Custom DSL
 
-_Reference: link:ADRs/ADR-001-DSL-Format.adoc[ADR-001]_
+_Reference: link:ADRs/ADR-001-DSL-Format.html[ADR-001]_
 
 *Decision:* JSONC with JSON Schema, not a custom DSL (like Structurizr DSL or LikeC4).
 
@@ -472,7 +472,7 @@ Risks are architectural decisions or conditions that may cause problems.
 
 *Likelihood:* Medium — the tool accepts `--model` and `--template` paths without validation. +
 *Impact:* Medium — an attacker who controls CLI arguments could read or write files outside the intended directory. +
-*Reference:* SEC-001 in the link:../security/2026-03-01-security-review.adoc[security review]. +
+*Reference:* SEC-001 in the link:../security/2026-03-01-security-review.html[security review]. +
 *Mitigation:* The tool is a local CLI invoked by the user; the user already has filesystem access. Risk is relevant only when CLI is invoked by automated agents with untrusted input. +
 *Recommendation:* *[A]* Document the trust model. Consider optional `--restrict-to-dir` flag for agent use cases.
 

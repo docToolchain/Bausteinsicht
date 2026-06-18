@@ -14,7 +14,7 @@ ifndef::imagesdir[:imagesdir: ../../images]
 == Risks and Technical Debts
 
 
-The canonical risk analysis for Bausteinsicht is the link:../2026-03-06-architecture-review.adoc[ATAM Architecture Review (2026-03-06)], which identifies 8 risks, 5 sensitivity points, and 6 tradeoff points.
+The canonical risk analysis for Bausteinsicht is the link:../2026-03-06-architecture-review.html[ATAM Architecture Review (2026-03-06)], which identifies 8 risks, 5 sensitivity points, and 6 tradeoff points.
 This section summarizes the top risks.
 For the complete risk register, sensitivity point analysis, and tradeoff analysis, refer to the full ATAM review.
 

@@ -24,7 +24,7 @@ The method produces a visual gap profile (spider chart) that highlights potentia
 
 === Companion Document
 
-This review complements the link:2026-03-06-architecture-review.adoc[ATAM Architecture Review] conducted on the same date.
+This review complements the link:2026-03-06-architecture-review.html[ATAM Architecture Review] conducted on the same date.
 Where ATAM provides comprehensive analysis of sensitivity points and tradeoffs, LASR provides a quick visual gap profile.
 
 
@@ -39,7 +39,7 @@ The tool ships as a single Go binary with zero runtime dependencies.
 
 == Step 2: Evaluation Scale — Quality Goals
 
-The top 5 quality goals are derived from the link:chapters/10_quality_requirements.adoc[quality requirements] and the project's business goals.
+The top 5 quality goals are derived from the link:chapters/10_quality_requirements.html[quality requirements] and the project's business goals.
 Each goal is assigned a **target value** (where we want to be for v1) on a 0–100 scale.
 
 [cols="1,3,1"]

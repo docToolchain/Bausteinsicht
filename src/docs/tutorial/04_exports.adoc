@@ -156,4 +156,4 @@ bausteinsicht export --view context --image-format png
 
 This drives the draw.io desktop app headlessly, so it requires draw.io installed on the machine. `--image-format svg`, `--scale 2` for high-DPI (scale factors above 1 need a hardware GPU), `--output <dir>` to choose the destination. In containers, see the devcontainer notes in the repository — headless draw.io needs xvfb and a dbus daemon.
 
-Continue with link:05_analysis_evolution.adoc[5. Analysis and Evolution].
+Continue with link:05_analysis_evolution.html[5. Analysis and Evolution].

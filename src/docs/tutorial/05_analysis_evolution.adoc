@@ -152,4 +152,4 @@ The diff speaks architecture — added elements, removed relationships, changed 
 
 For planned architectures, the model can carry `asIs` and `toBe` sections; `bausteinsicht diff` then reports the gap between today and the target as a structured change list — the same idea as snapshots, but for states you model deliberately side by side.
 
-Continue with link:06_ai_workflows.adoc[6. AI and Automation Workflows].
+Continue with link:06_ai_workflows.html[6. AI and Automation Workflows].

@@ -7,6 +7,15 @@ import (
 	"github.com/docToolchain/Bausteinsicht/internal/model"
 )
 
+// resolvePrefix returns the effective prefix for a loaded model:
+// ModelRef.Prefix if set, otherwise ModelRef.ID.
+func resolvePrefix(lm LoadedModel) string {
+	if lm.Ref.Prefix != "" {
+		return lm.Ref.Prefix
+	}
+	return lm.Ref.ID
+}
+
 // MergeModels combines multiple models into a single unified model.
 // Element IDs are prefixed to avoid collisions:
 // - If ModelRef.Prefix is set, use it as prefix
@@ -29,7 +38,8 @@ func MergeModels(loaded []LoadedModel) (*model.BausteinsichtModel, error) {
 		Constraints:   []model.Constraint{},
 	}
 
-	// Merge specifications (element and relationship kinds)
+	// Merge specifications and elements in a single pass per model.
+	idMap := make(map[string]string) // original ID → prefixed ID
 	for _, lm := range loaded {
 		for kind, def := range lm.Model.Specification.Elements {
 			if _, exists := merged.Specification.Elements[kind]; !exists {
@@ -41,33 +51,18 @@ func MergeModels(loaded []LoadedModel) (*model.BausteinsichtModel, error) {
 				merged.Specification.Relationships[kind] = def
 			}
 		}
-	}
-
-	// Map to track ID transformations for relationship resolution
-	idMap := make(map[string]string) // original ID → prefixed ID
-
-	// Merge elements with prefixing
-	for _, lm := range loaded {
-		prefix := lm.Ref.Prefix
-		if prefix == "" {
-			prefix = lm.Ref.ID
-		}
-
+		prefix := resolvePrefix(lm)
 		flatElems, _ := model.FlattenElements(lm.Model)
 		for id, elemPtr := range flatElems {
 			prefixedID := prefixElementID(id, prefix)
 			idMap[id] = prefixedID
-
 			merged.Model[prefixedID] = *elemPtr
 		}
 	}
 
-	// Merge relationships with ID remapping
+	// Merge relationships, views, dynamic views, and constraints in one pass.
 	for _, lm := range loaded {
-		prefix := lm.Ref.Prefix
-		if prefix == "" {
-			prefix = lm.Ref.ID
-		}
+		prefix := resolvePrefix(lm)
 
 		for _, rel := range lm.Model.Relationships {
 			remappedRel := rel
@@ -75,32 +70,15 @@ func MergeModels(loaded []LoadedModel) (*model.BausteinsichtModel, error) {
 			remappedRel.To = prefixElementID(rel.To, prefix)
 			merged.Relationships = append(merged.Relationships, remappedRel)
 		}
-	}
-
-	// Merge views (each model's views are prefixed with model ID)
-	for _, lm := range loaded {
-		prefix := lm.Ref.Prefix
-		if prefix == "" {
-			prefix = lm.Ref.ID
-		}
 
 		for viewID, view := range lm.Model.Views {
-			viewKey := prefix + "_" + viewID
 			remappedView := view
 			remappedView.Include = remapElementIDs(view.Include, prefix)
 			remappedView.Exclude = remapElementIDs(view.Exclude, prefix)
 			if view.Scope != "" {
 				remappedView.Scope = prefixElementID(view.Scope, prefix)
 			}
-			merged.Views[viewKey] = remappedView
-		}
-	}
-
-	// Merge dynamic views
-	for _, lm := range loaded {
-		prefix := lm.Ref.Prefix
-		if prefix == "" {
-			prefix = lm.Ref.ID
+			merged.Views[prefix+"_"+viewID] = remappedView
 		}
 
 		for _, dv := range lm.Model.DynamicViews {
@@ -112,23 +90,8 @@ func MergeModels(loaded []LoadedModel) (*model.BausteinsichtModel, error) {
 			}
 			merged.DynamicViews = append(merged.DynamicViews, remappedDV)
 		}
-	}
 
-	// Merge constraints
-	for _, lm := range loaded {
-		prefix := lm.Ref.Prefix
-		if prefix == "" {
-			prefix = lm.Ref.ID
-		}
-		_ = prefix // TODO: use prefix for remapping element IDs
-
-		for _, constraint := range lm.Model.Constraints {
-			remappedConstraint := constraint
-			if constraint.FromKind != "" {
-				remappedConstraint.FromKind = constraint.FromKind
-			}
-			merged.Constraints = append(merged.Constraints, remappedConstraint)
-		}
+		merged.Constraints = append(merged.Constraints, lm.Model.Constraints...)
 	}
 
 	return merged, nil

@@ -343,11 +343,11 @@ stop
 === UC-7: Drill-Down Navigation
 
 ==== Description
-An architect navigates between different abstraction levels within a single draw.io diagram using zoom-based drill-down.
+An architect navigates between abstraction levels by following links between draw.io pages — one page per view — drilling from a context view into a container view into a component view, and back via a generated navigation button. See link:../arc42/ADRs/ADR-009-Drill-Down-Navigation.adoc[ADR-009] for why this is page-based rather than single-page zoom.
 
 ==== Preconditions
-* Multiple views exist at different hierarchy levels
-* Views are placed on a single draw.io page with appropriate spacing
+* Multiple views exist at different hierarchy levels (e.g. a context view scoped to a system, a container view scoped to that system's children)
+* Sync has run, so each view is rendered as its own draw.io page
 
 ==== Flow
 
@@ -355,25 +355,24 @@ An architect navigates between different abstraction levels within a single draw
 ....
 @startuml
 start
-:Architect views context diagram
-(high zoom level);
-:Architect clicks on a system element;
-:draw.io follows link to
-container view area;
-:Zoom adjusts to show
-container-level detail;
+:Architect opens the context view page;
+:Architect clicks a system element;
+:draw.io follows the page link
+to that system's container view page;
 note right
-  Context diagram remains
-  visible (small) above
-  for orientation
+  Each view is a separate
+  draw.io page; sync generates
+  cross-page links on elements
+  that have a deeper view
 end note
-:Architect clicks on a container;
-:draw.io navigates to
-component view area;
+:Architect clicks a container element;
+:draw.io follows the link
+to the component view page;
 if (Wants to go back?) then (yes)
-  :Click on parent view
-  (visible above);
-  :Zoom back to parent level;
+  :Click the generated
+  "back" navigation button;
+  :draw.io returns to the
+  parent view page;
 else (no)
   :Continue exploring;
 endif
@@ -382,11 +381,11 @@ stop
 ....
 
 ==== Postconditions
-* User can navigate between abstraction levels via click
-* Parent views remain visible for orientation
+* User can navigate between abstraction levels by clicking linked elements
+* Each level is a dedicated page; a generated back-navigation button returns to the parent view
 
 ==== Error Scenarios
-* Target view does not exist → element is not clickable (no link generated)
+* Target view does not exist → element carries no page link (not clickable for drill-down)
 
 === UC-8: Export Diagram Views
 

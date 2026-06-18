@@ -241,6 +241,97 @@ func TestAppendArrayEntry_PreservesComments(t *testing.T) {
 	}
 }
 
+func TestInsertObjectEntry_TrailingLineComment(t *testing.T) {
+	// Regression for #399: comma must go before the trailing // comment.
+	input := `{
+  "model": {
+    "webshop": { "kind": "system", "title": "Webshop" } // main system
+  }
+}`
+	want := `{
+  "model": {
+    "webshop": { "kind": "system", "title": "Webshop" }, // main system
+    "api": { "kind": "system" }
+  }
+}`
+	got, err := InsertObjectEntry([]byte(input), []string{"model"}, "api", `{ "kind": "system" }`)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if string(got) != want {
+		t.Errorf("got:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestInsertObjectEntry_TrailingCommentWithURLInValue(t *testing.T) {
+	// Regression for review finding H1: findLineComment must not mistake // inside
+	// a string value (URL) for a comment, and must still find the real // comment.
+	input := `{
+  "model": {
+    "webshop": { "url": "https://example.com" } // main system
+  }
+}`
+	want := `{
+  "model": {
+    "webshop": { "url": "https://example.com" }, // main system
+    "api": { "kind": "system" }
+  }
+}`
+	got, err := InsertObjectEntry([]byte(input), []string{"model"}, "api", `{ "kind": "system" }`)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if string(got) != want {
+		t.Errorf("got:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestInsertObjectEntry_TrailingCommentAlreadyHasComma(t *testing.T) {
+	// Existing comma before a trailing comment must not produce a double comma.
+	input := `{
+  "model": {
+    "webshop": { "kind": "system" }, // main system
+    "db": { "kind": "database" }
+  }
+}`
+	got, err := InsertObjectEntry([]byte(input), []string{"model"}, "api", `{ "kind": "system" }`)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	result := string(got)
+	if strings.Contains(result, ",,") {
+		t.Errorf("double comma produced:\n%s", result)
+	}
+	if !strings.Contains(result, `"api"`) {
+		t.Errorf("new entry missing:\n%s", result)
+	}
+}
+
+func TestAppendArrayEntry_TrailingLineComment(t *testing.T) {
+	// Regression for #399: same trailing-comment corruption in arrays.
+	input := `{
+  "specification": { "elements": { "system": { "notation": "System" } } },
+  "model": {},
+  "relationships": [
+    { "from": "a", "to": "b", "label": "calls" } // initial rel
+  ],
+  "views": {}
+}`
+	got, err := AppendArrayEntry([]byte(input), []string{"relationships"}, `{ "from": "c", "to": "d", "label": "uses" }`)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	result := string(got)
+
+	if strings.Contains(result, "// initial rel,") {
+		t.Errorf("comma placed after trailing comment (file corruption):\n%s", result)
+	}
+	if !strings.Contains(result, `"from": "c"`) {
+		t.Errorf("new entry missing:\n%s", result)
+	}
+}
+
+
 func TestPatchValue_WithBlockComments(t *testing.T) {
 	input := `{
   /* block comment */

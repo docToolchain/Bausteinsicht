@@ -7,7 +7,7 @@
 
 == Review Context
 
-This is a follow-up Mini-ATAM review assessing the Bausteinsicht architecture 24 days after the initial link:2026-03-06-architecture-review.adoc[full ATAM review (2026-03-06)].
+This is a follow-up Mini-ATAM review assessing the Bausteinsicht architecture 24 days after the initial link:2026-03-06-architecture-review.html[full ATAM review (2026-03-06)].
 It focuses on three questions:
 
 1. Which recommendations from the initial review have been implemented?

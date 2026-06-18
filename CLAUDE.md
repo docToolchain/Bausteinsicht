@@ -34,7 +34,7 @@ Architecture-as-code tool with draw.io as visual frontend and bidirectional sync
 - Flexible element hierarchy (not limited to 4 C4 levels)
 - Unique variable names as element IDs for synchronization
 - Template-based styling (templates are draw.io files)
-- Zoom-based drill-down navigation on single draw.io page
+- Page-based drill-down navigation (one draw.io page per view, cross-page links + back button; see ADR-009)
 - CLI + watch mode; CLI commands for LLM-driven workflows
 
 ## Development Environment
