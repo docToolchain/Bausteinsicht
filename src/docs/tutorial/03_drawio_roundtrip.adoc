@@ -140,17 +140,14 @@ To restyle your architecture:
 
 1. Open `template.drawio` in draw.io.
 2. Restyle the shape of the kind you care about (say, make containers green).
-3. Sync **with the template flag**:
+3. Sync — the local `template.drawio` next to your model is picked up automatically:
 
 [source,bash]
 ----
-bausteinsicht sync --template template.drawio
+bausteinsicht sync
 ----
 
-[IMPORTANT]
-====
-Without `--template`, sync uses a built-in default template and your `template.drawio` is **not** picked up (see https://github.com/docToolchain/Bausteinsicht/issues/418[#418]). Until that changes, always pass `--template template.drawio` when you customize styles — in watch mode too.
-====
+Template resolution follows a clear precedence: an explicit `--template <path>` wins, otherwise the `template.drawio` next to the model is used, otherwise a built-in default. So you only need `--template` to point at a template in a different location.
 
 Templates only affect **newly created** shapes. Existing shapes keep their look — restyle them in draw.io directly, or remove them from the diagram and sync again.
 
