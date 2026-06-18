@@ -1228,7 +1228,7 @@ Imports an architecture model from an external DSL and writes a Bausteinsicht `.
 | `--force` | Overwrite the output file if it already exists. | No | `false`
 |===
 
-**Behavior:** parses the source DSL, maps people/systems/containers and relationships, and generates a matching specification. Exit `2` if the output exists without `--force`; exit `1` on any other import failure (unknown `--from`, unreadable input, parse/encoding error).
+**Behavior:** parses the source DSL, maps people/systems/containers and relationships, and generates a matching specification. Exit `2` if the output file already exists and neither `--force` nor `--dry-run` is set — `--dry-run` prints to stdout and skips the existence check, so it never fails on an existing output. Exit `1` on any other import failure (unknown `--from`, unreadable input, parse/encoding error).
 
 ==== `bausteinsicht generate-template`
 
@@ -1272,12 +1272,12 @@ Loads external metrics (error rate, coverage, …) from a JSON file and overlays
 |===
 | Subcommand | Description
 
-| `apply <metrics-file>` | Apply a metric heatmap (`--metric <key>`, default: first available; `--output`, default `architecture.drawio`).
+| `apply <metrics-file>` | Apply a metric heatmap (`--metric <key>`, default: first available; `--output`, default `<model-dir>/architecture.drawio`, i.e. next to the model file).
 | `list <metrics-file>` | List the metrics available in the file.
-| `remove` | Remove the overlay and restore original colors (`--output`).
+| `remove` | Remove the overlay and restore original colors (`--output`, same default).
 |===
 
-`apply` and `remove` load the model directly and do **not** auto-detect — pass `--model` (there is no default).
+`apply` and `remove` load the model directly and do **not** auto-detect — pass `--model` (there is no default). When `--output` is omitted it resolves relative to the model file's directory, not the current directory. Any overlay failure (missing model/metrics file, unreadable diagram, unknown metric) exits with code `2`.
 
 ==== `bausteinsicht repl`
 
@@ -1285,7 +1285,7 @@ Starts an interactive shell for editing the model.
 
 **Flags:** none beyond the global flags.
 
-**Behavior:** keeps the model in memory; supports `add`/`remove`/`list`/`undo`/`save`. Validates before every save; pure additions are patched comment-preserving, modifications/deletions fall back to a full rewrite (with a warning). Warns on exit with unsaved changes; `Ctrl-D` (EOF) exits cleanly.
+**Behavior:** keeps the model in memory; supports `add`/`remove`/`list`/`show`/`validate`/`undo`/`save` (plus `help` and `exit`). Validates before every save; pure additions are patched comment-preserving, modifications/deletions fall back to a full rewrite (with a warning). `exit` with unsaved changes prompts for confirmation before quitting; `Ctrl-D` (EOF) warns about unsaved changes and exits cleanly.
 
 ==== `bausteinsicht adr`
 
