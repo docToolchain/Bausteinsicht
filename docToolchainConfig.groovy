@@ -143,7 +143,7 @@ microsite.with {
     // set a title to '-' in order to remove this menu entry.
     // 'Development' holds internal dev artifacts (E2E reports, test plan, security review,
     // announcement) — built and link-reachable, but hidden from the top nav ('-').
-    menu = ['tutorial':'Tutorial', 'manual':'User Manual', 'PRD':'PRD', 'Specification':'Specification', 'arc42':'Architecture', 'ADR':'ADR', 'Development':'-']
+    menu = ['tutorial':'Tutorial', 'manual':'User Manual', 'PRD':'PRD', 'Specification':'Specification', 'arc42':'Architecture', 'ADR':'ADRs', 'Development':'-']
 
 //tag::additionalConverters[]
 /**
