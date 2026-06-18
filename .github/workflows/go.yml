@@ -27,6 +27,9 @@ jobs:
           go-version-file: go.mod
       - run: go build ./...
       - name: Run tests with coverage
+        id: test
+        # continue-on-error so the report still generates and uploads below;
+        # the job is failed explicitly in the final step if tests did not pass.
         continue-on-error: true
         shell: bash
         run: go test ./... -json -covermode=atomic -coverprofile=coverage.out > test-results.json
@@ -90,6 +93,16 @@ jobs:
             test-results.json
             coverage.out
           retention-days: 30
+      - name: Fail job if tests failed
+        if: always()
+        shell: bash
+        env:
+          TEST_OUTCOME: ${{ steps.test.outcome }}
+        run: |
+          if [ "$TEST_OUTCOME" != "success" ]; then
+            echo "::error::Go tests failed — see the 'Run tests with coverage' step and the uploaded test report."
+            exit 1
+          fi
 
   merge-reports:
     needs: build-and-test
@@ -127,7 +140,9 @@ jobs:
           retention-days: 90
 
   report-pr-comment:
-    if: github.event_name == 'pull_request'
+    # always() so the report still posts even when build-and-test fails the
+    # job on a test failure (the artifacts are uploaded before that happens).
+    if: always() && github.event_name == 'pull_request'
     needs: [build-and-test, merge-reports]
     runs-on: ubuntu-latest
     permissions:
