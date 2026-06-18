@@ -5,6 +5,11 @@ import (
 	"strings"
 )
 
+const (
+	modelPathPrefix = "model."
+	relPathFmt      = "relationships[%d]"
+)
+
 // ValidationError describes a single validation problem with its model path.
 type ValidationError struct {
 	Path    string
@@ -71,7 +76,7 @@ func validateElements(m *BausteinsichtModel) []ValidationError {
 	var errs []ValidationError
 	for id, elem := range m.Model {
 		if err := validateElementID(id); err != nil {
-			errs = append(errs, ValidationError{Path: "model." + id, Message: err.Error()})
+			errs = append(errs, ValidationError{Path: modelPathPrefix + id, Message: err.Error()})
 		}
 		errs = append(errs, validateElement(m, "model."+id, elem, 1)...)
 	}
@@ -148,7 +153,7 @@ func validateRelationships(m *BausteinsichtModel) []ValidationError {
 	seen := make(map[relSig]int) // signature → first index
 
 	for i, rel := range m.Relationships {
-		path := fmt.Sprintf("relationships[%d]", i)
+		path := fmt.Sprintf(relPathFmt, i)
 
 		if _, err := lookupElement(m, rel.From); err != nil {
 			errs = append(errs, ValidationError{
@@ -391,7 +396,7 @@ func validateLifecycleStatus(m *BausteinsichtModel) []ValidationWarning {
 		}
 		if !validStatus {
 			warnings = append(warnings, ValidationWarning{
-				Path:    "model." + id,
+				Path:    modelPathPrefix + id,
 				Message: fmt.Sprintf("unknown status %q; valid values are: %v", elem.Status, ValidStatuses),
 			})
 			continue
@@ -400,7 +405,7 @@ func validateLifecycleStatus(m *BausteinsichtModel) []ValidationWarning {
 		// Rule: archived elements should not have outgoing relationships
 		if elem.Status == StatusArchived && len(outgoing[id]) > 0 {
 			warnings = append(warnings, ValidationWarning{
-				Path:    "model." + id,
+				Path:    modelPathPrefix + id,
 				Message: fmt.Sprintf("archived element has %d outgoing relationships; archived elements should not have active relationships", len(outgoing[id])),
 			})
 		}
@@ -416,7 +421,7 @@ func validateLifecycleStatus(m *BausteinsichtModel) []ValidationWarning {
 			}
 			if !hasSuccessor {
 				warnings = append(warnings, ValidationWarning{
-					Path:    "model." + id,
+					Path:    modelPathPrefix + id,
 					Message: "deprecated element has no deployed successor of the same kind; consider linking to a replacement",
 				})
 			}
@@ -482,7 +487,7 @@ func validateDecisions(m *BausteinsichtModel) []ValidationError {
 		for _, decisionID := range elem.Decisions {
 			if !knownDecisions[decisionID] {
 				errs = append(errs, ValidationError{
-					Path:    "model." + id,
+					Path:    modelPathPrefix + id,
 					Message: fmt.Sprintf("references unknown decision %q", decisionID),
 				})
 			}
@@ -494,7 +499,7 @@ func validateDecisions(m *BausteinsichtModel) []ValidationError {
 		for _, decisionID := range rel.Decisions {
 			if !knownDecisions[decisionID] {
 				errs = append(errs, ValidationError{
-					Path:    fmt.Sprintf("relationships[%d]", i),
+					Path:    fmt.Sprintf(relPathFmt, i),
 					Message: fmt.Sprintf("references unknown decision %q", decisionID),
 				})
 			}
@@ -553,7 +558,7 @@ func validateSupersededDecisions(m *BausteinsichtModel) []ValidationWarning {
 		for _, decisionID := range elem.Decisions {
 			if status, exists := decisionStatus[decisionID]; exists && status == ADRSuperseded {
 				warnings = append(warnings, ValidationWarning{
-					Path:    "model." + id,
+					Path:    modelPathPrefix + id,
 					Message: fmt.Sprintf("references superseded decision %q", decisionID),
 				})
 			}
@@ -565,7 +570,7 @@ func validateSupersededDecisions(m *BausteinsichtModel) []ValidationWarning {
 		for _, decisionID := range rel.Decisions {
 			if status, exists := decisionStatus[decisionID]; exists && status == ADRSuperseded {
 				warnings = append(warnings, ValidationWarning{
-					Path:    fmt.Sprintf("relationships[%d]", i),
+					Path:    fmt.Sprintf(relPathFmt, i),
 					Message: fmt.Sprintf("references superseded decision %q", decisionID),
 				})
 			}

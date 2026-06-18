@@ -11,6 +11,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	flagFormat = "format"
+	formatJSON = "json"
+)
+
 func newWorkspaceCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "workspace",
@@ -69,8 +74,8 @@ func runWorkspaceMerge(cmd *cobra.Command, configPath, outputPath string) error 
 		return exitWithCode(fmt.Errorf("writing output file: %w", err), 2)
 	}
 
-	format, _ := cmd.Flags().GetString("format")
-	if format == "json" {
+	format, _ := cmd.Flags().GetString(flagFormat)
+	if format == formatJSON {
 		out, _ := json.Marshal(map[string]interface{}{
 			"message": "Models merged successfully",
 			"output":  outputPath,
@@ -119,8 +124,8 @@ func runWorkspaceValidate(cmd *cobra.Command, configPath string) error {
 	}
 
 	if len(validationErrs) > 0 {
-		format, _ := cmd.Flags().GetString("format")
-		if format == "json" {
+		format, _ := cmd.Flags().GetString(flagFormat)
+		if format == formatJSON {
 			var errMsgs []string
 			for _, e := range validationErrs {
 				errMsgs = append(errMsgs, e.Error())
@@ -138,8 +143,8 @@ func runWorkspaceValidate(cmd *cobra.Command, configPath string) error {
 		return exitWithCode(fmt.Errorf("validation failed"), 2)
 	}
 
-	format, _ := cmd.Flags().GetString("format")
-	if format == "json" {
+	format, _ := cmd.Flags().GetString(flagFormat)
+	if format == formatJSON {
 		out, _ := json.Marshal(map[string]interface{}{
 			"valid":  true,
 			"models": len(loaded),
@@ -170,8 +175,8 @@ func runWorkspaceList(cmd *cobra.Command, configPath string) error {
 		return exitWithCode(fmt.Errorf("loading workspace config: %w", err), 2)
 	}
 
-	format, _ := cmd.Flags().GetString("format")
-	if format == "json" {
+	format, _ := cmd.Flags().GetString(flagFormat)
+	if format == formatJSON {
 		out, _ := json.MarshalIndent(cfg, "", "  ")
 		_, _ = fmt.Fprintln(cmd.OutOrStdout(), string(out))
 		return nil
