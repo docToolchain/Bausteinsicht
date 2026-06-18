@@ -1,0 +1,17 @@
+# Force LF on checkout for all text files on every platform.
+#
+# Windows CI runners default to core.autocrlf=true, which would inject CRLF
+# at checkout and break byte-exact comparisons such as
+# internal/schema.TestCommittedSchemaInSync (it compares the committed
+# schemas/bausteinsicht.schema.json verbatim against the LF output of the
+# generator). Pinning eol=lf keeps the working copy identical to the LF blobs
+# the generator produces, so the test holds on Windows too.
+* text=auto eol=lf
+
+# Binary assets — never normalize.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.pdf  binary
