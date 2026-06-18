@@ -25,6 +25,42 @@ type ExportOptions struct {
 // platformPaths is a function variable so tests can override it.
 var platformPaths = platformDrawioPaths
 
+// DrawioPathEnvVar is the environment variable that overrides draw.io binary
+// auto-detection. The --drawio-path flag takes precedence over it.
+const DrawioPathEnvVar = "BAUSTEINSICHT_DRAWIO_PATH"
+
+// ResolveDrawioBinary determines which draw.io CLI binary to use.
+// Precedence (highest first):
+//  1. flagPath — the explicit --drawio-path flag value (if non-empty)
+//  2. BAUSTEINSICHT_DRAWIO_PATH environment variable (if set)
+//  3. auto-detection via DetectDrawioBinary
+//
+// When an explicit path (flag or env) is given, it must point at an existing
+// file; otherwise an error is returned rather than silently falling back to
+// auto-detection, so misconfiguration is surfaced loudly.
+func ResolveDrawioBinary(flagPath string) (string, error) {
+	if flagPath != "" {
+		return verifyExplicitBinary(flagPath, "--drawio-path")
+	}
+	if envPath := os.Getenv(DrawioPathEnvVar); envPath != "" {
+		return verifyExplicitBinary(envPath, DrawioPathEnvVar)
+	}
+	return DetectDrawioBinary()
+}
+
+// verifyExplicitBinary checks that an explicitly configured draw.io path exists
+// and is not a directory, returning a clear error referencing its source.
+func verifyExplicitBinary(path, source string) (string, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return "", fmt.Errorf("draw.io binary from %s not found: %s", source, path)
+	}
+	if info.IsDir() {
+		return "", fmt.Errorf("draw.io binary from %s is a directory, not an executable: %s", source, path)
+	}
+	return path, nil
+}
+
 // DetectDrawioBinary finds the draw.io CLI binary.
 // Search order:
 //  1. "drawio-export" — devcontainer wrapper (Linux, adds xvfb + --no-sandbox)

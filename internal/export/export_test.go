@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -61,6 +62,95 @@ func TestDetectDrawioBinary_ErrorWhenNotFound(t *testing.T) {
 	_, err := DetectDrawioBinary()
 	if err == nil {
 		t.Error("expected error when no draw.io binary found")
+	}
+}
+
+// TestResolveDrawioBinary_FlagWins verifies that an explicit --drawio-path value
+// takes precedence over the BAUSTEINSICHT_DRAWIO_PATH env var and auto-detection.
+// (#420)
+func TestResolveDrawioBinary_FlagWins(t *testing.T) {
+	dir := t.TempDir()
+	flagBin := fakeBinary(t, dir, "flag-drawio")
+	envBin := fakeBinary(t, dir, "env-drawio")
+
+	t.Setenv("BAUSTEINSICHT_DRAWIO_PATH", envBin)
+	// Ensure auto-detection cannot interfere.
+	t.Setenv("PATH", t.TempDir())
+	old := platformPaths
+	platformPaths = func() []string { return nil }
+	t.Cleanup(func() { platformPaths = old })
+
+	bin, err := ResolveDrawioBinary(flagBin)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if bin != flagBin {
+		t.Errorf("flag should win: expected %q, got %q", flagBin, bin)
+	}
+}
+
+// TestResolveDrawioBinary_EnvWhenNoFlag verifies that BAUSTEINSICHT_DRAWIO_PATH
+// is honored when the --drawio-path flag is absent. (#420)
+func TestResolveDrawioBinary_EnvWhenNoFlag(t *testing.T) {
+	dir := t.TempDir()
+	envBin := fakeBinary(t, dir, "env-drawio")
+
+	t.Setenv("BAUSTEINSICHT_DRAWIO_PATH", envBin)
+	// Ensure auto-detection cannot interfere.
+	t.Setenv("PATH", t.TempDir())
+	old := platformPaths
+	platformPaths = func() []string { return nil }
+	t.Cleanup(func() { platformPaths = old })
+
+	bin, err := ResolveDrawioBinary("")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if bin != envBin {
+		t.Errorf("env should be used: expected %q, got %q", envBin, bin)
+	}
+}
+
+// TestResolveDrawioBinary_AutoDetectWhenNeither verifies that auto-detection runs
+// when neither the flag nor the env var are set. (#420)
+func TestResolveDrawioBinary_AutoDetectWhenNeither(t *testing.T) {
+	dir := t.TempDir()
+	autoBin := fakeBinary(t, dir, "drawio")
+
+	t.Setenv("BAUSTEINSICHT_DRAWIO_PATH", "")
+	t.Setenv("PATH", dir)
+
+	bin, err := ResolveDrawioBinary("")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if bin != autoBin {
+		t.Errorf("auto-detect should be used: expected %q, got %q", autoBin, bin)
+	}
+}
+
+// TestResolveDrawioBinary_FlagPathNotFound verifies that an explicit --drawio-path
+// pointing at a non-existent file returns an error rather than silently falling
+// back to auto-detection. (#420)
+func TestResolveDrawioBinary_FlagPathNotFound(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "does-not-exist")
+	_, err := ResolveDrawioBinary(missing)
+	if err == nil {
+		t.Error("expected error when --drawio-path points at a missing file")
+	}
+}
+
+// TestResolveDrawioBinary_PathIsDirectory verifies that an explicit --drawio-path
+// pointing at a directory (a common misconfiguration) returns a clear error
+// rather than treating the directory as an executable. (#420)
+func TestResolveDrawioBinary_PathIsDirectory(t *testing.T) {
+	dir := t.TempDir()
+	_, err := ResolveDrawioBinary(dir)
+	if err == nil {
+		t.Fatal("expected error when --drawio-path points at a directory")
+	}
+	if !strings.Contains(err.Error(), "directory") {
+		t.Errorf("error should mention it is a directory, got: %v", err)
 	}
 }
 

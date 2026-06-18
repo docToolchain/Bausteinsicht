@@ -24,6 +24,7 @@ func newExportCmd() *cobra.Command {
 	cmd.Flags().String("output", ".", "Output directory")
 	cmd.Flags().Bool("embed-diagram", false, "Embed draw.io XML source in output")
 	cmd.Flags().Float64("scale", 1.0, "Export scale factor (e.g. 2.0 for retina, 3.0 for print); scale > 1 requires hardware GPU")
+	cmd.Flags().String("drawio-path", "", "Path to the draw.io CLI binary (overrides "+export.DrawioPathEnvVar+" and auto-detection)")
 	return cmd
 }
 
@@ -42,6 +43,7 @@ func runExport(cmd *cobra.Command, _ []string) error {
 	outputDir, _ := cmd.Flags().GetString("output")
 	embedDiagram, _ := cmd.Flags().GetBool("embed-diagram")
 	scale, _ := cmd.Flags().GetFloat64("scale")
+	drawioPathFlag, _ := cmd.Flags().GetString("drawio-path")
 
 	if outputDir != "" {
 		if err := validatePathContainment(outputDir); err != nil {
@@ -90,8 +92,9 @@ func runExport(cmd *cobra.Command, _ []string) error {
 		return exitWithCode(fmt.Errorf("loading draw.io file: %w", err), 2)
 	}
 
-	// Detect draw.io CLI binary.
-	binary, err := export.DetectDrawioBinary()
+	// Resolve draw.io CLI binary: --drawio-path flag, then
+	// BAUSTEINSICHT_DRAWIO_PATH env var, then auto-detection.
+	binary, err := export.ResolveDrawioBinary(drawioPathFlag)
 	if err != nil {
 		return exitWithCode(err, 2)
 	}
