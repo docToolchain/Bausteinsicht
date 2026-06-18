@@ -444,3 +444,131 @@ stop
 * View name not found → exit code 2, error message mentions "view not found"
 * draw.io CLI not available → error with installation instructions
 * Output directory not writable → error with path information
+
+[[business-rules]]
+== Business Rules
+
+Business Rules are the cross-cutting model-consistency constraints enforced by `bausteinsicht validate` — and therefore at the start of every forward sync (UC-3) and whenever an LLM agent validates (UC-6). Each rule has a stable `BR-NNN` ID, a severity, and a single source of truth in the code:
+
+* **error** — validation fails; sync aborts (exit code 1).
+* **warning** — reported with a `WARNING:` prefix but non-blocking (exit code 0).
+
+The `BR-NNN` IDs are the traceability anchors: acceptance criteria (`04_acceptance_criteria.adoc`) and tests reference them. The authoritative implementation is `internal/model/validate.go`.
+
+=== Element rules
+
+[cols="1,5,1,3"]
+|===
+| BR | Rule | Severity | Source
+
+| BR-001 | An element must declare a `kind`. | error | `validate.go` `validateElement`
+| BR-002 | An element's `kind` must be defined in `specification.elements`. | error | `validate.go` `validateElement`
+| BR-003 | An element may only have `children` if its kind has `container: true`. | error | `validate.go` `validateElement`
+| BR-004 | An element must declare a `title`. | error | `validate.go` `validateElement`
+| BR-005 | An element ID must not be empty or whitespace. | error | `validate.go` `validateElementID`
+| BR-006 | Element nesting must not exceed `MaxElementDepth`. | error | `validate.go` `validateElement`
+|===
+
+=== Relationship rules
+
+[cols="1,5,1,3"]
+|===
+| BR | Rule | Severity | Source
+
+| BR-007 | A relationship's `from` must resolve to an existing element. | error | `validate.go` `validateRelationships`
+| BR-008 | A relationship's `to` must resolve to an existing element. | error | `validate.go` `validateRelationships`
+| BR-009 | A relationship's `kind`, if set, must be defined in `specification.relationships`. | error | `validate.go` `validateRelationships`
+| BR-010 | A relationship's `cardinality`, if set, must be one of `1:1`, `1:N`, `N:N`. | error | `validate.go` `validateRelationships`
+| BR-011 | A relationship's `dataFlow`, if set, must be one of `sync`, `async`, `request/response`, `publish/subscribe`. | error | `validate.go` `validateRelationships`
+| BR-012 | Two relationships must not be fully duplicate (same `from`, `to`, `kind`, and `label`); they may share a pair if `kind` or `label` differs. | error | `validate.go` `validateRelationships`
+|===
+
+=== View rules
+
+[cols="1,5,1,3"]
+|===
+| BR | Rule | Severity | Source
+
+| BR-013 | A view must declare a `title`. | error | `validate.go` `validateViews`
+| BR-014 | A view's `layout`, if set, must be one of `layered`, `grid`, `none`. | error | `validate.go` `validateViews`
+| BR-015 | A view's `scope`, if set, must resolve to an existing element. | error | `validate.go` `validateViews`
+| BR-016 | Non-wildcard `include`/`exclude` entries must resolve to an existing element. | error | `validate.go` `validateViews`
+| BR-017 | `filter-tags`/`exclude-tags` must reference tags defined in `specification.tags`. | error | `validate.go` `validateViews`
+|===
+
+=== Dynamic view rules
+
+[cols="1,5,1,3"]
+|===
+| BR | Rule | Severity | Source
+
+| BR-018 | A dynamic view must declare a `key`. | error | `validate.go` `validateDynamicViews`
+| BR-019 | A dynamic view must declare a `title`. | error | `validate.go` `validateDynamicViews`
+| BR-020 | A dynamic view must have at least one step. | error | `validate.go` `validateDynamicViews`
+| BR-021 | Each step's `from` and `to` must resolve to an existing element. | error | `validate.go` `validateDynamicViews`
+| BR-022 | A step's `type`, if set, must be one of `sync`, `async`, `return`. | error | `validate.go` `validateDynamicViews`
+| BR-023 | Step `index` values must be unique within a dynamic view. | error | `validate.go` `validateDynamicViews`
+|===
+
+=== Pattern rules
+
+[cols="1,5,1,3"]
+|===
+| BR | Rule | Severity | Source
+
+| BR-024 | A pattern element's `kind` must be defined in `specification.elements`. | error | `validate.go` `validatePatterns`
+| BR-025 | A pattern relationship's `kind`, if set, must be defined in `specification.relationships`. | error | `validate.go` `validatePatterns`
+|===
+
+=== Decision (ADR) rules
+
+[cols="1,5,1,3"]
+|===
+| BR | Rule | Severity | Source
+
+| BR-026 | An element's or relationship's `decisions` must reference ADR IDs defined in `specification.decisions`. | error | `validate.go` `validateDecisions`
+| BR-027 | A defined decision that no element or relationship references produces an orphan warning. | warning | `validate.go` `validateOrphanDecisions`
+| BR-028 | Referencing a decision whose status is `superseded` produces a warning. | warning | `validate.go` `validateSupersededDecisions`
+|===
+
+=== Lifecycle rules
+
+[cols="1,5,1,3"]
+|===
+| BR | Rule | Severity | Source
+
+| BR-029 | An element's `status`, if set, must be one of `proposed`, `design`, `implementation`, `deployed`, `deprecated`, `archived`. | warning | `validate.go` `validateLifecycleStatus`
+| BR-030 | An archived element should have no outgoing relationships. | warning | `validate.go` `validateLifecycleStatus`
+| BR-031 | A deprecated element should link to a deployed successor of the same kind. | warning | `validate.go` `validateLifecycleStatus`
+|===
+
+=== Model completeness rules
+
+[cols="1,5,1,3"]
+|===
+| BR | Rule | Severity | Source
+
+| BR-032 | The specification should define at least one element kind. | warning | `validate.go` `validateEmptyModel`
+| BR-033 | The model should not be empty (at least one element). | warning | `validate.go` `validateEmptyModel`
+|===
+
+[[traceability]]
+== Traceability
+
+Each use case maps to its acceptance criteria (`04_acceptance_criteria.adoc`) and the business rules it exercises. Error-level rules (BR-001–BR-026) are enforced by `bausteinsicht validate`, which runs standalone, at the start of forward sync (UC-3), and on demand by LLM agents (UC-6); warning-level rules (BR-027–BR-033) are reported by the same pass.
+
+[cols="1,2,3"]
+|===
+| Use Case | Acceptance Criteria | Business Rules
+
+| UC-1 Initialize Architecture Model | AC-1.1 | BR-032, BR-033 (the generated sample model satisfies them)
+| UC-2 Define Architecture Elements | AC-2.1, AC-2.2 | BR-001–BR-012, BR-024, BR-025
+| UC-3 Generate draw.io Diagrams (Forward Sync) | AC-3.1, AC-3.2 | BR-001–BR-033 (full validation pass before sync)
+| UC-4 Edit in draw.io and Reverse Sync | AC-4.1, AC-4.2 | BR-005 (ID sanitization), BR-007, BR-008 (new relationships must resolve)
+| UC-5 Watch Mode | AC-5.1 | inherits UC-3 / UC-4
+| UC-6 LLM-Driven Architecture Modification | AC-6.1, AC-6.2 | BR-001–BR-033 (validate before sync)
+| UC-7 Drill-Down Navigation | AC-7.1 | — (rendering/navigation only)
+| UC-8 Export Diagram Views | AC-8.1 | — (rendering only)
+|===
+
+NOTE: Test traceability is, by convention going forward, expressed with a `// UC-3, BR-007` comment on the test (or a reference in the test name). Existing tests trace de-facto via GitHub issue numbers; new and touched tests should add the explicit UC/BR/AC reference rather than retrofitting all of them at once.
