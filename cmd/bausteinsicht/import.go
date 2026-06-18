@@ -25,8 +25,8 @@ Supported formats:
 
 Exit codes:
   0   import successful
-  1   parse error
-  2   output file already exists (use --force to overwrite)`,
+  1   import failed (unknown --from, unreadable input, parse/encoding error)
+  2   output file already exists (use --force to overwrite, or --dry-run to skip the check)`,
 		Args:          cobra.ExactArgs(1),
 		SilenceUsage:  true,
 		SilenceErrors: true,
