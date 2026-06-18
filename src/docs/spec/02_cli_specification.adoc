@@ -66,6 +66,46 @@ See link:01_use_cases.html[Use Cases] for the functional overview of all CLI com
 | Export dynamic views as PlantUML or Mermaid sequence diagrams
 | Implemented
 
+| `bausteinsicht lint`
+| Check the model against the architectural constraints defined in it
+| Implemented
+
+| `bausteinsicht health`
+| Compute an architecture health score (completeness, conformance, complexity)
+| Implemented
+
+| `bausteinsicht graph`
+| Analyze the relationship graph: cycles, centrality, dependency depth
+| Implemented
+
+| `bausteinsicht stale`
+| Flag elements that are old (beyond a threshold) and carry neither a lifecycle status nor an ADR link
+| Implemented
+
+| `bausteinsicht status`
+| List elements by lifecycle status
+| Implemented
+
+| `bausteinsicht find`
+| Full-text search over elements, relationships, and views
+| Implemented
+
+| `bausteinsicht show`
+| Show all details of a single element
+| Implemented
+
+| `bausteinsicht snapshot`
+| Save, list, diff, restore, and delete versioned model snapshots
+| Implemented
+
+| `bausteinsicht diff`
+| Compare the model's as-is and to-be sections
+| Implemented
+
+| `bausteinsicht changelog`
+| Generate an architecture changelog between two versions
+| Implemented
+
 | `bausteinsicht --version`
 | Display version number
 | Implemented
@@ -981,3 +1021,159 @@ $ bausteinsicht export-sequence --format json
   }
 ]
 ----
+
+==== `bausteinsicht lint`
+
+Evaluates the architectural constraints defined in the model and reports violations.
+
+**Flags:** none beyond the global flags.
+
+**Behavior:** loads the model and evaluates each constraint. Prints `All constraints passed.` when constraints exist with no violations, `No constraints defined.` when the model declares none, or the list of violations otherwise. Use in CI as an architecture gate.
+
+==== `bausteinsicht health`
+
+Computes an architecture health score (0–100, with a letter grade) across weighted categories such as completeness, conformance, and complexity.
+
+**Flags:**
+
+[cols="2,3,1,1"]
+|===
+| Flag | Description | Required | Default
+
+| `--summary` | Print only the overall score and grade. | No | `false`
+| `--output` | Write the report to a file instead of stdout. | No | (stdout)
+|===
+
+**Behavior:** requires an explicit `--model`. Emits a human-readable report (or JSON with `--format json`) of the overall score, per-category scores, and model statistics.
+
+==== `bausteinsicht graph`
+
+Analyzes the relationship graph: cycle detection, dependency depth, and centrality metrics.
+
+**Flags:**
+
+[cols="2,3,1,1"]
+|===
+| Flag | Description | Required | Default
+
+| `--centrality` | Show centrality metrics per element. | No | `false`
+| `--cycles-only` | Show only detected cycles. | No | `false`
+| `--output` | Write the report to a file instead of stdout. | No | (stdout)
+|===
+
+**Behavior:** requires an explicit `--model`. Reports element/relationship counts, max dependency depth, graph type (DAG / has cycles), and strongly connected components.
+
+==== `bausteinsicht stale`
+
+Flags elements that look forgotten. An element is reported only when **all three** hold: its last modification is older than the threshold, it has no lifecycle `status`, and it links no ADR (`decisions` is empty). Archived elements are skipped.
+
+**Flags:**
+
+[cols="2,3,1,1"]
+|===
+| Flag | Description | Required | Default
+
+| `--days`, `-d` | Consider an element stale if unmodified for this many days. | No | `90`
+| `--model`, `-m` | Model file path. | No | `architecture.jsonc`
+| `--drawio-file` | draw.io diagram path (auto-detected if empty). | No | (auto-detect)
+| `--mark-drawio` | Highlight stale elements in the diagram. | No | `false`
+| `--unmark-drawio` | Remove stale markers from the diagram (restores original styles). | No | `false`
+| `--format`, `-f` | Output format: `text` or `json`. | No | `text`
+|===
+
+**Behavior:** the last-modified date comes from per-element git history, or from the element's explicit `lastModified` field if set. Outside a git repository, elements without an explicit `lastModified` have no known date and are therefore **not** flagged by age. Output is deterministically ordered (by risk, then ID).
+
+==== `bausteinsicht status`
+
+Lists elements by lifecycle status (`proposed`, `design`, `implementation`, `deployed`, `deprecated`, `archived`).
+
+**Flags:**
+
+[cols="2,3,1,1"]
+|===
+| Flag | Description | Required | Default
+
+| `--filter`, `-f` | Show only elements with this status. | No | (all)
+|===
+
+**Behavior:** requires an explicit `--model`. Groups elements under their status.
+
+==== `bausteinsicht find`
+
+Full-text search over the model.
+
+**Arguments:** `<query>` (required) — the search string.
+
+**Flags:**
+
+[cols="2,3,1,1"]
+|===
+| Flag | Description | Required | Default
+
+| `--type` | Limit results to `element`, `relationship`, `view`, or `all`. | No | `all`
+|===
+
+**Behavior:** returns ranked matches grouped by object type, with the matched fields. `--format json` emits a structured result.
+
+==== `bausteinsicht show`
+
+Displays all fields, relationships, and views for a single element.
+
+**Arguments:** `<element-id>` (required) — the dot-path ID.
+
+**Behavior:** prints the element's kind, title, description, technology, relationships, and the views it appears in. `--format json` emits the element as structured data.
+
+==== `bausteinsicht snapshot`
+
+Manages versioned model snapshots stored in `.bausteinsicht-snapshots/`.
+
+**Subcommands:**
+
+[cols="1,3"]
+|===
+| Subcommand | Description
+
+| `save` | Capture the current model as a snapshot (`--message` adds a note).
+| `list` | List saved snapshots (`--output-format table\|json`).
+| `diff <id1> [id2]` | Diff snapshot `id1` against `id2`, or against the current model if `id2` is omitted (`--format text\|json`).
+| `restore <id> <output-path>` | Restore a snapshot to a file (`--force` to overwrite).
+| `delete <id>` | Delete a snapshot.
+|===
+
+**Behavior:** `diff` reports a structured architecture delta (added/removed elements and relationships), not a text diff.
+
+==== `bausteinsicht diff`
+
+Reports the gap between the model's `asIs` and `toBe` sections.
+
+**Flags:**
+
+[cols="2,3,1,1"]
+|===
+| Flag | Description | Required | Default
+
+| `--model` | Model file path. | No | `architecture.jsonc`
+| `--view` | Accepted for forward compatibility but currently has **no effect** (per-view diff is not yet implemented). | No | (all)
+| `--format` | Output format: `text` or `json`. | No | `text`
+|===
+
+**Behavior:** exits with an error if the model has no `asIs`/`toBe` sections.
+
+==== `bausteinsicht changelog`
+
+Generates a human-readable changelog between two versions of the model.
+
+**Flags:**
+
+[cols="2,3,1,1"]
+|===
+| Flag | Description | Required | Default
+
+| `--since` | Starting git ref (commit SHA or tag). Must be provided — there is no implemented default. | Yes (in practice) | (none)
+| `--until` | Ending git ref. | No | `HEAD`
+| `--model` | Model file path. | No | `architecture.jsonc`
+| `--changelog-format` | Output format: `markdown`, `asciidoc`, or `json`. | No | `markdown`
+| `--output` | Write to a file instead of stdout. | No | (stdout)
+|===
+
+**Behavior:** loads the model at each git ref (via `git rev-parse` / `git show`) and reports the architecture changes between them. Only git refs are supported — snapshot IDs are not (yet) resolved, and an empty `--since` fails to resolve. (Note: changelog uses `--changelog-format`, not the global `--format`.)
