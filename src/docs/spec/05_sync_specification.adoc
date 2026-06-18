@@ -610,9 +610,9 @@ NOTE: Unlike element templates which use `<object>` wrappers, the connector temp
 
 === Layout Modes
 
-Each view chooses how new elements are placed via its `layout` field; an out-of-set value is rejected by validation (BR-014). `computeLayout` (`internal/sync/layout.go`) dispatches on it:
+Each view chooses how its **fresh-page** layout is computed via its `layout` field; an out-of-set value is rejected by validation (BR-014). `computeLayout` (`internal/sync/layout.go`) runs only when a page is first populated or rebuilt with `--relayout`; incremental additions to an existing page use cursor-based placement (`computePlacement`) regardless of `layout`. `computeLayout` dispatches on the field:
 
-* `layered` (the default, also used when `layout` is empty) — elements are arranged in horizontal rows grouped by kind, following the specification's element order, with related elements placed near each other.
+* `layered` (the default, also used when `layout` is empty) — elements are arranged in horizontal rows grouped by kind, in the specification's element order. Within a tier, a view's scoped children are ordered by relationship adjacency (BFS) so related ones sit near each other; all other elements are ordered alphabetically.
 * `grid` — all elements are placed in a simple grid; useful for overview pages.
 * `none` — the legacy horizontal-row placement; sync does not arrange beyond a single row, leaving layout to the user.
 
@@ -620,7 +620,7 @@ Sync only *places* elements that are new to a page; it never moves elements alre
 
 === Status and Decision Badges
 
-When an element carries `decisions` (linked ADR IDs), forward sync renders one **decision badge** per decision as a child cell in the element's top-right corner. The entry point is `synchronizeDecisionBadges`, which clears stale badges and then calls `AddDecisionBadges` (`internal/sync/`). Each badge is coloured by the referenced ADR's status (`DecisionBadgeColor`: blue = active, yellow = proposed, grey = superseded/deprecated) and carries a `bausteinsicht_decision_id` attribute.
+When an element carries `decisions` (linked ADR IDs), forward sync renders one **decision badge** per decision as a child cell near the element's top-right corner (the X offset is derived from the element's `width` attribute, which defaults to 100 when absent — as it is on generated cells whose size lives in the child `<mxGeometry>` — so the placement approximates the top-right rather than tracking the exact width). The entry point is `synchronizeDecisionBadges`, which clears stale badges and then calls `AddDecisionBadges` (`internal/sync/`). Each badge is coloured by the referenced ADR's status (`DecisionBadgeColor`: blue = active, yellow = proposed, grey = superseded/deprecated) and carries a `bausteinsicht_decision_id` attribute.
 
 NOTE: A **status badge** renderer (`AddStatusBadge`, coloured by the element's lifecycle `status` via `StatusColor`) is implemented and unit-tested but is **not currently wired into forward sync** — no production code calls it. Whether to wire it up (render a lifecycle badge alongside decision badges) or remove it is an open decision; until then, element `status` is validated (BR-029–BR-031) but not visualised.
 
