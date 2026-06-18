@@ -64,7 +64,7 @@ The model contains:
 * **Actors**: Customer and Back-Office User
 * **System**: Online Shop, containing a Web Frontend, a Mobile App, a REST API (with Product Catalog, Order Processing, and Notification Service components), a Database, a Cache, a Message Queue, and Export Storage
 * **External systems**: Payment Provider and E-Mail Service
-* **Relationships**: e.g. the Customer uses the Web Frontend, the REST API reads/writes the Database, charges the Payment Provider, and sends mail via the E-Mail Service
+* **Relationships**: e.g. the Customer uses the Web Frontend, the REST API reads/writes the Database, the Order Processing component charges the Payment Provider, and the Notification Service sends email asynchronously via the E-Mail Service
 * **Views**: System Context, Container View, API Components
 * **Dynamic views** (sequence diagrams): Checkout Flow and Catalog Browse
 
