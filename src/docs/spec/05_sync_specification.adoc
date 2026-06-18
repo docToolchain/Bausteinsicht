@@ -610,13 +610,13 @@ NOTE: Unlike element templates which use `<object>` wrappers, the connector temp
 
 === Layout Modes
 
-Each view chooses how new elements are placed via its `layout` field (BR-014). `computeLayout` (`internal/sync/layout.go`) dispatches on it:
+Each view chooses how new elements are placed via its `layout` field; an out-of-set value is rejected by validation (BR-014). `computeLayout` (`internal/sync/layout.go`) dispatches on it:
 
 * `layered` (the default, also used when `layout` is empty) — elements are arranged in horizontal rows grouped by kind, following the specification's element order, with related elements placed near each other.
 * `grid` — all elements are placed in a simple grid; useful for overview pages.
 * `none` — the legacy horizontal-row placement; sync does not arrange beyond a single row, leaving layout to the user.
 
-Sync only *places* elements that are new to a page; it never moves elements already positioned (see <<Placement Strategy for New Elements>>). The `sync --relayout` flag (`ForwardOptions.Relayout`) overrides this: it clears and re-lays-out **all** view pages from scratch — deliberately destructive to manual arrangement.
+Sync only *places* elements that are new to a page; it never moves elements already positioned (see <<Placement Strategy for New Elements>>). The `sync --relayout` flag (`ForwardOptions.Relayout`) overrides this: it clears and re-lays-out **all** view pages from scratch, deliberately discarding the hand-tuned positions of managed elements. `clearPageElements` removes only Bausteinsicht-managed cells (`bausteinsicht_id` objects and `rel-…` connectors), so any shape you drew yourself is left untouched.
 
 === Status and Decision Badges
 
@@ -635,7 +635,7 @@ Forward sync can add two informational boxes to each view page:
 * a **metadata box** (`createMetadata`) showing the view's title and description, the model path, the sync timestamp, and the `config.author` / `config.repo` values;
 * a **legend** (`createLegend`) showing the element kinds used in the view.
 
-Both are enabled by default and switched off per model via `config.metadata: false` and `config.legend: false` — the gate is `Config.Metadata == nil || *Config.Metadata`, so an unset value means on. The boxes are keyed by `metadata-<viewID>` / `legend-<viewID>` cell IDs and are updated in place on subsequent syncs rather than duplicated.
+Both are enabled by default and switched off per model via `config.metadata: false` and `config.legend: false` — the gate is `Config.Metadata == nil || *Config.Metadata`, so an unset value means on. The metadata box additionally needs the sync to supply the model path and timestamp, which the normal `sync` / `watch` path always does. The boxes are keyed by `metadata-<viewID>` / `legend-<viewID>` cell IDs and are updated in place on subsequent syncs rather than duplicated.
 
 === Edge Cases
 
