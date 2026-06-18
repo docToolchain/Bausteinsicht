@@ -1,77 +1,163 @@
 # Bausteinsicht
 
-> Architecture-as-code tool with draw.io as visual frontend and bidirectional synchronization.
-> Define your architecture in a JSONC text file; Bausteinsicht generates and syncs draw.io diagrams in both directions.
-> Single Go binary, no runtime dependencies, LLM-friendly CLI.
+> Architecture-as-code tool: define your software architecture once in a JSONC text model, and Bausteinsicht generates and bidirectionally synchronizes draw.io diagrams from it. One model, many consistent views. Single Go binary, no runtime dependencies, built for LLM-driven workflows.
 
-## Core Concepts
+This file gives an LLM enough to understand Bausteinsicht and help a user model, sync, analyze, and export an architecture. Commands and syntax below match the CLI; when in doubt, run `bausteinsicht <command> --help`.
 
-**Model** — architecture is defined in a JSONC file as a tree of named elements. Each element has a `kind` (user-defined, e.g. `actor`, `system`, `container`), a `title`, optional `technology`, and optional `children`. Element IDs are dot-separated paths (`onlineshop.api`).
+## What makes it different
 
-**Views** — a view selects which elements to render in a diagram page. Each view has an `include` list (element IDs or glob patterns like `onlineshop.*`) and an optional `scope` that draws a bounding box around a parent element.
+- **Model vs. views.** The JSONC file is the single source of truth — a semantic graph of elements with stable identity. Diagrams (context, container, component, sequence, tables) are *derived views* of that one model, all using the same element identities. The same `onlineshop.api` appears in many views but is defined once.
+- **Bidirectional sync.** `sync` is a pure diff-and-apply against a stored state file (`.bausteinsicht-sync`): model changes flow to draw.io, and draw.io edits (titles, descriptions, new shapes/connectors) flow back to the model. On conflict, the model wins (with a warning — never a silent overwrite).
+- **draw.io as the editing surface**, not a one-way export target — the diagrams stay editable and re-sync.
+- **LLM-friendly.** Plain JSONC an agent reads and writes; a CLI with `--format json` on every command; an interactive REPL for guided, comment-preserving edits.
 
-**Sync** — `bausteinsicht sync` is a pure diff-and-apply operation: it compares the JSONC model and the draw.io XML against a stored state file (`.bausteinsicht-sync`), then applies changes in both directions. The model always wins on conflict.
+## Core concepts
 
-**Specification** — the `specification` block in the JSONC file defines which element kinds and relationship types exist, and maps them to draw.io template shapes.
+- **Element** — a node in the model (system, container, component, actor, datastore, …). Nested arbitrarily deep; keyed by a dot-separated path that is also its unique ID (`onlineshop.api.catalog`).
+- **Element kind** — the element's type. Kinds are not hardcoded; each model defines its own in the specification. A kind marked as a container may have children.
+- **Relationship** — a directed `from → to` connection with a `label` and a `kind` (e.g. `uses`).
+- **View** — a named filter that becomes one draw.io page. Has `include`/`exclude` (glob patterns like `onlineshop.*` allowed) and an optional `scope` (draws a boundary around a parent and powers drill-down) and `layout` (`layered` | `grid` | `none`).
+- **Dynamic view** — a behavioral view: ordered interaction `steps` between elements, rendered as a sequence diagram by `export-sequence`.
+- **Specification** — defines the vocabulary: which element kinds and relationship kinds exist, plus tags, patterns, and decision records.
+- **Lifecycle status** — optional element field: `proposed` → `design` → `implementation` → `deployed` → `deprecated` → `archived`.
+- **Sync state** — a checksummed snapshot of the last synced state in `.bausteinsicht-sync`, so the next sync knows what changed on each side.
+- **`bausteinsicht_id`** — the attribute on each synced draw.io cell that anchors it to its model element.
+- **Drill-down** — navigation is page-based: one draw.io page per view, with generated cross-page links and a back button (not single-canvas zoom).
+- **Template** — a draw.io file whose shapes carry a `bausteinsicht_template` attribute naming the kind they style; sync clones the matching shape for each new element.
+- **Snapshot / Overlay / Stale / Workspace** — versioned model captures (semantically diffable); metric heatmaps on diagrams; detection of forgotten elements; multi-model grouping.
 
-## Minimal Example
+## The JSONC model
+
+A model file has four main parts: `specification` (vocabulary), `model` (the element tree), top-level `relationships` (array), and `views` (object keyed by view name). Optional: top-level `dynamicViews` (array, each with a `key`).
 
 ```jsonc
 {
+  "$schema": "https://raw.githubusercontent.com/docToolchain/Bausteinsicht/main/schemas/bausteinsicht.schema.json",
   "specification": {
     "elements": {
-      "actor":  { "notation": "Actor" },
-      "system": { "notation": "Software System", "container": true }
+      "actor":     { "notation": "Actor" },
+      "system":    { "notation": "Software System", "container": true },
+      "container": { "notation": "Container", "container": true },
+      "datastore": { "notation": "Data Store" }
     },
-    "relationships": {
-      "uses": { "notation": "uses" }
-    }
+    "relationships": { "uses": { "notation": "uses" } }
   },
   "model": {
     "customer": { "kind": "actor", "title": "Customer" },
-    "shop": {
+    "onlineshop": {
       "kind": "system", "title": "Online Shop",
       "children": {
-        "api": { "kind": "container", "title": "REST API", "technology": "Go" }
+        "api": { "kind": "container", "title": "REST API", "technology": "Go" },
+        "db":  { "kind": "datastore", "title": "Database", "technology": "PostgreSQL" }
       }
     }
   },
   "relationships": [
-    { "from": "customer", "to": "shop", "kind": "uses" }
+    { "from": "customer", "to": "onlineshop.api", "label": "uses", "kind": "uses" },
+    { "from": "onlineshop.api", "to": "onlineshop.db", "label": "reads/writes", "kind": "uses" }
   ],
   "views": {
-    "context": { "title": "System Context", "include": ["customer", "shop"] }
-  }
+    "context":    { "title": "System Context", "include": ["customer", "onlineshop"] },
+    "containers": { "title": "Containers", "scope": "onlineshop", "include": ["onlineshop.*", "customer"] }
+  },
+  "dynamicViews": [
+    {
+      "key": "checkout", "title": "Checkout Flow",
+      "steps": [
+        { "from": "customer", "to": "onlineshop.api", "label": "POST /orders" },
+        { "from": "onlineshop.api", "to": "onlineshop.db", "label": "persist order" }
+      ]
+    }
+  ]
 }
 ```
 
-## CLI Quick Reference
+## CLI reference (verified syntax)
 
+Global flags (any command): `--format text|json` (use `json` for machine-readable output), `--model <path.jsonc>` (default: auto-detect a single `.jsonc` in the dir; aborts if several exist), `--template <path.drawio>`, `--verbose`, `--version`.
+
+**Project & sync**
 ```bash
-bausteinsicht init              # scaffold architecture.jsonc + template in current dir
-bausteinsicht sync              # sync model ↔ draw.io (bidirectional)
-bausteinsicht watch             # continuous sync on file save
-bausteinsicht validate          # validate model against JSON Schema
-bausteinsicht export png        # export diagram pages to PNG via headless draw.io
-bausteinsicht export table      # export element list as CSV or Markdown
-bausteinsicht --format json … # machine-readable JSON output for any command (LLM use)
+bausteinsicht init [--generate-template]     # scaffold architecture.jsonc + template + diagram
+bausteinsicht sync [--relayout] [--mermaid]  # one bidirectional sync cycle (model ↔ draw.io)
+bausteinsicht watch [--mermaid]              # continuous sync on file save
+bausteinsicht validate                       # validate model (JSON Schema + semantic rules)
 ```
 
-## Getting Started
+**Authoring** (validated, comment-preserving edits — prefer these over hand-rewriting JSONC)
+```bash
+bausteinsicht add element --id <id> --kind <kind> --title <t> [--parent <id>] [--technology <s>] [--description <s>]
+bausteinsicht add relationship --from <id> --to <id> --label <l> --kind <kind>
+bausteinsicht add view <key> --title <t> --include <id-or-glob> [--include ...]
+bausteinsicht add specification element|relationship ...
+bausteinsicht add add-from-pattern <pattern>     # instantiate a reusable pattern
+bausteinsicht repl                               # interactive REPL: add/remove, list, undo, save
+```
 
-- [Getting Started Tutorial](https://doctoolchain.github.io/Bausteinsicht/spec/06_tutorial.html): Step-by-step walkthrough from `bausteinsicht init` to a working diagram
-- [User Manual](https://doctoolchain.github.io/Bausteinsicht/manual/user-manual.html): Full CLI reference, watch mode, multi-view navigation, LLM workflows
+**Analysis** (note: `health`, `graph`, `status` require an explicit `--model`)
+```bash
+bausteinsicht lint                                 # check architecture constraints
+bausteinsicht health --model architecture.jsonc    # 0–100 health score (completeness, conformance, …)
+bausteinsicht graph  --model architecture.jsonc    # dependency cycles, depth, SCCs
+bausteinsicht stale [--days N] [--mark-drawio]     # find forgotten elements (uses git history)
+bausteinsicht status --model architecture.jsonc    # element lifecycle dashboard
+bausteinsicht find <query>                         # free-text search over elements/relationships/views
+bausteinsicht show <element-id>                    # full details of one element
+```
+
+**Evolution**
+```bash
+bausteinsicht snapshot save [--message <m>]  # capture model state (.bausteinsicht-snapshots/)
+bausteinsicht snapshot list | diff <id> | restore <id> | delete <id>
+bausteinsicht diff                           # gap between model's asIs and toBe sections
+bausteinsicht changelog                      # architecture changelog between two points in time
+bausteinsicht adr ...                        # manage Architecture Decision Records
+```
+
+**Import & export**
+```bash
+bausteinsicht import <file> --from structurizr|likec4 [--dry-run] [--force]
+bausteinsicht export --image-format png|svg [--view <key>] [--output <dir>] [--scale <n>]   # needs draw.io installed
+bausteinsicht export-diagram --diagram-format plantuml|mermaid|dot|d2|html|structurizr [--view <key>] [--output <dir>]
+bausteinsicht export-sequence [--diagram-format plantuml|mermaid]    # sequence diagrams from dynamicViews
+bausteinsicht export-table [--table-format adoc|md] [--view <key>] [--combined] [--output <dir>]
+bausteinsicht generate-template [--style default|c4|minimal|dark]
+bausteinsicht overlay ...                    # apply/remove metric heatmaps on diagrams
+bausteinsicht workspace ...                  # multi-model workspaces
+```
+
+Output notes: `export` writes `architecture-<view>.<fmt>` to `--output` (default `.`). `export-diagram` and `export-table` default to **stdout**; with `--output` they write per-view files. `--diagram-format structurizr` exports the whole workspace as `workspace.dsl` and rejects `--view`.
+
+## LLM-driven workflows
+
+When helping a user with Bausteinsicht, an agent should:
+
+- **Drive the CLI, don't hand-rewrite the JSONC.** Use `add element`/`add relationship`/`add view` — they validate against the specification (rejecting unknown kinds and dangling IDs) and patch the file without destroying comments. For multi-step edits, use `repl`.
+- **Use `--format json`** on any command for parseable output; errors come back as `{"error": "...", "code": N}` on stderr with stable exit codes (`0` ok, `1` operation error, `2` usage/file error).
+- **Validate before syncing** (`validate`), and after edits run `sync` to update diagrams.
+- **Gate quality in CI** with `validate`, `lint`, `graph`, and `health --format json`.
+- **Migrate existing models** with `import --from structurizr|likec4` (use `--dry-run` to preview).
+
+## Gotchas
+
+- `export` (PNG/SVG) drives a headless draw.io and requires draw.io installed; the text exports (`export-diagram`, `export-sequence`, `export-table`) do not.
+- Auto-detection aborts (exit 2) if several `.jsonc` files exist — pass `--model`.
+- Drill-down is one page per view with links, not single-canvas semantic zoom.
+
+## Getting started
+
+- [Getting Started Tutorial](https://doctoolchain.org/Bausteinsicht/tutorial/01_getting_started.html): hands-on walkthrough from `init` to sync, exports, analysis, and AI workflows
+- [User Manual](https://doctoolchain.org/Bausteinsicht/manual/user-manual.html): full CLI reference, watch mode, navigation, LLM workflows
 
 ## Reference
 
-- [CLI Specification](https://doctoolchain.github.io/Bausteinsicht/spec/02_cli_specification.html): All commands, flags, and exit codes
-- [Data Models](https://doctoolchain.github.io/Bausteinsicht/spec/03_data_models.html): JSONC model schema — elements, relationships, views, specifications
-- [Sync Specification](https://doctoolchain.github.io/Bausteinsicht/spec/05_sync_specification.html): How bidirectional sync works, conflict resolution, state file format
-
-## Security & Trust
-
-- [Trust Model](https://doctoolchain.github.io/Bausteinsicht/spec/07_trust_model.html): Trust boundaries, threat assessment, what Bausteinsicht does and does not do
+- [CLI Specification](https://doctoolchain.org/Bausteinsicht/spec/02_cli_specification.html): every command, flag, output format, and exit code
+- [Data Models](https://doctoolchain.org/Bausteinsicht/spec/03_data_models.html): JSONC model schema — elements, relationships, views, specification
+- [Sync Specification](https://doctoolchain.org/Bausteinsicht/spec/05_sync_specification.html): the bidirectional sync algorithm, conflict resolution, state file format
+- [Glossary](https://doctoolchain.org/Bausteinsicht/arc42/chapters/12_glossary.html): the project's ubiquitous language
+- [Architecture Decisions (ADRs)](https://doctoolchain.org/Bausteinsicht/arc42/chapters/09_architecture_decisions.html): the design decisions and their rationale
+- [Trust Model](https://doctoolchain.org/Bausteinsicht/spec/07_trust_model.html): trust boundaries, path/resource guards, external processes
 
 ## Source
 
-- [GitHub Repository](https://github.com/docToolchain/Bausteinsicht): Source code, issues, releases
+- [GitHub Repository](https://github.com/docToolchain/Bausteinsicht): source code, issues, releases
