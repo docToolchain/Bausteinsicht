@@ -290,6 +290,51 @@ Copy this table into the test report:
 | 8.12 | Output filename convention | Export all views | Files named `{base}-{viewID}.{ext}` (e.g., `architecture-context.png`)
 |===
 
+== 8b. Export-Diagram (6 tests)
+
+`export-diagram` renders views as C4 text diagrams (folded back from the 2026-03-05 report, Round 7).
+
+[cols="1,4,5,5"]
+|===
+| # | Test | Command | Expected
+
+| 8b.1 | Export view as C4-PlantUML | `export-diagram --view context --diagram-format plantuml` | C4-PlantUML text on stdout
+| 8b.2 | Export view as Mermaid | `export-diagram --view context --diagram-format mermaid` | Mermaid C4 text on stdout
+| 8b.3 | `--format json` honored | `export-diagram --view context --format json` | JSON wrapper, not plain text (regression #241)
+| 8b.4 | Unknown diagram format | `export-diagram --view context --diagram-format bogus` | Error: unknown diagram format
+| 8b.5 | Non-existent view | `export-diagram --view nope` | Error: view not found
+| 8b.6 | Structurizr workspace export | `export-diagram --diagram-format structurizr` | Single `workspace.dsl`; rejects `--view` (exit 1)
+|===
+
+== 8c. Export-Table (5 tests)
+
+`export-table` renders element attributes per view as a table (folded back from the 2026-03-05 report, Round 7).
+
+[cols="1,4,5,5"]
+|===
+| # | Test | Command | Expected
+
+| 8c.1 | Export as AsciiDoc table | `export-table --view context` | AsciiDoc table on stdout
+| 8c.2 | Export as Markdown table | `export-table --view context --table-format md` | Markdown table on stdout
+| 8c.3 | `--format json` honored | `export-table --view context --format json` | JSON output, not plain text (regression #239)
+| 8c.4 | Non-existent view | `export-table --view nope` | Error: view not found
+| 8c.5 | Combined across views | `export-table --combined` | All elements across views, deduplicated
+|===
+
+== 8d. Export-Sequence (4 tests)
+
+`export-sequence` renders dynamic views as sequence diagrams.
+
+[cols="1,4,5,5"]
+|===
+| # | Test | Command | Expected
+
+| 8d.1 | Export dynamic view as PlantUML | `export-sequence --view login-flow` | PlantUML sequence on stdout
+| 8d.2 | Export as Mermaid | `export-sequence --view login-flow --diagram-format mermaid` | Mermaid sequence on stdout
+| 8d.3 | Unknown dynamic view | `export-sequence --view nope` | Error: dynamic view not found
+| 8d.4 | Model without dynamicViews | `export-sequence` on a model with no dynamic views | Clear message, non-zero exit
+|===
+
 == 9. Draw.io File Integrity (5 tests)
 
 [cols="1,4,5,5"]
@@ -396,6 +441,87 @@ Copy this table into the test report:
 | 15.8 | No mixed stdout/stderr | Error command with `--format json` | JSON error on stderr only, no text on stdout
 |===
 
+== 16. Analysis & Inspection Commands (12 tests)
+
+Covers `lint`, `health`, `graph`, `stale`, `status`, `find`, `show`.
+
+[cols="1,4,5,5"]
+|===
+| # | Test | Command | Expected
+
+| 16.1 | Lint passes a clean model | `lint` on a model with no constraints violated | Exit 0, no violations
+| 16.2 | Lint reports a violation | `lint` on a model breaking a defined constraint | Exit 1, violation listed with constraint ID
+| 16.3 | Health score | `health --model architecture.jsonc` | Completeness/conformance/complexity score
+| 16.4 | Health requires `--model` | `health` with no `--model` | Error (health does not auto-detect — deviates from the global convention)
+| 16.5 | Graph analysis | `graph` | Cycles, centrality, dependency depth reported
+| 16.6 | Graph `--format json` | `graph --format json` | Machine-readable graph metrics
+| 16.7 | Stale with threshold | `stale --threshold 90` | Elements older than 90 days without status/ADR flagged
+| 16.8 | Stale outside git | `stale` outside a git repo, no `lastModified` | Graceful: nothing flagged
+| 16.9 | Status grouping | `status` | Elements grouped/sorted by lifecycle status
+| 16.10 | Find full-text | `find api` | Matching elements/relationships/views
+| 16.11 | Show element details | `show webshop.api` | All fields of the element
+| 16.12 | Show non-existent element | `show nope` | Error: element not found
+|===
+
+== 17. Evolution & Snapshots (9 tests)
+
+Covers `snapshot` (save/list/diff/restore/delete), `diff`, `changelog`.
+
+[cols="1,4,5,5"]
+|===
+| # | Test | Command | Expected
+
+| 17.1 | Save snapshot | `snapshot save v1` | Snapshot written to `.bausteinsicht-snapshots/`
+| 17.2 | List snapshots | `snapshot list` | Saved snapshots listed
+| 17.3 | Diff snapshots | `snapshot diff v1 v2` | Element/relationship changes between snapshots
+| 17.4 | Restore snapshot | `snapshot restore v1 --output restored.jsonc` | Model restored to snapshot state
+| 17.5 | Restore without `--force` over existing | `snapshot restore v1` onto existing output | Error: output exists (use `--force`)
+| 17.6 | Delete snapshot | `snapshot delete v1` | Snapshot removed
+| 17.7 | Diff as-is vs to-be | `diff` on a model with `asIs`/`toBe` | Differences reported
+| 17.8 | Diff without sections | `diff` on a model lacking `asIs`/`toBe` | Error: model does not contain asIs and toBe sections
+| 17.9 | Changelog | `changelog` in a git repo | Architecture changelog between versions (git-based)
+|===
+
+== 18. Model Tooling & Import (11 tests)
+
+Covers `import`, `generate-template`, `layout`, `schema`, `workspace`.
+
+[cols="1,4,5,5"]
+|===
+| # | Test | Command | Expected
+
+| 18.1 | Import Structurizr DSL | `import model.dsl --from structurizr` | `architecture.jsonc` generated
+| 18.2 | Import LikeC4 | `import model.c4 --from likec4` | `architecture.jsonc` generated
+| 18.3 | Import unknown format | `import x --from bogus` | Exit 1: unknown format
+| 18.4 | Import over existing output | `import model.dsl --from structurizr` (output exists) | Exit 2 unless `--force`; `--dry-run` skips the check
+| 18.5 | Generate template | `generate-template --style c4` | `architecture-template.drawio` with one styled shape per kind
+| 18.6 | Generate template invalid style | `generate-template --style bogus` | Error: invalid style
+| 18.7 | Layout | `layout --rank-dir LR` | Element positions written back to the draw.io file
+| 18.8 | Schema generate | `schema generate` | Schema written to `schemas/bausteinsicht.schema.json`
+| 18.9 | Schema in sync with types | `schema generate` then `git diff` | No diff (committed schema matches Go types)
+| 18.10 | Workspace validate | `workspace validate workspace.json` | JSON workspace config validated
+| 18.11 | Workspace merge | `workspace merge workspace.json merged.jsonc` | Combined model written
+|===
+
+== 19. Interactive, Overlay & ADR (7 tests)
+
+Covers `repl`, `overlay` (apply/list/remove), `adr` (list/show).
+
+[cols="1,4,5,5"]
+|===
+| # | Test | Command | Expected
+
+| 19.1 | REPL add + save | `repl`, then `add`/`save`/`exit` | Model updated; validated before save
+| 19.2 | REPL exit with unsaved changes | `repl`, edit, `exit` | Confirmation prompt before quitting
+| 19.3 | Overlay list metrics | `overlay list metrics.json` | Available metrics listed
+| 19.4 | Overlay apply | `overlay apply metrics.json --model architecture.jsonc` | Heatmap overlaid; output next to the model
+| 19.5 | Overlay requires `--model` | `overlay apply metrics.json` with no `--model` | Error (overlay does not auto-detect)
+| 19.6 | ADR list | `adr list` | Linked ADRs listed
+| 19.7 | ADR show / filter | `adr show ADR-001`, `adr list --element webshop.api` | ADR details / ADRs for that element
+|===
+
+NOTE: The `--drawio-path` error scenarios (8.9, 15.4) depend on #420 being resolved before they can be executed reliably.
+
 == Test History
 
 Record each test execution here:
@@ -406,4 +532,8 @@ Record each test execution here:
 
 | 2026-03-01 | 1+2 | 73 | 18 (#107-#124) | `e2e-test-report-2026-03-01.adoc`
 | 2026-03-02 | 3 | 221 | 12 (#140-#151) | `e2e-test-report-2026-03-02.adoc`
+| 2026-03-02 | 4 | 147 | 5 (#165–#169) | `e2e-test-report-2026-03-02-round4.adoc`
+| 2026-03-02 | 5 | 204 | 4 (#175–#178) | `e2e-test-report-2026-03-02-round5.adoc`
+| 2026-03-02 | 6 | 211 | 7 (#183–#189) | `e2e-test-report-2026-03-02-round6.adoc`
+| 2026-03-05 | 7 | 215 | 6 (#236–#241) | `e2e-test-report-2026-03-05.adoc`
 |===
