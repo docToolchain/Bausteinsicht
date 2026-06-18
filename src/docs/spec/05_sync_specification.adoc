@@ -608,6 +608,35 @@ Relationship connectors also use template styles. The connector template is iden
 
 NOTE: Unlike element templates which use `<object>` wrappers, the connector template is a bare `<mxCell>` since connectors do not need custom metadata attributes.
 
+=== Layout Modes
+
+Each view chooses how its **fresh-page** layout is computed via its `layout` field; an out-of-set value is rejected by validation (BR-014). `computeLayout` (`internal/sync/layout.go`) runs only when a page is first populated or rebuilt with `--relayout`; incremental additions to an existing page use cursor-based placement (`computePlacement`) regardless of `layout`. `computeLayout` dispatches on the field:
+
+* `layered` (the default, also used when `layout` is empty) — elements are arranged in horizontal rows grouped by kind, in the specification's element order. Within a tier, a view's scoped children are ordered by relationship adjacency (BFS) so related ones sit near each other; all other elements are ordered alphabetically.
+* `grid` — all elements are placed in a simple grid; useful for overview pages.
+* `none` — the legacy horizontal-row placement; sync does not arrange beyond a single row, leaving layout to the user.
+
+Sync only *places* elements that are new to a page; it never moves elements already positioned (see <<Placement Strategy for New Elements>>). The `sync --relayout` flag (`ForwardOptions.Relayout`) overrides this: it clears and re-lays-out **all** view pages from scratch, deliberately discarding the hand-tuned positions of managed elements. `clearPageElements` removes only Bausteinsicht-managed cells (`bausteinsicht_id` objects and `rel-…` connectors), so any shape you drew yourself is left untouched.
+
+=== Status and Decision Badges
+
+When an element carries `decisions` (linked ADR IDs), forward sync renders one **decision badge** per decision as a child cell near the element's top-right corner (the X offset is derived from the element's `width` attribute, which defaults to 100 when absent — as it is on generated cells whose size lives in the child `<mxGeometry>` — so the placement approximates the top-right rather than tracking the exact width). The entry point is `synchronizeDecisionBadges`, which clears stale badges and then calls `AddDecisionBadges` (`internal/sync/`). Each badge is coloured by the referenced ADR's status (`DecisionBadgeColor`: blue = active, yellow = proposed, grey = superseded/deprecated) and carries a `bausteinsicht_decision_id` attribute.
+
+NOTE: A **status badge** renderer (`AddStatusBadge`, coloured by the element's lifecycle `status` via `StatusColor`) is implemented and unit-tested but is **not currently wired into forward sync** — no production code calls it. Whether to wire it up (render a lifecycle badge alongside decision badges) or remove it is an open decision; until then, element `status` is validated (BR-029–BR-031) but not visualised.
+
+=== Tag-Based Styling
+
+An element's `tags` can drive its visual style. For each tag, `applyTagStyles` (`internal/sync/forward.go`) looks up the matching `TagDefinition` in `specification.tags` and merges its `style` properties into the element's draw.io style string. Tag styles layer on top of the template style, so a tag can override fill colour, stroke, or font without changing the template. Tags that resolve to no `TagDefinition`, or definitions without a `style`, leave the base style unchanged.
+
+=== Metadata and Legend Boxes
+
+Forward sync can add two informational boxes to each view page:
+
+* a **metadata box** (`createMetadata`) showing the view's title and description, the model path, the sync timestamp, and the `config.author` / `config.repo` values;
+* a **legend** (`createLegend`) showing the element kinds used in the view.
+
+Both are enabled by default and switched off per model via `config.metadata: false` and `config.legend: false` — the gate is `Config.Metadata == nil || *Config.Metadata`, so an unset value means on. The metadata box additionally needs the sync to supply the model path and timestamp, which the normal `sync` / `watch` path always does. The boxes are keyed by `metadata-<viewID>` / `legend-<viewID>` cell IDs and are updated in place on subsequent syncs rather than duplicated.
+
 === Edge Cases
 
 ==== Element appears in multiple views
