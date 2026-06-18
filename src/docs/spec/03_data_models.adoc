@@ -187,7 +187,7 @@ The model has these top-level sections. `specification`, `model`, `relationships
 | `status`
 | string
 | no
-| Lifecycle status: `proposed`, `design`, `implementation`, `deployed`, `deprecated`, or `archived` (see <<Element Lifecycle>>)
+| Lifecycle status: `proposed`, `design`, `implementation`, `deployed`, `deprecated`, or `archived` (see <<element-lifecycle,Element Lifecycle>>)
 
 | `decisions`
 | string[]
@@ -213,7 +213,7 @@ The model has these top-level sections. `specification`, `model`, `relationships
 The **key** of each element in the model object (e.g., `"customer"`, `"api"`) serves as its unique ID.
 Nested elements are referenced using dot notation: `"webshop.api.auth"`.
 
-[[Element Lifecycle]]
+[[element-lifecycle]]
 ==== Element Lifecycle
 
 An element's optional `status` follows this intended progression (the `status` command groups elements by it):
@@ -232,10 +232,11 @@ archived --> [*]
 @enduml
 ....
 
-The transitions themselves are not enforced — `status` is a plain string — but two lifecycle rules are checked during validation:
+The transitions themselves are not enforced — `status` is a plain string — but validation does check the following:
 
+* An unknown `status` value (not one of the six above) produces a warning listing the valid values.
 * An **archived** element should have no outgoing relationships (archived elements are no longer active).
-* A **deprecated** element should have a deployed successor of the same kind (so consumers have a migration target); otherwise a warning is emitted.
+* A **deprecated** element should have an outgoing relationship to a deployed successor *of the same kind* (a migration target); otherwise a warning is emitted.
 
 ==== Relationship Properties
 
