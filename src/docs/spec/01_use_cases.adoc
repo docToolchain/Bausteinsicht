@@ -28,14 +28,26 @@ ifndef::imagesdir[:imagesdir: ../../images]
 
 === UC-1: Initialize Architecture Model
 
-==== Description
-A software architect creates a new architecture model for a project.
+*Primary Actor:* Software Architect +
+*Level:* User Goal +
+*Scope:* Bausteinsicht (CLI + sync engine) +
+*Trigger:* The architect starts a new project and runs `bausteinsicht init`.
 
 ==== Preconditions
 * Bausteinsicht CLI is installed
 * A project directory exists
 
-==== Flow
+==== Main Success Scenario
+
+1. The architect runs `bausteinsicht init` in an empty project directory.
+2. Bausteinsicht creates the sample specification — eight element kinds: `actor`, `system`, `external_system`, `container`, `datastore`, `ui`, `queue`, `component`.
+3. Bausteinsicht creates an example model with sample elements using those kinds.
+4. Bausteinsicht creates the default draw.io template (`template.drawio`).
+5. Bausteinsicht runs an initial forward sync to generate `architecture.drawio`.
+6. Bausteinsicht writes the `.bausteinsicht-sync` state file.
+7. The architect opens the model in an IDE, which provides autocompletion and validation via the JSON Schema.
+
+==== Activity Diagram
 
 [plantuml, uc01-init, png]
 ....
@@ -59,25 +71,36 @@ stop
 @enduml
 ....
 
-==== Postconditions
-* A valid JSON model file exists with specification and example content
-* A default draw.io template file exists
-* A `.bausteinsicht-sync` state file exists for change tracking
-* JSON Schema is referenced for IDE support
+==== Extensions
 
-==== Error Scenarios
-* Model files already exist → Bausteinsicht warns and aborts (no overwrite)
+1a. One of `architecture.jsonc`, `architecture.drawio`, or `template.drawio` already exists: Bausteinsicht aborts with exit code 2 (an existing `.bausteinsicht-sync` is not checked).
+
+==== Postconditions
+
+*Success guarantee:* A valid model (`architecture.jsonc`), a template (`template.drawio`), an initial diagram (`architecture.drawio`), and a `.bausteinsicht-sync` state file exist; the generated sample satisfies BR-032 and BR-033.
+
+*Minimal guarantee:* If any of `architecture.jsonc`, `architecture.drawio`, or `template.drawio` already exists, none of those three is created or overwritten.
 
 === UC-2: Define Architecture Elements
 
-==== Description
-A software architect adds elements (systems, containers, components) to the architecture model.
+*Primary Actor:* Software Architect +
+*Level:* User Goal +
+*Scope:* Bausteinsicht (model file) +
+*Trigger:* The architect needs to add or change elements and relationships in the model.
 
 ==== Preconditions
 * An initialized architecture model exists
 * IDE has JSON Schema support active
 
-==== Flow
+==== Main Success Scenario
+
+1. The architect opens the model file in the IDE.
+2. The architect adds an element with a unique ID, `kind`, `title`, and optional `description`.
+3. The IDE validates against the JSON Schema as the architect types.
+4. The architect adds relationships (`from`, `to`, `label`).
+5. The architect saves the file; the model remains valid JSON.
+
+==== Activity Diagram
 
 [plantuml, uc02-define-elements, png]
 ....
@@ -100,25 +123,39 @@ stop
 @enduml
 ....
 
-==== Postconditions
-* Model contains new elements with unique IDs
-* Relationships reference valid element IDs
+==== Extensions
 
-==== Error Scenarios
-* Duplicate element ID → JSON Schema validation error in IDE
-* Relationship references non-existent element → validation warning on sync
+2a. The chosen ID duplicates an existing element key: JSON object keys must be unique, so the editor/JSON tooling flags the collision (plain JSON would silently keep only the last); the architect picks a different ID. (BR-005 separately requires IDs to be non-empty.)
+4a. A relationship references a non-existent element: `bausteinsicht validate` (and sync) reports it as an error (BR-007, BR-008).
+
+==== Postconditions
+
+*Success guarantee:* The model contains the new elements with unique IDs and relationships referencing valid element IDs (BR-001–BR-012).
+
+*Minimal guarantee:* Invalid edits are caught by the schema and by validation before sync; the model is never silently corrupted.
 
 === UC-3: Generate draw.io Diagrams (Forward Sync)
 
-==== Description
-The architect generates or updates draw.io diagrams from the model.
+*Primary Actor:* Software Architect +
+*Level:* User Goal +
+*Scope:* Bausteinsicht (sync engine) +
+*Trigger:* The architect runs `bausteinsicht sync` after changing the model.
 
 ==== Preconditions
 * A valid architecture model exists
-* A draw.io template exists
+* (Optional) A draw.io template — `template.drawio` next to the model or `--template <path>`; otherwise the embedded default template is used
 * (Optional) Existing draw.io diagrams with manual layout
 
-==== Flow
+==== Main Success Scenario
+
+1. The architect runs `bausteinsicht sync`.
+2. Bausteinsicht reads the model and runs validation (the business rules; JSON Schema validation is IDE-side, not part of the CLI sync).
+3. Bausteinsicht resolves the template for element styling (`--template` > local `template.drawio` > embedded default).
+4. For an existing diagram, it matches elements by `bausteinsicht_id`, updates changed titles/descriptions, adds new elements (visually marked), removes deleted ones, and preserves the existing layout.
+5. Bausteinsicht adds and updates relationship connectors with centered attachment.
+6. Bausteinsicht writes the draw.io XML and prints a summary of changes.
+
+==== Activity Diagram
 
 [plantuml, uc03-forward-sync, png]
 ....
@@ -156,28 +193,41 @@ stop
 @enduml
 ....
 
-==== Postconditions
-* draw.io file reflects current model state
-* Existing element positions are preserved
-* New elements are visually marked for manual positioning
-* Relationship connectors are attached to element centers
+==== Extensions
 
-==== Error Scenarios
-* Invalid model → validation errors displayed, sync aborted (includes semantic validation)
-* Template file missing → error with instructions to create one
-* draw.io file missing or empty → automatically recreated from template (#149)
-* draw.io file locked by another process → warning
+2a. The model is invalid: validation errors are displayed and the sync aborts with exit code 1 (BR-001–BR-026).
+3a. No local `template.drawio` and no `--template`: Bausteinsicht uses the embedded default template (not an error).
+4a. The draw.io file is missing or empty: Bausteinsicht prints a warning, recreates it from the template, and lays the elements out with the layout engine (default `layered`).
+6a. Writing the draw.io file fails (e.g. the path is not writable): Bausteinsicht reports an error and exits with code 2.
+
+==== Postconditions
+
+*Success guarantee:* The draw.io file reflects the current model state; existing element positions are preserved; new elements are visually marked for manual positioning; relationship connectors attach to element centers.
+
+*Minimal guarantee:* On a validation error, the existing diagram is left unchanged.
 
 === UC-4: Edit in draw.io and Reverse Sync
 
-==== Description
-An architect or developer edits elements in draw.io, and the changes are synced back to the model.
+*Primary Actor:* Software Architect or Developer +
+*Level:* User Goal +
+*Scope:* Bausteinsicht (sync engine) +
+*Trigger:* Someone has edited the diagram in draw.io and runs `bausteinsicht sync`.
 
 ==== Preconditions
 * draw.io diagrams were previously generated from the model
 * Elements in draw.io carry Bausteinsicht IDs
 
-==== Flow
+==== Main Success Scenario
+
+1. The user edits the diagram in draw.io (rename, change description, add an element or relationship, delete, or move) and saves.
+2. The architect runs `bausteinsicht sync`.
+3. Bausteinsicht reads the draw.io XML and the model and matches elements by ID.
+4. For each element carrying a `bausteinsicht_id` whose title or description changed, it updates the model element.
+5. For each new element, it derives an ID from the label (sanitized: lowercase, hyphen-separated) and assigns the first alphabetically-sorted kind from the specification.
+6. For each relationship, it adds new ones and updates changed labels.
+7. Bausteinsicht writes the updated model and prints a summary of changes.
+
+==== Activity Diagram
 
 [plantuml, uc04-reverse-sync, png]
 ....
@@ -240,29 +290,39 @@ stop
 @enduml
 ....
 
-==== Postconditions
-* Model reflects changes made in draw.io
-* New elements have IDs derived from their label (sanitized: lowercase, hyphen-separated)
-* New elements are assigned the first alphabetically-sorted kind from the specification
-* Elements with colliding IDs are skipped with a warning
-* Navigation buttons (nav-back-*) are ignored during reverse sync
-* Layout changes (element positions) do NOT modify the model
+==== Extensions
 
-==== Error Scenarios
-* Element in draw.io has no ID and cannot be auto-matched → warning with manual resolution instructions
-* Generated ID collides with existing element → import skipped with warning (#203)
-* Conflicting changes in both model and draw.io → warning displayed, no silent overwrite
+3a. The element is a navigation button (`nav-back-*`): it is skipped — excluded from detection (#205).
+4a. The same element changed in both the model and the diagram: a warning is displayed and the model wins; there is no silent overwrite.
+5a. The generated ID collides with an existing element: the import is skipped with a warning (#203).
+5b. A draw.io element has no ID and cannot be auto-matched: a warning with manual-resolution instructions is shown.
+
+==== Postconditions
+
+*Success guarantee:* The model reflects the diagram edits; new elements have sanitized IDs (lowercase, hyphen-separated) and the first alphabetically-sorted kind; colliding IDs are skipped with a warning; navigation buttons are ignored; element positions (layout) do not modify the model.
+
+*Minimal guarantee:* Conflicting changes never silently overwrite the model; layout-only edits never change it.
 
 === UC-5: Watch Mode
 
-==== Description
-Bausteinsicht continuously watches for file changes and synchronizes automatically.
+*Primary Actor:* Software Architect +
+*Level:* User Goal +
+*Scope:* Bausteinsicht (watcher) +
+*Trigger:* The architect runs `bausteinsicht watch` to keep model and diagram in sync while editing.
 
 ==== Preconditions
 * An initialized architecture model exists
 * draw.io diagrams exist
 
-==== Flow
+==== Main Success Scenario
+
+1. The architect runs `bausteinsicht watch`.
+2. Bausteinsicht starts file watchers on the model and draw.io files.
+3. On a model-file change, it runs forward sync (UC-3).
+4. On a draw.io-file change, it runs reverse sync (UC-4).
+5. It prints each sync result and keeps watching until the architect stops it with Ctrl+C.
+
+==== Activity Diagram
 
 [plantuml, uc05-watch, png]
 ....
@@ -287,23 +347,36 @@ stop
 @enduml
 ....
 
-==== Postconditions
-* Model and draw.io diagrams are kept in sync continuously
+==== Extensions
 
-==== Error Scenarios
-* Rapid successive changes → debounce to avoid conflicts
-* File watcher fails on network drives → fallback to polling with warning
+2a. The file watcher cannot be created or started: Bausteinsicht reports an error and exits — there is no polling fallback. (A watched file that is removed and later recreated is automatically re-watched.)
+3a, 4a. Rapid successive changes: events are debounced (300 ms) to avoid conflicting syncs.
+
+==== Postconditions
+
+*Success guarantee:* While running, the model and draw.io diagrams are kept in sync continuously.
+
+*Minimal guarantee:* Each individual sync follows the UC-3 / UC-4 guarantees; debouncing prevents half-applied conflicting syncs.
 
 === UC-6: LLM-Driven Architecture Modification
 
-==== Description
-An LLM agent modifies the architecture model using CLI commands.
+*Primary Actor:* LLM Agent +
+*Level:* User Goal +
+*Scope:* Bausteinsicht (CLI) +
+*Trigger:* An LLM agent is asked to modify the architecture and invokes the Bausteinsicht CLI.
 
 ==== Preconditions
 * An initialized architecture model exists
 * LLM agent has access to the Bausteinsicht CLI
 
-==== Flow
+==== Main Success Scenario
+
+1. The LLM reads the model file (JSON) and analyzes the current architecture.
+2. The LLM modifies the model directly or via CLI commands (`add element`, `add relationship`, …).
+3. The LLM runs `bausteinsicht validate`.
+4. On success, the LLM runs `bausteinsicht sync`; the draw.io diagrams update.
+
+==== Activity Diagram
 
 [plantuml, uc06-llm, png]
 ....
@@ -331,25 +404,38 @@ stop
 @enduml
 ....
 
-==== Postconditions
-* Model is valid and updated
-* draw.io diagrams reflect the changes
-* New elements are marked for manual positioning
+==== Extensions
 
-==== Error Scenarios
-* LLM generates invalid JSON → validate catches it before sync
-* LLM uses non-existent element ID in relationship → validation error
+3a. The model is invalid — malformed JSON, or a relationship referencing a non-existent element: `validate` reports the error before sync; the LLM fixes it and re-validates (BR-007, BR-008).
+
+==== Postconditions
+
+*Success guarantee:* The model is valid and updated; the draw.io diagrams reflect the changes; new elements are marked for manual positioning.
+
+*Minimal guarantee:* `validate` catches invalid changes before sync, so a broken model is never synced.
 
 === UC-7: Drill-Down Navigation
 
-==== Description
-An architect navigates between abstraction levels by following links between draw.io pages — one page per view — drilling from a context view into a container view into a component view, and back via a generated navigation button. See link:../arc42/ADRs/ADR-009-Drill-Down-Navigation.adoc[ADR-009] for why this is page-based rather than single-page zoom.
+*Primary Actor:* Software Architect +
+*Level:* User Goal +
+*Scope:* Bausteinsicht (generated draw.io pages) +
+*Trigger:* The architect opens the generated diagram and wants to move between abstraction levels.
+
+Navigation is page-based — one draw.io page per view, with generated cross-page links and a back button — rather than single-page zoom. See link:../arc42/ADRs/ADR-009-Drill-Down-Navigation.html[ADR-009] for the rationale.
 
 ==== Preconditions
 * Multiple views exist at different hierarchy levels (e.g. a context view scoped to a system, a container view scoped to that system's children)
 * Sync has run, so each view is rendered as its own draw.io page
 
-==== Flow
+==== Main Success Scenario
+
+1. The architect opens the context-view page.
+2. The architect clicks a system element that has a deeper view.
+3. draw.io follows the generated page link to that system's container-view page.
+4. The architect clicks a container element; draw.io follows the link to the component-view page.
+5. The architect clicks the generated back-navigation button to return to the parent view page.
+
+==== Activity Diagram
 
 [plantuml, uc07-drilldown, png]
 ....
@@ -380,27 +466,36 @@ stop
 @enduml
 ....
 
-==== Postconditions
-* User can navigate between abstraction levels by clicking linked elements
-* Each level is a dedicated page; a generated back-navigation button returns to the parent view
+==== Extensions
 
-==== Error Scenarios
-* Target view does not exist → element carries no page link (not clickable for drill-down)
+2a. The target view does not exist: the element carries no page link and is not clickable for drill-down.
+
+==== Postconditions
+
+*Success guarantee:* The architect can navigate between abstraction levels by clicking linked elements; each level is a dedicated page, and a generated back-navigation button returns to the parent view.
+
+*Minimal guarantee:* Elements without a deeper view simply carry no drill-down link; navigation never leads to a missing page.
 
 === UC-8: Export Diagram Views
 
-==== Description
-A developer or CI pipeline exports diagram views as PNG or SVG images for use in documentation or reports.
-
-==== Actors
-* Developer
-* CI pipeline
+*Primary Actor:* Developer or CI pipeline +
+*Level:* User Goal +
+*Scope:* Bausteinsicht (export via draw.io CLI) +
+*Trigger:* A developer or CI job runs `bausteinsicht export` to render views as images for documentation or reports.
 
 ==== Preconditions
 * A synced architecture model exists with at least one view
 * draw.io CLI is available (headless via `xvfb-run` in CI environments)
 
-==== Flow
+==== Main Success Scenario
+
+1. The user runs `bausteinsicht export` (optionally with `--view`, `--image-format`, `--output`).
+2. Bausteinsicht reads the model to determine the available views.
+3. With `--view`, it selects the matching view; otherwise it selects all views.
+4. For each selected view, it invokes the draw.io CLI to render the page as an image.
+5. Bausteinsicht writes the image files to the output directory and prints an export summary.
+
+==== Activity Diagram
 
 [plantuml, uc08-export, png]
 ....
@@ -435,15 +530,17 @@ stop
 @enduml
 ....
 
-==== Postconditions
-* Image files (PNG or SVG) exist for each exported view
-* File names correspond to view names
-* Exit code is 0 on success
+==== Extensions
 
-==== Error Scenarios
-* View name not found → exit code 2, error message mentions "view not found"
-* draw.io CLI not available → error with installation instructions
-* Output directory not writable → error with path information
+3a. The `--view` name is not found: Bausteinsicht exits with code 2 and a message mentioning "view not found".
+4a. The draw.io CLI is not available: Bausteinsicht reports an error with installation instructions.
+5a. The output directory is not writable: Bausteinsicht reports an error naming the path.
+
+==== Postconditions
+
+*Success guarantee:* Image files (PNG or SVG) exist for each exported view, named after the view; exit code is 0.
+
+*Minimal guarantee:* On any error (unknown view, missing draw.io CLI, unwritable output) the command exits non-zero and does not report success.
 
 [[business-rules]]
 == Business Rules
