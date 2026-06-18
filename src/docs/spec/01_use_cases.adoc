@@ -516,7 +516,7 @@ The `BR-NNN` IDs are the traceability anchors: acceptance criteria (`04_acceptan
 |===
 | BR | Rule | Severity | Source
 
-| BR-024 | A pattern element's `kind` must be defined in `specification.elements`. | error | `validate.go` `validatePatterns`
+| BR-024 | A pattern element must declare a `kind`, and that `kind` must be defined in `specification.elements`. | error | `validate.go` `validatePatterns`
 | BR-025 | A pattern relationship's `kind`, if set, must be defined in `specification.relationships`. | error | `validate.go` `validatePatterns`
 |===
 
@@ -564,7 +564,7 @@ Each use case maps to its acceptance criteria (`04_acceptance_criteria.adoc`) an
 | UC-1 Initialize Architecture Model | AC-1.1 | BR-032, BR-033 (the generated sample model satisfies them)
 | UC-2 Define Architecture Elements | AC-2.1, AC-2.2 | BR-001–BR-012, BR-024, BR-025
 | UC-3 Generate draw.io Diagrams (Forward Sync) | AC-3.1, AC-3.2 | BR-001–BR-033 (full validation pass before sync)
-| UC-4 Edit in draw.io and Reverse Sync | AC-4.1, AC-4.2 | BR-005 (ID sanitization), BR-007, BR-008 (new relationships must resolve)
+| UC-4 Edit in draw.io and Reverse Sync | AC-4.1, AC-4.2 | BR-005 (generated IDs must be non-empty), BR-007, BR-008 (new relationships must resolve)
 | UC-5 Watch Mode | AC-5.1 | inherits UC-3 / UC-4
 | UC-6 LLM-Driven Architecture Modification | AC-6.1, AC-6.2 | BR-001–BR-033 (validate before sync)
 | UC-7 Drill-Down Navigation | AC-7.1 | — (rendering/navigation only)
