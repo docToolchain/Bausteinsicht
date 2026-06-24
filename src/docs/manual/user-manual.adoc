@@ -55,7 +55,7 @@ bausteinsicht sync
 This creates a sample Online Shop architecture with three views.
 Open `architecture.drawio` in draw.io to see the generated diagrams.
 
-For a detailed walkthrough, see the link:../spec/06_tutorial.html[Getting Started Tutorial].
+For a detailed walkthrough, see the link:../spec/06_tutorial.html[Getting Started Tutorial] or the https://paul-fleischmann.com/en/projekte/bausteinsicht/tutorial/[online tutorial].
 
 === Daily Workflow
 
@@ -581,6 +581,7 @@ See the link:../spec/02_cli_specification.html[CLI Specification] for full comma
 
 === Further Reading
 
+* https://paul-fleischmann.com/en/projekte/bausteinsicht/tutorial/[Online Tutorial] — hands-on walkthrough (paul-fleischmann.com)
 * link:../spec/03_data_models.html[Data Models] — JSONC structure, draw.io XML format, Go structs
 * link:../spec/05_sync_specification.html[Sync Specification] — three-way sync algorithm details
 * link:../spec/06_tutorial.html[Getting Started Tutorial] — step-by-step walkthrough
