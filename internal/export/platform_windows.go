@@ -19,12 +19,17 @@ func platformDrawioPaths() []string {
 	// First, try SCOOP env var if set (allows override).
 	// If not set, try default: C:\Users\<username>\scoop\
 	if scoop := os.Getenv("SCOOP"); scoop != "" {
+		// Scoop bucket uses "draw.io" as the app name (with dot), so the install
+		// directory is apps\draw.io\current. "drawio" (no dot) is kept as a
+		// fallback in case a custom bucket uses a different naming convention.
+		paths = append(paths, filepath.Join(scoop, "apps", "draw.io", "current", drawioExe))
 		paths = append(paths, filepath.Join(scoop, "apps", "drawio", "current", drawioExe))
 		paths = append(paths, filepath.Join(scoop, "shims", drawioExe))
 	} else {
 		// Fallback: try default Scoop location if user home dir is available
 		if currentUser, err := user.Current(); err == nil {
 			scoopHome := filepath.Join(currentUser.HomeDir, "scoop")
+			paths = append(paths, filepath.Join(scoopHome, "apps", "draw.io", "current", drawioExe))
 			paths = append(paths, filepath.Join(scoopHome, "apps", "drawio", "current", drawioExe))
 			paths = append(paths, filepath.Join(scoopHome, "shims", drawioExe))
 		}

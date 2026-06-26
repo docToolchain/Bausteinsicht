@@ -53,6 +53,27 @@ func TestDetectDrawioBinary_FallsBackToDrawio(t *testing.T) {
 	}
 }
 
+// TestDetectDrawioBinary_FallsBackToDrawioDotExe verifies that draw.io (with dot) is found
+// on PATH. Regression test for #385: Scoop on Windows installs draw.io.exe, which
+// exec.LookPath("drawio") cannot find — only exec.LookPath("draw.io") resolves it.
+func TestDetectDrawioBinary_FallsBackToDrawioDotExe(t *testing.T) {
+	dir := t.TempDir()
+	fakeBin := fakeBinary(t, dir, "draw.io")
+	// PATH contains only draw.io; drawio-export and drawio must NOT be found.
+	t.Setenv("PATH", dir)
+	old := platformPaths
+	platformPaths = func() []string { return nil }
+	t.Cleanup(func() { platformPaths = old })
+
+	bin, err := DetectDrawioBinary()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if bin != fakeBin {
+		t.Errorf("expected %q, got %q", fakeBin, bin)
+	}
+}
+
 func TestDetectDrawioBinary_ErrorWhenNotFound(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
 	// Override platform paths so filesystem installs don't interfere.
@@ -494,6 +515,35 @@ func TestDetectDrawioBinary_macOSHomebrewIntel(t *testing.T) {
 	platformPaths = func() []string {
 		return []string{exePath}
 	}
+	t.Cleanup(func() { platformPaths = old })
+
+	bin, err := DetectDrawioBinary()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if bin != exePath {
+		t.Errorf("expected %q, got %q", exePath, bin)
+	}
+}
+
+// TestDetectDrawioBinary_WindowsScoopAppsDrawIoDotPath verifies detection of the canonical
+// Scoop apps directory name "draw.io" (with dot). Regression test for #385: the previous
+// code used "drawio" (no dot) which never matched because Scoop names the app "draw.io".
+func TestDetectDrawioBinary_WindowsScoopAppsDrawIoDotPath(t *testing.T) {
+	dir := t.TempDir()
+	// Simulate C:\Users\<user>\scoop\apps\draw.io\current\draw.io.exe
+	appsDir := filepath.Join(dir, "scoop", "apps", "draw.io", "current")
+	if err := os.MkdirAll(appsDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	exePath := filepath.Join(appsDir, "draw.io.exe")
+	if err := os.WriteFile(exePath, []byte("#!/bin/sh\n"), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("PATH", "")
+	old := platformPaths
+	platformPaths = func() []string { return []string{exePath} }
 	t.Cleanup(func() { platformPaths = old })
 
 	bin, err := DetectDrawioBinary()
