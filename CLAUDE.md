@@ -135,6 +135,14 @@ Before merging any PR:
 2. **Security review** on the changes
 3. **Code review** on the changes
 
+#### Quality Gate Override Policy
+SonarCloud's **New Code Coverage** gate (threshold: **65%**) may trip on PRs that touch previously-untested legacy code without adding new logic. A verified **behavior-preserving refactor** may be admin-merged despite the gate if ALL of these hold:
+- All functional CI checks are green (build, unit tests, lint, golangci-lint)
+- An independent code review confirms no new logic was added
+- The merge reason is noted in the PR description (e.g. "admin merge: refactor only, gate tripped by legacy untested lines")
+
+Pads and exclusion-based workarounds are **not** acceptable alternatives — they hide real coverage gaps.
+
 ### Security Report
 The security report at `src/docs/security/2026-03-01-security-review.adoc` is a living document. Update it (with a Changelog entry) whenever:
 - Security findings are fixed or new ones discovered
@@ -222,10 +230,10 @@ _Updated by `/risk-mitigate` on 2026-03-04_
 | SAST | ✅ Present | `gosec` (security scanner), `nilaway` (nil pointer analysis), `staticcheck` |
 | AI Code Review | ✅ Present | Claude Code with code-review plugin; PR merge policy requires review |
 | Property-Based Tests | ✅ Set up | `pgregory.net/rapid` — label roundtrip + escapeHTML + trimBrackets property tests |
-| SonarQube Quality Gate | ❌ N/A | Not configured |
+| SonarQube Quality Gate | ✅ Present | SonarCloud on all PRs; new-code-coverage threshold set to 65% (see override policy in PR Merge Policy section); `sonar.qualitygate.wait=true` in `sonar-project.properties` |
 | Sampling Review (~20%) | ✅ Present | PR merge policy: security review + code review required |
 
-**Overall Status:** 9/10 measures active (1 N/A)
+**Overall Status:** 10/10 measures active
 
 ## Branch & PR Management
 
