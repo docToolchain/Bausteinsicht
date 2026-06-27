@@ -471,4 +471,3 @@ func (s *replState) validateCommand() {
 		fmt.Printf("  %s\n", err.Error())
 	}
 }
-
