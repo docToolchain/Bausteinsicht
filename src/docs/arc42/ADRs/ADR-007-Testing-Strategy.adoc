@@ -30,6 +30,98 @@ Testing strategy clarity enables:
 - Clear expectations for new contributors
 - Documented trade-offs between isolation and realism
 
+== Evaluated Options
+
+=== Option A: Ad-Hoc Testing (No Formal Strategy)
+
+Write tests wherever convenient, with no prescribed tiers or location rules.
+
+*Pros:*
+* Zero overhead for contributors
+* Flexible
+
+*Cons:*
+* Inconsistent test quality across packages
+* No shared vocabulary for test types; hard to parallelize in CI
+* No clear mocking policy
+
+=== Option B: Three-Tier Strategy — Unit / Integration / E2E (chosen)
+
+Prescribe three named tiers (70/25/5 split), each with explicit scope, latency budget, and file location rules.
+
+*Pros:*
+* Consistent contributor expectations
+* CI can run tiers in parallel
+* Property-based testing (`pgregory.net/rapid`) fits naturally in the unit tier
+* Mocking policy is explicit: avoid unless unavoidable
+
+*Cons:*
+* Learning curve for new contributors
+* Some scenarios require tests in two tiers
+
+=== Option C: Two-Tier Strategy — Fast / Slow
+
+Divide tests into "fast" (<100 ms) and "slow" (everything else) with no E2E distinction.
+
+*Pros:*
+* Simpler than three tiers
+
+*Cons:*
+* No separation between integration and full CLI E2E tests; CI must run all slow tests together
+* CLI breakages are not isolated from model-layer failures
+
+== Weighted Pugh Matrix
+
+Rating scale: -1 = worse than reference, 0 = same as reference, +1 = better than reference.
+Reference: Option A (ad-hoc, no strategy).
+
+[cols="3,1,1,1,1"]
+|===
+| Criterion | Weight | A: Ad-hoc (Ref) | B: Three-tier (chosen) | C: Two-tier
+
+| Contributor clarity (explicit tier rules)
+| 3
+| 0
+| +1
+| 0
+
+| CI parallelisation
+| 2
+| 0
+| +1
+| 0
+
+| Feedback speed (unit tests ≤100 ms)
+| 2
+| 0
+| +1
+| +1
+
+| Isolation of E2E from integration failures
+| 2
+| 0
+| +1
+| -1
+
+| Low learning curve
+| 1
+| 0
+| -1
+| -1
+
+| Property-based testing integration
+| 2
+| 0
+| +1
+| +1
+
+| *Weighted total*
+| —
+| *0*
+| *+10*
+| *+1*
+|===
+
 == Decision
 
 Adopt a **three-tier testing strategy** with clear boundaries:

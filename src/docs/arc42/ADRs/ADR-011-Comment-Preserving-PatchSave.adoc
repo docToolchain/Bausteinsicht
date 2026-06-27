@@ -1,0 +1,154 @@
+:jbake-title: ADR-011: Comment-Preserving Patch-Save
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: ADR
+:jbake-order: 11
+
+= ADR-011: Comment-Preserving Patch-Save with Full-Save Fallback
+
+== Status
+
+Accepted
+
+== Context
+
+JSONC model files can contain user-written comments and a meaningful key ordering (e.g., `customer` before `webshop` before `payments`). These are not preserved by `json.MarshalIndent` (which sorts keys alphabetically and discards comments).
+
+Bausteinsicht writes back to the model file in two flows:
+
+* **Reverse sync** (`bausteinsicht sync`): draw.io label edits propagate to the model
+* **REPL save** (`bausteinsicht repl`): user-guided element additions persist to disk
+
+In both flows, pure **insertions** (new elements, new relationships) are the common case. Pure **deletions and modifications** are rarer.
+
+=== Forces
+
+* Comments in JSONC represent intent (team decisions, trade-off notes) — silently losing them on every sync would erode trust in the tool
+* A full parser that round-trips JSONC with comments is complex and brittle
+* Standard `encoding/json` is sufficient for reading; the write problem is the focus
+* A patch-then-fallback strategy covers the common case without implementing a full JSONC serializer
+
+== Evaluated Options
+
+=== Option A: Always Full Rewrite (json.MarshalIndent)
+
+Every save rewrites the entire file with formatted JSON, discarding comments and resetting key order.
+
+*Pros:*
+* Simple: one code path
+* Output is always canonical
+
+*Cons:*
+* Comments lost on every sync — unacceptable for user-facing model files
+* Alphabetic key sort changes file order, causing noisy diffs
+
+=== Option B: Comment-Preserving Patch for Insertions, Full Rewrite Fallback for Others
+
+Parse the on-disk JSONC, identify added elements/relationships by comparing against the previous state, and **surgically insert** them into the raw file bytes at the correct JSON position. For deletions and modifications, fall back to `json.MarshalIndent`.
+
+`internal/model/patch.go` implements `PatchInsert` (single-op variant) and `PatchSave` (multi-op variant). The sync engine (`cmd/bausteinsicht/sync.go:saveModel`) and the REPL (`cmd/bausteinsicht/repl_save.go:patchSave`) both use this strategy.
+
+*Pros:*
+* Comments and key order preserved for the overwhelmingly common case (pure insertions)
+* Two code paths are small; the fallback path is well-understood
+* No external dependency
+
+*Cons:*
+* Two code paths to test
+* Deletions/modifications still lose comments — documented limitation
+
+=== Option C: Full JSONC Round-Trip Library
+
+Use or write a JSONC parser that preserves comment positions and round-trips losslessly.
+
+*Pros:*
+* Comments always preserved
+
+*Cons:*
+* High implementation complexity
+* No mature Go library exists for this
+* All formats (inline, block, trailing) must be handled
+
+== Weighted Pugh Matrix
+
+Rating scale: -1 = worse than reference, 0 = same as reference, +1 = better than reference.
+Reference: Option A (always full rewrite).
+
+[cols="3,1,1,1,1"]
+|===
+| Criterion | Weight | A: Full rewrite (Ref) | B: Patch + fallback (chosen) | C: Full JSONC lib
+
+| Comments preserved (insert case)
+| 3
+| 0
+| +1
+| +1
+
+| Comments preserved (delete/modify case)
+| 2
+| 0
+| 0
+| +1
+
+| Key order preserved
+| 2
+| 0
+| +1
+| +1
+
+| Implementation complexity
+| 2
+| 0
+| -1
+| -3
+
+| External dependency risk
+| 1
+| 0
+| 0
+| -1
+
+| *Weighted total*
+| —
+| *0*
+| *+6*
+| *+1*
+|===
+
+== Decision
+
+**Adopt Option B: comment-preserving patch for insertions, full-rewrite fallback for deletions/modifications.**
+
+Implementation:
+
+* `internal/model/patch.go` — `PatchInsert(path, patchFn)`, `InsertObjectEntry`, `AppendArrayEntry`
+* `cmd/bausteinsicht/sync.go:saveModel` — reverse sync uses patch path; falls back on element deletion or modification
+* `cmd/bausteinsicht/repl_save.go:patchSave` — REPL uses the same strategy
+
+== Consequences
+
+=== Positive
+
+* User comments in JSONC model files survive `bausteinsicht sync` for the common (insertion) case
+* Key ordering is preserved, producing minimal diffs
+* No external dependency
+
+=== Negative
+
+* Deleting or modifying an existing element triggers a full rewrite — comments in the modified element's vicinity are lost
+* Two code paths increase test surface (mitigated by `TestReplSaveCommand_*` suite)
+
+=== Documented Limitation
+
+Deletions and modifications of existing model entries trigger the full-rewrite path. Users should add comments on elements they do not intend to delete. This limitation is documented in link:../chapters/08_concepts.html[Chapter 8.6].
+
+=== Risk
+
+* R-PATCH-1: Patch insertion at wrong JSON position produces malformed JSON. Mitigated by `model.Load` verification after each patch (CI integration tests catch regressions).
+
+== References
+
+* `internal/model/patch.go`
+* `cmd/bausteinsicht/sync.go` (function `saveModel`)
+* `cmd/bausteinsicht/repl_save.go` (function `patchSave`)
+* Chapter 8.6: JSONC Comment Preservation
