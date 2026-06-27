@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xmi:XMI xmi:version="2.1"
+    xmlns:xmi="http://www.omg.org/spec/XMI/20131001"
+    xmlns:uml="http://www.omg.org/spec/UML/20131001">
+  <uml:Model xmi:type="uml:Model" name="TestModel" xmi:id="model-1">
+    <packagedElement xmi:type="uml:Package" name="System" xmi:id="sys-1">
+      <packagedElement xmi:type="uml:Package" name="Backend" xmi:id="backend-1">
+        <packagedElement xmi:type="uml:Component" name="API" xmi:id="api-1"/>
+        <packagedElement xmi:type="uml:Component" name="Database" xmi:id="db-1"/>
+        <packagedElement xmi:type="uml:Dependency" name="reads" xmi:id="dep-1"
+            client="api-1" supplier="db-1"/>
+      </packagedElement>
+    </packagedElement>
+  </uml:Model>
+</xmi:XMI>

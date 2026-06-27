@@ -43,6 +43,9 @@
 
 | 2026-04-27 (batch fix)
 | Fixed SEC-001 (path traversal via CLI flags — reject `..` in `--model`/`--template`/`--output`), SEC-005 (error on multiple `.jsonc` files), SEC-006 (10 MB file size limit), SEC-008 (`stripTags` attribute quoting), SEC-013 (`sanitizeID` strips dots/slashes), SEC-016 (`--output` path traversal). SEC-014 (Dockerfile checksums) deferred — upstream projects don't publish checksums.
+
+| 2026-06-27 (XMI importer)
+| Added `internal/importer/xmi/` (issue #401). New XMI attack surface reviewed: (1) XXE — mitigated by `hasDOCTYPE()` pre-check and `dec.Entity = map[string]string{}` to disable entity expansion; (2) deep hierarchy DoS — mitigated by `maxDepth=20` cap in `parseElem`, same pattern as SEC-007; (3) ID injection via crafted element names — sanitized by `sanitizeID()` (same function used for draw.io, same SEC-013 fix applied). No new SEC findings introduced.
 |===
 
 === Scope

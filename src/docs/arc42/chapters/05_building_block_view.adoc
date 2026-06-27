@@ -110,7 +110,7 @@ Every production package, grouped by role. Each row is a Level-1 building block:
 |===
 | Package | Responsibility | Source
 
-| `importer` | Import models from Structurizr DSL and LikeC4 (`import`) | `internal/importer/` (`structurizr/`, `likec4/`)
+| `importer` | Import models from Structurizr DSL, LikeC4, and XMI/Enterprise Architect (`import`) | `internal/importer/` (`structurizr/`, `likec4/`, `xmi/`)
 | `exporter` | Export the model as Structurizr DSL | `internal/exporter/structurizr/`
 | `diagram` | Render views as text diagrams: C4-PlantUML, Mermaid, DOT, D2, HTML, sequence (`export-diagram`, `export-sequence`) | `internal/diagram/`
 | `table` | Render element attributes as AsciiDoc/Markdown tables (`export-table`) | `internal/table/`

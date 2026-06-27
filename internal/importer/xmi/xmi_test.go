@@ -1,0 +1,337 @@
+package xmi_test
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/docToolchain/Bausteinsicht/internal/importer/xmi"
+)
+
+// ─── TS-XMI-01: Basic element import ─────────────────────────────────────────
+
+func TestImport_BasicElements(t *testing.T) {
+	r, err := xmi.Import(td("basic.xmi"), nil)
+	if err != nil {
+		t.Fatalf("Import: %v", err)
+	}
+	m := r.Model
+
+	for _, kind := range []string{"component", "actor"} {
+		if _, ok := m.Specification.Elements[kind]; !ok {
+			t.Errorf("specification missing kind %q", kind)
+		}
+	}
+
+	if e, ok := m.Model["api"]; !ok {
+		t.Error("expected element 'api'")
+	} else if e.Kind != "component" {
+		t.Errorf("api.Kind = %q, want 'component'", e.Kind)
+	}
+	if e, ok := m.Model["customer"]; !ok {
+		t.Error("expected element 'customer'")
+	} else if e.Kind != "actor" {
+		t.Errorf("customer.Kind = %q, want 'actor'", e.Kind)
+	}
+
+	if len(m.Relationships) != 1 {
+		t.Fatalf("relationships count = %d, want 1", len(m.Relationships))
+	}
+	rel := m.Relationships[0]
+	if rel.From != "customer" || rel.To != "api" {
+		t.Errorf("relationship = {%s → %s}, want {customer → api}", rel.From, rel.To)
+	}
+	if rel.Label != "uses" {
+		t.Errorf("relationship.Label = %q, want 'uses'", rel.Label)
+	}
+}
+
+// ─── TS-XMI-02: Package hierarchy → dot-path children ────────────────────────
+
+func TestImport_Hierarchy(t *testing.T) {
+	r, err := xmi.Import(td("hierarchy.xmi"), nil)
+	if err != nil {
+		t.Fatalf("Import: %v", err)
+	}
+	m := r.Model
+
+	sys, ok := m.Model["system"]
+	if !ok {
+		t.Fatal("expected element 'system'")
+	}
+	if sys.Kind != "package" {
+		t.Errorf("system.Kind = %q, want 'package'", sys.Kind)
+	}
+
+	backend, ok := sys.Children["backend"]
+	if !ok {
+		t.Fatal("expected child 'backend' in 'system'")
+	}
+	if backend.Kind != "package" {
+		t.Errorf("backend.Kind = %q, want 'package'", backend.Kind)
+	}
+
+	if _, ok := backend.Children["api"]; !ok {
+		t.Fatal("expected child 'api' in 'system.backend'")
+	}
+
+	if len(m.Relationships) != 1 {
+		t.Fatalf("relationships count = %d, want 1", len(m.Relationships))
+	}
+	rel := m.Relationships[0]
+	if rel.From != "system.backend.api" {
+		t.Errorf("rel.From = %q, want 'system.backend.api'", rel.From)
+	}
+	if rel.To != "system.backend.database" {
+		t.Errorf("rel.To = %q, want 'system.backend.database'", rel.To)
+	}
+}
+
+// ─── TS-XMI-04: --kind-map override ─────────────────────────────────────────
+
+func TestImport_KindMapOverride(t *testing.T) {
+	km, err := xmi.ParseKindMap("Component=service,Class=entity")
+	if err != nil {
+		t.Fatalf("ParseKindMap: %v", err)
+	}
+	r, err := xmi.Import(td("kindmap.xmi"), km)
+	if err != nil {
+		t.Fatalf("Import: %v", err)
+	}
+	m := r.Model
+
+	if e, ok := m.Model["payment-service"]; !ok {
+		t.Error("expected element 'payment-service'")
+	} else if e.Kind != "service" {
+		t.Errorf("payment-service.Kind = %q, want 'service'", e.Kind)
+	}
+	if e, ok := m.Model["order-entity"]; !ok {
+		t.Error("expected element 'order-entity'")
+	} else if e.Kind != "entity" {
+		t.Errorf("order-entity.Kind = %q, want 'entity'", e.Kind)
+	}
+	if _, ok := m.Specification.Elements["component"]; ok {
+		t.Error("specification should not contain 'component' when mapped to 'service'")
+	}
+	if _, ok := m.Specification.Elements["service"]; !ok {
+		t.Error("specification missing 'service'")
+	}
+}
+
+// ─── TS-XMI-05: Stereotype as kind ───────────────────────────────────────────
+
+func TestImport_StereotypeKind(t *testing.T) {
+	r, err := xmi.Import(td("stereotypes.xmi"), nil)
+	if err != nil {
+		t.Fatalf("Import: %v", err)
+	}
+	m := r.Model
+
+	orders, ok := m.Model["orders"]
+	if !ok {
+		t.Fatal("expected element 'orders'")
+	}
+	if orders.Kind != "microservice" {
+		t.Errorf("orders.Kind = %q, want 'microservice'", orders.Kind)
+	}
+	for _, w := range r.Warnings {
+		if strings.Contains(strings.ToLower(w), "orders") {
+			t.Errorf("unexpected warning for 'orders': %s", w)
+		}
+	}
+
+	payments, ok := m.Model["payments"]
+	if !ok {
+		t.Fatal("expected element 'payments'")
+	}
+	if payments.Kind != "component" {
+		t.Errorf("payments.Kind = %q, want 'component'", payments.Kind)
+	}
+}
+
+// ─── TS-XMI-06: Unknown type fallback ────────────────────────────────────────
+
+func TestImport_UnknownTypeFallback(t *testing.T) {
+	r, err := xmi.Import(td("unknown_type.xmi"), nil)
+	if err != nil {
+		t.Fatalf("Import should succeed: %v", err)
+	}
+	if trigger, ok := r.Model.Model["trigger"]; !ok {
+		t.Error("expected element 'trigger'")
+	} else if trigger.Kind != "element" {
+		t.Errorf("trigger.Kind = %q, want 'element'", trigger.Kind)
+	}
+
+	hasWarn := false
+	for _, w := range r.Warnings {
+		if strings.Contains(w, "uml:Signal") {
+			hasWarn = true
+		}
+	}
+	if !hasWarn {
+		t.Errorf("expected warning about uml:Signal; got: %v", r.Warnings)
+	}
+}
+
+// ─── TS-XMI-07: Unresolvable relationship skipped ────────────────────────────
+
+func TestImport_UnresolvableRelationship(t *testing.T) {
+	r, err := xmi.Import(td("unresolvable_rel.xmi"), nil)
+	if err != nil {
+		t.Fatalf("Import should succeed: %v", err)
+	}
+	if len(r.Model.Relationships) != 0 {
+		t.Errorf("expected 0 relationships, got %d", len(r.Model.Relationships))
+	}
+	hasWarn := false
+	for _, w := range r.Warnings {
+		if strings.Contains(w, "unknown-id") {
+			hasWarn = true
+		}
+	}
+	if !hasWarn {
+		t.Errorf("expected warning about 'unknown-id'; got: %v", r.Warnings)
+	}
+}
+
+// ─── TS-XMI-08: Malformed XML rejected ───────────────────────────────────────
+
+func TestImport_InvalidXML(t *testing.T) {
+	_, err := xmi.Import(td("invalid.xmi"), nil)
+	if err == nil {
+		t.Fatal("expected error for invalid XML, got nil")
+	}
+	if !strings.Contains(err.Error(), "invalid XML") && !strings.Contains(err.Error(), "not a valid XMI") {
+		t.Errorf("unexpected error message: %v", err)
+	}
+}
+
+func TestImport_NotXMI(t *testing.T) {
+	_, err := xmi.Import(td("not_xmi.xml"), nil)
+	if err == nil {
+		t.Fatal("expected error for non-XMI XML, got nil")
+	}
+	if !strings.Contains(err.Error(), "not a valid XMI") {
+		t.Errorf("unexpected error message: %v", err)
+	}
+}
+
+// ─── TS-XMI-09: ID sanitization and collision ────────────────────────────────
+
+func TestImport_IDSanitization(t *testing.T) {
+	r, err := xmi.Import(td("sanitize.xmi"), nil)
+	if err != nil {
+		t.Fatalf("Import: %v", err)
+	}
+	if _, ok := r.Model.Model["payment-service-v2"]; !ok {
+		t.Error("expected element 'payment-service-v2'")
+	}
+}
+
+func TestImport_IDCollision(t *testing.T) {
+	r, err := xmi.Import(td("id_collision.xmi"), nil)
+	if err != nil {
+		t.Fatalf("Import: %v", err)
+	}
+	m := r.Model
+	if _, ok := m.Model["api"]; !ok {
+		t.Error("expected element 'api'")
+	}
+	if _, ok := m.Model["api-2"]; !ok {
+		t.Error("expected element 'api-2' for collision")
+	}
+	hasWarn := false
+	for _, w := range r.Warnings {
+		if strings.Contains(w, "collision") || strings.Contains(w, "api-2") {
+			hasWarn = true
+		}
+	}
+	if !hasWarn {
+		t.Errorf("expected collision warning; got: %v", r.Warnings)
+	}
+}
+
+// ─── TS-XMI-10: Specification completeness ───────────────────────────────────
+
+func TestImport_SpecificationCompleteness(t *testing.T) {
+	r, err := xmi.Import(td("basic.xmi"), nil)
+	if err != nil {
+		t.Fatalf("Import: %v", err)
+	}
+	spec := r.Model.Specification.Elements
+	for _, want := range []string{"component", "actor"} {
+		if _, ok := spec[want]; !ok {
+			t.Errorf("specification missing kind %q", want)
+		}
+	}
+	if _, ok := spec["package"]; ok {
+		t.Error("specification should not contain 'package' for basic.xmi")
+	}
+}
+
+// ─── XXE protection ───────────────────────────────────────────────────────────
+
+func TestImport_XXEDoctype(t *testing.T) {
+	xxe := []byte(`<?xml version="1.0"?>
+<!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
+<xmi:XMI xmlns:xmi="http://www.omg.org/spec/XMI/20131001">
+</xmi:XMI>`)
+	path := filepath.Join(t.TempDir(), "xxe.xmi")
+	if err := os.WriteFile(path, xxe, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, err := xmi.Import(path, nil)
+	if err == nil {
+		t.Fatal("expected error for DOCTYPE-containing XMI, got nil")
+	}
+	if !strings.Contains(err.Error(), "DOCTYPE") {
+		t.Errorf("expected DOCTYPE error, got: %v", err)
+	}
+}
+
+// ─── ParseKindMap ─────────────────────────────────────────────────────────────
+
+func TestParseKindMap(t *testing.T) {
+	tests := []struct {
+		input   string
+		want    map[string]string
+		wantErr bool
+	}{
+		{"", nil, false},
+		{"Component=service", map[string]string{"Component": "service"}, false},
+		{"Component=service,Class=entity", map[string]string{"Component": "service", "Class": "entity"}, false},
+		{" Component = service ", map[string]string{"Component": "service"}, false},
+		{"bad", nil, true},
+		{"=value", nil, true},
+		{"key=", nil, true},
+	}
+	for _, tc := range tests {
+		got, err := xmi.ParseKindMap(tc.input)
+		if tc.wantErr {
+			if err == nil {
+				t.Errorf("ParseKindMap(%q): expected error", tc.input)
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("ParseKindMap(%q): unexpected error: %v", tc.input, err)
+			continue
+		}
+		if len(got) != len(tc.want) {
+			t.Errorf("ParseKindMap(%q): len=%d, want %d", tc.input, len(got), len(tc.want))
+			continue
+		}
+		for k, v := range tc.want {
+			if got[k] != v {
+				t.Errorf("ParseKindMap(%q)[%q] = %q, want %q", tc.input, k, got[k], v)
+			}
+		}
+	}
+}
+
+// ─── helpers ─────────────────────────────────────────────────────────────────
+
+func td(name string) string {
+	return filepath.Join("testdata", name)
+}

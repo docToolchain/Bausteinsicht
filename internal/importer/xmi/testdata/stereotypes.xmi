@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xmi:XMI xmi:version="2.1"
+    xmlns:xmi="http://www.omg.org/spec/XMI/20131001"
+    xmlns:uml="http://www.omg.org/spec/UML/20131001">
+  <uml:Model xmi:type="uml:Model" name="TestModel" xmi:id="model-1">
+    <packagedElement xmi:type="uml:Component" name="Orders" xmi:id="orders-1">
+      <xmi:Extension extender="Enterprise Architect">
+        <stereotype name="microservice"/>
+      </xmi:Extension>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Component" name="Payments" xmi:id="payments-1"/>
+  </uml:Model>
+</xmi:XMI>
