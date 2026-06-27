@@ -10,6 +10,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/docToolchain/Bausteinsicht/internal/importer"
 	"github.com/docToolchain/Bausteinsicht/internal/model"
@@ -17,7 +18,8 @@ import (
 
 const (
 	// maxDepth caps element nesting to prevent stack/heap exhaustion on pathological inputs.
-	maxDepth     = 20
+	// Real-world EA exports (e.g. AUTOSAR) can reach depth 23; 50 gives ample headroom.
+	maxDepth     = 50
 	fallbackKind = "element"
 )
 
@@ -80,6 +82,53 @@ func hasDOCTYPE(data []byte) bool {
 	return doctypeRe.Match(data[:limit])
 }
 
+// ─── Charset conversion ───────────────────────────────────────────────────────
+
+// windows1252Table maps bytes 0x80–0x9F to their Unicode codepoints.
+// Outside this range, Windows-1252 and ISO-8859-1 are identical to Latin-1
+// (bytes 0xA0–0xFF equal Unicode codepoints U+00A0–U+00FF).
+var windows1252Table = [32]rune{
+	0x20AC, 0x0081, 0x201A, 0x0192, 0x201E, 0x2026, 0x2020, 0x2021,
+	0x02C6, 0x2030, 0x0160, 0x2039, 0x0152, 0x008D, 0x017D, 0x008F,
+	0x0090, 0x2018, 0x2019, 0x201C, 0x201D, 0x2022, 0x2013, 0x2014,
+	0x02DC, 0x2122, 0x0161, 0x203A, 0x0153, 0x009D, 0x017E, 0x0178,
+}
+
+// win1252ToUTF8 converts a Windows-1252 (or ISO-8859-1/Latin-1) byte slice to UTF-8.
+func win1252ToUTF8(data []byte) []byte {
+	out := make([]byte, 0, len(data)+len(data)/8)
+	for _, b := range data {
+		if b < 0x80 {
+			out = append(out, b)
+			continue
+		}
+		var rn rune
+		if b <= 0x9F {
+			rn = windows1252Table[b-0x80]
+		} else {
+			rn = rune(b) // 0xA0–0xFF: same codepoint in Unicode
+		}
+		out = utf8.AppendRune(out, rn)
+	}
+	return out
+}
+
+// charsetReader is the xml.Decoder.CharsetReader implementation.
+// It handles Windows-1252 and ISO-8859-1/Latin-1, which are common in EA exports.
+func charsetReader(charset string, input io.Reader) (io.Reader, error) {
+	norm := strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(charset, "-", ""), "_", ""))
+	switch norm {
+	case "windows1252", "cp1252", "win1252", "iso88591", "latin1":
+		data, err := io.ReadAll(input)
+		if err != nil {
+			return nil, err
+		}
+		return bytes.NewReader(win1252ToUTF8(data)), nil
+	default:
+		return nil, fmt.Errorf("unsupported charset %q — convert the file to UTF-8 first", charset)
+	}
+}
+
 // ─── XML parsing ─────────────────────────────────────────────────────────────
 
 // attrVal returns the value of the first XML attribute with the given local name.
@@ -96,7 +145,8 @@ func attrVal(attrs []xml.Attr, local string) string {
 // Returns (nil, nil) if the document is valid XML but not an XMI file.
 func parseXMI(data []byte) (*xmiElem, error) {
 	dec := xml.NewDecoder(bytes.NewReader(data))
-	dec.Entity = map[string]string{} // disable entity expansion (XXE mitigation)
+	dec.Entity = map[string]string{}  // disable entity expansion (XXE mitigation)
+	dec.CharsetReader = charsetReader // handle windows-1252 / ISO-8859-1 EA exports
 
 	for {
 		tok, err := dec.Token()
@@ -151,7 +201,12 @@ func parseElem(dec *xml.Decoder, se xml.StartElement, depth int) (*xmiElem, erro
 			}
 			// Direct stereotype element (outside Extension, less common)
 			if t.Name.Local == "stereotype" {
-				if name := attrVal(t.Attr, "name"); name != "" && e.Stereotype == "" {
+				// EA XMI 2.1 uses stereotype="…"; other tools use name="…"
+				name := attrVal(t.Attr, "name")
+				if name == "" {
+					name = attrVal(t.Attr, "stereotype")
+				}
+				if name != "" && e.Stereotype == "" {
 					e.Stereotype = name
 				}
 				if err := dec.Skip(); err != nil {
@@ -185,6 +240,9 @@ func extractStereotype(dec *xml.Decoder) (string, error) {
 			depth++
 			if t.Name.Local == "stereotype" && stereo == "" {
 				stereo = attrVal(t.Attr, "name")
+				if stereo == "" {
+					stereo = attrVal(t.Attr, "stereotype") // EA XMI 2.1 variant
+				}
 			}
 		case xml.EndElement:
 			if depth == 0 {

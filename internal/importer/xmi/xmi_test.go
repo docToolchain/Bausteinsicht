@@ -290,6 +290,39 @@ func TestImport_XXEDoctype(t *testing.T) {
 	}
 }
 
+// ─── Integration: large real-world EA export ──────────────────────────────────
+
+// TestImport_BigData runs against a real Enterprise Architect XMI export
+// (AUTOSAR model, windows-1252 encoding, ~114 MB, depth >20).
+// The fixture is gitignored due to its size; the test is skipped in CI when absent.
+func TestImport_BigData(t *testing.T) {
+	const minSize = 1 * 1024 * 1024 // 1 MB — stub is only a few hundred bytes
+	path := td("BigData.xmi")
+	fi, err := os.Stat(path)
+	if err != nil || fi.Size() < minSize {
+		t.Skipf("BigData.xmi not present or too small (%d bytes); skipping integration test", func() int64 {
+			if err == nil {
+				return fi.Size()
+			}
+			return 0
+		}())
+	}
+
+	r, err := xmi.Import(path, nil)
+	if err != nil {
+		t.Fatalf("Import failed: %v", err)
+	}
+	if len(r.Model.Model) == 0 {
+		t.Error("expected non-empty model")
+	}
+	if len(r.Model.Specification.Elements) == 0 {
+		t.Error("expected non-empty specification")
+	}
+	t.Logf("BigData: %d top-level elements, %d relationships, %d spec kinds, %d warnings",
+		len(r.Model.Model), len(r.Model.Relationships),
+		len(r.Model.Specification.Elements), len(r.Warnings))
+}
+
 // ─── ParseKindMap ─────────────────────────────────────────────────────────────
 
 func TestParseKindMap(t *testing.T) {
