@@ -69,8 +69,9 @@ func verifyExplicitBinary(path, source string) (string, error) {
 func DetectDrawioBinary() (string, error) {
 	var searched strings.Builder
 
-	// Try PATH first
-	for _, name := range []string{"drawio-export", "drawio"} {
+	// Try PATH first. "draw.io" is included because Scoop on Windows installs
+	// the binary as draw.io.exe and exec.LookPath resolves the .exe extension.
+	for _, name := range []string{"drawio-export", "drawio", "draw.io"} {
 		path, err := exec.LookPath(name)
 		if err == nil {
 			return path, nil

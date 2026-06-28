@@ -755,7 +755,18 @@ Exports draw.io diagram views to image files (PNG or SVG) using the draw.io CLI.
 | Embed the draw.io XML source in the exported image file.
 | No
 | `false`
+
+| `--drawio-path`
+| Explicit path to the draw.io CLI binary. Overrides `BAUSTEINSICHT_DRAWIO_PATH` and auto-detection. Exits with code 2 if the path does not exist.
+| No
+| (auto-detected)
 |===
+
+**draw.io binary resolution** (highest precedence first):
+
+. `--drawio-path` flag — must point at an existing file
+. `BAUSTEINSICHT_DRAWIO_PATH` environment variable — must point at an existing file
+. Auto-detection: `drawio-export` or `drawio` or `draw.io` on `PATH`, then platform-native install paths (Scoop, Chocolatey, Homebrew, standard installer)
 
 **Behavior:**
 
