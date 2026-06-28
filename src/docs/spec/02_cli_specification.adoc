@@ -1296,7 +1296,13 @@ Starts an interactive shell for editing the model.
 
 **Flags:** none beyond the global flags.
 
-**Behavior:** keeps the model in memory; supports `add`/`remove`/`list`/`show`/`validate`/`undo`/`save` (plus `help` and `exit`). Validates before every save; pure additions are patched comment-preserving, modifications/deletions fall back to a full rewrite (with a warning). `exit` with unsaved changes prompts for confirmation before quitting; `Ctrl-D` (EOF) warns about unsaved changes and exits cleanly.
+**Behavior:** keeps the model in memory; supports `add`/`remove`/`list`/`show`/`validate`/`undo`/`save` (plus `help` and `exit`). Pure additions are patched comment-preserving; modifications/deletions fall back to a full rewrite (with a warning). `exit` with unsaved changes prompts for confirmation before quitting; `Ctrl-D` (EOF) warns about unsaved changes and exits cleanly.
+
+**Validate-before-save gate:** `save` runs validation and aborts if the in-memory model has more errors than the on-disk model had at load time. This allows saving valid edits even when the on-disk model already contains validation errors (e.g. a broken view reference that cannot be fixed via REPL commands). If the error count would increase, save is aborted and all errors are listed.
+
+**Overwrite behavior:** when `add element` targets an ID that already exists, the existing element is overwritten. The description prompt shows the current description in brackets; pressing Enter without input keeps the existing description unchanged rather than clearing it.
+
+**Known limitation:** `remove relationship` tokenizes the label using whitespace splitting. Labels containing consecutive spaces (e.g. `"A  B"`) can never be matched — use a single space in labels or remove such relationships by editing the model file directly.
 
 ==== `bausteinsicht adr`
 
