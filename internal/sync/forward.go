@@ -327,18 +327,7 @@ func populateNewPage(
 	} else {
 		// Incremental: fall back to cursor-based placement.
 		pl := computePlacement(page)
-		// Seed childCount with children already on the page so newly added
-		// children don't stack at grid index 0 on top of existing ones (#330).
-		if scopeID != "" {
-			parentCellID := scopedCellID(viewID, scopeID)
-			for _, obj := range page.FindAllElements() {
-				if cell := obj.FindElement("mxCell"); cell != nil {
-					if cell.SelectAttrValue("parent", "") == parentCellID {
-						pl.childCount[scopeID]++
-					}
-				}
-			}
-		}
+		pl.childCount[scopeID] = countScopeChildren(page, viewID, scopeID)
 		initialChildCount := pl.childCount[scopeID]
 		for _, id := range toPlace {
 			applyElementAdded(id, viewID, scopeID, page, templates, flat, &m.Specification, &pl, result)
@@ -541,18 +530,7 @@ func applyChangesToPage(
 	result *ForwardResult,
 ) {
 	pl := computePlacement(page)
-	// Seed childCount with children already on the page so incrementally added
-	// children don't stack at grid index 0 on top of existing ones (#330).
-	if scopeID != "" {
-		parentCellID := scopedCellID(viewID, scopeID)
-		for _, obj := range page.FindAllElements() {
-			if cell := obj.FindElement("mxCell"); cell != nil {
-				if cell.SelectAttrValue("parent", "") == parentCellID {
-					pl.childCount[scopeID]++
-				}
-			}
-		}
-	}
+	pl.childCount[scopeID] = countScopeChildren(page, viewID, scopeID)
 	initialChildCount := pl.childCount[scopeID]
 
 	for _, ch := range cs.ModelElementChanges {
@@ -680,6 +658,26 @@ type placement struct {
 	childCount map[string]int // tracks number of children per parent for grid layout (#330)
 }
 
+// countScopeChildren returns how many draw.io cells are currently parented to
+// scopeID on page. Used to seed the grid-layout childCount so newly added
+// children start at the next free slot rather than slot 0 (#330).
+// Returns 0 when scopeID is empty (top-level elements use cursor-based layout).
+func countScopeChildren(page *drawio.Page, viewID, scopeID string) int {
+	if scopeID == "" {
+		return 0
+	}
+	parentCellID := scopedCellID(viewID, scopeID)
+	count := 0
+	for _, obj := range page.FindAllElements() {
+		if cell := obj.FindElement("mxCell"); cell != nil {
+			if cell.SelectAttrValue("parent", "") == parentCellID {
+				count++
+			}
+		}
+	}
+	return count
+}
+
 // computePlacement scans existing elements on a page and returns a placement
 // state positioned one row below all existing content.
 func computePlacement(page *drawio.Page) placement {
@@ -748,6 +746,12 @@ func applyElementAdded(
 
 	// For child elements, use relative coordinates within the parent.
 	// Position children in a grid starting at (20, 80) inside the parent boundary (#330).
+	// childCount is seeded with the number of children already on the page, so newly
+	// added children are assigned the next free slot (N, N+1, …) rather than slot 0.
+	// This heuristic assumes existing children occupy slots 0..N-1 in consecutive order.
+	// Children repositioned by the draw.io layout engine can sit at arbitrary coordinates,
+	// so a seeded slot may in principle overlap a layout-placed child; no such overlap
+	// has been observed in practice.
 	x, y := pl.nextX, pl.nextY
 	isChild := scopeID != "" && isChildOf(id, scopeID)
 	if isChild {
