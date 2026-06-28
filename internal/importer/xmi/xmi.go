@@ -405,6 +405,11 @@ func (s *convState) collectElem(
 	}
 	if len(childMap) > 0 {
 		elem.Children = childMap
+		// Mark this kind as a container in the specification — derived from the XMI hierarchy.
+		if ks, ok := bsModel.Specification.Elements[kind]; ok && !ks.Container {
+			ks.Container = true
+			bsModel.Specification.Elements[kind] = ks
+		}
 	}
 
 	// Store in target map with local key only

@@ -76,6 +76,13 @@ func TestImport_Hierarchy(t *testing.T) {
 		t.Fatal("expected child 'api' in 'system.backend'")
 	}
 
+	// Package kind must be auto-detected as container because it has children
+	if spec, ok := m.Specification.Elements["package"]; !ok {
+		t.Error("specification missing kind 'package'")
+	} else if !spec.Container {
+		t.Error("package kind should have container=true (auto-set from XMI hierarchy)")
+	}
+
 	if len(m.Relationships) != 1 {
 		t.Fatalf("relationships count = %d, want 1", len(m.Relationships))
 	}
