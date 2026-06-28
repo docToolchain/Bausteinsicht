@@ -10,8 +10,9 @@ import (
 	"strings"
 )
 
-// MaxModelFileSize is the maximum allowed model file size (10 MB).
-const MaxModelFileSize = 10 * 1024 * 1024
+// MaxModelFileSize is the maximum allowed model file size (100 MB).
+// Large enterprise exports (e.g. AUTOSAR UML from Enterprise Architect) can exceed 10 MB.
+const MaxModelFileSize = 100 * 1024 * 1024
 
 // Load reads a JSONC file, strips comments and trailing commas, and parses it.
 func Load(path string) (*BausteinsichtModel, error) {
