@@ -1,0 +1,166 @@
+:jbake-title: ADR-010: LSP Server
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: ADR
+:jbake-order: 10
+
+= ADR-010: LSP Server and VS Code Extension as Second Product Surface
+
+== Status
+
+Accepted
+
+== Context
+
+Bausteinsicht's primary product surface is the CLI (`cmd/bausteinsicht/`).
+A second surface — a Language Server Protocol (LSP) server (`cmd/bausteinsicht-lsp/`, `internal/lsp/`) and a VS Code extension (`vscode-extension/`) — was introduced to provide richer in-editor support beyond what JSON Schema alone can deliver.
+
+JSON Schema (ADR-001) provides autocompletion and type validation for free in any JSON-Schema-aware editor. However it cannot:
+
+* Report cross-file errors (e.g., `include` references an element that does not exist)
+* Provide hover documentation from the live model (not just schema descriptions)
+* Show code lenses (quick-action links adjacent to elements in the editor)
+* Integrate with the draw.io diagram via editor commands
+
+These capabilities require a live language server that understands the full model semantics.
+
+=== Constraints
+
+* Must not break the CLI-only workflow — the LSP is strictly additive
+* Must not introduce Node.js as a runtime dependency (ADR-002, security policy)
+* The Go LSP server must share model/validation logic with the CLI (no duplication)
+* VS Code extension may use TypeScript (extension host runs in Node.js, which VS Code already provides — no new runtime added to the user's PATH)
+
+== Evaluated Options
+
+=== Option A: JSON Schema Only (Status Quo)
+
+Keep JSON Schema as the only IDE integration point.
+
+*Pros:*
+* No maintenance burden for a second binary
+* Works in all editors without additional install step
+
+*Cons:*
+* Cannot report semantic errors (unknown element IDs in `include` lists)
+* No hover docs derived from live model
+* No code lenses or editor commands
+
+=== Option B: LSP Server in Go + VS Code Extension in TypeScript
+
+Implement a Go LSP server that speaks the Language Server Protocol over stdin/stdout.
+Pair with a minimal VS Code extension that starts the server.
+
+*Pros:*
+* Full semantic validation (cross-references, unknown kinds, missing IDs)
+* Code lenses (e.g., "Open in draw.io", "Sync now")
+* Hover documentation from actual model state
+* Shared Go model/validation code with CLI — no logic duplication
+* VS Code extension uses TypeScript only for the extension host bridge (no new user dependency)
+
+*Cons:*
+* Second binary to build, package, and maintain
+* LSP protocol complexity
+* VS Code extension publishing workflow
+
+=== Option C: External Language Server (e.g., yaml-language-server with plugins)
+
+Use an existing generic LSP server extended via plugin hooks.
+
+*Pros:*
+* No new binary
+
+*Cons:*
+* JSON-specific LSP servers are limited; extending them for cross-reference validation is as complex as writing a dedicated server
+* Plugin API is unstable across versions
+
+== Weighted Pugh Matrix
+
+Rating scale: -1 = worse than reference, 0 = same as reference, +1 = better than reference.
+Reference: Option A (JSON Schema only).
+
+[cols="3,1,1,1,1"]
+|===
+| Criterion | Weight | A: Schema only (Ref) | B: Go LSP (chosen) | C: External LSP
+
+| Semantic validation (cross-refs)
+| 3
+| 0
+| +1
+| 0
+
+| Hover docs from live model
+| 2
+| 0
+| +1
+| -1
+
+| Code lenses / editor commands
+| 2
+| 0
+| +1
+| -1
+
+| Maintenance burden
+| 2
+| 0
+| -1
+| -1
+
+| No new user runtime dependency
+| 3
+| 0
+| +1
+| +1
+
+| Shared model logic (no duplication)
+| 2
+| 0
+| +1
+| -1
+
+| Works in all editors
+| 1
+| 0
+| -1
+| -1
+
+| *Weighted total*
+| —
+| *0*
+| *+9*
+| *-7*
+|===
+
+== Decision
+
+**Adopt Option B: Go LSP server + minimal VS Code extension.**
+
+The LSP server reuses `internal/model`, `internal/schema`, and `internal/lsp` packages.
+The VS Code extension (`vscode-extension/`) only bridges the extension host to the Go binary; all logic lives in Go.
+
+== Consequences
+
+=== Positive
+
+* Semantic diagnostics surfaced directly in the editor (unknown element IDs, invalid kinds)
+* Code lenses enable "Sync now" and "Open diagram" without leaving the editor
+* Shared Go logic means validation parity between CLI and LSP
+
+=== Negative
+
+* Two binaries to build and distribute (`bausteinsicht` and `bausteinsicht-lsp`)
+* VS Code extension must be published to the Marketplace separately
+* LSP initialization adds ~200 ms latency before first diagnostics appear
+
+=== Risk
+
+* R-LSP-1: LSP server crashes silently (client detaches, no visible error). Mitigated by restart-on-exit configuration in the VS Code extension.
+
+== References
+
+* `cmd/bausteinsicht-lsp/` — LSP server entry point
+* `internal/lsp/` — diagnostics, code lenses, server implementation
+* `vscode-extension/` — VS Code extension bridge
+* ADR-001: DSL Format (JSON Schema as base layer)
+* ADR-002: Implementation Language (Go, no Node.js in product)

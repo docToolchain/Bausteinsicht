@@ -113,6 +113,58 @@ Calling `add` on an existing item merges/updates fields instead of erroring.
 * More complex to explain and document
 * Other commands may need similar merge behavior later
 
+== Weighted Pugh Matrix
+
+Rating scale: -1 = worse than reference, 0 = same as reference, +1 = better than reference.
+Reference: Option A (all commands reject duplicates).
+
+[cols="3,1,1,1,1"]
+|===
+| Criterion | Weight | A: Strict reject (Ref) | B: Merge (chosen) | C: Hybrid (view-only merge)
+
+| LLM-friendly incremental workflow
+| 3
+| 0
+| +1
+| +1
+
+| Predictable, consistent semantics
+| 2
+| 0
+| -1
+| -1
+
+| Prevents accidental overwrites
+| 2
+| 0
+| -1
+| 0
+
+| Idempotent retry safety
+| 2
+| 0
+| +1
+| +1
+
+| Implementation simplicity
+| 1
+| 0
+| -1
+| 0
+
+| Solves Issue #392 explicitly
+| 2
+| 0
+| +1
+| +1
+
+| *Weighted total*
+| —
+| *0*
+| *+4*
+| *+3*
+|===
+
 == Decision
 
 **Adopt Option B: Merge on Existing Items**

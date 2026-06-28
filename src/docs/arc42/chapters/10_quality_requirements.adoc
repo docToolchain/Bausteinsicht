@@ -13,105 +13,143 @@ ifndef::imagesdir[:imagesdir: ../../images]
 
 === Quality Requirements Overview
 
-[cols="1,3"]
+[cols="1,2,3"]
 |===
-| Category (ISO 25010) | Quality Requirement
+| ISO 25010 Characteristic | Quality Requirement | Top-goal link
 
 | Usability / Learnability
-| The tool and its DSL must be easy to learn for developers and architects. No prior knowledge of C4, Structurizr, or LikeC4 should be required.
+| New users productive within 30 minutes using only docs and IDE autocompletion
+| Concretises QG-1 (Learnability)
 
-| Usability / Operability (IDE Support)
-| Editing the architecture model must be supported by IDE features (autocompletion, validation, hover docs) without installing tool-specific plugins.
+| Usability / Operability
+| IDE autocompletion, validation, hover docs without tool-specific plugin
+| Concretises QG-2 (IDE Support)
 
-| Compatibility / Interoperability (LLM Friendliness)
-| The model format and CLI must be designed so that LLM agents can reliably read, write, and manipulate architecture models.
+| Compatibility / Interoperability
+| LLM agents can reliably read, write, and manipulate architecture models
+| Concretises QG-3 (LLM Friendliness)
 
-| Functional Suitability / Correctness (Sync Reliability)
-| Bidirectional synchronization must never silently lose data. New elements, changed descriptions, and relationships must be correctly propagated in both directions.
+| Functional Suitability / Correctness
+| Bidirectional sync never silently loses data
+| Derived (sync reliability enables QG-1–3)
 
 | Portability / Installability
-| The tool must be distributable as a single binary without runtime dependencies. Installation must not require package managers, virtual environments, or runtimes.
+| Single binary, no runtime dependencies, install in under 1 minute
+| Derived (prerequisite for all three top goals)
 
-| Maintainability / Modifiability (Flexible Hierarchy)
-| The element hierarchy must not be hardcoded to a fixed number of levels. Users must be able to define their own element kinds and nesting depth.
+| Maintainability / Modifiability
+| Element hierarchy freely configurable, not hardcoded to C4 levels
+| Derived (enables diverse team adoption)
+
+| Performance Efficiency
+| 10 MB JSONC model processed in under 5 seconds on commodity hardware
+| Derived (blocks usability at scale)
+
+| Reliability / Fault Tolerance
+| Corrupt or oversized input never corrupts the model file
+| Derived (trust prerequisite for QG-1)
+
+| Security
+| Path traversal via CLI flags rejected; model files written at 0600
+| Derived (operating in shared workspaces)
 |===
 
 === Quality Scenarios
+
+The six-part scenario form used below:
+*Source* → *Stimulus* → *Artifact* → *Environment* → *Response* → *Response Measure*
 
 ==== QS-1: Learnability
 
 [cols="1,3"]
 |===
-| Context
-| A developer unfamiliar with Bausteinsicht wants to create an architecture model for a new project.
+| Source | Developer unfamiliar with Bausteinsicht, first contact with the project
 
-| Stimulus
-| The developer reads the getting-started documentation and opens their IDE.
+| Stimulus | Reads the getting-started documentation and opens their IDE
 
-| Acceptance Criteria
-| Within 30 minutes, the developer has created a valid architecture model with at least 3 elements, 2 relationships, and 1 draw.io view — using only the documentation and IDE autocompletion.
+| Artifact | Bausteinsicht CLI + JSON Schema + user manual
+
+| Environment | Normal developer workstation; IDE with JSON Schema support (VS Code, IntelliJ, or Neovim)
+
+| Response | Developer creates and validates an architecture model using IDE autocompletion
+
+| Response Measure | Within *30 minutes*, the developer has created a valid model with ≥3 elements, ≥2 relationships, and ≥1 draw.io view — using only documentation and IDE features, no Bausteinsicht-specific help
 |===
 
-Driven by: link:../ADRs/ADR-001-DSL-Format.html[ADR-001] (JSON chosen for universal familiarity and IDE support).
+Concretises QG-1. Driven by: link:../ADRs/ADR-001-DSL-Format.html[ADR-001] (JSON chosen for universal familiarity and IDE support).
 
 ==== QS-2: IDE Support
 
 [cols="1,3"]
 |===
-| Context
-| An architect edits a `.jsonc` architecture model file in VS Code, IntelliJ, or Neovim.
+| Source | Architect editing a `.jsonc` model file
 
-| Stimulus
-| The architect types a new element definition.
+| Stimulus | Types a new element definition
 
-| Acceptance Criteria
-| The editor provides autocompletion for property names, validates values against allowed types, and shows hover documentation for each field — without any Bausteinsicht-specific plugin installed. Only the JSON Schema association is required.
+| Artifact | `.jsonc` model file with `$schema` reference
+
+| Environment | VS Code, IntelliJ, or Neovim with JSON Schema plugin; no Bausteinsicht plugin installed
+
+| Response | Editor shows autocompletion for property names, validates values, and displays hover documentation
+
+| Response Measure | *0 additional plugins installed* beyond JSON Schema association; all three named IDEs provide autocompletion and validation
 |===
 
-Driven by: link:../ADRs/ADR-001-DSL-Format.html[ADR-001] (JSON Schema provides free IDE support via SchemaStore).
+Concretises QG-2. Driven by: link:../ADRs/ADR-001-DSL-Format.html[ADR-001] (JSON Schema provides free IDE support via SchemaStore).
 
 ==== QS-3: LLM Friendliness
 
 [cols="1,3"]
 |===
-| Context
-| An LLM agent (e.g., Claude) is asked to add a new microservice to an existing architecture model.
+| Source | LLM agent (e.g., Claude Code)
 
-| Stimulus
-| The agent reads the current model file and uses CLI commands.
+| Stimulus | Instructed to add a new microservice to an existing architecture model
 
-| Acceptance Criteria
-| The agent successfully adds the element with title, description, technology, and relationships, then runs `bausteinsicht sync` — all without human intervention and without producing invalid JSON.
+| Artifact | JSONC model file + Bausteinsicht CLI
+
+| Environment | Automated agent workflow; no human at the keyboard
+
+| Response | Agent reads the model, issues `bausteinsicht add element` and `add relationship` commands, then runs `bausteinsicht sync`
+
+| Response Measure | *0 human interventions* required; model remains valid JSON after agent edits; `bausteinsicht validate` reports no new errors
 |===
 
-Driven by: link:../ADRs/ADR-001-DSL-Format.html[ADR-001] (JSON is the native output format of LLMs).
+Concretises QG-3. Driven by: link:../ADRs/ADR-001-DSL-Format.html[ADR-001] (JSON is the native output format of LLMs).
 
 ==== QS-4: Sync Reliability
 
 [cols="1,3"]
 |===
-| Context
-| An architect modifies an element's description in draw.io and adds a new element in the JSON model simultaneously.
+| Source | Architect (working in draw.io) and developer (working in JSONC) simultaneously
 
-| Stimulus
-| `bausteinsicht sync` is executed.
+| Stimulus | `bausteinsicht sync` is executed after both sides made changes
 
-| Acceptance Criteria
-| The description change from draw.io is applied to the model. The new element from the model appears in the draw.io view. No data is silently lost. If a true conflict exists (same field changed in both), a warning is displayed.
+| Artifact | JSONC model file + draw.io diagram + `.bausteinsicht-sync` state
+
+| Environment | Normal development workflow; no true data conflict (different fields changed)
+
+| Response | Description change from draw.io is written to the model; new element from the model appears in the draw.io view; conflicts (same field changed on both sides) produce a warning and model wins
+
+| Response Measure | *0 silent data losses*; every changed field appears in the correct destination; conflicts logged to stderr with element ID and field name
 |===
+
+Derived from reliability requirement (trust prerequisite for all top goals).
 
 ==== QS-5: Installability
 
 [cols="1,3"]
 |===
-| Context
-| A developer on macOS, Linux, or Windows wants to use Bausteinsicht.
+| Source | Developer on macOS, Linux, or Windows
 
-| Stimulus
-| The developer downloads the binary and runs `bausteinsicht --version`.
+| Stimulus | Downloads the binary from a GitHub Release and runs `bausteinsicht --version`
 
-| Acceptance Criteria
-| The tool runs immediately without installing Go, Python, Node.js, Java, or any other runtime. Total time from download to first successful command is under 1 minute.
+| Artifact | Released binary (goreleaser cross-compiled archive)
+
+| Environment | Clean workstation; no Go, Python, Node.js, Java, or other runtime installed
+
+| Response | Command executes and prints the version string
+
+| Response Measure | *Under 1 minute* from download to first successful command; *0 runtime dependencies* required
 |===
 
 Driven by: link:../ADRs/ADR-002-Implementation-Language.html[ADR-002] (Go chosen for single-binary distribution).
@@ -120,12 +158,76 @@ Driven by: link:../ADRs/ADR-002-Implementation-Language.html[ADR-002] (Go chosen
 
 [cols="1,3"]
 |===
-| Context
-| An architect models a system where a component contains sub-components, which in turn contain further sub-components (3+ nesting levels beyond the C4 standard).
+| Source | Architect modeling a system with deep nesting (e.g., domain → subdomain → system → service → component)
 
-| Stimulus
-| The architect defines deeply nested elements in the JSON model.
+| Stimulus | Defines elements nested 4–49 levels deep in the JSON model
 
-| Acceptance Criteria
-| The model validates successfully. draw.io views correctly render all nesting levels. There is no artificial limit on hierarchy depth.
+| Artifact | JSONC model file
+
+| Environment | Normal model editing; `bausteinsicht validate` or `bausteinsicht sync`
+
+| Response | Model validates and renders correctly for all depths up to the enforced limit
+
+| Response Measure | Nesting depths 1–49 succeed without error; depth 50 returns a *clear error message* naming the offending element path (enforced by `MaxElementDepth=50` in `internal/model/resolve.go`, introduced as SEC-007 to prevent stack-overflow DoS)
 |===
+
+NOTE: Prior versions of this document stated "no artificial limit on hierarchy depth." This was corrected in the 2026-06-27 audit. A depth of 50 covers all realistic C4 and custom hierarchy depths while preventing denial-of-service (see link:../../security/2026-03-01-security-review.html[SEC-007]).
+
+Driven by: link:../ADRs/ADR-001-DSL-Format.html[ADR-001] (flexible element kinds).
+
+==== QS-7: Performance at Scale
+
+[cols="1,3"]
+|===
+| Source | Developer with a large monolith model
+
+| Stimulus | Runs `bausteinsicht sync` on a JSONC model with 500+ elements and a 10 MB file
+
+| Artifact | JSONC model + draw.io diagram
+
+| Environment | Commodity developer laptop (≥4 cores, ≥8 GB RAM); no external network dependency
+
+| Response | Sync completes without timeout or OOM
+
+| Response Measure | Sync finishes in *under 5 seconds* wall time; benchmarks in `internal/benchmarks/` enforce regression detection in CI
+|===
+
+Derived from performance efficiency requirement.
+
+==== QS-8: Reliability Under Bad Input
+
+[cols="1,3"]
+|===
+| Source | Attacker or misconfigured tool writing a corrupt/oversized JSONC file to the model path
+
+| Stimulus | `bausteinsicht sync` is invoked with a 50 MB malformed JSONC file
+
+| Artifact | JSONC model file
+
+| Environment | Developer workstation; tool runs with normal user permissions
+
+| Response | Tool rejects the file with an error; existing draw.io diagram and sync state are **not modified**
+
+| Response Measure | *0 model mutations* on parse failure; error returned with code 2; existing files intact (atomic write pattern ensures no partial overwrite)
+|===
+
+Derived from reliability and security requirements (T-4 DoS mitigation, SEC-006).
+
+==== QS-9: Security — Path Containment
+
+[cols="1,3"]
+|===
+| Source | Malicious JSONC model or untrusted script passing crafted CLI arguments
+
+| Stimulus | CLI invoked with `--model ../../etc/passwd` or `--output /tmp/../../root/`
+
+| Artifact | CLI argument parser (`cmd/bausteinsicht/root.go`)
+
+| Environment | Any OS; normal user privileges
+
+| Response | Tool rejects the path with an error before any file I/O
+
+| Response Measure | *All* paths containing `..` are rejected with exit code 2; no reads or writes occur outside the project directory (verified by SEC-001, SEC-016 fixes)
+|===
+
+Derived from security requirement (T-2 path traversal).
