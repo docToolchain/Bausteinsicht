@@ -19,7 +19,13 @@ import (
 const (
 	// maxDepth caps element nesting to prevent stack/heap exhaustion on pathological inputs.
 	// Real-world EA exports (e.g. AUTOSAR) can reach depth 23; 50 gives ample headroom.
-	maxDepth     = 50
+	maxDepth = 50
+
+	// maxXMIFileSize is the per-file read cap for XMI import (200 MB).
+	// win1252ToUTF8 allocates a second copy, so peak RSS is ~2× the raw file size;
+	// the cap prevents runaway memory use on pathological inputs.
+	maxXMIFileSize = 200 * 1024 * 1024
+
 	fallbackKind = "element"
 )
 
@@ -262,7 +268,15 @@ func extractStereotype(dec *xml.Decoder) (string, error) {
 // kindMap maps UML type local names or stereotype names to Bausteinsicht kind values.
 // Pass nil for kindMap to use default mappings only.
 func Import(path string, kindMap map[string]string) (*importer.ImportResult, error) {
-	data, err := os.ReadFile(path)
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, fmt.Errorf("reading %s: %w", path, err)
+	}
+	if info.Size() > maxXMIFileSize {
+		return nil, fmt.Errorf("reading %s: file size %d exceeds XMI import limit of %d bytes",
+			path, info.Size(), maxXMIFileSize)
+	}
+	data, err := os.ReadFile(path) // #nosec G304 -- path from CLI flag
 	if err != nil {
 		return nil, fmt.Errorf("reading %s: %w", path, err)
 	}
@@ -379,6 +393,9 @@ func (s *convState) collectElem(
 
 	// Skip elements without a name or without a recognisable type
 	if e.Name == "" || e.XMIType == "" {
+		if e.Name != "" && e.XMIType == "" {
+			s.warnings = append(s.warnings, fmt.Sprintf("element %q skipped: no xmi:type attribute", e.Name))
+		}
 		for _, child := range e.Children {
 			s.collectElem(child, parentPath, target, bsModel, rels)
 		}
@@ -505,17 +522,12 @@ func (s *convState) makeID(name, parentPath string) string {
 }
 
 // sanitizeID converts a name to a valid Bausteinsicht element ID.
-// Rules: lowercase, spaces → hyphens, only [a-z0-9_-] retained, collapse multiple hyphens.
+// Rules: lowercase, non-[a-z0-9_] runs → single hyphen, trim leading/trailing hyphens.
 var nonIDRe = regexp.MustCompile(`[^a-z0-9_]+`)
 
 func sanitizeID(name string) string {
 	s := strings.ToLower(name)
-	s = strings.ReplaceAll(s, " ", "-")
 	s = nonIDRe.ReplaceAllString(s, "-")
-	// collapse runs of hyphens
-	for strings.Contains(s, "--") {
-		s = strings.ReplaceAll(s, "--", "-")
-	}
 	s = strings.Trim(s, "-")
 	if s == "" {
 		return fallbackKind

@@ -1,5 +1,5 @@
 // Package importer provides parsers for importing architecture models from
-// external formats (Structurizr DSL, LikeC4) into Bausteinsicht.
+// external formats (Structurizr DSL, LikeC4, XMI/Enterprise Architect) into Bausteinsicht.
 package importer
 
 import "github.com/docToolchain/Bausteinsicht/internal/model"

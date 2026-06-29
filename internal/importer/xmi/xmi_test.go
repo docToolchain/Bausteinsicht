@@ -260,6 +260,47 @@ func TestImport_IDCollision(t *testing.T) {
 	}
 }
 
+func TestImport_IDCollision_Triple(t *testing.T) {
+	// Three elements with the same name produce api, api-2, api-3.
+	data := []byte(`<?xml version="1.0" encoding="UTF-8"?>
+<xmi:XMI xmi:version="2.1" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmlns:uml="http://www.omg.org/spec/UML/20131001">
+  <uml:Model xmi:type="uml:Model" name="M" xmi:id="m1">
+    <packagedElement xmi:type="uml:Component" name="API" xmi:id="e1"/>
+    <packagedElement xmi:type="uml:Component" name="Api" xmi:id="e2"/>
+    <packagedElement xmi:type="uml:Component" name="api" xmi:id="e3"/>
+  </uml:Model>
+</xmi:XMI>`)
+
+	path := filepath.Join(t.TempDir(), "triple.xmi")
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := xmi.Import(path, nil)
+	if err != nil {
+		t.Fatalf("Import: %v", err)
+	}
+	m := r.Model
+	for _, want := range []string{"api", "api-2", "api-3"} {
+		if _, ok := m.Model[want]; !ok {
+			keys := make([]string, 0, len(m.Model))
+			for k := range m.Model {
+				keys = append(keys, k)
+			}
+			t.Errorf("expected element %q; model keys: %v", want, keys)
+		}
+	}
+	collisionWarns := 0
+	for _, w := range r.Warnings {
+		if strings.Contains(w, "collision") {
+			collisionWarns++
+		}
+	}
+	if collisionWarns < 2 {
+		t.Errorf("expected ≥2 collision warnings for 3 duplicates, got %d: %v", collisionWarns, r.Warnings)
+	}
+}
+
 // ─── TS-XMI-10: Specification completeness ───────────────────────────────────
 
 func TestImport_SpecificationCompleteness(t *testing.T) {
