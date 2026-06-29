@@ -43,6 +43,12 @@
 
 | 2026-04-27 (batch fix)
 | Fixed SEC-001 (path traversal via CLI flags — reject `..` in `--model`/`--template`/`--output`), SEC-005 (error on multiple `.jsonc` files), SEC-006 (10 MB file size limit), SEC-008 (`stripTags` attribute quoting), SEC-013 (`sanitizeID` strips dots/slashes), SEC-016 (`--output` path traversal). SEC-014 (Dockerfile checksums) deferred — upstream projects don't publish checksums.
+
+| 2026-06-27 (XMI importer)
+| Added `internal/importer/xmi/` (issue #401). New XMI attack surface reviewed: (1) XXE — mitigated by `hasDOCTYPE()` pre-check and `dec.Entity = map[string]string{}` to disable entity expansion; (2) deep hierarchy DoS — mitigated by `maxDepth=50` cap in `parseElem`, same pattern as SEC-007 (AUTOSAR exports can reach depth 23; 50 gives headroom); (3) ID injection via crafted element names — sanitized by `sanitizeID()` (same function used for draw.io, same SEC-013 fix applied). XMI version is detected from root element; non-2.1 versions emit a warning. No new SEC findings introduced.
+
+| 2026-06-29 (XMI review fixes)
+| Reverted `MaxModelFileSize` in `loader.go` back to 10 MB (SEC-006). The XMI importer uses `os.ReadFile` directly and is not subject to the JSONC file size limit; the 100 MB bump was unnecessary and would have silently relaxed SEC-006 for all JSONC model loading.
 |===
 
 === Scope

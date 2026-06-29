@@ -110,7 +110,7 @@ Every production package, grouped by role. Each row is a Level-1 building block:
 |===
 | Package | Responsibility | Source
 
-| `importer` | Import models from Structurizr DSL and LikeC4 (`import`) | `internal/importer/` (`structurizr/`, `likec4/`)
+| `importer` | Import models from Structurizr DSL, LikeC4, and XMI/Enterprise Architect (`import`). The XMI sub-package buffers the entire file in memory and converts Windows-1252 to UTF-8 before parsing, so peak RSS is ~2× the raw file size (e.g. ~230 MB for a 114 MB AUTOSAR export); a 200 MB read cap is enforced. | `internal/importer/` (`structurizr/`, `likec4/`, `xmi/`)
 | `exporter` | Export the model as Structurizr DSL | `internal/exporter/structurizr/`
 | `diagram` | Render views as text diagrams: C4-PlantUML, Mermaid, DOT, D2, HTML, sequence (`export-diagram`, `export-sequence`) | `internal/diagram/`
 | `table` | Render element attributes as AsciiDoc/Markdown tables (`export-table`) | `internal/table/`

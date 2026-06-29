@@ -1233,13 +1233,16 @@ Imports an architecture model from an external DSL and writes a Bausteinsicht `.
 |===
 | Flag | Description | Required | Default
 
-| `--from` | Source format: `structurizr` (`.dsl`) or `likec4` (`.c4`). | Yes | (none)
+| `--from` | Source format: `structurizr` (`.dsl`), `likec4` (`.c4`), or `xmi` (`.xmi`/`.xml`). | Yes | (none)
 | `--output` | Output model file path. | No | `architecture.jsonc`
 | `--dry-run` | Print the generated model to stdout instead of writing the file. | No | `false`
 | `--force` | Overwrite the output file if it already exists. | No | `false`
+| `--kind-map` | XMI only: comma-separated `Type=kind` overrides (e.g. `Component=service,Class=entity`). | No | (none)
 |===
 
 **Behavior:** parses the source DSL, maps people/systems/containers and relationships, and generates a matching specification. Exit `2` if the output file already exists and neither `--force` nor `--dry-run` is set — `--dry-run` prints to stdout and skips the existence check, so it never fails on an existing output. Exit `1` on any other import failure (unknown `--from`, unreadable input, parse/encoding error).
+
+**XMI-specific behavior:** reads XMI 2.1 files (e.g., Enterprise Architect exports). UML element types are mapped to Bausteinsicht element kinds using `--kind-map` overrides or the built-in defaults (e.g., `uml:Component` → `component`). EA stereotypes (inside `xmi:Extension`) take precedence over the UML type mapping. Unknown UML types produce a warning and are imported with kind `element`. Unresolvable relationship endpoints are skipped with a warning. DOCTYPE declarations are rejected (XXE mitigation). Element hierarchy depth is capped at 50 levels. This is a **one-way migration** — XMI-specific data (layout, tagged values, OCL constraints) is not preserved.
 
 ==== `bausteinsicht generate-template`
 

@@ -10,7 +10,8 @@ import (
 	"strings"
 )
 
-// MaxModelFileSize is the maximum allowed model file size (10 MB).
+// MaxModelFileSize is the maximum allowed model file size (10 MB — SEC-006).
+// XMI import uses os.ReadFile directly and is not subject to this limit.
 const MaxModelFileSize = 10 * 1024 * 1024
 
 // Load reads a JSONC file, strips comments and trailing commas, and parses it.
