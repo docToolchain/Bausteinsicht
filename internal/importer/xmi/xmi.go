@@ -80,6 +80,13 @@ func (e *xmiElem) umlLocal() string {
 
 var doctypeRe = regexp.MustCompile(`(?i)<!DOCTYPE`)
 
+// hasDOCTYPE scans the first 4096 bytes for a DOCTYPE declaration.
+// The window is intentionally limited: XML declarations and DOCTYPE must appear
+// in the document prologue, which precedes any content and is always within the
+// first few hundred bytes in practice. A file engineered with >4096 bytes of
+// whitespace before DOCTYPE would still be safe because dec.Entity = map[string]string{}
+// (set in parseXMI) disables entity expansion regardless of DOCTYPE position —
+// hasDOCTYPE is defense-in-depth, not the primary XXE mitigation.
 func hasDOCTYPE(data []byte) bool {
 	limit := len(data)
 	if limit > 4096 {
