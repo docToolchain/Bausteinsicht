@@ -475,7 +475,7 @@ func TestImport_MaxDepthExceeded(t *testing.T) {
 	b.WriteString("  <uml:Model xmi:type=\"uml:Model\" name=\"Deep\" xmi:id=\"m1\">\n")
 	for i := range levels {
 		b.WriteString(strings.Repeat("  ", i+2))
-		b.WriteString(fmt.Sprintf("<packagedElement xmi:type=\"uml:Package\" xmi:id=\"p%d\" name=\"Level%d\">\n", i, i))
+		fmt.Fprintf(&b, "<packagedElement xmi:type=\"uml:Package\" xmi:id=\"p%d\" name=\"Level%d\">\n", i, i)
 	}
 	for i := levels - 1; i >= 0; i-- {
 		b.WriteString(strings.Repeat("  ", i+2))
