@@ -1,6 +1,7 @@
 package xmi_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -367,6 +368,123 @@ func TestParseKindMap(t *testing.T) {
 				t.Errorf("ParseKindMap(%q)[%q] = %q, want %q", tc.input, k, got[k], v)
 			}
 		}
+	}
+}
+
+// ─── TS-XMI-11: Windows-1252 charset ─────────────────────────────────────────
+
+func TestImport_Win1252Charset(t *testing.T) {
+	// Build a Windows-1252 encoded XMI. The element name "ApiéTest" uses byte
+	// 0xE9 (é in Latin-1/Windows-1252 = U+00E9). After sanitizeID it becomes "api-test".
+	data := []byte("<?xml version=\"1.0\" encoding=\"windows-1252\"?>\n" +
+		"<xmi:XMI xmlns:xmi=\"http://www.omg.org/spec/XMI/20131001\" xmi:version=\"2.1\">\n" +
+		"  <uml:Model xmi:type=\"uml:Model\" name=\"Test\" xmi:id=\"m1\">\n" +
+		"    <packagedElement xmi:type=\"uml:Component\" xmi:id=\"e1\" name=\"Api")
+	data = append(data, 0xE9) // 'é' in Windows-1252
+	data = append(data, []byte("Test\"/>\n  </uml:Model>\n</xmi:XMI>")...)
+
+	path := filepath.Join(t.TempDir(), "win1252.xmi")
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := xmi.Import(path, nil)
+	if err != nil {
+		t.Fatalf("Import with windows-1252 encoding: %v", err)
+	}
+	// "ApiéTest" → lower "apiétest" → non-ASCII stripped → "api-test"
+	if _, ok := r.Model.Model["api-test"]; !ok {
+		got := make([]string, 0, len(r.Model.Model))
+		for k := range r.Model.Model {
+			got = append(got, k)
+		}
+		t.Errorf("expected element 'api-test', got keys: %v", got)
+	}
+}
+
+func TestImport_UnsupportedCharset(t *testing.T) {
+	data := []byte("<?xml version=\"1.0\" encoding=\"utf-16\"?>\n" +
+		"<xmi:XMI xmlns:xmi=\"http://www.omg.org/spec/XMI/20131001\" xmi:version=\"2.1\">\n" +
+		"</xmi:XMI>")
+
+	path := filepath.Join(t.TempDir(), "utf16.xmi")
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := xmi.Import(path, nil)
+	if err == nil {
+		t.Fatal("expected error for unsupported charset, got nil")
+	}
+	if !strings.Contains(strings.ToLower(err.Error()), "charset") &&
+		!strings.Contains(strings.ToLower(err.Error()), "unsupported") {
+		t.Errorf("unexpected error message: %v", err)
+	}
+}
+
+// ─── TS-XMI-12: maxDepth guard ───────────────────────────────────────────────
+
+func TestImport_MaxDepthExceeded(t *testing.T) {
+	// 55 nested packagedElement elements puts the deepest one at depth=57
+	// (XMI=0, Model=1, p[0]=2 … p[54]=56), well above maxDepth=50.
+	const levels = 55
+	var b strings.Builder
+	b.WriteString("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
+	b.WriteString("<xmi:XMI xmlns:xmi=\"http://www.omg.org/spec/XMI/20131001\" xmi:version=\"2.1\">\n")
+	b.WriteString("  <uml:Model xmi:type=\"uml:Model\" name=\"Deep\" xmi:id=\"m1\">\n")
+	for i := range levels {
+		b.WriteString(strings.Repeat("  ", i+2))
+		b.WriteString(fmt.Sprintf("<packagedElement xmi:type=\"uml:Package\" xmi:id=\"p%d\" name=\"Level%d\">\n", i, i))
+	}
+	for i := levels - 1; i >= 0; i-- {
+		b.WriteString(strings.Repeat("  ", i+2))
+		b.WriteString("</packagedElement>\n")
+	}
+	b.WriteString("  </uml:Model>\n</xmi:XMI>")
+
+	path := filepath.Join(t.TempDir(), "deep.xmi")
+	if err := os.WriteFile(path, []byte(b.String()), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := xmi.Import(path, nil)
+	if err == nil {
+		t.Fatal("expected error for element nesting beyond maxDepth, got nil")
+	}
+	if !strings.Contains(err.Error(), "depth") {
+		t.Errorf("expected depth error, got: %v", err)
+	}
+}
+
+// ─── TS-XMI-13: XMI version detection ────────────────────────────────────────
+
+func TestImport_XMIVersionWarning(t *testing.T) {
+	// XMI 1.1 has a completely different element encoding; only version 2.1 is supported.
+	// The importer should succeed (not error) but emit a version warning.
+	data := []byte("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+		"<xmi:XMI xmlns:xmi=\"http://www.omg.org/spec/XMI/20110701\" xmi:version=\"1.1\">\n" +
+		"  <uml:Model xmi:type=\"uml:Model\" name=\"Test\" xmi:id=\"m1\">\n" +
+		"    <packagedElement xmi:type=\"uml:Component\" xmi:id=\"e1\" name=\"Api\"/>\n" +
+		"  </uml:Model>\n</xmi:XMI>")
+
+	path := filepath.Join(t.TempDir(), "xmi11.xmi")
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := xmi.Import(path, nil)
+	if err != nil {
+		t.Fatalf("Import with XMI 1.1 should not error: %v", err)
+	}
+
+	hasVersionWarn := false
+	for _, w := range r.Warnings {
+		if strings.Contains(w, "1.1") || strings.Contains(strings.ToLower(w), "version") {
+			hasVersionWarn = true
+		}
+	}
+	if !hasVersionWarn {
+		t.Errorf("expected version warning for XMI 1.1; got warnings: %v", r.Warnings)
 	}
 }
 

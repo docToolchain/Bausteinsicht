@@ -142,8 +142,9 @@ func attrVal(attrs []xml.Attr, local string) string {
 }
 
 // parseXMI decodes XMI bytes into an intermediate element tree.
-// Returns (nil, nil) if the document is valid XML but not an XMI file.
-func parseXMI(data []byte) (*xmiElem, error) {
+// Returns (nil, "", nil) if the document is valid XML but not an XMI file.
+// The second return value is the xmi:version attribute from the root element.
+func parseXMI(data []byte) (*xmiElem, string, error) {
 	dec := xml.NewDecoder(bytes.NewReader(data))
 	dec.Entity = map[string]string{}  // disable entity expansion (XXE mitigation)
 	dec.CharsetReader = charsetReader // handle windows-1252 / ISO-8859-1 EA exports
@@ -151,19 +152,21 @@ func parseXMI(data []byte) (*xmiElem, error) {
 	for {
 		tok, err := dec.Token()
 		if err == io.EOF {
-			return nil, nil
+			return nil, "", nil
 		}
 		if err != nil {
-			return nil, err
+			return nil, "", err
 		}
 		se, ok := tok.(xml.StartElement)
 		if !ok {
 			continue
 		}
 		if se.Name.Local != "XMI" {
-			return nil, nil // not an XMI document
+			return nil, "", nil // not an XMI document
 		}
-		return parseElem(dec, se, 0)
+		version := attrVal(se.Attr, "version")
+		root, err := parseElem(dec, se, 0)
+		return root, version, err
 	}
 }
 
@@ -271,7 +274,7 @@ func fromBytes(data []byte, kindMap map[string]string) (*importer.ImportResult, 
 		return nil, fmt.Errorf("import failed: DOCTYPE declarations are not allowed")
 	}
 
-	root, err := parseXMI(data)
+	root, xmiVersion, err := parseXMI(data)
 	if err != nil {
 		return nil, fmt.Errorf("import failed: invalid XML: %w", err)
 	}
@@ -284,6 +287,14 @@ func fromBytes(data []byte, kindMap map[string]string) (*importer.ImportResult, 
 		xmiToBS: map[string]string{},
 		usedIDs: map[string]int{},
 	}
+
+	// XMI 1.1 has a completely different element encoding (type expressed as XML tag names,
+	// not xmi:type attributes). Warn early so the user knows the result may be empty.
+	if xmiVersion != "2.1" {
+		s.warnings = append(s.warnings, fmt.Sprintf(
+			"XMI version %q detected; only 2.1 is fully supported — import may be incomplete or empty", xmiVersion))
+	}
+
 	return s.convert(root)
 }
 
