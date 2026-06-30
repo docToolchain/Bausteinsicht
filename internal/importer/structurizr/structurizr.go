@@ -158,6 +158,15 @@ func (s *scanner) next() (token, error) {
 		return s.next()
 	case c == '"':
 		return s.scanString(line)
+	case c == '*':
+		// Consume one or two '*' and return as a single identifier token
+		// so that "include *" and "include **" are parsed correctly.
+		s.consume()
+		if n, _ := s.at(0); n == '*' {
+			s.consume()
+			return token{kind: tokIdent, val: "**", line: line}, nil
+		}
+		return token{kind: tokIdent, val: "*", line: line}, nil
 	case c == '!' || unicode.IsLetter(c) || c == '_':
 		return s.scanIdent(line)
 	default:
@@ -623,6 +632,25 @@ func (is *importState) processViewsStmts(stmts []stmt) {
 				}
 			case "autoLayout":
 				v.Layout = "auto"
+			}
+		}
+
+		// Structurizr's "include *" on a scoped view means all elements visible
+		// in that scope, but Bausteinsicht's "*" pattern only matches top-level
+		// IDs (no dots). Expand the pattern to explicitly include scope children
+		// so containers/components are placed inside their boundary.
+		if scope != "" && len(v.Include) == 1 && v.Include[0] == "*" {
+			switch s.keyword {
+			case "container":
+				v.Include = []string{"*", scope + ".*"}
+			case "component":
+				parts := strings.Split(scope, ".")
+				if len(parts) > 1 {
+					parentScope := strings.Join(parts[:len(parts)-1], ".")
+					v.Include = []string{"*", parentScope + ".*", scope + ".*"}
+				} else {
+					v.Include = []string{"*", scope + ".*"}
+				}
 			}
 		}
 

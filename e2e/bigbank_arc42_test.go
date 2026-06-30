@@ -472,6 +472,14 @@ func validateSVGLinks(t *testing.T, svgPath string, anchorMap map[string]string)
 		if strings.HasPrefix(href, "data:page/id,") {
 			continue // internal draw.io drill-down links — not rendered in SVG
 		}
+		// draw.io resolves relative fragment-only hrefs (#anchor) against its
+		// own export3.html source file during SVG export. Strip the prefix so
+		// we can validate the anchor regardless of the draw.io install path.
+		if strings.HasPrefix(href, "file://") {
+			if idx := strings.LastIndex(href, "#"); idx != -1 {
+				href = href[idx:] // "#sec-foo"
+			}
+		}
 		// Any remaining href is an element-level link and must match our anchorMap.
 		elementHrefs++
 		if !expected[href] {

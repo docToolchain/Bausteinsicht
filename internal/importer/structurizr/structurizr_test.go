@@ -142,6 +142,75 @@ func TestImport_NoViews(t *testing.T) {
 	}
 }
 
+func TestImport_ScopedView_IncludeExpansion(t *testing.T) {
+	// Verify that "include *" on a container/component view gets expanded to
+	// include scope descendants, matching Structurizr semantics.
+	const src = `workspace {
+  model {
+    user = person "User"
+    system = softwareSystem "System" {
+      app = container "App" {
+        ctrl = component "Controller"
+      }
+      db = container "DB"
+    }
+    external = softwareSystem "External"
+  }
+  views {
+    systemContext system "Context" { include * }
+    container system "Containers" { include * }
+    component app "Components" { include * }
+  }
+}`
+	result, err := structurizr.ImportSource(src)
+	if err != nil {
+		t.Fatalf("ImportSource failed: %v", err)
+	}
+	m := result.Model
+
+	// systemContext with scope: keep plain "*" (top-level elements are correct)
+	ctxView, ok := m.Views["system"]
+	if !ok {
+		t.Fatal("expected view key 'system'")
+	}
+	if len(ctxView.Include) != 1 || ctxView.Include[0] != "*" {
+		t.Errorf("systemContext view: expected include=[\"*\"], got %v", ctxView.Include)
+	}
+
+	// container view: must add "system.*" so containers appear inside boundary
+	containersView, ok := m.Views["system_1"]
+	if !ok {
+		t.Fatal("expected view key 'system_1'")
+	}
+	wantContainers := []string{"*", "system.*"}
+	if len(containersView.Include) != len(wantContainers) {
+		t.Errorf("container view: expected include=%v, got %v", wantContainers, containersView.Include)
+	} else {
+		for i, p := range wantContainers {
+			if containersView.Include[i] != p {
+				t.Errorf("container view include[%d]: want %q, got %q", i, p, containersView.Include[i])
+			}
+		}
+	}
+
+	// component view: must add parent containers + scope components
+	// scope resolves to "system.app"
+	componentsView, ok := m.Views["system.app"]
+	if !ok {
+		t.Fatal("expected view key 'system.app'")
+	}
+	wantComponents := []string{"*", "system.*", "system.app.*"}
+	if len(componentsView.Include) != len(wantComponents) {
+		t.Errorf("component view: expected include=%v, got %v", wantComponents, componentsView.Include)
+	} else {
+		for i, p := range wantComponents {
+			if componentsView.Include[i] != p {
+				t.Errorf("component view include[%d]: want %q, got %q", i, p, componentsView.Include[i])
+			}
+		}
+	}
+}
+
 func TestImport_UnknownViewType_Warning(t *testing.T) {
 	const src = `workspace {
   model {
