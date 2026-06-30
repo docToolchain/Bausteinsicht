@@ -109,3 +109,13 @@ The lost "parent visible" orientation is a usability trade-off, not a correctnes
 
 * Page per view and cross-page links: `internal/sync/forward.go` (`pageID := "view-" + viewID`, `data:page/id,` links)
 * Back-navigation button: `internal/sync/forward.go` (generated `nav-back-` cell)
+
+=== Extension: User-Defined Element Links (#483)
+
+Elements may carry an optional `link` field in the JSONC model, pointing to an external URL or document anchor (e.g. `"link": "architecture.adoc#sec-backend"`). This supports clickable diagram elements in SVG-based documentation pipelines.
+
+*Priority rule:* Drill-down links take priority over user-defined links. When both exist for the same element, the drill-down link (`data:page/id,...`) is applied last and overwrites the user-defined value. A sync warning is emitted to alert the user.
+
+Rationale: drill-down navigation is the primary navigation mechanism established by this ADR. Overriding it silently via a user-defined link would break diagram navigation without a visible signal.
+
+*Reverse sync:* `link` is never read back from draw.io. It is model-authoritative; draw.io edits to the link attribute are overwritten on the next sync.

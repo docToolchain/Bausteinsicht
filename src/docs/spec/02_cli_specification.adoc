@@ -776,6 +776,8 @@ Exports draw.io diagram views to image files (PNG or SVG) using the draw.io CLI.
 * Output files are named `architecture-<view-key>.<format>` (e.g., `architecture-context.png`).
 * Each view page is exported individually; partial failures are reported.
 
+NOTE: Use `--image-format svg` when element `link` fields must remain clickable in the output. SVG export preserves `link` attributes as native `<a href>` elements, which are clickable when the SVG is embedded in HTML or processed by Asciidoctor PDF. PNG export is a raster format and discards all link information.
+
 **JSON output structure** (the `errors` array is present only on partial failure):
 [source,json]
 ----

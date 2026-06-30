@@ -259,6 +259,11 @@ The model has these top-level sections. `specification`, `model`, `relationships
 | no
 | RFC3339 timestamp; overrides git-derived last-modified for stale detection
 
+| `link`
+| string
+| no
+| Hyperlink on the draw.io shape and in SVG export. Accepts any URL or document anchor (e.g. `architecture.adoc#sec-backend`). When a scoped detail view exists for the element, the auto-generated drill-down link takes priority (see ADR-009). Use SVG export (`--image-format svg`) to preserve links in HTML/PDF documentation pipelines; PNG export discards link information.
+
 | `children`
 | object
 | no

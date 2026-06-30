@@ -470,6 +470,8 @@ stop
 
 2a. The target view does not exist: the element carries no page link and is not clickable for drill-down.
 
+2b. The element has no detail view but carries a user-defined `link` field: the element is clickable and opens the linked URL or document anchor. In SVG export embedded in HTML/PDF, the link is preserved as a native `<a href>` element. If a detail view is later added for the same element, the drill-down link takes priority (the user-defined link is overridden; a sync warning is emitted).
+
 ==== Postconditions
 
 *Success guarantee:* The architect can navigate between abstraction levels by clicking linked elements; each level is a dedicated page, and a generated back-navigation button returns to the parent view.

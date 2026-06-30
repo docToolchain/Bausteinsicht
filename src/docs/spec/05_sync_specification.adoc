@@ -106,6 +106,9 @@ Triggered when the JSON model changes.
 | Updated element (kind)
 | Update `bausteinsicht_kind` attribute and apply the new kind's template style.
 
+| Updated element (link)
+| Set or clear the `link` attribute on `<object>`. The model value is always authoritative; `link` is never read back from draw.io. If the element also has a scoped detail view, the drill-down link overwrites the user-defined link and a sync warning is emitted (see <<drill-down-link-priority,Drill-Down Link Priority>>).
+
 | Deleted element
 | Remove `<object>`, its child text sub-cells, and all connectors where `source` or `target` matches the element's cell ID.
 
@@ -144,6 +147,10 @@ Triggered when the draw.io file changes.
 | Element technology changed
 | `technology` attribute on `<object>` differs from model
 | Update model element technology
+
+| Element link changed
+| _(not detected — `link` is model-authoritative and never read back from draw.io)_
+| _(n/a — link changes propagate forward only)_
 
 | New element (from draw.io)
 | `<object>` wrapping a vertex `<mxCell>` with no `bausteinsicht_id` and a non-empty label
@@ -259,6 +266,22 @@ Elements that have a detail view (a view whose `scope` matches the element) rece
 
 On any view page where the element appears, the `link` attribute is set to `data:page/id,view-<viewID>`.
 Clicking the element in draw.io navigates to its detail view (#198).
+
+[[drill-down-link-priority]]
+==== User-Defined Links and Drill-Down Priority
+
+An element may carry a user-defined `link` field in the model (e.g. `"link": "architecture.adoc#sec-api"`).
+This link is written to the draw.io `<object>` during forward sync and is preserved in SVG export as a native `<a href>` element, making it clickable in HTML and PDF documentation pipelines.
+
+*Priority rule:* If the element also has a scoped detail view, the auto-generated drill-down link (`data:page/id,...`) takes priority over the user-defined link (ADR-009). The drill-down link is applied last and overwrites the user-defined value. A sync warning is emitted when this occurs:
+
+----
+element <id>: user-defined link overridden by drill-down link (ADR-009)
+----
+
+Elements that carry a `link` but have no matching scoped view retain the user-defined link unchanged.
+
+*Reverse sync:* The `link` attribute is never read back from draw.io into the model. It is model-authoritative by design; manual edits to the link in draw.io are silently overwritten on the next sync.
 
 ==== Back-Navigation Button
 
