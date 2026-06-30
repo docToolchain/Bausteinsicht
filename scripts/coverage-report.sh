@@ -61,32 +61,35 @@ else
 fi
 
 # ── 3. Parse per-package coverage ─────────────────────────────────────────────
-# go tool cover -func output:
-#   github.com/…/pkg/file.go:123:   FuncName   78.5%
-# We aggregate per package (strip module prefix and file name).
+# Coverage profile format (go test -coverprofile / go tool covdata textfmt):
+#   mode: atomic
+#   github.com/…/pkg/file.go:start,end  numstmt  count
+#
+# We compute statement-weighted coverage per package (same method Go uses for
+# its own "total:" line), avoiding the unweighted-function-mean bias that
+# inflates or deflates packages with few large functions vs. many small ones.
 
 pkg_coverage() {
   local file="$1"
   [ -s "$file" ] || return 0
-  go tool cover -func="$file" 2>/dev/null | awk -v mod="$MODULE/" '
-    /^github\.com\// {
-      pct = $NF
-      sub(/%$/, "", pct)
-      # strip module prefix from column 1
+  awk -v mod="$MODULE/" '
+    NR == 1 { next }
+    {
       path = $1
-      sub(mod, "", path)
-      # remove :line suffix
       sub(/:.*/, "", path)
-      # strip filename (last component after /)
+      sub(mod "/", "", path)
       n = split(path, parts, "/")
       pkg = ""
       for (i = 1; i < n; i++) pkg = (pkg == "" ? parts[i] : pkg "/" parts[i])
       if (pkg == "") pkg = path
-      sum[pkg] += pct
-      cnt[pkg]++
+      total[pkg]   += $2
+      if ($3 > 0) covered[pkg] += $2
     }
-    END { for (p in sum) printf "%s %.4f\n", p, sum[p]/cnt[p] }
-  '
+    END {
+      for (p in total)
+        printf "%s %.4f\n", p, (total[p] > 0 ? covered[p]/total[p]*100 : 0)
+    }
+  ' "$file"
 }
 
 unit_data=$(pkg_coverage "$WORK/unit.cov")
