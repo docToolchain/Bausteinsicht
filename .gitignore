@@ -35,6 +35,7 @@ Simon-Brown-Demo/
 # Code coverage
 coverage/
 *.out
+coverage-report.md
 
 # Claude Code (track project settings, ignore user-specific files)
 .claude/settings.local.json

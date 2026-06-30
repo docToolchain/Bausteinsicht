@@ -6,7 +6,7 @@ DIST := dist
         build_windows_amd64 build_windows_arm64 \
         schema-generate schema-validate \
         build-extension package-extension \
-        test test-race bench coverage vet staticcheck gosec nilaway govulncheck deadcode \
+        test test-race bench coverage coverage-report vet staticcheck gosec nilaway govulncheck deadcode \
         gitleaks golangci-lint check check-duplicates clean install-tools install-hooks
 
 # Ensure GOPATH/bin is in PATH for installed tools
@@ -94,6 +94,12 @@ coverage:
 	else \
 		echo "⚠️  Coverage report could not be generated"; \
 	fi
+
+# Side-by-side unit vs. E2E coverage comparison (writes coverage-report.md)
+coverage-report:
+	@echo "Generating side-by-side coverage report..."
+	@scripts/coverage-report.sh > coverage-report.md
+	@echo "📊 Report written to coverage-report.md"
 
 # Run benchmarks
 bench:
