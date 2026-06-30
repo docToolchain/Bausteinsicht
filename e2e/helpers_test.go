@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -36,6 +37,9 @@ func TestMain(m *testing.M) {
 	}
 
 	bin := filepath.Join(root, "bausteinsicht-e2e-test")
+	if runtime.GOOS == "windows" {
+		bin += ".exe"
+	}
 	cmd := exec.Command("go", "build", "-o", bin, "./cmd/bausteinsicht")
 	cmd.Dir = root
 	if out, buildErr := cmd.CombinedOutput(); buildErr != nil {
@@ -86,18 +90,4 @@ func runCLIAllowFail(t *testing.T, bin, dir string, args ...string) (string, int
 		code = cmd.ProcessState.ExitCode()
 	}
 	return string(out), code
-}
-
-// ─── File helpers ─────────────────────────────────────────────────────────────
-
-// copyFile copies src to dst.
-func copyFile(t *testing.T, src, dst string) {
-	t.Helper()
-	data, err := os.ReadFile(src)
-	if err != nil {
-		t.Fatalf("copyFile read %s: %v", src, err)
-	}
-	if err := os.WriteFile(dst, data, 0o644); err != nil {
-		t.Fatalf("copyFile write %s: %v", dst, err)
-	}
 }
