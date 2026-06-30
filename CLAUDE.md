@@ -99,6 +99,7 @@ internal/drawio/       # draw.io XML document/element/connector/label/template w
 internal/sync/         # Bidirectional sync engine: diff, forward/reverse apply, conflict resolution, state
 internal/diagram/      # Export to C4-PlantUML / Mermaid text formats
 internal/watcher/      # File-system watcher (fsnotify) for --watch mode
+e2e/                   # Automated end-to-end pipeline tests (Go); testdata/ holds DSL/model fixtures
 ```
 
 ### Data Flow
@@ -120,6 +121,7 @@ internal/watcher/      # File-system watcher (fsnotify) for --watch mode
 - **Templates are `.drawio` files** — visual styles come from template pages, not hardcoded; `internal/drawio.TemplateSet` loads and clones them.
 - **Run a single package's tests:** `go test ./internal/sync/` (or any other package path)
 - **Run a single test:** `go test -run TestName ./internal/sync/`
+- **Run automated E2E tests:** `go test ./e2e/ -v` — exercises full import→sync→adoc pipeline; SVG export step auto-skips if draw.io CLI is absent
 
 ## Workflow Rules
 
