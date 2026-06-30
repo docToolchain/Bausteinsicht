@@ -231,7 +231,8 @@ func applyForwardPerView(
 		reconcileViewPage(page, elemSet, flat, scopeID, viewID, result)
 
 		// Set drill-down links on elements that have a detail view. (#198)
-		applyDrillDownLinks(page, drillDownLinks)
+		// Drill-down links take priority over user-defined element links (ADR-009).
+		result.Warnings = append(result.Warnings, applyDrillDownLinks(page, drillDownLinks)...)
 
 		// Create back-navigation button on detail views (views with scope). (#198)
 		if scopeID != "" {
@@ -733,6 +734,7 @@ func applyElementAdded(
 				Title:       elem.Title,
 				Technology:  elem.Technology,
 				Description: elem.Description,
+				Link:        elem.Link,
 			})
 		}
 		return
@@ -1000,6 +1002,7 @@ func buildElementData(id, viewID, scopeID string, elem *model.Element, ts drawio
 		Title:       elem.Title,
 		Technology:  elem.Technology,
 		Description: elem.Description,
+		Link:        elem.Link,
 		X:           x,
 		Y:           y,
 		Width:       w,
@@ -1044,6 +1047,7 @@ func applyElementModified(
 		Title:       title,
 		Technology:  technology,
 		Description: description,
+		Link:        elem.Link,
 	})
 	result.ElementsUpdated++
 }
@@ -1221,13 +1225,22 @@ func mergeStyles(base, overlay string) string {
 
 // applyDrillDownLinks sets the link attribute on elements that have a detail
 // view (a view whose scope matches the element's bausteinsicht_id). (#198)
-func applyDrillDownLinks(page *drawio.Page, links map[string]string) {
+// Drill-down links take priority over user-defined element links (ADR-009, #483).
+// Returns a warning for each element whose user-defined link is overridden.
+func applyDrillDownLinks(page *drawio.Page, links map[string]string) []string {
+	var warnings []string
 	for _, obj := range page.FindAllElements() {
 		bid := obj.SelectAttrValue("bausteinsicht_id", "")
-		if link, ok := links[bid]; ok {
-			setAttrOn(obj, "link", link)
+		drillDown, ok := links[bid]
+		if !ok {
+			continue
 		}
+		if existing := obj.SelectAttrValue("link", ""); existing != "" && existing != drillDown {
+			warnings = append(warnings, "element "+bid+": user-defined link overridden by drill-down link (ADR-009)")
+		}
+		setAttrOn(obj, "link", drillDown)
 	}
+	return warnings
 }
 
 // setAttrOn sets or creates an attribute on an etree element.

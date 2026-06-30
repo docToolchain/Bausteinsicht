@@ -202,6 +202,9 @@
         "lastModified": {
           "type": "string"
         },
+        "link": {
+          "type": "string"
+        },
         "metadata": {
           "additionalProperties": {
             "type": "string"

@@ -1524,6 +1524,94 @@ func TestDetectChanges_ActualDrawioDeletionStillDetected(t *testing.T) {
 	}
 }
 
+func TestDetectChanges_LinkAdded(t *testing.T) {
+	// Element exists in last state without link; model now has a link set.
+	state := stateWithElem("app", "App", "", "")
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"app": {Kind: "container", Title: "App", Link: "docs/arch.adoc#sec-app"},
+		},
+		Relationships: []model.Relationship{},
+	}
+	doc := docWithElem("app", "App", "", "")
+	cs := DetectChanges(m, doc, state, nil)
+
+	found := false
+	for _, ch := range cs.ModelElementChanges {
+		if ch.ID == "app" && ch.Field == "link" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected ModelElementChange with Field=link when link is added")
+	}
+}
+
+func TestDetectChanges_LinkModified(t *testing.T) {
+	state := emptyState()
+	state.Elements["app"] = ElementState{Title: "App", Kind: "container", Link: "docs/old.adoc#old"}
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"app": {Kind: "container", Title: "App", Link: "docs/new.adoc#new"},
+		},
+		Relationships: []model.Relationship{},
+	}
+	doc := docWithElem("app", "App", "", "")
+	cs := DetectChanges(m, doc, state, nil)
+
+	found := false
+	for _, ch := range cs.ModelElementChanges {
+		if ch.ID == "app" && ch.Field == "link" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected ModelElementChange with Field=link when link is modified")
+	}
+}
+
+func TestDetectChanges_LinkRemoved(t *testing.T) {
+	state := emptyState()
+	state.Elements["app"] = ElementState{Title: "App", Kind: "container", Link: "docs/arch.adoc#sec-app"}
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"app": {Kind: "container", Title: "App"}, // link cleared
+		},
+		Relationships: []model.Relationship{},
+	}
+	doc := docWithElem("app", "App", "", "")
+	cs := DetectChanges(m, doc, state, nil)
+
+	found := false
+	for _, ch := range cs.ModelElementChanges {
+		if ch.ID == "app" && ch.Field == "link" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected ModelElementChange with Field=link when link is removed")
+	}
+}
+
+func TestDetectChanges_LinkUnchanged(t *testing.T) {
+	state := emptyState()
+	state.Elements["app"] = ElementState{Title: "App", Kind: "container", Link: "docs/arch.adoc#sec-app"}
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"app": {Kind: "container", Title: "App", Link: "docs/arch.adoc#sec-app"},
+		},
+		Relationships: []model.Relationship{},
+	}
+	doc := docWithElem("app", "App", "", "")
+	cs := DetectChanges(m, doc, state, nil)
+
+	for _, ch := range cs.ModelElementChanges {
+		if ch.ID == "app" && ch.Field == "link" {
+			t.Error("unexpected ModelElementChange for link when link is unchanged")
+		}
+	}
+}
+
 func TestSanitizeID_StripsDangerousCharacters(t *testing.T) {
 	tests := []struct {
 		input string

@@ -352,6 +352,49 @@ func TestLoad_RejectsOversizedFile(t *testing.T) {
 	}
 }
 
+func TestLoad_ElementLink(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "model.jsonc")
+	content := `{
+		"specification": {"elements": {"system": {"notation": "System"}}},
+		"model": {
+			"backend": {"kind": "system", "title": "Backend", "link": "docs/arch.adoc#sec-backend"}
+		}
+	}`
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	m, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+	elem := m.Model["backend"]
+	if elem.Link != "docs/arch.adoc#sec-backend" {
+		t.Errorf("expected link %q, got %q", "docs/arch.adoc#sec-backend", elem.Link)
+	}
+}
+
+func TestLoad_ElementLinkAbsent(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "model.jsonc")
+	content := `{
+		"specification": {"elements": {"system": {"notation": "System"}}},
+		"model": {
+			"backend": {"kind": "system", "title": "Backend"}
+		}
+	}`
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	m, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+	if link := m.Model["backend"].Link; link != "" {
+		t.Errorf("expected empty link, got %q", link)
+	}
+}
+
 func TestAutoDetect_ErrorOnMultipleFiles(t *testing.T) {
 	dir := t.TempDir()
 	for _, name := range []string{"a.jsonc", "b.jsonc"} {

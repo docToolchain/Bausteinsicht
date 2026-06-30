@@ -478,6 +478,7 @@ func detectElementChanges(
 			appendIfChanged(id, "description", lastElem.Description, me.Description, &cs.ModelElementChanges)
 			appendIfChanged(id, "technology", lastElem.Technology, me.Technology, &cs.ModelElementChanges)
 			appendIfChanged(id, "kind", lastElem.Kind, me.Kind, &cs.ModelElementChanges)
+			appendIfChanged(id, "link", lastElem.Link, me.Link, &cs.ModelElementChanges)
 		}
 
 		// Draw.io side changes

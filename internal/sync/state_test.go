@@ -318,3 +318,31 @@ func TestBuildState_CorrectSnapshot(t *testing.T) {
 		t.Errorf("unexpected relationship: %+v", rel)
 	}
 }
+
+func TestBuildState_PreservesLink(t *testing.T) {
+	dir := t.TempDir()
+	modelPath := filepath.Join(dir, "model.jsonc")
+	if err := os.WriteFile(modelPath, []byte(`{"model": {}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	drawioPath := filepath.Join(dir, "arch.drawio")
+	if err := os.WriteFile(drawioPath, []byte(`<mxfile/>`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"api": {Kind: "service", Title: "API", Link: "docs/arch.adoc#sec-api"},
+		},
+	}
+	doc := drawio.NewDocument()
+
+	state, err := BuildState(m, doc, modelPath, drawioPath)
+	if err != nil {
+		t.Fatalf("BuildState failed: %v", err)
+	}
+
+	if got := state.Elements["api"].Link; got != "docs/arch.adoc#sec-api" {
+		t.Errorf("expected link %q in state, got %q", "docs/arch.adoc#sec-api", got)
+	}
+}

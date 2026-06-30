@@ -726,3 +726,140 @@ func TestMergeStyles_NoDuplicateKeys(t *testing.T) {
 		t.Errorf("expected shape preserved in %q", got)
 	}
 }
+
+// elementLink returns the link attribute of an element by bausteinsicht_id, or "".
+func elementLink(page *drawio.Page, id string) string {
+	obj := page.FindElement(id)
+	if obj == nil {
+		return ""
+	}
+	return obj.SelectAttrValue("link", "")
+}
+
+func TestApplyForward_ElementLink_SetOnCreate(t *testing.T) {
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"api": {Kind: "container", Title: "API", Link: "docs/arch.adoc#sec-api"},
+		},
+		Views: map[string]model.View{
+			"ctx": {Title: "Context", Include: []string{"api"}},
+		},
+		Relationships: []model.Relationship{},
+	}
+	doc := drawio.NewDocument()
+	doc.AddPage("view-ctx", "Context")
+	ts := minimalTemplates(t)
+	cs := &ChangeSet{
+		ModelElementChanges: []ElementChange{{ID: "api", Type: Added}},
+	}
+
+	ApplyForward(cs, doc, ts, m)
+
+	page := doc.GetPage("view-ctx")
+	if page == nil {
+		t.Fatal("expected page view-ctx to exist")
+	}
+	if got := elementLink(page, "api"); got != "docs/arch.adoc#sec-api" {
+		t.Errorf("expected link %q on created element, got %q", "docs/arch.adoc#sec-api", got)
+	}
+}
+
+func TestApplyForward_ElementLink_SetOnUpdate(t *testing.T) {
+	// Place element without link, then trigger a link field update.
+	doc := drawio.NewDocument()
+	page := doc.AddPage("view-ctx", "Context")
+	_ = page.CreateElement(drawio.ElementData{
+		ID: "api", CellID: "view-ctx--api", Kind: "container", Title: "API",
+	}, "")
+
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"api": {Kind: "container", Title: "API", Link: "docs/arch.adoc#sec-api"},
+		},
+		Views: map[string]model.View{
+			"ctx": {Title: "Context", Include: []string{"api"}},
+		},
+		Relationships: []model.Relationship{},
+	}
+	ts := minimalTemplates(t)
+	cs := &ChangeSet{
+		ModelElementChanges: []ElementChange{{ID: "api", Field: "link"}},
+	}
+
+	ApplyForward(cs, doc, ts, m)
+
+	if got := elementLink(page, "api"); got != "docs/arch.adoc#sec-api" {
+		t.Errorf("expected link %q after update, got %q", "docs/arch.adoc#sec-api", got)
+	}
+}
+
+func TestApplyForward_ElementLink_NoDrilldown(t *testing.T) {
+	// Element has link but no matching scope view → user link preserved.
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"api": {Kind: "container", Title: "API", Link: "docs/arch.adoc#sec-api"},
+		},
+		Views: map[string]model.View{
+			"ctx": {Title: "Context", Include: []string{"api"}},
+			// no view with Scope: "api"
+		},
+		Relationships: []model.Relationship{},
+	}
+	doc := drawio.NewDocument()
+	doc.AddPage("view-ctx", "Context")
+	ts := minimalTemplates(t)
+	cs := &ChangeSet{
+		ModelElementChanges: []ElementChange{{ID: "api", Type: Added}},
+	}
+
+	ApplyForward(cs, doc, ts, m)
+
+	page := doc.GetPage("view-ctx")
+	if page == nil {
+		t.Fatal("expected page view-ctx")
+	}
+	if got := elementLink(page, "api"); got != "docs/arch.adoc#sec-api" {
+		t.Errorf("expected user link preserved, got %q", got)
+	}
+}
+
+func TestApplyForward_ElementLink_DrilldownWins(t *testing.T) {
+	// Element has a user link AND a scoped detail view exists → drill-down wins, warning emitted.
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"api": {Kind: "container", Title: "API", Link: "docs/arch.adoc#sec-api"},
+		},
+		Views: map[string]model.View{
+			"ctx":    {Title: "Context", Include: []string{"api"}},
+			"detail": {Title: "API Detail", Scope: "api"},
+		},
+		Relationships: []model.Relationship{},
+	}
+	doc := drawio.NewDocument()
+	doc.AddPage("view-ctx", "Context")
+	doc.AddPage("view-detail", "API Detail")
+	ts := minimalTemplates(t)
+	cs := &ChangeSet{
+		ModelElementChanges: []ElementChange{{ID: "api", Type: Added}},
+	}
+
+	result := ApplyForward(cs, doc, ts, m)
+
+	page := doc.GetPage("view-ctx")
+	if page == nil {
+		t.Fatal("expected page view-ctx")
+	}
+	link := elementLink(page, "api")
+	if !strings.HasPrefix(link, "data:page/id,") {
+		t.Errorf("expected drill-down link (data:page/id,...), got %q", link)
+	}
+	found := false
+	for _, w := range result.Warnings {
+		if strings.Contains(w, "api") && strings.Contains(w, "overridden") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected override warning in result.Warnings, got: %v", result.Warnings)
+	}
+}

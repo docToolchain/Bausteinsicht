@@ -30,6 +30,7 @@ type ElementState struct {
 	Description string `json:"description,omitempty"`
 	Technology  string `json:"technology,omitempty"`
 	Kind        string `json:"kind"`
+	Link        string `json:"link,omitempty"`
 }
 
 // RelationshipState captures a relationship's synced values.
@@ -164,6 +165,7 @@ func BuildState(m *model.BausteinsichtModel, doc *drawio.Document, modelPath, dr
 			Description: elem.Description,
 			Technology:  elem.Technology,
 			Kind:        elem.Kind,
+			Link:        elem.Link,
 		}
 	}
 

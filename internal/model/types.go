@@ -246,6 +246,7 @@ type Element struct {
 	LastModified string             `json:"lastModified,omitempty"` // RFC3339 timestamp (optional override for git-based staleness detection)
 	Children     map[string]Element `json:"children,omitempty"`
 	Metadata     map[string]string  `json:"metadata,omitempty"`
+	Link         string             `json:"link,omitempty"` // hyperlink on the draw.io shape and in SVG export
 }
 
 type Relationship struct {
