@@ -20,9 +20,9 @@ import (
 	"testing"
 
 	"github.com/docToolchain/Bausteinsicht/internal/drawio"
+	"github.com/docToolchain/Bausteinsicht/internal/importer/structurizr"
 	"github.com/docToolchain/Bausteinsicht/internal/model"
 	bsync "github.com/docToolchain/Bausteinsicht/internal/sync"
-	"github.com/docToolchain/Bausteinsicht/internal/importer/structurizr"
 	"github.com/docToolchain/Bausteinsicht/templates"
 )
 
