@@ -190,7 +190,7 @@ func TestBuildExportArgs(t *testing.T) {
 		"--page-index", "2",
 		"--output", "/tmp/out.png",
 		"--embed-diagram",
-		"--", "arch.drawio",
+		"arch.drawio",
 	}
 	if len(args) != len(expected) {
 		t.Fatalf("expected %d args, got %d: %v", len(expected), len(args), args)
@@ -202,11 +202,11 @@ func TestBuildExportArgs(t *testing.T) {
 	}
 }
 
-// TestBuildExportArgs_InputFileIsLastArg is a regression test for the bug where
-// unrecognized Electron flags (e.g. --disable-gpu) passed before the input file
-// would land as program.args[0] in draw.io's CLI parser, causing
-// "Error: input file/directory not found" with exit code 0.
-// The input file must always be the last argument so it is unambiguously paths[0].
+// TestBuildExportArgs_InputFileIsLastArg verifies that the input file is always the
+// last positional argument so draw.io unambiguously picks it up as paths[0].
+// Note: no "--" separator is used — draw.io v29+ silently fails (exit 0, no output)
+// when "--" precedes the input file. The old "--disable-gpu" workaround is now handled
+// via the ELECTRON_DISABLE_GPU=1 env var in the drawio-export wrapper instead.
 func TestBuildExportArgs_InputFileIsLastArg(t *testing.T) {
 	for _, scale := range []float64{0, 1.0, 2.0} {
 		args := BuildExportArgs(ExportOptions{
@@ -218,9 +218,6 @@ func TestBuildExportArgs_InputFileIsLastArg(t *testing.T) {
 		})
 		if args[len(args)-1] != "arch.drawio" {
 			t.Errorf("scale=%v: input file must be the last argument, got %q (full args: %v)", scale, args[len(args)-1], args)
-		}
-		if args[len(args)-2] != "--" {
-			t.Errorf("scale=%v: '--' separator must precede input file, got %q (full args: %v)", scale, args[len(args)-2], args)
 		}
 	}
 }

@@ -130,7 +130,12 @@ func BuildExportArgs(opts ExportOptions) []string {
 	if opts.Scale > 1 {
 		args = append(args, "--scale", fmt.Sprintf("%g", opts.Scale))
 	}
-	args = append(args, "--", opts.InputFile)
+	// The input file is always the last positional argument. No "--" separator is
+	// used: draw.io v29+ does not treat "--" as an end-of-options marker and
+	// silently fails with exit 0 when it encounters it. The original workaround
+	// ("--disable-gpu" landing as paths[0]) is now avoided via ELECTRON_DISABLE_GPU=1
+	// in the drawio-export wrapper instead.
+	args = append(args, opts.InputFile)
 	return args
 }
 
