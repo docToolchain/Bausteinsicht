@@ -21,7 +21,7 @@ func TestDrillDownLinks(t *testing.T) {
 	dslDst := filepath.Join(dir, "workspace.dsl")
 	copyTestFile(t, dslSrc, dslDst)
 
-	runCLI(t, bin, dir, "import", "--format", "structurizr", "workspace.dsl")
+	runCLI(t, bin, dir, "import", "--from", "structurizr", "workspace.dsl")
 	runCLI(t, bin, dir, "sync")
 
 	drawioPath := filepath.Join(dir, "architecture.drawio")

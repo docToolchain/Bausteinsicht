@@ -21,7 +21,7 @@ func TestLikeC4Pipeline(t *testing.T) {
 
 	// ── Step 1: import ────────────────────────────────────────────────────
 	// simple.c4: user (person), myPlatform (system), frontend/api/db (containers)
-	runCLI(t, bin, dir, "import", "--format", "likec4", "model.c4")
+	runCLI(t, bin, dir, "import", "--from", "likec4", "model.c4")
 
 	// ── Step 2: validate ─────────────────────────────────────────────────
 	runCLI(t, bin, dir, "validate")
@@ -30,7 +30,7 @@ func TestLikeC4Pipeline(t *testing.T) {
 	runCLI(t, bin, dir, "sync")
 
 	// ── Step 4: export as Mermaid ─────────────────────────────────────────
-	out := runCLI(t, bin, dir, "export-diagram", "--format", "mermaid")
+	out := runCLI(t, bin, dir, "export-diagram", "--diagram-format", "mermaid")
 
 	// All top-level elements from the fixture must appear in the diagram output.
 	for _, name := range []string{"Customer", "My Platform"} {

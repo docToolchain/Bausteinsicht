@@ -45,6 +45,12 @@ func TestPerformanceBudget(t *testing.T) {
 
 // writeLargeModel writes a JSONC model with n flat elements to path.
 func writeLargeModel(path string, n int) error {
+	type kindDef struct {
+		Notation string `json:"notation"`
+	}
+	type specBlock struct {
+		Elements map[string]kindDef `json:"elements"`
+	}
 	type element struct {
 		Title       string `json:"title"`
 		Description string `json:"description"`
@@ -55,11 +61,19 @@ func writeLargeModel(path string, n int) error {
 		Include []string `json:"include"`
 	}
 	type modelFile struct {
-		Model map[string]element `json:"model"`
-		Views map[string]view    `json:"views"`
+		Specification specBlock          `json:"specification"`
+		Model         map[string]element `json:"model"`
+		Views         map[string]view    `json:"views"`
 	}
 
+	kinds := []string{"system", "external_system"}
 	m := modelFile{
+		Specification: specBlock{
+			Elements: map[string]kindDef{
+				"system":          {Notation: "System"},
+				"external_system": {Notation: "External System"},
+			},
+		},
 		Model: make(map[string]element, n),
 		Views: map[string]view{
 			"overview": {
@@ -68,7 +82,6 @@ func writeLargeModel(path string, n int) error {
 			},
 		},
 	}
-	kinds := []string{"system", "container", "component", "actor", "external_system"}
 	for i := 0; i < n; i++ {
 		id := fmt.Sprintf("element%03d", i)
 		m.Model[id] = element{

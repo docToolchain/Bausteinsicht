@@ -21,7 +21,7 @@ func TestXMIPipeline(t *testing.T) {
 
 	// ── Step 1: import XMI ────────────────────────────────────────────────
 	// basic.xmi has: API (Component) + Customer (Actor) + uses (Dependency)
-	runCLI(t, bin, dir, "import", "--format", "xmi", "model.xmi")
+	runCLI(t, bin, dir, "import", "--from", "xmi", "model.xmi")
 
 	// ── Step 2: validate ─────────────────────────────────────────────────
 	runCLI(t, bin, dir, "validate")
@@ -30,7 +30,7 @@ func TestXMIPipeline(t *testing.T) {
 	runCLI(t, bin, dir, "sync")
 
 	// ── Step 4: export as PlantUML ────────────────────────────────────────
-	out := runCLI(t, bin, dir, "export-diagram", "--format", "plantuml")
+	out := runCLI(t, bin, dir, "export-diagram", "--diagram-format", "plantuml")
 
 	// XMI has API and Customer — both must appear in the PlantUML output.
 	for _, elem := range []string{"API", "Customer"} {

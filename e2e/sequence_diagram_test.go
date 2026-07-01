@@ -42,7 +42,7 @@ func TestSequenceDiagram(t *testing.T) {
 		outDir := t.TempDir()
 		runCLI(t, bin, dir, "export-sequence",
 			"--model", "architecture.jsonc",
-			"--format", "plantuml",
+			"--diagram-format", "plantuml",
 			"--output", outDir,
 		)
 		entries, err := os.ReadDir(outDir)
@@ -66,7 +66,7 @@ func TestSequenceDiagram(t *testing.T) {
 		outDir := t.TempDir()
 		runCLI(t, bin, dir, "export-sequence",
 			"--model", "architecture.jsonc",
-			"--format", "mermaid",
+			"--diagram-format", "mermaid",
 			"--output", outDir,
 		)
 		entries, err := os.ReadDir(outDir)
