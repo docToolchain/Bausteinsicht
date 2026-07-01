@@ -1,17 +1,13 @@
 package e2e
 
-// TestOverlayHeatmap (#488) exercises the overlay apply/remove lifecycle:
+// TestOverlayHeatmap (#488) exercises the overlay apply/remove lifecycle.
 //
-//  1. init — creates model + architecture.jsonc (model file required by overlay cmd)
-//  2. Create a minimal draw.io file with a known direct mxCell (the format overlay expects)
-//  3. Write metrics.json referencing that cell ID
-//  4. overlay apply → fillColor attribute injected into draw.io
-//  5. overlay remove → original style restored, data-original-fill attribute removed
+// Sub-test "BareDrawio": uses a hand-crafted draw.io with direct <mxCell> children
+// to verify the core overlay logic (apply, check, remove, check).
 //
-// Note: Bausteinsicht's sync output wraps elements in <object> tags; overlay applies
-// to direct mxCell children of <root>. This test uses a hand-crafted draw.io that
-// matches what overlay expects, so the overlay logic is exercised end-to-end even
-// while the full integration path remains a documented gap (issue #488).
+// Sub-test "BausteinsichtOutput": uses real init+sync output, where elements are
+// wrapped in <object bausteinsicht_id="..."> tags. Verifies that overlay correctly
+// matches on bausteinsicht_id and applies/removes colors on the inner mxCell.
 
 import (
 	"encoding/json"
@@ -29,10 +25,10 @@ const minimalDrawio = `<?xml version="1.0" encoding="UTF-8"?>
         <mxCell id="0"/>
         <mxCell id="1" parent="0"/>
         <mxCell id="customer" value="Customer" style="rounded=1;fillColor=#dae8fc;" vertex="1" parent="1">
-          <mxGeometry x="100" y="100" width="120" height="60" as="geometry" style="rounded=1;fillColor=#dae8fc;"/>
+          <mxGeometry x="100" y="100" width="120" height="60" as="geometry"/>
         </mxCell>
         <mxCell id="api" value="API" style="rounded=1;fillColor=#d5e8d4;" vertex="1" parent="1">
-          <mxGeometry x="300" y="100" width="120" height="60" as="geometry" style="rounded=1;fillColor=#d5e8d4;"/>
+          <mxGeometry x="300" y="100" width="120" height="60" as="geometry"/>
         </mxCell>
       </root>
     </mxGraphModel>
@@ -40,53 +36,27 @@ const minimalDrawio = `<?xml version="1.0" encoding="UTF-8"?>
 </mxfile>`
 
 func TestOverlayHeatmap(t *testing.T) {
+	t.Run("BareDrawio", testOverlayBareDrawio)
+	t.Run("BausteinsichtOutput", testOverlayBausteinsichtOutput)
+}
+
+func testOverlayBareDrawio(t *testing.T) {
 	bin := buildBinary(t)
 	dir := t.TempDir()
 
-	// ── Step 1: init to get a valid model file ────────────────────────────────
+	// init to get a valid model file (required by overlay cmd)
 	runCLI(t, bin, dir, "init")
 
-	// ── Step 2: write a minimal draw.io with known mxCell IDs ─────────────────
 	overlayDrawio := filepath.Join(dir, "overlay-test.drawio")
 	if err := os.WriteFile(overlayDrawio, []byte(minimalDrawio), 0o644); err != nil {
 		t.Fatalf("write overlay-test.drawio: %v", err)
 	}
 
-	// ── Step 3: write metrics.json ────────────────────────────────────────────
-	type elementMetric struct {
-		ElementID string  `json:"elementId"`
-		Coverage  float64 `json:"coverage"`
-	}
-	type metaInfo struct {
-		Source             string            `json:"source"`
-		Generated          string            `json:"generated"`
-		MetricDescriptions map[string]string `json:"metric_descriptions"`
-	}
-	type metricsFile struct {
-		Meta    metaInfo        `json:"meta"`
-		Metrics []elementMetric `json:"metrics"`
-	}
+	metricsPath := writeMetrics(t, dir, []metricEntry{
+		{ElementID: "customer", Coverage: 0.2},
+		{ElementID: "api", Coverage: 0.9},
+	})
 
-	mf := metricsFile{
-		Meta: metaInfo{
-			Source:    "e2e-test",
-			Generated: "2026-01-01T00:00:00Z",
-			MetricDescriptions: map[string]string{
-				"coverage": "Test coverage percentage (0–1)",
-			},
-		},
-		Metrics: []elementMetric{
-			{ElementID: "customer", Coverage: 0.2}, // low → should get red/orange color
-			{ElementID: "api", Coverage: 0.9},      // high → should keep green color
-		},
-	}
-	metricsJSON, _ := json.MarshalIndent(mf, "", "  ")
-	metricsPath := filepath.Join(dir, "metrics.json")
-	if err := os.WriteFile(metricsPath, metricsJSON, 0o644); err != nil {
-		t.Fatalf("write metrics.json: %v", err)
-	}
-
-	// ── Step 4: overlay apply → check fillColor changed ───────────────────────
 	runCLI(t, bin, dir,
 		"overlay", "apply",
 		"--model", "architecture.jsonc",
@@ -95,39 +65,104 @@ func TestOverlayHeatmap(t *testing.T) {
 		metricsPath,
 	)
 
-	afterApply, err := os.ReadFile(overlayDrawio)
-	if err != nil {
-		t.Fatalf("read draw.io after apply: %v", err)
-	}
-	afterApplyStr := string(afterApply)
-
-	// Overlay should have injected a heatmap color (not the original #dae8fc).
-	if !strings.Contains(afterApplyStr, "data-original-fill") {
+	afterApply := readFile(t, overlayDrawio)
+	if !strings.Contains(afterApply, "data-original-fill") {
 		t.Error("overlay apply: expected 'data-original-fill' attribute in draw.io XML")
 	}
-	// The low-coverage element should get a warning color (not green).
-	// Default scheme: green=#d5e8d4, yellow=#fff2cc, orange=#ffe6cc, red=#f8cecc.
-	// coverage=0.2 should map to orange or red.
-	if strings.Count(afterApplyStr, "fillColor=#dae8fc") > 0 {
-		t.Log("Note: original fillColor #dae8fc still present — overlay may not have changed it")
-	}
-	t.Logf("draw.io after overlay apply (excerpt):\n%.500s", afterApplyStr)
 
-	// ── Step 5: overlay remove → data-original-fill gone ─────────────────────
 	runCLI(t, bin, dir,
 		"overlay", "remove",
 		"--model", "architecture.jsonc",
 		"--output", overlayDrawio,
 	)
 
-	afterRemove, err := os.ReadFile(overlayDrawio)
-	if err != nil {
-		t.Fatalf("read draw.io after remove: %v", err)
-	}
-	if strings.Contains(string(afterRemove), "data-original-fill") {
+	afterRemove := readFile(t, overlayDrawio)
+	if strings.Contains(afterRemove, "data-original-fill") {
 		t.Error("overlay remove: 'data-original-fill' still present after remove")
 	}
-	t.Logf("draw.io after overlay remove (excerpt):\n%.500s", string(afterRemove))
+}
 
-	t.Log("overlay heatmap lifecycle OK: apply → check fillColor → remove → check restored")
+// testOverlayBausteinsichtOutput verifies overlay works on real bausteinsicht sync output,
+// where draw.io elements are <object bausteinsicht_id="..."><mxCell .../></object>.
+// The overlay matches on bausteinsicht_id, so metrics use model element IDs directly.
+func testOverlayBausteinsichtOutput(t *testing.T) {
+	bin := buildBinary(t)
+	dir := t.TempDir()
+
+	// init creates architecture.jsonc + architecture.drawio with <object>-wrapped elements.
+	runCLI(t, bin, dir, "init")
+
+	drawioPath := filepath.Join(dir, "architecture.drawio")
+
+	// The default model's top-level element is "customer"; use its model ID (bausteinsicht_id).
+	metricsPath := writeMetrics(t, dir, []metricEntry{
+		{ElementID: "customer", Coverage: 0.1},
+	})
+
+	runCLI(t, bin, dir,
+		"overlay", "apply",
+		"--model", "architecture.jsonc",
+		"--output", drawioPath,
+		"--metric", "coverage",
+		metricsPath,
+	)
+
+	afterApply := readFile(t, drawioPath)
+	if !strings.Contains(afterApply, "data-original-fill") {
+		t.Error("overlay apply on bausteinsicht output: expected 'data-original-fill' on inner mxCell")
+	}
+
+	runCLI(t, bin, dir,
+		"overlay", "remove",
+		"--model", "architecture.jsonc",
+		"--output", drawioPath,
+	)
+
+	afterRemove := readFile(t, drawioPath)
+	if strings.Contains(afterRemove, "data-original-fill") {
+		t.Error("overlay remove on bausteinsicht output: 'data-original-fill' still present after remove")
+	}
+}
+
+// ─── helpers ─────────────────────────────────────────────────────────────────
+
+type metricEntry struct {
+	ElementID string  `json:"elementId"`
+	Coverage  float64 `json:"coverage"`
+}
+
+type metricsFileJSON struct {
+	Meta struct {
+		Source             string            `json:"source"`
+		Generated          string            `json:"generated"`
+		MetricDescriptions map[string]string `json:"metric_descriptions"`
+	} `json:"meta"`
+	Metrics []metricEntry `json:"metrics"`
+}
+
+func writeMetrics(t *testing.T, dir string, entries []metricEntry) string {
+	t.Helper()
+	var mf metricsFileJSON
+	mf.Meta.Source = "e2e-test"
+	mf.Meta.Generated = "2026-01-01T00:00:00Z"
+	mf.Meta.MetricDescriptions = map[string]string{"coverage": "Test coverage (0–1)"}
+	mf.Metrics = entries
+	data, err := json.MarshalIndent(mf, "", "  ")
+	if err != nil {
+		t.Fatalf("marshal metrics: %v", err)
+	}
+	path := filepath.Join(dir, "metrics.json")
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatalf("write metrics.json: %v", err)
+	}
+	return path
+}
+
+func readFile(t *testing.T, path string) string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %s: %v", path, err)
+	}
+	return string(data)
 }

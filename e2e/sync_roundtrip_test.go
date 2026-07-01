@@ -7,6 +7,7 @@ package e2e
 //  3. Idempotency: third sync — sync state unchanged (stable state)
 
 import (
+	"bytes"
 	"os"
 	"strings"
 	"testing"
@@ -88,12 +89,25 @@ func TestBidirectionalSyncRoundtrip(t *testing.T) {
 		t.Errorf("reverse sync: customer.Title = %q, want %q", customerElem.Title, newTitle)
 	}
 
-	// ── Step 4: third sync — functional idempotency check ────────────────────
-	// The sync state file may change (metadata timestamp updates each run), so
-	// we verify functional stability: the model title must remain "VIP Customer"
-	// and the third sync must report zero element changes.
-	thirdSyncOut := runCLI(t, bin, dir, "sync")
-	_ = os.Remove(dir + "/.bausteinsicht-sync") // not asserted — see comment above
+	// ── Step 4: third sync — idempotency check ───────────────────────────────
+	// Read state after 2nd sync, run a 3rd sync, compare: the state file must
+	// be byte-identical (no spurious diffs on a stable model+draw.io).
+	statePath := dir + "/.bausteinsicht-sync"
+	state2, err := os.ReadFile(statePath)
+	if err != nil {
+		t.Fatalf("read .bausteinsicht-sync after 2nd sync: %v", err)
+	}
+
+	runCLI(t, bin, dir, "sync")
+
+	state3, err := os.ReadFile(statePath)
+	if err != nil {
+		t.Fatalf("read .bausteinsicht-sync after 3rd sync: %v", err)
+	}
+	if !bytes.Equal(state2, state3) {
+		t.Errorf("idempotency: .bausteinsicht-sync changed after no-op 3rd sync\nbefore: %s\nafter:  %s",
+			state2, state3)
+	}
 
 	m2, err := model.Load(modelPath)
 	if err != nil {
@@ -102,9 +116,6 @@ func TestBidirectionalSyncRoundtrip(t *testing.T) {
 	if m2.Model["customer"].Title != newTitle {
 		t.Errorf("idempotency: customer.Title reverted to %q after third sync", m2.Model["customer"].Title)
 	}
-	if strings.Contains(thirdSyncOut, "updated") && !strings.Contains(thirdSyncOut, "0 updated") {
-		t.Logf("third sync reported updates (metadata or layout change is expected): %s", thirdSyncOut)
-	}
 
-	t.Logf("bidirectional sync roundtrip OK: customer.Title=%q after reverse sync", newTitle)
+	t.Logf("bidirectional sync roundtrip OK: customer.Title=%q, state file stable", newTitle)
 }
