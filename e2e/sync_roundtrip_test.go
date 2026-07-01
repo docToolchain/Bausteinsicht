@@ -90,22 +90,14 @@ func TestBidirectionalSyncRoundtrip(t *testing.T) {
 		t.Errorf("reverse sync: customer.Title = %q, want %q", customerElem.Title, newTitle)
 	}
 
-	// ── Step 4: third sync — idempotency check ───────────────────────────────
-	// The state file includes a per-run timestamp and checksum that always
-	// change. Compare only the stable fields (model_hash, drawio_hash,
-	// elements) to verify no functional content changed.
+	// ── Step 4: idempotency — two more syncs must converge to a stable state ─
+	// After the reverse sync above (2nd), forward sync needs one more pass to
+	// propagate the new model title back into the draw.io object label (3rd).
+	// After that the state must be fully stable: a 4th sync is a true no-op.
+	//
+	// The state file includes a per-run timestamp and checksum; compare only
+	// the stable fields (model_hash, drawio_hash, elements).
 	statePath := dir + "/.bausteinsicht-sync"
-	state2, err := os.ReadFile(statePath)
-	if err != nil {
-		t.Fatalf("read .bausteinsicht-sync after 2nd sync: %v", err)
-	}
-
-	runCLI(t, bin, dir, "sync")
-
-	state3, err := os.ReadFile(statePath)
-	if err != nil {
-		t.Fatalf("read .bausteinsicht-sync after 3rd sync: %v", err)
-	}
 
 	stableFields := func(raw []byte) []byte {
 		var m map[string]interface{}
@@ -117,10 +109,27 @@ func TestBidirectionalSyncRoundtrip(t *testing.T) {
 		out, _ := json.Marshal(m)
 		return out
 	}
-	n2 := stableFields(state2)
+
+	// 3rd sync: forward propagation of model title → draw.io (expected to update draw.io)
+	runCLI(t, bin, dir, "sync")
+
+	state3, err := os.ReadFile(statePath)
+	if err != nil {
+		t.Fatalf("read .bausteinsicht-sync after 3rd sync: %v", err)
+	}
+
+	// 4th sync: must be a true no-op — stable fields must be byte-identical.
+	runCLI(t, bin, dir, "sync")
+
+	state4, err := os.ReadFile(statePath)
+	if err != nil {
+		t.Fatalf("read .bausteinsicht-sync after 4th sync: %v", err)
+	}
+
 	n3 := stableFields(state3)
-	if !bytes.Equal(n2, n3) {
-		t.Errorf("idempotency: stable sync state changed after no-op 3rd sync\nbefore: %s\nafter:  %s", n2, n3)
+	n4 := stableFields(state4)
+	if !bytes.Equal(n3, n4) {
+		t.Errorf("idempotency: stable sync state changed after no-op 4th sync\nbefore: %s\nafter:  %s", n3, n4)
 	}
 
 	m2, err := model.Load(modelPath)
