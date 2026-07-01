@@ -8,6 +8,7 @@ package e2e
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"strings"
 	"testing"
@@ -90,8 +91,9 @@ func TestBidirectionalSyncRoundtrip(t *testing.T) {
 	}
 
 	// ── Step 4: third sync — idempotency check ───────────────────────────────
-	// Read state after 2nd sync, run a 3rd sync, compare: the state file must
-	// be byte-identical (no spurious diffs on a stable model+draw.io).
+	// The state file includes a per-run timestamp and checksum that always
+	// change. Compare only the stable fields (model_hash, drawio_hash,
+	// elements) to verify no functional content changed.
 	statePath := dir + "/.bausteinsicht-sync"
 	state2, err := os.ReadFile(statePath)
 	if err != nil {
@@ -104,9 +106,21 @@ func TestBidirectionalSyncRoundtrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read .bausteinsicht-sync after 3rd sync: %v", err)
 	}
-	if !bytes.Equal(state2, state3) {
-		t.Errorf("idempotency: .bausteinsicht-sync changed after no-op 3rd sync\nbefore: %s\nafter:  %s",
-			state2, state3)
+
+	stableFields := func(raw []byte) []byte {
+		var m map[string]interface{}
+		if jsonErr := json.Unmarshal(raw, &m); jsonErr != nil {
+			t.Fatalf("parse .bausteinsicht-sync: %v", jsonErr)
+		}
+		delete(m, "timestamp")
+		delete(m, "checksum")
+		out, _ := json.Marshal(m)
+		return out
+	}
+	n2 := stableFields(state2)
+	n3 := stableFields(state3)
+	if !bytes.Equal(n2, n3) {
+		t.Errorf("idempotency: stable sync state changed after no-op 3rd sync\nbefore: %s\nafter:  %s", n2, n3)
 	}
 
 	m2, err := model.Load(modelPath)

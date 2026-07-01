@@ -88,10 +88,7 @@ func Remove(drawioPath string) error {
 	root := doc.Root()
 
 	// Collect all candidate cells: direct mxCell children and mxCell inside <object> wrappers.
-	var cells []*etree.Element
-	for _, cell := range root.FindElements(".//mxGraphModel/root/mxCell") {
-		cells = append(cells, cell)
-	}
+	cells := root.FindElements(".//mxGraphModel/root/mxCell")
 	for _, obj := range root.FindElements(".//mxGraphModel/root/object") {
 		if inner := obj.FindElement("mxCell"); inner != nil {
 			cells = append(cells, inner)
