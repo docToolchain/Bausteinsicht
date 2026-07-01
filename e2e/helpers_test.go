@@ -30,9 +30,9 @@ func TestMain(m *testing.M) {
 		os.Exit(m.Run())
 	}
 
-	root, err := findModuleRoot()
+	root, err := findModuleRootPath()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "findModuleRoot: %v\n", err)
+		fmt.Fprintf(os.Stderr, "findModuleRootPath: %v\n", err)
 		os.Exit(1)
 	}
 
