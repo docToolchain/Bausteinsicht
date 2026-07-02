@@ -245,7 +245,7 @@ func TestBigBankArc42Pipeline(t *testing.T) {
 
 	// Build the bausteinsicht binary once into a temp location.
 	binaryPath := filepath.Join(t.TempDir(), "bausteinsicht")
-	moduleRoot, err := findModuleRoot()
+	moduleRoot, err := findModuleRootPath()
 	if err != nil {
 		t.Fatalf("find module root: %v", err)
 	}
@@ -562,8 +562,8 @@ func viewKeys(views map[string]model.View) []string {
 	return sortedKeys(views)
 }
 
-// findModuleRoot walks up from the e2e/ directory to find the directory containing go.mod.
-func findModuleRoot() (string, error) {
+// findModuleRootPath walks up from the e2e/ directory to find the directory containing go.mod.
+func findModuleRootPath() (string, error) {
 	dir, err := filepath.Abs(".")
 	if err != nil {
 		return "", err

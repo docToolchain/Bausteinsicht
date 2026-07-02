@@ -30,9 +30,9 @@ func TestMain(m *testing.M) {
 		os.Exit(m.Run())
 	}
 
-	root, err := findModuleRoot()
+	root, err := findModuleRootPath()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "findModuleRoot: %v\n", err)
+		fmt.Fprintf(os.Stderr, "findModuleRootPath: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -60,6 +60,30 @@ func buildBinary(t *testing.T) string {
 		t.Fatal("binary not built: TestMain did not set sharedBinaryPath")
 	}
 	return sharedBinaryPath
+}
+
+// ─── File helpers ─────────────────────────────────────────────────────────────
+
+// findModuleRoot returns the module root directory, failing the test on error.
+func findModuleRoot(t *testing.T) string {
+	t.Helper()
+	root, err := findModuleRootPath()
+	if err != nil {
+		t.Fatalf("findModuleRoot: %v", err)
+	}
+	return root
+}
+
+// copyTestFile copies src to dst, failing the test on error.
+func copyTestFile(t *testing.T, src, dst string) {
+	t.Helper()
+	data, err := os.ReadFile(src)
+	if err != nil {
+		t.Fatalf("copyTestFile read %s: %v", src, err)
+	}
+	if err := os.WriteFile(dst, data, 0o644); err != nil {
+		t.Fatalf("copyTestFile write %s: %v", dst, err)
+	}
 }
 
 // ─── CLI execution helpers ────────────────────────────────────────────────────
