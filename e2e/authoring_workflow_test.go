@@ -50,14 +50,15 @@ func TestAuthoringWorkflow(t *testing.T) {
 	if lintCode == 0 {
 		t.Error("lint should have failed after adding a container without technology (C02 constraint)")
 	}
-	if !strings.Contains(lintAfterOut, "bare-service") && !strings.Contains(lintAfterOut, "VIOLATION") {
-		t.Errorf("lint output does not mention violation or 'bare-service': %q", lintAfterOut)
+	// bare-service must be mentioned specifically — a generic VIOLATION elsewhere is not sufficient.
+	if !strings.Contains(lintAfterOut, "bare-service") {
+		t.Errorf("lint output does not mention 'bare-service': %q", lintAfterOut)
 	}
 
 	// ── Bonus: lint --format json also reports violation ──────────────────────
 	lintJSONOut, _ := runCLIAllowFail(t, bin, dir, "lint", "--format", "json")
 	if !strings.Contains(lintJSONOut, `"passed":false`) && !strings.Contains(lintJSONOut, `"total":`) {
-		t.Logf("lint JSON output: %s", lintJSONOut)
+		t.Errorf("lint --format json output missing expected JSON fields: %s", lintJSONOut)
 	}
 
 	t.Log("authoring workflow OK: init → validate → lint (pass) → add element → lint (fail) verified")
