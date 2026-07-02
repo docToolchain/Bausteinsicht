@@ -59,10 +59,10 @@ Copy this table into the test report:
 | 4. Reverse Sync + Conflicts | 22 | | |
 | 5. Views / Wildcards / Scope / Lifting | 28 | | |
 | 6. CLI Add Commands | 30 | | |
-| 7. Watch Mode | 8 | | |
+| 7. Watch Mode | 10 | | |
 | 8. Export | 12 | | |
-| 8b. Export-Diagram | 6 | | |
-| 8c. Export-Table | 5 | | |
+| 8b. Export-Diagram | 10 | | |
+| 8c. Export-Table | 6 | | |
 | 8d. Export-Sequence | 4 | | |
 | 9. Draw.io File Integrity | 5 | | |
 | 10. Security / Injection Testing | 9 | | |
@@ -71,11 +71,12 @@ Copy this table into the test report:
 | 13. Model File Edge Cases | 7 | | |
 | 14. Template Handling | 6 | | |
 | 15. Error Output Formatting | 8 | | |
-| 16. Analysis & Inspection | 12 | | |
+| 16. Analysis & Inspection | 15 | | |
 | 17. Evolution & Snapshots | 9 | | |
-| 18. Model Tooling & Import | 11 | | |
+| 18. Model Tooling & Import | 16 | | |
 | 19. Interactive, Overlay & ADR | 7 | | |
-| **Total** | **258** | | |
+| 20. Language Server (LSP) | 6 | | |
+| **Total** | **279** | | |
 |===
 ----
 
@@ -261,7 +262,7 @@ Copy this table into the test report:
 | 6.30 | Add relationship preserves comments | | No comment loss
 |===
 
-== 7. Watch Mode (8 tests)
+== 7. Watch Mode (10 tests)
 
 [cols="1,4,5,5"]
 |===
@@ -275,6 +276,8 @@ Copy this table into the test report:
 | 7.6 | Non-existent model | `watch --model nonexistent.jsonc` | Immediate error
 | 7.7 | Clean exit on SIGINT | `kill -INT` | "Stopped watching." (exit 0)
 | 7.8 | File delete + recreate | Delete model, recreate, modify | Watch continues detecting changes
+| 7.9 | `--mermaid` flag | `watch --mermaid`, modify model, wait 3s | `architecture.md` (default `--mermaid-output`) created/updated with Mermaid diagrams alongside the regular drawio sync
+| 7.10 | `--mermaid-output` custom path | `watch --mermaid --mermaid-output docs/diagrams.md` | Mermaid markdown written to the custom path, not the default
 |===
 
 == 8. Export (12 tests)
@@ -297,7 +300,7 @@ Copy this table into the test report:
 | 8.12 | Output filename convention | Export all views | Files named `{base}-{viewID}.{ext}` (e.g., `architecture-context.png`)
 |===
 
-== 8b. Export-Diagram (6 tests)
+== 8b. Export-Diagram (10 tests)
 
 `export-diagram` renders views as C4 text diagrams (folded back from the 2026-03-05 report, Round 7).
 
@@ -311,9 +314,13 @@ Copy this table into the test report:
 | 8b.4 | Unknown diagram format | `export-diagram --view context --diagram-format bogus` | Error: unknown diagram format
 | 8b.5 | Non-existent view | `export-diagram --view nope` | Error: view not found
 | 8b.6 | Structurizr workspace export | `export-diagram --diagram-format structurizr` | Single `workspace.dsl`; rejects `--view` (exit 1)
+| 8b.7 | Export as Graphviz DOT | `export-diagram --view context --diagram-format dot --output out/` | `architecture-context.dot` with valid DOT syntax
+| 8b.8 | Export as D2 | `export-diagram --view context --diagram-format d2 --output out/` | `architecture-context.d2` with valid D2 syntax
+| 8b.9 | Export as interactive HTML | `export-diagram --diagram-format html --output out/` | One `.html` file per view (multi-view branch); `--view context` produces exactly one file (single-view branch, a different code path)
+| 8b.10 | `--format json` for dot/d2/html | `export-diagram --diagram-format dot --format json` | JSON wrapper with `"format":"dot"`, same as 8b.3 but for the dot/d2/html code path (`handleNewFormats`), which has its own separate JSON branch
 |===
 
-== 8c. Export-Table (5 tests)
+== 8c. Export-Table (6 tests)
 
 `export-table` renders element attributes per view as a table (folded back from the 2026-03-05 report, Round 7).
 
@@ -326,6 +333,7 @@ Copy this table into the test report:
 | 8c.3 | `--format json` honored | `export-table --view context --format json` | JSON output, not plain text (regression #239)
 | 8c.4 | Non-existent view | `export-table --view nope` | Error: view not found
 | 8c.5 | Combined across views | `export-table --combined` | All elements across views, deduplicated
+| 8c.6 | All views, not combined | `export-table` (no `--view`, no `--combined`) | Single file `all-views-elements.<ext>` with one titled section per view — a third code path (`FormatAllViews`) distinct from both 8c.1 (single view) and 8c.5 (deduplicated combined)
 |===
 
 == 8d. Export-Sequence (4 tests)
@@ -448,7 +456,7 @@ Copy this table into the test report:
 | 15.8 | No mixed stdout/stderr | Error command with `--format json` | JSON error on stderr only, no text on stdout
 |===
 
-== 16. Analysis & Inspection Commands (12 tests)
+== 16. Analysis & Inspection Commands (15 tests)
 
 Covers `lint`, `health`, `graph`, `stale`, `status`, `find`, `show`.
 
@@ -464,10 +472,13 @@ Covers `lint`, `health`, `graph`, `stale`, `status`, `find`, `show`.
 | 16.6 | Graph `--format json` | `graph --model architecture.jsonc --format json` | Machine-readable graph metrics
 | 16.7 | Stale with threshold | `stale --days 90` | Elements older than 90 days without status/ADR flagged
 | 16.8 | Stale outside git | `stale` outside a git repo, no `lastModified` | Graceful: nothing flagged
-| 16.9 | Status grouping | `status --model architecture.jsonc` | Elements grouped/sorted by lifecycle status (`status` reads `--model` directly and does not auto-detect)
-| 16.10 | Find full-text | `find api` | Matching elements/relationships/views
-| 16.11 | Show element details | `show webshop.api` | All fields of the element
-| 16.12 | Show non-existent element | `show nope` | Error: element not found
+| 16.9 | Stale `--format json` | `stale --format json` | JSON with `staleElements` array, `id`/`lastModified`/`risk`/etc. per entry
+| 16.10 | Stale `--mark-drawio` | Sync a stale element into drawio, `stale --mark-drawio` | Risk-color fill applied to the stale element's `mxCell`; original fill/stroke preserved in `data-original-fill`/`data-original-stroke-color` for reversal; `"Marked N stale elements"` on stderr
+| 16.11 | Stale `--unmark-drawio` | After 16.10, `stale --unmark-drawio` | Original fill/stroke restored, marker attributes removed (idempotent — a second `--unmark-drawio` is a no-op)
+| 16.12 | Status grouping | `status --model architecture.jsonc` | Elements grouped/sorted by lifecycle status (`status` reads `--model` directly and does not auto-detect)
+| 16.13 | Find full-text | `find api` | Matching elements/relationships/views
+| 16.14 | Show element details | `show webshop.api` | All fields of the element
+| 16.15 | Show non-existent element | `show nope` | Error: element not found
 |===
 
 == 17. Evolution & Snapshots (9 tests)
@@ -489,7 +500,7 @@ Covers `snapshot` (save/list/diff/restore/delete), `diff`, `changelog`.
 | 17.9 | Changelog | `changelog` in a git repo | Architecture changelog between versions (git-based)
 |===
 
-== 18. Model Tooling & Import (11 tests)
+== 18. Model Tooling & Import (16 tests)
 
 Covers `import`, `generate-template`, `layout`, `schema`, `workspace`.
 
@@ -508,6 +519,11 @@ Covers `import`, `generate-template`, `layout`, `schema`, `workspace`.
 | 18.9 | Schema in sync with types | `schema generate` then `git diff` | No diff (committed schema matches Go types)
 | 18.10 | Workspace validate | `workspace validate workspace.json` | JSON workspace config validated
 | 18.11 | Workspace merge | `workspace merge workspace.json merged.jsonc` | Combined model written
+| 18.12 | Import XMI (EA export) | `import model.xmi --from xmi` | `architecture.jsonc` generated; UML types mapped to Bausteinsicht kinds via built-in defaults (e.g. `uml:Component` → `component`); result imports and syncs cleanly
+| 18.13 | Import XMI with `--kind-map` | `import model.xmi --from xmi --kind-map Component=service,Class=entity` | Overridden kinds applied instead of the built-in defaults; overridden kinds are registered in `specification.elements` so the model still validates/syncs
+| 18.14 | Import XMI with EA stereotype | XMI element carrying an `xmi:Extension`/`stereotype` tag (e.g. `microservice`) | Stereotype wins over the UML type mapping and any `--kind-map` override for that element
+| 18.15 | Import XMI, Windows-1252 encoded | XMI file with a `windows-1252` (not UTF-8) `encoding` declaration and non-ASCII bytes | Correctly transcoded to UTF-8 in the resulting model — no mangled characters
+| 18.16 | Import XMI path traversal in `!include` | XMI/DSL referencing `../../etc/passwd`-style paths | Rejected with a path-traversal warning; import continues without the escaping file
 |===
 
 == 19. Interactive, Overlay & ADR (7 tests)
@@ -525,6 +541,24 @@ Covers `repl`, `overlay` (apply/list/remove), `adr` (list/show).
 | 19.5 | Overlay with no model | `overlay apply metrics.json` with no `--model` | Error loading model (overlay reads `--model` and does not auto-detect, so the empty default path fails to load)
 | 19.6 | ADR list | `adr list` | Linked ADRs listed
 | 19.7 | ADR show / filter | `adr show ADR-001`, `adr list --element webshop.api` | ADR details / ADRs for that element
+|===
+
+== 20. Language Server (LSP) (6 tests)
+
+`bausteinsicht-lsp` is a **separate binary** (`cmd/bausteinsicht-lsp`), not a subcommand of `bausteinsicht` — it implements the Language Server Protocol over stdio for IDE integration (JSON Schema-backed completion/diagnostics while editing `.jsonc` models), corresponding to the `bausteinsicht.lsp` container and its `ide -> bausteinsicht.model` / `bausteinsicht.lsp -> bausteinsicht.model` relationships in this project's own architecture model (`src/docs/arc42/architecture.jsonc`). It had **zero** E2E coverage before this section existed — the main `e2e/` suite only builds and exercises the `bausteinsicht` binary, never `bausteinsicht-lsp`.
+
+Testing it means sending newline/`Content-Length`-framed JSON-RPC messages over the process's stdin and reading responses from stdout (not plain CLI args/stdout text like every other section in this plan).
+
+[cols="1,4,5,5"]
+|===
+| # | Test | Steps | Expected
+
+| 20.1 | `initialize` handshake | Send an `initialize` request, then `initialized` notification | Valid `InitializeResult` response; server does not exit
+| 20.2 | `textDocument/didOpen` triggers diagnostics | Open a `.jsonc` document with a validation error (e.g. unknown `kind`) | A `textDocument/publishDiagnostics` notification is sent listing the error
+| 20.3 | `textDocument/didChange` re-validates | Open a valid document, then send a change introducing an error | New `publishDiagnostics` notification reflects the updated error state (and clears previous diagnostics when fixed)
+| 20.4 | `textDocument/didSave` re-validates | Save-triggered validation path, distinct from `didChange` | Diagnostics consistent with on-disk content
+| 20.5 | `shutdown` + exit | Send `shutdown` request, then `exit` notification | Process exits cleanly (exit 0), no diagnostics sent after shutdown
+| 20.6 | `-debug` flag | Start with `-debug`, malformed request | Debug logging appears on stderr (silently discarded to `/dev/null` without the flag, per `main.go`)
 |===
 
 == Test History
