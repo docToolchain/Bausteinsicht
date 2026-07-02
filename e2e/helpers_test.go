@@ -106,8 +106,8 @@ func runCLIAllowFail(t *testing.T, bin, dir string, args ...string) (string, int
 	cmd.Dir = dir
 	out, err := cmd.CombinedOutput()
 	if err != nil && cmd.ProcessState == nil {
-		// exec itself failed (e.g., binary not found) — surface the error.
-		t.Logf("exec %s: %v", bin, err)
+		// exec itself failed (e.g., binary not found) — fatal to avoid misleading downstream errors.
+		t.Fatalf("exec %s: %v", bin, err)
 	}
 	code := 0
 	if cmd.ProcessState != nil {

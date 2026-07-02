@@ -58,13 +58,10 @@ func TestMultiFormatExportConsistency(t *testing.T) {
 		"--output", outDir,
 	)
 
-	mmdFiles, _ := filepath.Glob(filepath.Join(outDir, "*.mmd"))
+	// export-diagram --diagram-format mermaid always produces .md files.
+	mmdFiles, _ := filepath.Glob(filepath.Join(outDir, "*.md"))
 	if len(mmdFiles) == 0 {
-		// Some versions emit .md
-		mmdFiles, _ = filepath.Glob(filepath.Join(outDir, "*.md"))
-	}
-	if len(mmdFiles) == 0 {
-		t.Error("no .mmd/.md files produced by export-diagram --format mermaid")
+		t.Error("no .md files produced by export-diagram --diagram-format mermaid")
 	} else {
 		t.Logf("Mermaid: %d file(s) exported", len(mmdFiles))
 		assertFilesContainTitles(t, "Mermaid", mmdFiles, titlesByID)
