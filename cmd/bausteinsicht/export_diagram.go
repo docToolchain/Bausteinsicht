@@ -119,6 +119,7 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 		var entries []diagramEntry
 		keys := sortedKeys(views)
 		for _, key := range keys {
+			warnIfEmptyView(cmd, m, key, views[key])
 			result, fmtErr := diagram.FormatView(m, key, f)
 			if fmtErr != nil {
 				return exitWithCode(fmtErr, 1)
@@ -135,6 +136,7 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 	}
 
 	for key := range views {
+		warnIfEmptyView(cmd, m, key, views[key])
 		result, fmtErr := diagram.FormatView(m, key, f)
 		if fmtErr != nil {
 			return exitWithCode(fmtErr, 1)
@@ -186,6 +188,7 @@ func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map
 		var entries []diagramEntry
 		keys := sortedKeys(views)
 		for _, key := range keys {
+			warnIfEmptyView(cmd, m, key, views[key])
 			result, fmtErr := renderFunc(m, key)
 			if fmtErr != nil {
 				return exitWithCode(fmtErr, 1)
@@ -206,6 +209,7 @@ func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map
 		// When exporting to HTML, we need to handle multiple views in a single file
 		if viewKey != "" {
 			// Single view HTML export
+			warnIfEmptyView(cmd, m, viewKey, views[viewKey])
 			result, err := renderFunc(m, viewKey)
 			if err != nil {
 				return exitWithCode(err, 1)
@@ -231,6 +235,7 @@ func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map
 		// Multiple views: export each as separate HTML file
 		keys := sortedKeys(views)
 		for _, key := range keys {
+			warnIfEmptyView(cmd, m, key, views[key])
 			result, err := renderFunc(m, key)
 			if err != nil {
 				return exitWithCode(err, 1)
@@ -257,6 +262,7 @@ func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map
 	// For DOT and D2: export each view separately
 	keys := sortedKeys(views)
 	for _, key := range keys {
+		warnIfEmptyView(cmd, m, key, views[key])
 		result, err := renderFunc(m, key)
 		if err != nil {
 			return exitWithCode(err, 1)
@@ -279,6 +285,22 @@ func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map
 	}
 
 	return nil
+}
+
+// warnIfEmptyView prints a stderr warning when a view resolves to zero
+// elements, so an empty exported diagram doesn't silently look like success
+// (#512: import produced views with a scope but no include list, and
+// export-diagram wrote 0-node files without any indication anything was
+// wrong).
+func warnIfEmptyView(cmd *cobra.Command, m *model.BausteinsichtModel, key string, view model.View) {
+	resolved, err := model.ResolveView(m, &view)
+	if err != nil {
+		return
+	}
+	if len(resolved) == 0 {
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
+			"WARNING: view %q resolves to 0 elements — check its scope/include/exclude; the exported diagram will be empty\n", key)
+	}
 }
 
 func sortedKeys(views map[string]model.View) []string {
