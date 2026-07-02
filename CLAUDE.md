@@ -134,8 +134,9 @@ When starting work on a ticket:
 ### PR Merge Policy
 Before merging any PR:
 1. **Doc check** — run `/doc-check review` to verify spec/architecture is consistent with implementation and tests
-2. **Security review** on the changes
-3. **Code review** on the changes
+2. **E2E coverage check** — part of `/doc-check review` (see "E2E test coverage" in the doc-check skill): every new CLI command, new flag, or bug fix that spans more than one command (e.g. import → sync → export pipelines) must have a corresponding scenario under `e2e/*_test.go`. A user-visible change with no e2e test is a blocking (❌) finding, not just a suggestion — see [Issue #512](https://github.com/docToolchain/Bausteinsicht/issues/512), where an import bug shipped in v1.2.0 with zero test coverage anywhere in the repo.
+3. **Security review** on the changes
+4. **Code review** on the changes
 
 #### Quality Gate Override Policy
 SonarCloud's **New Code Coverage** gate (threshold: **65%**) may trip on PRs that touch previously-untested legacy code without adding new logic. A verified **behavior-preserving refactor** may be admin-merged despite the gate if ALL of these hold:
