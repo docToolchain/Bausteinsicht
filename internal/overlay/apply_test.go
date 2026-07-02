@@ -263,12 +263,13 @@ func TestApply_BareMxCell(t *testing.T) {
 	if !strings.Contains(styleB, "fillColor=") {
 		t.Errorf("svc-b: expected fillColor in style, got %q", styleB)
 	}
-	// svc-a (coverage=100, higher=better) should be green; svc-b should be red.
-	if !strings.Contains(styleA, DefaultColorScheme.Green) {
-		t.Errorf("svc-a: expected green %s, got style %q", DefaultColorScheme.Green, styleA)
+	// The heatmap uses a temperature scale: normalized=1.0 → RED (hot), 0.0 → GREEN (cool).
+	// coverage=100 normalizes to 1.0 (top of range) → RED; coverage=0 normalizes to 0.0 → GREEN.
+	if !strings.Contains(styleA, DefaultColorScheme.Red) {
+		t.Errorf("svc-a: expected red %s (normalized 1.0), got style %q", DefaultColorScheme.Red, styleA)
 	}
-	if !strings.Contains(styleB, DefaultColorScheme.Red) {
-		t.Errorf("svc-b: expected red %s, got style %q", DefaultColorScheme.Red, styleB)
+	if !strings.Contains(styleB, DefaultColorScheme.Green) {
+		t.Errorf("svc-b: expected green %s (normalized 0.0), got style %q", DefaultColorScheme.Green, styleB)
 	}
 }
 
@@ -292,11 +293,12 @@ func TestApply_ObjectWrapped(t *testing.T) {
 	styleCustomer := readCellStyle(t, path, "customer")
 	styleShop := readCellStyle(t, path, "onlineshop")
 
-	if !strings.Contains(styleCustomer, DefaultColorScheme.Green) {
-		t.Errorf("customer: expected green %s, got %q", DefaultColorScheme.Green, styleCustomer)
+	// Temperature scale: normalized=1.0 → RED, 0.0 → GREEN.
+	if !strings.Contains(styleCustomer, DefaultColorScheme.Red) {
+		t.Errorf("customer: expected red %s (normalized 1.0), got %q", DefaultColorScheme.Red, styleCustomer)
 	}
-	if !strings.Contains(styleShop, DefaultColorScheme.Red) {
-		t.Errorf("onlineshop: expected red %s, got %q", DefaultColorScheme.Red, styleShop)
+	if !strings.Contains(styleShop, DefaultColorScheme.Green) {
+		t.Errorf("onlineshop: expected green %s (normalized 0.0), got %q", DefaultColorScheme.Green, styleShop)
 	}
 }
 
@@ -366,10 +368,12 @@ func TestRemove_BareMxCell(t *testing.T) {
 // ─── Remove — <object>-wrapped elements ──────────────────────────────────────
 
 func TestRemove_ObjectWrapped(t *testing.T) {
+	// Two elements so the span > 0 and both colors are applied.
 	path := writeTempDrawio(t, drawioWithObjects(map[string]string{
-		"api": "fillColor=#ffffff;",
+		"api":  "fillColor=#ffffff;",
+		"svc2": "fillColor=#ffffff;",
 	}))
-	metrics := metricsFor(map[string]float64{"api": 0})
+	metrics := metricsFor(map[string]float64{"api": 100, "svc2": 0})
 	if err := Apply(path, metrics, "coverage", DefaultColorScheme); err != nil {
 		t.Fatalf("Apply: %v", err)
 	}
@@ -378,13 +382,14 @@ func TestRemove_ObjectWrapped(t *testing.T) {
 		t.Fatalf("Remove: %v", err)
 	}
 
-	style := readCellStyle(t, path, "api")
-	if strings.Contains(style, DefaultColorScheme.Red) {
-		t.Errorf("Remove: heatmap color still present: %q", style)
+	// After remove, neither heatmap color should remain.
+	styleAPI := readCellStyle(t, path, "api")
+	if strings.Contains(styleAPI, DefaultColorScheme.Red) {
+		t.Errorf("Remove: RED heatmap color still present on api: %q", styleAPI)
 	}
 	orig := readCellAttr(t, path, "api", OriginalFillAttr)
 	if orig != "" {
-		t.Errorf("Remove: data-original-fill still present: %q", orig)
+		t.Errorf("Remove: data-original-fill still present on api: %q", orig)
 	}
 }
 
