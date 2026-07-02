@@ -6,11 +6,14 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
 
 // sharedBinaryPath is set by TestMain before any test runs and is valid for
-// the entire test process lifetime.
+// the entire test process lifetime. Never use sync.Once + t.Cleanup — the
+// cleanup would delete the binary after the first test finishes, breaking all
+// subsequent tests in the same run.
 var sharedBinaryPath string
 
 // TestMain builds the bausteinsicht binary once before all tests and removes
@@ -48,4 +51,43 @@ func TestMain(m *testing.M) {
 	code := m.Run()
 	_ = os.Remove(bin)
 	os.Exit(code)
+}
+
+// buildBinary returns the path to the shared pre-built bausteinsicht binary.
+func buildBinary(t *testing.T) string {
+	t.Helper()
+	if sharedBinaryPath == "" {
+		t.Fatal("binary not built: TestMain did not set sharedBinaryPath")
+	}
+	return sharedBinaryPath
+}
+
+// ─── CLI execution helpers ────────────────────────────────────────────────────
+
+// runCLI runs the binary with the given args in dir, returns combined stdout+stderr,
+// and fails the test if the command exits with a non-zero code.
+func runCLI(t *testing.T, bin, dir string, args ...string) string {
+	t.Helper()
+	out, code := runCLIAllowFail(t, bin, dir, args...)
+	if code != 0 {
+		t.Fatalf("bausteinsicht %s: exit %d\n%s", strings.Join(args, " "), code, out)
+	}
+	return out
+}
+
+// runCLIAllowFail runs the binary and returns output + exit code without failing.
+func runCLIAllowFail(t *testing.T, bin, dir string, args ...string) (string, int) {
+	t.Helper()
+	cmd := exec.Command(bin, args...)
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	if err != nil && cmd.ProcessState == nil {
+		// exec itself failed (e.g., binary not found) — fatal to avoid misleading downstream errors.
+		t.Fatalf("exec %s: %v", bin, err)
+	}
+	code := 0
+	if cmd.ProcessState != nil {
+		code = cmd.ProcessState.ExitCode()
+	}
+	return string(out), code
 }

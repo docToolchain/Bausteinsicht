@@ -46,14 +46,30 @@ func Apply(drawioPath string, metrics *MetricsFile, metricKey string, scheme Col
 	normalized := Normalize(extracted, higherIsBetter)
 
 	root := doc.Root()
-	for _, page := range root.FindElements(".//mxGraphModel/root/mxCell") {
-		elementID := page.SelectAttrValue("id", "")
+
+	// Bare mxCell children (hand-crafted or connector elements)
+	for _, cell := range root.FindElements(".//mxGraphModel/root/mxCell") {
+		elementID := cell.SelectAttrValue("id", "")
 		if elementID == "" || elementID == "0" || elementID == "1" {
 			continue
 		}
-
 		if normVal, ok := normalized[elementID]; ok {
-			applyColor(page, normVal, scheme)
+			applyColor(cell, normVal, scheme)
+		}
+	}
+
+	// <object>-wrapped elements (bausteinsicht sync output).
+	// Match on bausteinsicht_id so metrics.json uses model IDs, not page-scoped draw.io IDs.
+	for _, obj := range root.FindElements(".//mxGraphModel/root/object") {
+		bsID := obj.SelectAttrValue("bausteinsicht_id", "")
+		if bsID == "" {
+			continue
+		}
+		if normVal, ok := normalized[bsID]; ok {
+			inner := obj.FindElement("mxCell")
+			if inner != nil {
+				applyColor(inner, normVal, scheme)
+			}
 		}
 	}
 
@@ -70,19 +86,24 @@ func Remove(drawioPath string) error {
 	}
 
 	root := doc.Root()
-	for _, cell := range root.FindElements(".//mxGraphModel/root/mxCell") {
-		originalFill := cell.SelectAttrValue(OriginalFillAttr, "")
-		if originalFill != "" {
-			geometry := cell.FindElement("mxGeometry")
-			if geometry != nil {
-				style := geometry.SelectAttrValue(styleAttr, "")
-				if style != "" {
-					style = updateStyleFill(style, originalFill)
-					geometry.CreateAttr(styleAttr, style)
-				}
-			}
-			cell.RemoveAttr(OriginalFillAttr)
+
+	// Collect all candidate cells: direct mxCell children and mxCell inside <object> wrappers.
+	cells := root.FindElements(".//mxGraphModel/root/mxCell")
+	for _, obj := range root.FindElements(".//mxGraphModel/root/object") {
+		if inner := obj.FindElement("mxCell"); inner != nil {
+			cells = append(cells, inner)
 		}
+	}
+
+	for _, cell := range cells {
+		originalFill := cell.SelectAttrValue(OriginalFillAttr, "")
+		if originalFill == "" {
+			continue
+		}
+		style := cell.SelectAttrValue(styleAttr, "")
+		style = updateStyleFill(style, originalFill)
+		cell.CreateAttr(styleAttr, style)
+		cell.RemoveAttr(OriginalFillAttr)
 	}
 
 	if err := doc.WriteToFile(drawioPath); err != nil {
@@ -91,26 +112,33 @@ func Remove(drawioPath string) error {
 	return nil
 }
 
+// applyColor sets a heatmap fill color on a draw.io mxCell element.
+// Style and fillColor live on the mxCell itself (not on its mxGeometry child).
 func applyColor(cell *etree.Element, normalized float64, scheme ColorScheme) {
 	color := ColorForValue(normalized, scheme)
 
-	geometry := cell.FindElement("mxGeometry")
-	if geometry == nil {
-		return
-	}
-
-	style := geometry.SelectAttrValue(styleAttr, "")
-	originalFill := geometry.SelectAttrValue(fillColorAttr, "")
-
+	style := cell.SelectAttrValue(styleAttr, "")
+	originalFill := extractFillColor(style)
 	if originalFill == "" {
 		originalFill = "#ffffff"
 	}
+
 	if cell.SelectAttrValue(OriginalFillAttr, "") == "" {
 		cell.CreateAttr(OriginalFillAttr, originalFill)
 	}
 
 	style = updateStyleFill(style, color)
-	geometry.CreateAttr(styleAttr, style)
+	cell.CreateAttr(styleAttr, style)
+}
+
+// extractFillColor parses a draw.io style string and returns the fillColor value.
+func extractFillColor(style string) string {
+	for _, part := range parseStyleParts(style) {
+		if startsWithKey(part, fillColorAttr) && len(part) > len(fillColorAttr)+1 {
+			return part[len(fillColorAttr)+1:]
+		}
+	}
+	return ""
 }
 
 func updateStyleFill(style, color string) string {
