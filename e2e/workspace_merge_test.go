@@ -74,9 +74,9 @@ func TestWorkspaceMerge(t *testing.T) {
 		t.Fatalf("read merged model: %v", err)
 	}
 	merged := string(mergedBytes)
-	// Default model has "customer" — both team-a and team-b should contribute it with prefix.
-	if !strings.Contains(merged, "a.customer") && !strings.Contains(merged, "a-customer") &&
-		!strings.Contains(merged, "customer") {
-		t.Errorf("merged model missing any customer element\ncontent: %.500s", merged)
+	// Default model has "customer" — workspace merge prefixes IDs with "<prefix>_<id>",
+	// so team-a (prefix "a") contributes "a_customer".
+	if !strings.Contains(merged, "a_customer") {
+		t.Errorf("merged model missing 'a_customer' (team-a prefix + customer element)\ncontent: %.500s", merged)
 	}
 }

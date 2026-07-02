@@ -20,7 +20,11 @@ func TestGraphAnalysis(t *testing.T) {
 			"--model", "architecture.jsonc",
 			"--cycles-only",
 		)
-		// Default model has no cycles — output should say so or be empty.
+		// Default model has no cycles — output should say so explicitly or be empty.
+		lower := strings.ToLower(out)
+		if strings.TrimSpace(out) != "" && !strings.Contains(lower, "no cycle") && !strings.Contains(lower, "cycle") {
+			t.Errorf("graph --cycles-only: unexpected output (expected cycle summary or empty):\n%s", out)
+		}
 		t.Logf("graph --cycles-only: %s", out)
 	})
 

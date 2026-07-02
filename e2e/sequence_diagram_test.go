@@ -76,6 +76,14 @@ func TestSequenceDiagram(t *testing.T) {
 		if len(entries) == 0 {
 			t.Fatal("export-sequence mermaid: no files produced")
 		}
+		for _, e := range entries {
+			content, _ := os.ReadFile(filepath.Join(outDir, e.Name()))
+			if !strings.Contains(string(content), "checkout") &&
+				!strings.Contains(strings.ToLower(string(content)), "sequence") &&
+				!strings.Contains(string(content), "customer") {
+				t.Errorf("Mermaid output %s missing expected content:\n%s", e.Name(), content)
+			}
+		}
 	})
 
 }

@@ -39,13 +39,11 @@ func TestDrillDownLinks(t *testing.T) {
 	for _, page := range doc.Pages() {
 		xmlRoot := page.Root()
 
-		// Check <object> elements for tooltip/link attributes.
+		// Check <object> elements for the link attribute (drill-down links are stored
+		// in "link", not "tooltip" — tooltip holds the element description).
 		for _, obj := range xmlRoot.SelectElements("object") {
 			bsID := obj.SelectAttrValue("bausteinsicht_id", "")
-			link := obj.SelectAttrValue("tooltip", "")
-			if link == "" {
-				link = obj.SelectAttrValue("link", "")
-			}
+			link := obj.SelectAttrValue("link", "")
 
 			if strings.Contains(bsID, "internetBankingSystem") && !strings.Contains(bsID, ".") {
 				if strings.Contains(link, "data:page/id") {
@@ -59,8 +57,7 @@ func TestDrillDownLinks(t *testing.T) {
 	}
 
 	if !drillDownFound {
-		t.Log("Note: internetBankingSystem drill-down link (data:page/id) not found — " +
-			"feature may use a different attribute or BigBank fixture structure differs from expectation")
+		t.Error("internetBankingSystem: expected data:page/id drill-down link, found none")
 	}
 	if customerHasLink {
 		t.Error("customer: unexpectedly has a data:page/id drill-down link (no detail view)")
@@ -68,11 +65,12 @@ func TestDrillDownLinks(t *testing.T) {
 
 	// ── Back-nav button assertion ─────────────────────────────────────────
 	// At least one page should contain a back-nav button (detail view pages).
+	// Back-nav buttons are <object id="nav-back-..."> elements, not bare <mxCell>.
 	backNavFound := false
 	for _, page := range doc.Pages() {
 		xmlRoot := page.Root()
-		for _, cell := range xmlRoot.SelectElements("mxCell") {
-			id := cell.SelectAttrValue("id", "")
+		for _, obj := range xmlRoot.SelectElements("object") {
+			id := obj.SelectAttrValue("id", "")
 			if strings.Contains(id, "nav-back") {
 				backNavFound = true
 				break
@@ -83,7 +81,7 @@ func TestDrillDownLinks(t *testing.T) {
 		}
 	}
 	if !backNavFound {
-		t.Log("Note: no back-nav button found — BigBank may use a different button ID convention")
+		t.Error("no back-nav button (<object id='nav-back-...'>) found on any detail view page")
 	}
 
 	t.Logf("drill-down link check: internetBankingSystem has link=%v, customer has link=%v",

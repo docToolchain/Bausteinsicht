@@ -11,9 +11,22 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/beevik/etree"
 	"github.com/docToolchain/Bausteinsicht/internal/drawio"
 	"github.com/docToolchain/Bausteinsicht/internal/model"
 )
+
+// setCellAttr updates an existing attribute in-place or creates it if absent.
+// Use instead of CreateAttr when the attribute may already exist.
+func setCellAttr(el *etree.Element, key, value string) {
+	for i, a := range el.Attr {
+		if a.Key == key {
+			el.Attr[i].Value = value
+			return
+		}
+	}
+	el.CreateAttr(key, value)
+}
 
 func TestConflictResolution(t *testing.T) {
 	t.Run("ModelWins", testConflictModelWins)
@@ -54,13 +67,18 @@ func testConflictModelWins(t *testing.T) {
 	for _, cell := range page.Root().SelectElements("mxCell") {
 		if cell.SelectAttrValue("parent", "") == cellID &&
 			strings.HasSuffix(cell.SelectAttrValue("id", ""), "-title") {
-			cell.CreateAttr("value", "API Service")
+			// Update the existing "value" attribute in-place; CreateAttr would
+			// add a duplicate and the original value would still be read back.
+			setCellAttr(cell, "value", "API Service")
 			mutated = true
 			break
 		}
 	}
 	if !mutated {
-		obj.CreateAttr("label", "API Service")
+		// No title sub-cell found — this would mean the element uses an HTML
+		// label. This should not happen after init (which always produces
+		// sub-cell elements), so fail loudly to catch regressions.
+		t.Fatal("customer element has no title sub-cell after init; cannot simulate draw.io edit")
 	}
 	if err := drawio.SaveDocument(drawioPath, doc); err != nil {
 		t.Fatalf("SaveDocument: %v", err)
@@ -137,13 +155,13 @@ func testConflictOneSidedDrawio(t *testing.T) {
 	for _, cell := range page.Root().SelectElements("mxCell") {
 		if cell.SelectAttrValue("parent", "") == cellID &&
 			strings.HasSuffix(cell.SelectAttrValue("id", ""), "-title") {
-			cell.CreateAttr("value", "Reverse Only")
+			setCellAttr(cell, "value", "Reverse Only")
 			mutated = true
 			break
 		}
 	}
 	if !mutated {
-		obj.CreateAttr("label", "Reverse Only")
+		t.Fatal("customer element has no title sub-cell after init; cannot simulate draw.io edit")
 	}
 	if err := drawio.SaveDocument(drawioPath, doc); err != nil {
 		t.Fatalf("SaveDocument: %v", err)

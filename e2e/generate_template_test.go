@@ -32,8 +32,7 @@ func TestGenerateTemplate(t *testing.T) {
 		}
 	}
 	if !templateFound {
-		// generate-template may write into a subdirectory — check recursively.
-		t.Log("generate-template: no extra .drawio found at top level; checking subdirs")
+		t.Error("generate-template: no template .drawio file found in working directory")
 	}
 
 	// ── Step 2: sync still works after template generation ────────────────

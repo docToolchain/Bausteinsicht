@@ -38,7 +38,7 @@ func TestREPL(t *testing.T) {
 	outStr := string(out)
 	// `list` should show some elements.
 	if !strings.Contains(strings.ToLower(outStr), "customer") {
-		t.Logf("repl output did not mention 'customer' — may be expected if REPL prompts differently")
+		t.Errorf("repl 'list' output did not mention 'customer':\n%s", outStr)
 	}
 	t.Logf("repl output:\n%s", outStr)
 }

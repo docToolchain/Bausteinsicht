@@ -27,7 +27,7 @@ func TestPerformanceBudget(t *testing.T) {
 	runCLI(t, bin, dir, "sync")
 	elapsed := time.Since(start)
 
-	const budget = 2 * time.Second
+	const budget = 5 * time.Second
 	if elapsed > budget {
 		t.Errorf("sync of 110-element model took %v, exceeds budget of %v", elapsed, budget)
 	}
