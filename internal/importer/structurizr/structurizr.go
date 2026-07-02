@@ -637,6 +637,11 @@ func (is *importState) processViewsStmts(stmts []stmt) {
 				// a valid Layout value (see model.validate) and would fail
 				// validation on the very model this importer just wrote.
 				v.Layout = "layered"
+				if len(bs.args) > 0 {
+					is.warnings = append(is.warnings, fmt.Sprintf(
+						"line %d: view %q: autoLayout direction %q not preserved, mapped to layout: \"layered\"",
+						bs.line, viewKey, strings.Join(bs.args, " ")))
+				}
 			}
 		}
 

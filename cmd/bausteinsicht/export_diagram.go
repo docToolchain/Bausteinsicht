@@ -88,6 +88,12 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 		views = m.Views
 	}
 
+	// Warn once per view up front, regardless of which format/output branch
+	// below ends up rendering it (#512).
+	for key, view := range views {
+		warnIfEmptyView(cmd, m, key, view)
+	}
+
 	outputFormat, _ := cmd.Flags().GetString("format")
 
 	// Handle new export formats (DOT, D2, HTML) — with JSON envelope support
@@ -119,7 +125,6 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 		var entries []diagramEntry
 		keys := sortedKeys(views)
 		for _, key := range keys {
-			warnIfEmptyView(cmd, m, key, views[key])
 			result, fmtErr := diagram.FormatView(m, key, f)
 			if fmtErr != nil {
 				return exitWithCode(fmtErr, 1)
@@ -136,7 +141,6 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 	}
 
 	for key := range views {
-		warnIfEmptyView(cmd, m, key, views[key])
 		result, fmtErr := diagram.FormatView(m, key, f)
 		if fmtErr != nil {
 			return exitWithCode(fmtErr, 1)
@@ -188,7 +192,6 @@ func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map
 		var entries []diagramEntry
 		keys := sortedKeys(views)
 		for _, key := range keys {
-			warnIfEmptyView(cmd, m, key, views[key])
 			result, fmtErr := renderFunc(m, key)
 			if fmtErr != nil {
 				return exitWithCode(fmtErr, 1)
@@ -209,7 +212,6 @@ func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map
 		// When exporting to HTML, we need to handle multiple views in a single file
 		if viewKey != "" {
 			// Single view HTML export
-			warnIfEmptyView(cmd, m, viewKey, views[viewKey])
 			result, err := renderFunc(m, viewKey)
 			if err != nil {
 				return exitWithCode(err, 1)
@@ -235,7 +237,6 @@ func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map
 		// Multiple views: export each as separate HTML file
 		keys := sortedKeys(views)
 		for _, key := range keys {
-			warnIfEmptyView(cmd, m, key, views[key])
 			result, err := renderFunc(m, key)
 			if err != nil {
 				return exitWithCode(err, 1)
@@ -262,7 +263,6 @@ func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map
 	// For DOT and D2: export each view separately
 	keys := sortedKeys(views)
 	for _, key := range keys {
-		warnIfEmptyView(cmd, m, key, views[key])
 		result, err := renderFunc(m, key)
 		if err != nil {
 			return exitWithCode(err, 1)
