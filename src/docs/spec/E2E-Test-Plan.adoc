@@ -16,6 +16,41 @@ Run periodically (at least before each release) to catch regressions and edge-ca
 
 Test reports are stored as: `src/docs/e2e-test-report-YYYY-MM-DD.adoc`
 
+== Automation Status
+
+_Cross-checked 2026-07-02 against the automated Go suite in `e2e/*.go` (subprocess-level, black-box CLI tests — the same class of test this plan describes; unit tests in `internal/**/*_test.go` and `cmd/bausteinsicht/*_test.go` are a separate, complementary layer and are **not** counted here, per this doc's own stated purpose of catching what unit tests miss)._
+
+This is a grep/keyword-based pass, not an exhaustive row-by-row audit — treat percentages as directional, not exact. See #519 for the tracked follow-up work.
+
+[cols="1,3,1,1,4"]
+|===
+| Section | Name | Tests | Automated in `e2e/*.go` | Notes
+
+| 1 | Basic Workflow | 6 | ~2/6 | `init`/`validate` incidentally exercised as setup in nearly every test, but double-init, read-only dir, `init --format json`, and the "Already in sync" message have no dedicated assertion
+| 2 | Validate | 25 | 0/25 | Zero e2e coverage of these specific edge cases; very likely covered at the `internal/model` unit-test level (schema/referential-integrity edge cases don't need a subprocess)
+| 3 | Forward Sync | 23 | ~5/23 | `sync_roundtrip_test.go`/`conflict_resolution_test.go` cover the core cycle; long IDs/labels, self-referencing relationships, re-parenting, and the `xmllint` well-formedness checks (3.23) are untested
+| 4 | Reverse Sync + Conflicts | 22 | ~6/22 | Conflict resolution itself is well covered (`TestConflictResolution`); JSONC comment preservation (4.16-4.18) and HTML entity/tag handling in labels (4.4-4.7) have **zero** e2e coverage
+| 5 | Views / Wildcards / Scope / Lifting | 28 | 0/28 | Zero e2e coverage; likely well unit-tested in `internal/model/resolve_test.go`, but the interaction with real `sync` output (drawio connectors after lifting) is untested end-to-end
+| 6 | CLI Add Commands | 30 | ~6/30 | Basic add-element/relationship flows are exercised as setup; ID/label validation edge cases and JSONC comment preservation after `add` (6.25-6.30) have zero e2e coverage
+| 7 | Watch Mode | 10 | ~5/10 | Model/drawio change detection and `--mermaid` (added this session) covered; debounce, invalid-model recovery, and clean SIGINT exit are untested
+| 8 | Export (PNG/SVG) | 12 | ~2/12 | Only the draw.io-not-found error path (8.9, added this session) is deterministic; the rest depend on a real draw.io CLI + headless display and mostly skip in CI
+| 8b | Export-Diagram | 10 | ~9/10 | Well covered after this session's work (plantuml/mermaid/structurizr/dot/d2/html); only the `--format json` unknown-format error (8b.4) unverified
+| 8c | Export-Table | 6 | ~5/6 | Well covered after this session's work
+| 8d | Export-Sequence | 4 | ~3/4 | Covered by `sequence_diagram_test.go`; the "no dynamicViews" case (8d.4) unverified
+| 9 | Draw.io File Integrity | 5 | 0/5 | Zero e2e coverage (no `xmllint`/structural-integrity checks after repeated cycles)
+| 10 | Security / Injection Testing | 9 | 0/9 | Zero e2e coverage; likely covered at the `internal/drawio`/`internal/model` unit level for XML escaping, but path-traversal and shell-injection-via-ID have no black-box confirmation
+| 11 | CLI Flag Interactions | 9 | 0/9 | Zero e2e coverage of `--verbose`, conflicting `--model`/`--template` types, or unknown-flag handling
+| 12 | Sync State Edge Cases | 6 | ~1/6 | Only the idempotency/stable-state check in `sync_roundtrip_test.go`; corrupt/extra/missing `.bausteinsicht-sync` entries untested
+| 13 | Model File Edge Cases | 7 | 0/7 | Zero e2e coverage (BOM, line endings, minified JSON, 100-element performance)
+| 14 | Template Handling | 6 | 0/6 | Zero e2e coverage of `--template`
+| 15 | Error Output Formatting | 8 | 0/8 | Zero e2e coverage of the `{"error":"...","code":N}` JSON error contract across commands
+| 16 | Analysis & Inspection | 15 | ~11/15 | Well covered after this session's work (`stale`, `status`, `health`, `graph`, `find`, `show`)
+| 17 | Evolution & Snapshots | 9 | ~6/9 | `snapshot`/`diff`/`changelog` covered; restore-over-existing-output and delete-snapshot edge cases unverified
+| 18 | Model Tooling & Import | 16 | ~11/16 | Well covered after this session's work (`schema`, `structurizr`/`likec4`/`xmi` import, `workspace`); `generate-template`/`layout` invalid-input cases unverified
+| 19 | Interactive, Overlay & ADR | 7 | ~6/7 | Well covered after this session's work (`repl`, `overlay`, `adr`); REPL exit-confirmation prompt (19.2) unverified
+| 20 | Language Server (LSP) | 6 | 0/6 | Brand new section (this session) — `bausteinsicht-lsp` is a separate binary the `e2e/` suite never builds
+|===
+
 == Before You Start
 
 === Pre-Requisites
