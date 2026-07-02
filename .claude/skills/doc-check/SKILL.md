@@ -1,16 +1,16 @@
 ---
 name: doc-check
 description: >
-  Checks and updates spec/architecture documentation at ticket start and at review.
+  Checks and updates spec/architecture documentation and e2e test coverage at ticket start and at review.
   'start': identifies which docs need updating for a ticket and applies the updates.
-  'review': verifies that docs, implementation, and tests are consistent before merge.
+  'review': verifies that docs, implementation, tests, and e2e coverage are consistent before merge.
 license: MIT
 compatibility:
   os: [linux, macos]
   tools: []
 metadata:
   author: docToolchain
-  version: "1.2"
+  version: "1.3"
 allowed-tools: Bash Read Write Edit Glob Grep
 argument-hint: "start [#<issue-number>] | review"
 ---
@@ -69,6 +69,7 @@ as the fallback — it covers the same doc gates.
    | Any other existing `internal/<pkg>/` with user-visible output change | spec/01, spec/02 |
    | New user-facing behavior without an existing acceptance criterion | spec/04 |
    | A significant design tradeoff (new library, new format, new algorithm) | new ADR |
+   | New CLI command, new flag, or a fix where one command's output feeds another (import→sync, sync→export, snapshot→restore) | plan an `e2e/*_test.go` scenario chaining producer→consumer (see review mode's "E2E test coverage" check) — flag this now so it's not missed at review |
 
    **Catch-all:** Any change to an existing `internal/` package that alters CLI-visible behavior,
    output format, or exported API → check spec/01 and spec/02. When in doubt, flag as "unsure"
@@ -134,7 +135,34 @@ as the fallback — it covers the same doc gates.
    grep -rn "<feature-name>" --include="*_test.go" .
    ```
 
-   **C. No stale docs** — check for renamed/deleted exported symbols still referenced in docs.
+   **C. E2E test coverage** — every user-visible new feature or cross-command bug fix needs an
+   end-to-end scenario, not just a unit test. Unit tests catch a wrong return value; they do not
+   catch "command A writes a value command B then rejects" — that class of bug only shows up when
+   the pipeline runs for real. (See [Issue #512](https://github.com/docToolchain/Bausteinsicht/issues/512):
+   `import --from structurizr` wrote a `layout` value that `sync`'s own validation rejected — shipped
+   in v1.2.0 with zero test coverage anywhere in the repo, unit or e2e, because no test ever ran
+   `import` output through `sync`.)
+
+   For each changed/added file, check whether it falls into one of these triggers:
+   - New `cmd/bausteinsicht/*.go` command or subcommand
+   - New or changed `--flag` with user-visible effect
+   - A fix or feature where the input of one command is produced by another (import→sync,
+     sync→export, snapshot→restore, etc.) — i.e. anything that only breaks when chained
+   - A bug fix whose root cause is "component X assumes something about component Y's output/format"
+
+   If any trigger matches, search for a scenario that actually chains the relevant commands:
+   ```bash
+   grep -rln "<command-name>\|<scenario-keyword>" e2e/*_test.go
+   ```
+   A unit test on the producing side alone (e.g. only testing the importer's output struct) does
+   **not** satisfy this — the check must confirm the *consuming* command (sync/export/etc.) actually
+   runs against that output in the test, the same way a real user's shell pipeline would.
+
+   - Trigger matched, no e2e scenario chaining producer→consumer → ❌ (blocking)
+   - Trigger matched, existing e2e test covers it but doesn't assert on the specific new behavior → ⚠️
+   - Pure internal refactor with no user-visible or cross-command effect → no check needed
+
+   **D. No stale docs** — check for renamed/deleted exported symbols still referenced in docs.
 
    Two-pass extraction (handles both top-level funcs and methods):
    ```bash
@@ -171,6 +199,8 @@ as the fallback — it covers the same doc gates.
    ### ❌ Inconsistencies (blocking)
    - Flag `--threshold` added in `stale.go:45` but missing from `spec/02_cli_specification.adoc`
    - Old name `MarkElements` still referenced in `spec/05` but renamed to `MarkInDrawio` in code
+   - `import --from structurizr` writes `layout: "auto"` but no e2e test runs the imported model
+     through `sync` — the producer→consumer chain is untested (check C)
 
    ### Verdict
    PASS / NEEDS DOCS / FAIL
