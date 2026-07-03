@@ -9,7 +9,7 @@ jobs:
   cleanup:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
           fetch-depth: 0
 
@@ -36,20 +36,13 @@ jobs:
             BRANCH_LIST=$(echo "$MERGED_REMOTE" | tr '\n' ' ')
 
             # Create issue for notification
+            BODY=$(printf 'Found branches merged to main. Safe to delete:\n\n%s\n\n**How to clean up:**\n```bash\ngit fetch origin\ngit branch -d %s\ngit push origin %s\n```\n\nOr delete individually in GitHub web UI: Settings → Branches' \
+              "$(echo "$MERGED_REMOTE" | sed 's/^/- origin\//')" \
+              "$BRANCH_LIST" \
+              "$(echo "$MERGED_REMOTE" | sed 's/^/--delete /' | tr '\n' ' ')")
             gh issue create \
               --title "🧹 Cleanup: Merged branches ready for deletion" \
-              --body "Found branches merged to main. Safe to delete:
-
-$(echo "$MERGED_REMOTE" | sed 's/^/- origin\//')
-
-**How to clean up:**
-\`\`\`bash
-git fetch origin
-git branch -d $(echo "$MERGED_REMOTE" | tr '\n' ' ')
-git push origin $(echo "$MERGED_REMOTE" | sed 's/^/--delete /' | tr '\n' ' ')
-\`\`\`
-
-Or delete individually in GitHub web UI: Settings → Branches" \
+              --body "$BODY" \
               --label infrastructure \
               2>/dev/null || echo "Issue creation skipped (may already exist)"
           else
