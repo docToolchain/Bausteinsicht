@@ -181,22 +181,38 @@ func testSecNullByteTitle(t *testing.T) {
 	out, _ := runCLIAllowFail(t, bin, dir, "sync")
 	assertNoCrash(t, out)
 }
+
+// testSecVeryLongString covers 10.6: a 100,000-character title must not
+// crash the CLI or corrupt the resulting draw.io XML. The string is written
+// directly into the model file (like testSecNullByteTitle) rather than
+// passed as a CLI arg — Windows' CreateProcess has a ~32K command-line
+// length limit, so a 100K-char --title flag fails at the OS/exec layer
+// before the program even starts, on that platform only. Going through the
+// model file avoids that platform-specific ceiling entirely and is a more
+// accurate test of the tool's own handling of long strings.
 func testSecVeryLongString(t *testing.T) {
 	bin := buildBinary(t)
 	dir := t.TempDir()
 	runCLI(t, bin, dir, "init")
 
+	modelPath := dir + "/architecture.jsonc"
+	data, err := os.ReadFile(modelPath)
+	if err != nil {
+		t.Fatalf("read model: %v", err)
+	}
 	longTitle := strings.Repeat("A", 100_000)
-	out, code := runCLIAllowFail(t, bin, dir, "add", "element", "--id", "longtest", "--kind", "system", "--title", longTitle)
-	assertNoCrash(t, out)
-	if code != 0 {
-		t.Fatalf("add element with 100K-char title failed: exit %d\n%s", code, out)
+	patched := strings.Replace(string(data), `"title": "Customer"`, `"title": "`+longTitle+`"`, 1)
+	if patched == string(data) {
+		t.Fatal("anchor for customer title not found in sample model")
+	}
+	if err := os.WriteFile(modelPath, []byte(patched), 0o644); err != nil {
+		t.Fatalf("write model: %v", err)
 	}
 
-	out2, code2 := runCLIAllowFail(t, bin, dir, "sync")
-	assertNoCrash(t, out2)
-	if code2 != 0 {
-		t.Fatalf("sync with 100K-char title failed: exit %d\n%s", code2, out2)
+	out, code := runCLIAllowFail(t, bin, dir, "sync")
+	assertNoCrash(t, out)
+	if code != 0 {
+		t.Fatalf("sync with 100K-char title failed: exit %d\n%s", code, out)
 	}
 
 	assertDrawioWellFormed(t, dir+"/architecture.drawio")
