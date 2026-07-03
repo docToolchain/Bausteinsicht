@@ -1,0 +1,128 @@
+:jbake-title: E2E Test Report 2026-07-03
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: Development
+:jbake-order: 15
+
+= E2E Test Report — 2026-07-03
+:toc:
+:toc-title: Contents
+:sectnums:
+
+== Summary
+
+This round closed all 10 sections/line-groups on #519's prioritized gap list (found via the automation-status
+cross-check added the day before, 2026-07-02) — 116 previously-`SKIP: not automated` test-plan lines now have
+real subprocess-level `e2e/*_test.go` coverage. Unlike prior rounds, this was **automated test authoring**, not a
+manual click-through of the plan — so this report's numbers come straight from
+`scripts/e2e-test-report.sh` (also added this round, see "New Tooling" below) rather than hand-transcription.
+
+[cols="1,3,1,1,1"]
+|===
+| Section | Tests | Pass | Fail | Not Automated (this round's tagging convention)
+
+| 1 | Basic Workflow | 6 | 0 | 6
+| 2 | Validate | 25 | 25 | 0
+| 3 | Forward Sync | 23 | 0 | 23
+| 4 | Reverse Sync + Conflicts | 22 | 7 | 15
+| 5 | Views / Wildcards / Scope / Lifting | 28 | 28 | 0
+| 6 | CLI Add Commands | 30 | 6 | 24
+| 7 | Watch Mode | 10 | 0 | 10
+| 8 | Export | 12 | 0 | 12
+| 8b | Export-Diagram | 10 | 0 | 10
+| 8c | Export-Table | 6 | 0 | 6
+| 8d | Export-Sequence | 4 | 0 | 4
+| 9 | Draw.io File Integrity | 5 | 5 | 0
+| 10 | Security / Injection Testing | 9 | 9 | 0
+| 11 | CLI Flag Interactions | 9 | 9 | 0
+| 12 | Sync State Edge Cases | 6 | 6 | 0
+| 13 | Model File Edge Cases | 7 | 7 | 0
+| 14 | Template Handling | 6 | 6 | 0
+| 15 | Error Output Formatting | 8 | 8 | 0
+| 16 | Analysis & Inspection Commands | 15 | 0 | 15
+| 17 | Evolution & Snapshots | 9 | 0 | 9
+| 18 | Model Tooling & Import | 16 | 0 | 16
+| 19 | Interactive, Overlay & ADR | 7 | 0 | 7
+| 20 | Language Server (LSP) | 6 | 0 | 6
+| **Total** | | **279** | **116** | **163**
+|===
+
+**Overall result: 116 PASS, 0 FAIL, 163 "not automated" by this round's tagging convention.**
+
+IMPORTANT: The "Not Automated" column above reflects only lines tagged via this round's `<planID>_...` subtest
+naming convention (see `internal/e2eplan`) or registered in its exception registry — it is **not** the same as
+"zero e2e coverage". Sections 3, 7, 8/8b/8c/8d, 16-19 already have substantial coverage from `e2e/*_test.go` files
+predating this convention (see the "Automation Status" table in `E2E-Test-Plan.adoc`, which tracks coverage
+qualitatively per-file); they just aren't yet wired into the machine-readable per-line report. Retagging them is
+future work, not a regression introduced here.
+
+== Environment
+
+* Sandboxed dev environment (not the devcontainer); Go 1.19 preinstalled did not satisfy `go.mod`'s `go 1.25.8`
+  directive (`go1.19`'s toolchain parser predates the 3-component version format) — Go 1.26.4 was downloaded and
+  used for this session's builds/tests instead.
+* `drawio` / `drawio-export` / `xvfb-run` available; `xmllint` not available (draw.io XML well-formedness checks
+  used `internal/drawio.LoadDocument` re-parsing instead, consistent with how the CLI itself parses the file).
+* `golangci-lint` and `actionlint` were installed ad hoc via `go install` to verify new code before committing.
+
+== New Automation Added
+
+One new `e2e/*_test.go` file per prioritized section (`jsonc_comment_preservation_test.go`,
+`label_html_handling_test.go`, `views_wildcards_lifting_test.go`, `security_injection_test.go`,
+`cli_flag_interactions_test.go`, `error_output_format_test.go`, `drawio_file_integrity_test.go`,
+`model_file_edge_cases_test.go`, `sync_state_edge_cases_test.go`, `template_handling_test.go`,
+`validate_edge_cases_test.go`), plus a `runCLISplit` helper (stdout/stderr captured separately) added to
+`helpers_test.go` for the JSON-error-envelope and stdout-cleanliness assertions in sections 11 and 15.
+
+== New Tooling
+
+Implements #519's "per CI statt manuell erzeugen" follow-up:
+
+* `internal/e2eplan` — plan-ID → test-name registry, plus a `<planID>_...` subtest naming convention that's
+  auto-detected without any registry entry.
+* `scripts/e2e-test-report-gen` + `scripts/e2e-test-report.sh` (`make e2e-test-report`) — generates this report's
+  Summary table (and a full 279-line per-plan-line detail table, omitted here for length — see the
+  `e2e-test-plan-report` CI artifact or run the script locally) directly from `go test ./e2e/... -json`.
+* Wired into `.github/workflows/go.yml` as a new `e2e-plan-report` job: job summary + build artifact + PR comment.
+  Does **not** auto-commit a dated report file to `main` — left as a separate, more consequential decision per
+  #519's own caution about CI commits.
+
+== Bug Found & Fixed
+
+[cols="1,3,1"]
+|===
+| Issue | Description | Status
+
+| #520 | `mergeStyles` (`internal/sync/forward.go`) built the merged style string by ranging over a Go map, so two
+freshly-added same-kind elements in one `sync` could get differently-ordered (value-equivalent) `style`
+attributes — non-reproducible XML output, noisy diffs. Found writing 9.3 (style consistency). | ✅ Fixed same
+branch: overlay key order now tracked in a slice, not derived from map iteration.
+|===
+
+== Test Plan Corrections
+
+Four "Expected" outcomes in `E2E-Test-Plan.adoc` were stale relative to current behavior and corrected in the
+same change that closed each section (not treated as product bugs):
+
+[cols="1,4"]
+|===
+| Line(s) | Correction
+
+| 5.13, 5.26, 5.27 | Described as "Warning, graceful" / "No match, empty page" outcomes; actual behavior since
+#176's fix is a blocking `model.Validate` error (sync exits 1) — softer pre-#176 behavior was still documented.
+| 5.23 | Clarified that "Empty page" only holds for a *wildcard* nonexistent-include pattern (e.g.
+`["nonexistent.*"]`); a literal nonexistent ID without `*` hits the same blocking error as 5.13/5.26/5.27.
+| 12.5 | Described as "Clear error"; `internal/sync/state.go:60-65` explicitly treats a zero-byte sync-state file
+the same as a missing one (empty state, no error) — "e.g. truncated write".
+|===
+
+== Changelog
+
+[cols="1,3"]
+|===
+| Version | Change
+
+| 2026-07-03 | Round 8 (automated): 116 test-plan lines newly automated across 10 sections/line-groups from #519's
+prioritized list, including the previously-optional section 2 (Validate). 1 bug found and fixed (#520). 4 stale
+test-plan expectations corrected. Added `scripts/e2e-test-report.sh` tooling and wired it into CI.
+|===

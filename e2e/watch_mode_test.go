@@ -5,10 +5,12 @@ package e2e
 // the model, and asserts the draw.io reflects the change within a timeout.
 
 import (
+	"bufio"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -29,18 +31,56 @@ func TestWatchMode(t *testing.T) {
 		"--model", "architecture.jsonc",
 	)
 	watchCmd.Dir = dir
+	stdout, err := watchCmd.StdoutPipe()
+	if err != nil {
+		t.Fatalf("StdoutPipe: %v", err)
+	}
 	if err := watchCmd.Start(); err != nil {
 		t.Fatalf("start watch: %v", err)
 	}
-	t.Cleanup(func() { _ = watchCmd.Process.Kill() })
+	t.Cleanup(func() {
+		// watch handles SIGINT/SIGTERM for graceful shutdown (cmd/bausteinsicht/watch.go).
+		// A hard Process.Kill() (SIGKILL) cannot be intercepted, so the -cover
+		// instrumented binary never gets to flush its coverage counters to
+		// GOCOVERDIR on exit — this silently zeroed out internal/watcher's E2E
+		// coverage despite this test existing. SIGTERM + Wait() lets it exit
+		// normally instead; Kill() remains as a fallback if it hangs.
+		done := make(chan struct{})
+		go func() { _ = watchCmd.Wait(); close(done) }()
+		_ = watchCmd.Process.Signal(syscall.SIGTERM)
+		select {
+		case <-done:
+		case <-time.After(2 * time.Second):
+			_ = watchCmd.Process.Kill()
+			<-done
+		}
+	})
 
-	// Give watch time to start and perform its initial sync.
-	time.Sleep(500 * time.Millisecond)
+	// Wait for watch's startup log line before mutating the model, instead of
+	// a fixed sleep — reduces (but does not fully eliminate; the watcher is
+	// registered slightly after this line is printed) the race between the
+	// model write below and fsnotify's watch registration.
+	readyCh := make(chan struct{})
+	go func() {
+		scanner := bufio.NewScanner(stdout)
+		for scanner.Scan() {
+			if strings.Contains(scanner.Text(), "Watching") {
+				close(readyCh)
+				return
+			}
+		}
+	}()
+	select {
+	case <-readyCh:
+	case <-time.After(3 * time.Second):
+		t.Fatal("watch did not print its startup message within 3s")
+	}
+	time.Sleep(200 * time.Millisecond)
 
 	// Mutate the model: change customer.title.
-	m, err := model.Load(modelPath)
-	if err != nil {
-		t.Fatalf("model.Load: %v", err)
+	m, loadErr := model.Load(modelPath)
+	if loadErr != nil {
+		t.Fatalf("model.Load: %v", loadErr)
 	}
 	cust := m.Model["customer"]
 	cust.Title = "Watch Test Customer"
