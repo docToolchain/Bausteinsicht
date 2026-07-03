@@ -1,7 +1,7 @@
 @startuml
 !include <C4/C4_Component>
 
-Container(bausteinsicht_export, "Export", "Go", "Diagram export to PNG and SVG formats via draw.io CLI")
+Container(bausteinsicht_export, "Export", "Go", "Export diagrams to PNG, SVG, and other visual formats via draw.io CLI")
 Container(bausteinsicht_sync, "Sync Engine", "Go", "Bidirectional synchronization engine between JSONC model and draw.io diagrams")
 System_Ext(drawio_app, "draw.io App", "draw.io desktop or web application for visual diagram editing")
 Container_Boundary(bausteinsicht_drawio, "draw.io") {

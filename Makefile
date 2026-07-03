@@ -6,7 +6,7 @@ DIST := dist
         build_windows_amd64 build_windows_arm64 \
         schema-generate schema-validate \
         build-extension package-extension \
-        test test-race bench coverage coverage-report e2e-test-report vet staticcheck gosec nilaway govulncheck deadcode \
+        test test-race bench coverage coverage-report e2e-test-report arc42-docs vet staticcheck gosec nilaway govulncheck deadcode \
         gitleaks golangci-lint check check-duplicates clean install-tools install-hooks
 
 # Ensure GOPATH/bin is in PATH for installed tools
@@ -106,6 +106,11 @@ e2e-test-report:
 	@echo "Generating line-accurate E2E test report..."
 	@scripts/e2e-test-report.sh > e2e-test-report.adoc
 	@echo "📋 Report written to e2e-test-report.adoc"
+
+# Regenerate arc42 chapter 5's generated artifacts (element tables, .puml,
+# PNG diagrams) from src/docs/arc42/architecture.jsonc (see #524, #526)
+arc42-docs:
+	@scripts/generate-arc42-docs.sh
 
 # Run benchmarks
 bench:

@@ -1,0 +1,55 @@
+[cols="2,1,1,3"]
+|===
+| Element | Kind | Technology | Description
+
+| Add
+| component
+| Go
+| Add element/relationship/view/specification/pattern subcommands
+
+| Analysis
+| component
+| Go
+| find, show, status, stale, health, graph, and lint subcommands
+
+| Core
+| component
+| Go
+| Root command wiring, init, sync, validate, watch, and template resolution
+
+| Evolution
+| component
+| Go
+| snapshot (save/list/diff/restore/delete), diff, and changelog subcommands
+
+| Export Commands
+| component
+| Go
+| export, export-diagram, export-table, and export-sequence subcommands
+
+| Interactive
+| component
+| Go
+| repl, overlay, and adr subcommands
+
+| Tooling
+| component
+| Go
+| import, generate-template, layout, schema, and workspace subcommands
+
+| Model
+| container
+| Go
+| JSONC architecture model management — loading, validation, and mutation
+
+| Sync Engine
+| container
+| Go
+| Bidirectional synchronization engine between JSONC model and draw.io diagrams
+
+| Watcher
+| container
+| Go / fsnotify
+| File system monitoring for automatic sync on model or diagram changes
+
+|===

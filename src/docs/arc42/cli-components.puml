@@ -1,0 +1,22 @@
+@startuml
+!include <C4/C4_Component>
+
+Container(bausteinsicht_model, "Model", "Go", "JSONC architecture model management — loading, validation, and mutation")
+Container(bausteinsicht_sync, "Sync Engine", "Go", "Bidirectional synchronization engine between JSONC model and draw.io diagrams")
+Container(bausteinsicht_watcher, "Watcher", "Go / fsnotify", "File system monitoring for automatic sync on model or diagram changes")
+Container_Boundary(bausteinsicht_cli, "CLI") {
+  Component(bausteinsicht_cli_add, "Add", "Go", "Add element/relationship/view/specification/pattern subcommands")
+  Component(bausteinsicht_cli_analysis, "Analysis", "Go", "find, show, status, stale, health, graph, and lint subcommands")
+  Component(bausteinsicht_cli_core, "Core", "Go", "Root command wiring, init, sync, validate, watch, and template resolution")
+  Component(bausteinsicht_cli_evolution, "Evolution", "Go", "snapshot (save/list/diff/restore/delete), diff, and changelog subcommands")
+  Component(bausteinsicht_cli_export_cmds, "Export Commands", "Go", "export, export-diagram, export-table, and export-sequence subcommands")
+  Component(bausteinsicht_cli_interactive, "Interactive", "Go", "repl, overlay, and adr subcommands")
+  Component(bausteinsicht_cli_tooling, "Tooling", "Go", "import, generate-template, layout, schema, and workspace subcommands")
+}
+
+Rel(bausteinsicht_cli, bausteinsicht_model, "loads/saves JSONC")
+Rel(bausteinsicht_cli, bausteinsicht_sync, "triggers sync")
+Rel(bausteinsicht_cli, bausteinsicht_watcher, "starts watch mode")
+Rel(bausteinsicht_sync, bausteinsicht_model, "comment-preserving updates")
+Rel(bausteinsicht_watcher, bausteinsicht_sync, "triggers on file change")
+@enduml

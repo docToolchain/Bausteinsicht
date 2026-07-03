@@ -30,7 +30,7 @@
 | Export
 | container
 | Go
-| Diagram export to PNG and SVG formats via draw.io CLI
+| Export diagrams to PNG, SVG, and other visual formats via draw.io CLI
 
 | Sync Engine
 | container
