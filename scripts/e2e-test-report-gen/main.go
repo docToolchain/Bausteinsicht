@@ -292,25 +292,33 @@ func buildReport(lines []planLine, results map[string]testResult, autoDetected m
 }
 
 // planIDLess orders IDs like "8b.4" and "8.12" sensibly: numeric section
-// prefix first (with optional letter suffix as a tiebreaker), then numeric
-// line number.
+// number first (so "20.1" sorts after "8.1", not before it as a plain
+// string compare would — '2' < '8' lexicographically), then the optional
+// letter suffix ("8" before "8b"), then numeric line number (so "8.2"
+// sorts before "8.12").
 func planIDLess(a, b string) bool {
-	sa, na := splitPlanID(a)
-	sb, nb := splitPlanID(b)
-	if sa != sb {
-		return sa < sb
+	na, la, ta := splitPlanID(a)
+	nb, lb, tb := splitPlanID(b)
+	if na != nb {
+		return na < nb
 	}
-	return na < nb
+	if la != lb {
+		return la < lb
+	}
+	return ta < tb
 }
 
-var planIDRe = regexp.MustCompile(`^(\d+[a-z]?)\.(\d+)$`)
+var planIDRe = regexp.MustCompile(`^(\d+)([a-z]?)\.(\d+)$`)
 
-func splitPlanID(id string) (section string, line int) {
+// splitPlanID splits a plan ID into its numeric section, optional letter
+// suffix, and numeric line number, e.g. "8b.4" -> (8, "b", 4).
+func splitPlanID(id string) (sectionNum int, sectionLetter string, line int) {
 	m := planIDRe.FindStringSubmatch(id)
 	if m == nil {
-		return id, 0
+		return 0, id, 0
 	}
-	// planIDRe guarantees m[2] is all digits, so the error is unreachable.
-	n, _ := strconv.Atoi(m[2])
-	return m[1], n
+	// planIDRe guarantees m[1] and m[3] are all digits, so these errors are unreachable.
+	sectionNum, _ = strconv.Atoi(m[1])
+	line, _ = strconv.Atoi(m[3])
+	return sectionNum, m[2], line
 }
