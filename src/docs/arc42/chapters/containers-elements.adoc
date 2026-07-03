@@ -2,10 +2,30 @@
 |===
 | Element | Kind | Technology | Description
 
+| Changelog
+| container
+| Go
+| Architecture changelog generation between two git refs
+
 | CLI
 | container
 | Go / Cobra
 | Command-line interface providing validate, sync, export, and watch commands
+
+| Constraints
+| container
+| Go
+| Validation constraints for model linting and consistency checking
+
+| Diagram
+| container
+| Go
+| Text-based diagram export to Mermaid C4 and PlantUML formats with markdown wrapping
+
+| Diff
+| container
+| Go
+| As-is vs. to-be architecture comparison
 
 | draw.io
 | container
@@ -15,22 +35,92 @@
 | Export
 | container
 | Go
-| Diagram export to PNG and SVG formats via draw.io CLI
+| Export diagrams to PNG, SVG, and other visual formats via draw.io CLI
+
+| Exporter
+| container
+| Go
+| Architecture export to Structurizr DSL and other formats
+
+| Graph
+| container
+| Go
+| Relationship graph analysis — cycle detection and dependency depth
+
+| Health
+| container
+| Go
+| Architecture health scoring — completeness, conformance, and complexity
+
+| Importer
+| container
+| Go
+| Import architecture from Structurizr DSL and LikeC4 formats
+
+| Layout
+| container
+| Go
+| Auto-layout algorithms for positioning elements in draw.io diagrams
+
+| Language Server
+| container
+| Go
+| Language Server Protocol implementation for VS Code and other editors
 
 | Model
 | container
 | Go
 | JSONC architecture model management — loading, validation, and mutation
 
+| Overlay
+| container
+| Go
+| Metric heatmap overlay application and removal on draw.io diagrams
+
+| Schema
+| container
+| Go
+| JSON Schema generation from Go model types for IDE autocompletion
+
+| Search
+| container
+| Go
+| Element and relationship search with filtering and pattern matching
+
+| Snapshot
+| container
+| Go
+| Versioned architecture snapshot storage and restore
+
+| Stale
+| container
+| Go
+| Detects unused or forgotten architecture elements via git history and ADR/status metadata
+
 | Sync Engine
 | container
 | Go
 | Bidirectional synchronization engine between JSONC model and draw.io diagrams
 
+| Table
+| container
+| Go
+| Export architecture to CSV and Markdown table formats
+
+| Template
+| container
+| Go
+| draw.io template generation from element specification (shapes, layout)
+
 | Watcher
 | container
 | Go / fsnotify
 | File system monitoring for automatic sync on model or diagram changes
+
+| Workspace
+| container
+| Go
+| Multi-model workspace configuration loading and merging
 
 | Developer
 | actor
