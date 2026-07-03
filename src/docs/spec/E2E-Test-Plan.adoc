@@ -29,9 +29,9 @@ This is a grep/keyword-based pass, not an exhaustive row-by-row audit — treat 
 | 1 | Basic Workflow | 6 | ~2/6 | `init`/`validate` incidentally exercised as setup in nearly every test, but double-init, read-only dir, `init --format json`, and the "Already in sync" message have no dedicated assertion
 | 2 | Validate | 25 | 0/25 | Zero e2e coverage of these specific edge cases; very likely covered at the `internal/model` unit-test level (schema/referential-integrity edge cases don't need a subprocess)
 | 3 | Forward Sync | 23 | ~5/23 | `sync_roundtrip_test.go`/`conflict_resolution_test.go` cover the core cycle; long IDs/labels, self-referencing relationships, re-parenting, and the `xmllint` well-formedness checks (3.23) are untested
-| 4 | Reverse Sync + Conflicts | 22 | ~6/22 | Conflict resolution itself is well covered (`TestConflictResolution`); JSONC comment preservation (4.16-4.18) and HTML entity/tag handling in labels (4.4-4.7) have **zero** e2e coverage
-| 5 | Views / Wildcards / Scope / Lifting | 28 | 0/28 | Zero e2e coverage; likely well unit-tested in `internal/model/resolve_test.go`, but the interaction with real `sync` output (drawio connectors after lifting) is untested end-to-end
-| 6 | CLI Add Commands | 30 | ~6/30 | Basic add-element/relationship flows are exercised as setup; ID/label validation edge cases and JSONC comment preservation after `add` (6.25-6.30) have zero e2e coverage
+| 4 | Reverse Sync + Conflicts | 22 | ~10/22 | Conflict resolution itself is well covered (`TestConflictResolution`); JSONC comment preservation (4.16-4.18, `jsonc_comment_preservation_test.go`) and HTML entity/tag handling in labels (4.4-4.7, `label_html_handling_test.go`) closed by #519
+| 5 | Views / Wildcards / Scope / Lifting | 28 | 28/28 | Closed by #519 (`views_wildcards_lifting_test.go`) — wildcard/exclude/scope resolution and connector lifting verified against real `sync` output, not just `internal/model/resolve_test.go`
+| 6 | CLI Add Commands | 30 | ~9/30 | Basic add-element/relationship flows are exercised as setup; JSONC comment preservation after `add` (6.25-6.30, `jsonc_comment_preservation_test.go`) closed by #519; other ID/label validation edge cases still untested
 | 7 | Watch Mode | 10 | ~5/10 | Model/drawio change detection and `--mermaid` (added this session) covered; debounce, invalid-model recovery, and clean SIGINT exit are untested
 | 8 | Export (PNG/SVG) | 12 | ~2/12 | Only the draw.io-not-found error path (8.9, added this session) is deterministic; the rest depend on a real draw.io CLI + headless display and mostly skip in CI
 | 8b | Export-Diagram | 10 | ~9/10 | Well covered after this session's work (plantuml/mermaid/structurizr/dot/d2/html); only the `--format json` unknown-format error (8b.4) unverified
@@ -241,7 +241,7 @@ Copy this table into the test report:
 | 5.10 | Exclude nested wildcard | Include `**`, exclude `prefix.*` | Correct
 | 5.11 | Exclude descendants | Include `prefix.**`, exclude `prefix.child.**` | Children excluded, not parent
 | 5.12 | Scope with valid element | `"scope": "webshop"` | Boundary box
-| 5.13 | Scope with non-existent element | | Warning, graceful
+| 5.13 | Scope with non-existent element | | Blocking validation error ("does not resolve to an existing element"), sync exits 1 — not a soft warning; see #176
 | 5.14 | Scope with empty include | | Only boundary
 | 5.15 | Direct + lifted relationships | | Direct has priority
 | 5.16 | Lifted to parent | | Label preserved
@@ -251,11 +251,11 @@ Copy this table into the test report:
 | 5.20 | Remove view from model, sync | | Page removed from drawio
 | 5.21 | Rename view key | | Old page removed, new added
 | 5.22 | Empty include `[]` | | Empty page
-| 5.23 | Nonexistent element in include | | Empty page
+| 5.23 | Nonexistent element in include, as a wildcard pattern (e.g. `["nonexistent.*"]`) | | Empty page — note: a *literal* nonexistent ID (no `*`) is instead a blocking validation error, same as 5.13/5.26/5.27
 | 5.24 | Include = exclude (cancel out) | | Empty page
 | 5.25 | Duplicate entries in include | `["x", "x"]` | Deduplicated
-| 5.26 | Trailing dot `"webshop."` | | No match, empty page
-| 5.27 | Just dots `"..."` | | No match, empty page
+| 5.26 | Trailing dot `"webshop."` | | Blocking validation error ("element does not exist") — not a silent empty page; the #176 fix ("typos like 'customer.' silently remove elements from draw.io") turned this into a hard error
+| 5.27 | Just dots `"..."` | | Blocking validation error ("element does not exist"), same #176 protection
 | 5.28 | 3 views, add element to all | | Element on all 3 pages
 |===
 
