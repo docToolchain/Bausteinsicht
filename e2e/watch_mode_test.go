@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 	"testing"
@@ -40,13 +41,28 @@ func TestWatchMode(t *testing.T) {
 	}
 	t.Cleanup(func() {
 		// watch handles SIGINT/SIGTERM for graceful shutdown (cmd/bausteinsicht/watch.go).
-		// A hard Process.Kill() (SIGKILL) cannot be intercepted, so the -cover
-		// instrumented binary never gets to flush its coverage counters to
-		// GOCOVERDIR on exit — this silently zeroed out internal/watcher's E2E
-		// coverage despite this test existing. SIGTERM + Wait() lets it exit
-		// normally instead; Kill() remains as a fallback if it hangs.
+		// A hard Process.Kill() (SIGKILL on Unix) cannot be intercepted, so the
+		// -cover instrumented binary never gets to flush its coverage counters
+		// to GOCOVERDIR on exit — this silently zeroed out internal/watcher's
+		// E2E coverage despite this test existing. SIGTERM + Wait() lets it
+		// exit normally instead; Kill() remains as a fallback if it hangs.
+		//
+		// On Windows, os/exec's Process.Signal only supports os.Kill — any
+		// other signal, including SIGTERM, is a silent no-op returning
+		// syscall.EWINDOWS without touching the process (see os/exec_windows.go
+		// in the Go stdlib). Sending SIGTERM there would just waste the full
+		// 2s timeout below before falling through to the same Kill() this is
+		// trying to avoid. So on Windows we skip straight to Kill(): the
+		// coverage-flush goal of this cleanup is unreachable on that platform
+		// with this mechanism, not silently degraded — see the "Watch Mode"
+		// row in E2E-Test-Plan.adoc's Automation Status table.
 		done := make(chan struct{})
 		go func() { _ = watchCmd.Wait(); close(done) }()
+		if runtime.GOOS == "windows" {
+			_ = watchCmd.Process.Kill()
+			<-done
+			return
+		}
 		_ = watchCmd.Process.Signal(syscall.SIGTERM)
 		select {
 		case <-done:
