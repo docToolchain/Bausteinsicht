@@ -40,7 +40,7 @@ This is a grep/keyword-based pass, not an exhaustive row-by-row audit — treat 
 | 9 | Draw.io File Integrity | 5 | 0/5 | Zero e2e coverage (no `xmllint`/structural-integrity checks after repeated cycles)
 | 10 | Security / Injection Testing | 9 | 0/9 | Zero e2e coverage; likely covered at the `internal/drawio`/`internal/model` unit level for XML escaping, but path-traversal and shell-injection-via-ID have no black-box confirmation
 | 11 | CLI Flag Interactions | 9 | 0/9 | Zero e2e coverage of `--verbose`, conflicting `--model`/`--template` types, or unknown-flag handling
-| 12 | Sync State Edge Cases | 6 | ~1/6 | Only the idempotency/stable-state check in `sync_roundtrip_test.go`; corrupt/extra/missing `.bausteinsicht-sync` entries untested
+| 12 | Sync State Edge Cases | 6 | 6/6 | Closed by #519 (`sync_state_edge_cases_test.go`); found the 12.5 "Expected" was stale (see doc correction below)
 | 13 | Model File Edge Cases | 7 | 0/7 | Zero e2e coverage (BOM, line endings, minified JSON, 100-element performance)
 | 14 | Template Handling | 6 | 0/6 | Zero e2e coverage of `--template`
 | 15 | Error Output Formatting | 8 | 0/8 | Zero e2e coverage of the `{"error":"...","code":N}` JSON error contract across commands
@@ -442,7 +442,7 @@ Copy this table into the test report:
 | 12.2 | Extra/stale entries | Fake elements in sync state | Cleaned up gracefully
 | 12.3 | Missing entries | Remove some from sync state | No duplicates created
 | 12.4 | Empty sync state `{}` | | No duplicates, rebuilds state
-| 12.5 | Empty file (0 bytes) | | Clear error
+| 12.5 | Empty file (0 bytes) | | Treated the same as a missing file (empty state, no error) — internal/sync/state.go:60-65 explicitly handles "e.g. truncated write"; not a "Clear error" as originally stated here
 | 12.6 | JSON array instead of object | `[]` | Clear type error
 |===
 
