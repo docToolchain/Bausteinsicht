@@ -6,7 +6,7 @@ DIST := dist
         build_windows_amd64 build_windows_arm64 \
         schema-generate schema-validate \
         build-extension package-extension \
-        test test-race bench coverage coverage-report e2e-test-report arc42-docs arc42-drift-check vet staticcheck gosec nilaway govulncheck deadcode \
+        test test-race bench coverage coverage-report e2e-test-report arc42-docs arc42-sequences arc42-drift-check vet staticcheck gosec nilaway govulncheck deadcode \
         gitleaks golangci-lint check check-duplicates clean install-tools install-hooks
 
 # Ensure GOPATH/bin is in PATH for installed tools
@@ -111,6 +111,11 @@ e2e-test-report:
 # PNG diagrams) from src/docs/arc42/architecture.jsonc (see #524, #526)
 arc42-docs:
 	@scripts/generate-arc42-docs.sh
+
+# Regenerate chapter 6's runtime sequence diagrams from `dynamicViews` in
+# architecture.jsonc (see #535). No-op until dynamicViews content exists.
+arc42-sequences:
+	@scripts/generate-arc42-sequences.sh
 
 # Verify every real internal/ and cmd/ package has a matching container
 # element in architecture.jsonc, and vice versa (see #524, #526)
