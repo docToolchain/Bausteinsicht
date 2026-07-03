@@ -8,7 +8,7 @@ jobs:
   check-duplicates:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
           fetch-depth: 0
 
@@ -46,15 +46,8 @@ jobs:
             echo -e "$DUPLICATES"
             echo ""
 
-            gh pr comment ${{ github.event.pull_request.number }} \
-              --body "⚠️ **Potential Duplicate Work Detected**
-
-This PR may overlap with other open PRs:$(echo -e "$DUPLICATES")
-
-Please review and coordinate:
-1. Confirm this PR doesn't duplicate existing work
-2. If duplicate, consider closing this PR
-3. If improvements, consider cherry-picking into existing PR instead"
+            BODY=$(printf '⚠️ **Potential Duplicate Work Detected**\n\nThis PR may overlap with other open PRs:%s\n\nPlease review and coordinate:\n1. Confirm this PR does not duplicate existing work\n2. If duplicate, consider closing this PR\n3. If improvements, consider cherry-picking into existing PR instead' "$(echo -e "$DUPLICATES")")
+            gh pr comment ${{ github.event.pull_request.number }} --body "$BODY"
           else
             echo "✅ No overlapping work detected"
           fi

@@ -8,7 +8,7 @@ jobs:
   freshness:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
           fetch-depth: 0
 
@@ -33,19 +33,8 @@ jobs:
             if [ "$COMMITS_BEHIND" -gt 0 ]; then
               echo "- ⚠️ Branch is behind main" >> $GITHUB_STEP_SUMMARY
 
-              gh pr comment ${{ github.event.pull_request.number }} \
-                --body "⚠️ **Branch is behind main by $COMMITS_BEHIND commit(s)**
-
-This may cause merge conflicts or miss recent bug fixes/improvements.
-
-**Recommended action:**
-\`\`\`bash
-git fetch origin
-git rebase origin/main
-git push --force-with-lease
-\`\`\`
-
-This ensures compatibility with the latest main and prevents conflicts."
+              BODY=$(printf '⚠️ **Branch is behind main by %s commit(s)**\n\nThis may cause merge conflicts or miss recent bug fixes/improvements.\n\n**Recommended action:**\n```bash\ngit fetch origin\ngit rebase origin/main\ngit push --force-with-lease\n```\n\nThis ensures compatibility with the latest main and prevents conflicts.' "$COMMITS_BEHIND")
+              gh pr comment ${{ github.event.pull_request.number }} --body "$BODY"
             fi
           else
             echo "✅ Branch is up-to-date with main" >> $GITHUB_STEP_SUMMARY

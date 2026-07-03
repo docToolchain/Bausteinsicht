@@ -9,7 +9,7 @@ jobs:
   check-stale:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
           fetch-depth: 0
 
@@ -34,8 +34,10 @@ jobs:
             # Check if merged to main
             if ! git merge-base --is-ancestor origin/$branch origin/main 2>/dev/null; then
               if [ "$DAYS_OLD" -gt 7 ]; then
-                STALE_BRANCHES="$STALE_BRANCHES- \`$branch\` ($DAYS_OLD days old)
-"
+                # The trailing \n must be appended outside $(...): command
+                # substitution strips trailing newlines, which would run
+                # consecutive entries together on one line.
+                STALE_BRANCHES="${STALE_BRANCHES}$(printf -- '- `%s` (%s days old)' "$branch" "$DAYS_OLD")"$'\n'
                 BRANCH_COUNT=$((BRANCH_COUNT + 1))
               fi
             fi
@@ -49,23 +51,10 @@ jobs:
             echo "$STALE_BRANCHES" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
 
+            BODY=$(printf 'Found stale branches (not merged to main, >7 days old):\n\n%s\n\n**Recommendation:**\nReview if these branches should be:\n1. Merged (if still relevant work)\n2. Deleted (if work is abandoned or superseded)\n\nDelete with:\n```bash\ngit fetch origin\ngit branch -D <branch>\ngit push origin --delete <branch>\n```' "$STALE_BRANCHES")
             gh issue create \
               --title "🧹 Cleanup: Stale branches found" \
-              --body "Found stale branches (not merged to main, >7 days old):
-
-$STALE_BRANCHES
-
-**Recommendation:**
-Review if these branches should be:
-1. Merged (if still relevant work)
-2. Deleted (if work is abandoned or superseded)
-
-Delete with:
-\`\`\`bash
-git fetch origin
-git branch -D <branch>
-git push origin --delete <branch>
-\`\`\`" \
+              --body "$BODY" \
               --label infrastructure \
               2>/dev/null || echo "Issue already exists or other error"
           else
