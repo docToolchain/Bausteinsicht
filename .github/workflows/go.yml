@@ -267,6 +267,80 @@ jobs:
               });
             }
 
+  e2e-plan-report:
+    name: E2E Test Plan Report (line-accurate)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        with:
+          go-version-file: go.mod
+      - name: Generate line-accurate E2E-Test-Plan.adoc report
+        # Artifact + PR comment only — this does NOT commit
+        # src/docs/e2e-test-report-<date>.adoc to main. Per #519, that's a
+        # separate, deliberate decision left for later.
+        run: |
+          chmod +x scripts/e2e-test-report.sh
+          scripts/e2e-test-report.sh > e2e-test-report.adoc
+        continue-on-error: true
+      - name: Append to job summary
+        if: always()
+        run: |
+          if [ -f e2e-test-report.adoc ]; then
+            {
+              echo '```asciidoc'
+              cat e2e-test-report.adoc
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "⚠️ e2e-test-report.adoc was not generated." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-plan-report
+          path: e2e-test-report.adoc
+          retention-days: 30
+      - name: Post or update PR comment
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            if (!fs.existsSync('e2e-test-report.adoc')) return;
+            const body = fs.readFileSync('e2e-test-report.adoc', 'utf8');
+            const marker = '<!-- bsx-e2e-plan-report -->';
+            const fullBody = marker + '\n## 🧪 E2E Test Plan Report (generated)\n\n'
+              + '<details><summary>Per-line PASS/FAIL/SKIP (click to expand)</summary>\n\n'
+              + '```asciidoc\n' + body + '\n```\n\n</details>\n\n'
+              + '💡 `SKIP: not automated` means no `e2e/*_test.go` test is mapped to that line yet — see `internal/e2eplan` and `E2E-Test-Plan.adoc`\'s "Generating a Line-Accurate Report Automatically" section.';
+
+            const comments = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.data.find(c => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body: fullBody,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: fullBody,
+              });
+            }
+
   coverage:
     runs-on: ubuntu-latest
     permissions:
