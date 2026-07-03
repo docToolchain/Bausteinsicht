@@ -50,7 +50,51 @@
           "kind": "container",
           "title": "CLI",
           "description": "Command-line interface providing validate, sync, export, and watch commands",
-          "technology": "Go / Cobra"
+          "technology": "Go / Cobra",
+          "children": {
+            "core": {
+              "kind": "component",
+              "title": "Core",
+              "description": "Root command wiring, init, sync, validate, watch, and template resolution",
+              "technology": "Go"
+            },
+            "add": {
+              "kind": "component",
+              "title": "Add",
+              "description": "Add element/relationship/view/specification/pattern subcommands",
+              "technology": "Go"
+            },
+            "export_cmds": {
+              "kind": "component",
+              "title": "Export Commands",
+              "description": "export, export-diagram, export-table, and export-sequence subcommands",
+              "technology": "Go"
+            },
+            "analysis": {
+              "kind": "component",
+              "title": "Analysis",
+              "description": "find, show, status, stale, health, graph, and lint subcommands",
+              "technology": "Go"
+            },
+            "evolution": {
+              "kind": "component",
+              "title": "Evolution",
+              "description": "snapshot (save/list/diff/restore/delete), diff, and changelog subcommands",
+              "technology": "Go"
+            },
+            "tooling": {
+              "kind": "component",
+              "title": "Tooling",
+              "description": "import, generate-template, layout, schema, and workspace subcommands",
+              "technology": "Go"
+            },
+            "interactive": {
+              "kind": "component",
+              "title": "Interactive",
+              "description": "repl, overlay, and adr subcommands",
+              "technology": "Go"
+            }
+          }
         },
         "drawio": {
           "kind": "container",
@@ -261,6 +305,79 @@
           "title": "Watcher",
           "description": "File system monitoring for automatic sync on model or diagram changes",
           "technology": "Go / fsnotify"
+        },
+
+        // internal/benchmarks, internal/chaos, and internal/e2eplan are
+        // deliberately NOT modeled here: they are test/tooling packages
+        // (performance benchmarks, chaos testing, and the e2e-test-plan
+        // report generator's own registry), not part of the product's own
+        // architecture — see the "container" spec definition above ("A Go
+        // package group within the system"). See #524.
+        "changelog": {
+          "kind": "container",
+          "title": "Changelog",
+          "description": "Architecture changelog generation between two git refs",
+          "technology": "Go"
+        },
+        "diff": {
+          "kind": "container",
+          "title": "Diff",
+          "description": "As-is vs. to-be architecture comparison",
+          "technology": "Go"
+        },
+        "graph": {
+          "kind": "container",
+          "title": "Graph",
+          "description": "Relationship graph analysis — cycle detection and dependency depth",
+          "technology": "Go"
+        },
+        "health": {
+          "kind": "container",
+          "title": "Health",
+          "description": "Architecture health scoring — completeness, conformance, and complexity",
+          "technology": "Go"
+        },
+        "layout": {
+          "kind": "container",
+          "title": "Layout",
+          "description": "Auto-layout algorithms for positioning elements in draw.io diagrams",
+          "technology": "Go"
+        },
+        "overlay": {
+          "kind": "container",
+          "title": "Overlay",
+          "description": "Metric heatmap overlay application and removal on draw.io diagrams",
+          "technology": "Go"
+        },
+        "schema": {
+          "kind": "container",
+          "title": "Schema",
+          "description": "JSON Schema generation from Go model types for IDE autocompletion",
+          "technology": "Go"
+        },
+        "snapshot": {
+          "kind": "container",
+          "title": "Snapshot",
+          "description": "Versioned architecture snapshot storage and restore",
+          "technology": "Go"
+        },
+        "stale": {
+          "kind": "container",
+          "title": "Stale",
+          "description": "Detects unused or forgotten architecture elements via git history and ADR/status metadata",
+          "technology": "Go"
+        },
+        "template": {
+          "kind": "container",
+          "title": "Template",
+          "description": "draw.io template generation from element specification (shapes, layout)",
+          "technology": "Go"
+        },
+        "workspace": {
+          "kind": "container",
+          "title": "Workspace",
+          "description": "Multi-model workspace configuration loading and merging",
+          "technology": "Go"
         }
       }
     },
@@ -381,6 +498,72 @@
       "from": "bausteinsicht.cli",
       "to": "bausteinsicht.lsp",
       "label": "starts language server",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.cli",
+      "to": "bausteinsicht.changelog",
+      "label": "triggers changelog generation",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.cli",
+      "to": "bausteinsicht.diff",
+      "label": "triggers as-is/to-be diff",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.cli",
+      "to": "bausteinsicht.graph",
+      "label": "triggers graph analysis",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.cli",
+      "to": "bausteinsicht.health",
+      "label": "triggers health scoring",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.cli",
+      "to": "bausteinsicht.layout",
+      "label": "triggers auto-layout",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.cli",
+      "to": "bausteinsicht.overlay",
+      "label": "triggers overlay apply/remove",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.cli",
+      "to": "bausteinsicht.schema",
+      "label": "triggers schema generation",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.cli",
+      "to": "bausteinsicht.snapshot",
+      "label": "manages snapshots",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.cli",
+      "to": "bausteinsicht.stale",
+      "label": "triggers stale-element detection",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.cli",
+      "to": "bausteinsicht.template",
+      "label": "generates draw.io templates",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.cli",
+      "to": "bausteinsicht.workspace",
+      "label": "loads/merges workspace config",
       "kind": "uses"
     },
     {
@@ -580,6 +763,96 @@
       "to": "bausteinsicht.model",
       "label": "indexes for completion",
       "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.changelog",
+      "to": "bausteinsicht.diff",
+      "label": "computes as-is/to-be delta per ref",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.changelog",
+      "to": "bausteinsicht.model",
+      "label": "loads model at each git ref",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.diff",
+      "to": "bausteinsicht.model",
+      "label": "reads as-is/to-be sections",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.graph",
+      "to": "bausteinsicht.model",
+      "label": "reads elements and relationships",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.health",
+      "to": "bausteinsicht.model",
+      "label": "reads elements for scoring",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.layout",
+      "to": "bausteinsicht.drawio",
+      "label": "writes computed positions",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.layout",
+      "to": "bausteinsicht.model",
+      "label": "reads element hierarchy",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.schema",
+      "to": "bausteinsicht.model",
+      "label": "reflects Go struct types",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.snapshot",
+      "to": "bausteinsicht.model",
+      "label": "serializes/restores model state",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.stale",
+      "to": "bausteinsicht.drawio",
+      "label": "reads/writes risk-color marking",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.stale",
+      "to": "bausteinsicht.model",
+      "label": "reads status/ADR metadata",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.stale",
+      "to": "bausteinsicht.overlay",
+      "label": "reuses heatmap color scale",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.template",
+      "to": "bausteinsicht.drawio",
+      "label": "generates template shapes/styles",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.template",
+      "to": "bausteinsicht.model",
+      "label": "reads element kind specification",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.workspace",
+      "to": "bausteinsicht.model",
+      "label": "merges multiple models",
+      "kind": "uses"
     }
   ],
   "views": {
@@ -677,6 +950,17 @@
         "bausteinsicht.cli"
       ],
       "description": "Element and relationship search with pattern matching and filtering"
+    },
+    "cli-components": {
+      "title": "CLI Package Components",
+      "scope": "bausteinsicht.cli",
+      "include": [
+        "bausteinsicht.cli.*",
+        "bausteinsicht.model",
+        "bausteinsicht.sync",
+        "bausteinsicht.watcher"
+      ],
+      "description": "CLI subcommand clusters, grouped by concern rather than one component per file"
     }
   }
 }
