@@ -8,7 +8,7 @@ jobs:
   verify-from-main:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
           fetch-depth: 0
 
@@ -41,21 +41,8 @@ jobs:
             echo "  git push --force-with-lease"
             echo ""
 
-            gh pr comment ${{ github.event.pull_request.number }} \
-              --body "⚠️ **Branch Behind Main**
-
-This branch is based on an older commit from main and is behind by **$COMMITS_BEHIND commit(s)**.
-
-This often happens when a feature branch is created from another feature branch instead of from main directly.
-
-**Recommendation:**
-\`\`\`bash
-git fetch origin
-git rebase origin/main
-git push --force-with-lease
-\`\`\`
-
-After rebasing, this warning will disappear."
+            BODY=$(printf '⚠️ **Branch Behind Main**\n\nThis branch is based on an older commit from main and is behind by **%s commit(s)**.\n\nThis often happens when a feature branch is created from another feature branch instead of from main directly.\n\n**Recommendation:**\n```bash\ngit fetch origin\ngit rebase origin/main\ngit push --force-with-lease\n```\n\nAfter rebasing, this warning will disappear.' "$COMMITS_BEHIND")
+            gh pr comment ${{ github.event.pull_request.number }} --body "$BODY"
 
             # Don't fail - let it proceed with warning
           fi

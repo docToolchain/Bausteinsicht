@@ -922,6 +922,7 @@ Exports views as text diagrams in one of several formats (C4-PlantUML, Mermaid, 
 * Without `--output`, the diagram(s) are written to stdout. With `--output <dir>`, per-view files are named `<view-key>.<ext>`, where `<ext>` is `puml`, `mmd`, `dot`, `d2`, or `html`.
 * `--diagram-format structurizr` is special: it exports the entire workspace as a single `workspace.dsl` file and rejects `--view` (exit code 1).
 * Creates the output directory if it does not exist.
+* Before rendering each view, prints a `WARNING: view "<key>" resolves to 0 elements — check its scope/include/exclude; the exported diagram will be empty` to stderr if the view's resolved element set is empty. This does not fail the export (exit code stays `0`) — it only surfaces a diagram that would otherwise silently look successful despite being empty (#512).
 
 **JSON output structure** — `--format json` emits an array of one object per exported view (not a file list):
 [source,json]
@@ -1245,6 +1246,8 @@ Imports an architecture model from an external DSL and writes a Bausteinsicht `.
 **Behavior:** parses the source DSL, maps people/systems/containers and relationships, and generates a matching specification. Exit `2` if the output file already exists and neither `--force` nor `--dry-run` is set — `--dry-run` prints to stdout and skips the existence check, so it never fails on an existing output. Exit `1` on any other import failure (unknown `--from`, unreadable input, parse/encoding error).
 
 **XMI-specific behavior:** reads XMI 2.1 files (e.g., Enterprise Architect exports). UML element types are mapped to Bausteinsicht element kinds using `--kind-map` overrides or the built-in defaults (e.g., `uml:Component` → `component`). EA stereotypes (inside `xmi:Extension`) take precedence over the UML type mapping. Unknown UML types produce a warning and are imported with kind `element`. Unresolvable relationship endpoints are skipped with a warning. DOCTYPE declarations are rejected (XXE mitigation). Element hierarchy depth is capped at 50 levels. This is a **one-way migration** — XMI-specific data (layout, tagged values, OCL constraints) is not preserved.
+
+**Structurizr-specific behavior:** a view's `autoLayout <direction>` directive is mapped to Bausteinsicht's `layered` layout (there is no direction-aware equivalent). The direction argument itself is not preserved, and a warning is emitted noting the dropped value (e.g. `line 12: view "context": autoLayout direction "lr" not preserved, mapped to layout: "layered"`). `include *` on a `container`/`component` view is expanded to also include the view's scope's children (e.g. `["*", "<scope>.*"]`, plus the parent scope for `component` views), matching Structurizr's semantics where a scoped view's wildcard include means "everything visible in this scope" rather than Bausteinsicht's default top-level-only `*` match. `filtered`, `dynamic`, and `deployment` views are not supported and are skipped with a warning (#512).
 
 ==== `bausteinsicht generate-template`
 

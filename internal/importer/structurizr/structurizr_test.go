@@ -229,6 +229,72 @@ func TestImport_UnknownViewType_Warning(t *testing.T) {
 	}
 }
 
+func TestImport_AutoLayout_MapsToLayeredAndWarns(t *testing.T) {
+	// autoLayout has no direction-aware Bausteinsicht equivalent; the importer
+	// must map it to a valid layout value ("layered", not "auto" — which
+	// model.Validate rejects) and warn that the direction argument is dropped.
+	const src = `workspace {
+  model {
+    a = softwareSystem "A"
+  }
+  views {
+    systemContext a "Context" {
+      include *
+      autoLayout lr
+    }
+  }
+}`
+	result, err := structurizr.ImportSource(src)
+	if err != nil {
+		t.Fatalf("ImportSource failed: %v", err)
+	}
+	m := result.Model
+
+	view, ok := m.Views["a"]
+	if !ok {
+		t.Fatal("expected view key 'a'")
+	}
+	if view.Layout != "layered" {
+		t.Errorf("expected layout \"layered\", got %q", view.Layout)
+	}
+
+	var found bool
+	for _, w := range result.Warnings {
+		if strings.Contains(w, "autoLayout direction") && strings.Contains(w, `"lr"`) {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected a warning about the dropped autoLayout direction, got warnings: %v", result.Warnings)
+	}
+}
+
+func TestImport_AutoLayout_NoDirection_NoWarning(t *testing.T) {
+	// autoLayout with no direction argument has nothing to drop, so no warning
+	// should be emitted — only the layout mapping itself.
+	const src = `workspace {
+  model {
+    a = softwareSystem "A"
+  }
+  views {
+    systemContext a "Context" {
+      include *
+      autoLayout
+    }
+  }
+}`
+	result, err := structurizr.ImportSource(src)
+	if err != nil {
+		t.Fatalf("ImportSource failed: %v", err)
+	}
+	for _, w := range result.Warnings {
+		if strings.Contains(w, "autoLayout direction") {
+			t.Errorf("expected no autoLayout-direction warning without a direction argument, got: %v", result.Warnings)
+		}
+	}
+}
+
 func TestImport_PathTraversalRejected(t *testing.T) {
 	tmpDir := t.TempDir()
 

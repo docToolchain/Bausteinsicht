@@ -6,7 +6,7 @@ DIST := dist
         build_windows_amd64 build_windows_arm64 \
         schema-generate schema-validate \
         build-extension package-extension \
-        test test-race bench coverage coverage-report vet staticcheck gosec nilaway govulncheck deadcode \
+        test test-race bench coverage coverage-report e2e-test-report vet staticcheck gosec nilaway govulncheck deadcode \
         gitleaks golangci-lint check check-duplicates clean install-tools install-hooks
 
 # Ensure GOPATH/bin is in PATH for installed tools
@@ -100,6 +100,12 @@ coverage-report:
 	@echo "Generating side-by-side coverage report..."
 	@scripts/coverage-report.sh > coverage-report.md
 	@echo "📊 Report written to coverage-report.md"
+
+# Line-accurate PASS/FAIL/SKIP report for E2E-Test-Plan.adoc (see #519)
+e2e-test-report:
+	@echo "Generating line-accurate E2E test report..."
+	@scripts/e2e-test-report.sh > e2e-test-report.adoc
+	@echo "📋 Report written to e2e-test-report.adoc"
 
 # Run benchmarks
 bench:

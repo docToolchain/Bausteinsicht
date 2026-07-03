@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
@@ -114,4 +115,24 @@ func runCLIAllowFail(t *testing.T, bin, dir string, args ...string) (string, int
 		code = cmd.ProcessState.ExitCode()
 	}
 	return string(out), code
+}
+
+// runCLISplit runs the binary with stdout and stderr captured separately
+// (unlike runCLI/runCLIAllowFail, which merge them) and returns both plus
+// the exit code, without failing the test on a non-zero exit.
+func runCLISplit(t *testing.T, bin, dir string, args ...string) (stdout, stderr string, code int) {
+	t.Helper()
+	cmd := exec.Command(bin, args...)
+	cmd.Dir = dir
+	var outBuf, errBuf bytes.Buffer
+	cmd.Stdout = &outBuf
+	cmd.Stderr = &errBuf
+	err := cmd.Run()
+	if err != nil && cmd.ProcessState == nil {
+		t.Fatalf("exec %s: %v", bin, err)
+	}
+	if cmd.ProcessState != nil {
+		code = cmd.ProcessState.ExitCode()
+	}
+	return outBuf.String(), errBuf.String(), code
 }

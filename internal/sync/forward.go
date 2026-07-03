@@ -1185,18 +1185,26 @@ func mergeStyles(base, overlay string) string {
 		return overlay
 	}
 
-	// Parse overlay keys.
+	// Parse overlay keys. overlayOrder preserves the overlay's original
+	// declaration order so the merged style string is deterministic —
+	// ranging over overlayKeys directly would iterate in Go's randomized
+	// map order, producing a different byte sequence on every run even for
+	// identical input (found via e2e testing, #519).
 	overlayKeys := make(map[string]string)
+	var overlayOrder []string
 	for _, part := range strings.Split(overlay, ";") {
 		part = strings.TrimSpace(part)
 		if part == "" {
 			continue
 		}
+		key := part
 		if idx := strings.IndexByte(part, '='); idx > 0 {
-			overlayKeys[part[:idx]] = part
-		} else {
-			overlayKeys[part] = part
+			key = part[:idx]
 		}
+		if _, exists := overlayKeys[key]; !exists {
+			overlayOrder = append(overlayOrder, key)
+		}
+		overlayKeys[key] = part
 	}
 
 	// Build result: base properties (skipping those overridden) + overlay.
@@ -1216,8 +1224,8 @@ func mergeStyles(base, overlay string) string {
 		sb.WriteString(part)
 		sb.WriteByte(';')
 	}
-	for _, v := range overlayKeys {
-		sb.WriteString(v)
+	for _, key := range overlayOrder {
+		sb.WriteString(overlayKeys[key])
 		sb.WriteByte(';')
 	}
 	return sb.String()

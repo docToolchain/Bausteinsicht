@@ -727,6 +727,43 @@ func TestMergeStyles_NoDuplicateKeys(t *testing.T) {
 	}
 }
 
+// TestMergeStyles_DeterministicOverlayOrder guards against a real bug found
+// via e2e testing (#519 -> #520): mergeStyles used to range over a Go map to
+// append overlay keys, so the same input could produce differently-ordered
+// (value-equivalent) output across runs — non-reproducible XML for
+// identically-styled elements. Overlay keys must now come out in their
+// original declaration order, every time.
+func TestMergeStyles_DeterministicOverlayOrder(t *testing.T) {
+	base := "shape=mxgraph.c4.person2;fillColor=#08427B;"
+	overlay := "strokeColor=#FF0000;dashed=1;"
+	want := mergeStyles(base, overlay)
+
+	for i := 0; i < 50; i++ {
+		got := mergeStyles(base, overlay)
+		if got != want {
+			t.Fatalf("run %d: mergeStyles is non-deterministic:\n  first: %q\n  got:   %q", i, want, got)
+		}
+	}
+
+	// The overlay's own multi-key order must be preserved exactly as
+	// declared (strokeColor before dashed), not reordered.
+	strokeIdx := strings.Index(want, "strokeColor=#FF0000")
+	dashedIdx := strings.Index(want, "dashed=1")
+	if strokeIdx < 0 || dashedIdx < 0 || strokeIdx > dashedIdx {
+		t.Errorf("expected overlay keys in declared order (strokeColor before dashed), got %q", want)
+	}
+}
+
+// TestMergeStyles_EmptyBaseOrOverlay covers the short-circuit branches.
+func TestMergeStyles_EmptyBaseOrOverlay(t *testing.T) {
+	if got := mergeStyles("shape=x;", ""); got != "shape=x;" {
+		t.Errorf("empty overlay: got %q, want base unchanged", got)
+	}
+	if got := mergeStyles("", "shape=x;"); got != "shape=x;" {
+		t.Errorf("empty base: got %q, want overlay unchanged", got)
+	}
+}
+
 // elementLink returns the link attribute of an element by bausteinsicht_id, or "".
 func elementLink(page *drawio.Page, id string) string {
 	obj := page.FindElement(id)
