@@ -1,0 +1,21 @@
+@startuml error_recovery
+title Error & Recovery: Failed Write During Sync
+
+participant "Software Architect" as architect
+participant "Core" as bausteinsicht_cli_core
+participant "Engine" as bausteinsicht_sync_engine
+participant "Document" as bausteinsicht_drawio_document
+participant "State" as bausteinsicht_sync_state
+
+architect -> bausteinsicht_cli_core : 1. bausteinsicht sync
+bausteinsicht_cli_core -> bausteinsicht_sync_engine : 2. Run(...) — pure, in-memory
+bausteinsicht_sync_engine --> bausteinsicht_cli_core : 3. SyncResult
+bausteinsicht_cli_core -> bausteinsicht_drawio_document : 4. SaveDocument(arch.drawio) — atomic temp-file + rename
+bausteinsicht_cli_core -> bausteinsicht_sync_state : 5. if write succeeded: SaveState(.bausteinsicht-sync), SHA-256 checksummed
+bausteinsicht_cli_core --> architect : 6. if write failed: exit 1, original files intact, state unchanged
+bausteinsicht_cli_core --> architect : 7. if write succeeded: summary
+architect -> bausteinsicht_cli_core : 8. next run: bausteinsicht sync
+bausteinsicht_cli_core -> bausteinsicht_cli_core : 9. state unchanged from failed run → DetectChanges re-finds same delta
+bausteinsicht_cli_core --> architect : 10. completes the interrupted change, no manual repair
+
+@enduml

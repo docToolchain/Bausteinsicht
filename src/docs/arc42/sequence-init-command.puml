@@ -1,0 +1,16 @@
+@startuml init_command
+title Init Command
+
+participant "Software Architect" as architect
+participant "Core" as bausteinsicht_cli_core
+participant "Loader" as bausteinsicht_model_loader
+participant "Engine" as bausteinsicht_sync_engine
+
+architect -> bausteinsicht_cli_core : 1. bausteinsicht init
+bausteinsicht_cli_core -> bausteinsicht_cli_core : 2. check if files already exist (abort with error if so)
+bausteinsicht_cli_core -> bausteinsicht_model_loader : 3. Save(model.jsonc, sample specification + example elements)
+bausteinsicht_cli_core -> bausteinsicht_sync_engine : 4. Run(model, document=empty, state=empty, templates, opts)
+bausteinsicht_sync_engine --> bausteinsicht_cli_core : 5. initial arch.drawio written
+bausteinsicht_cli_core --> architect : 6. Project initialized. Open arch.drawio in draw.io.
+
+@enduml

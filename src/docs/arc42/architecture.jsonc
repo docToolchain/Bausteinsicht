@@ -395,6 +395,21 @@
       "kind": "external_system",
       "title": "IDE",
       "description": "IDE with JSON Schema support for JSONC editing with autocompletion"
+    },
+    "architect": {
+      "kind": "actor",
+      "title": "Software Architect",
+      "description": "Edits the JSONC model or draw.io diagrams directly and runs bausteinsicht CLI commands (sync, init, watch, stale, ...). Deliberately not included in the \"context\" view's structural diagram (see that chapter's NOTE) — modeled here so dynamicViews (chapter 6 runtime scenarios) can reference it as a real participant."
+    },
+    "llm_agent": {
+      "kind": "actor",
+      "title": "LLM Agent",
+      "description": "Uses bausteinsicht CLI commands (add, sync, ...) programmatically, typically with --format json output. Same context-view exclusion rationale as \"architect\"."
+    },
+    "git": {
+      "kind": "external_system",
+      "title": "Git",
+      "description": "Version control read via `git log` by stale detection and changelog generation; optional (both degrade gracefully outside a git repository). Same context-view exclusion rationale as \"architect\"."
     }
   },
   "relationships": [
@@ -962,5 +977,515 @@
       ],
       "description": "CLI subcommand clusters, grouped by concern rather than one component per file"
     }
-  }
+  },
+  "dynamicViews": [
+    {
+      "key": "sync-command",
+      "title": "Sync Command",
+      "description": "The most important runtime scenario: what happens when the user runs `bausteinsicht sync`. Conflict resolution (model wins) happens inside sync.engine, between DetectChanges and Apply, and isn't broken out as separate steps here.",
+      "steps": [
+        {
+          "index": 1,
+          "from": "architect",
+          "to": "bausteinsicht.cli.core",
+          "label": "bausteinsicht sync"
+        },
+        {
+          "index": 2,
+          "from": "bausteinsicht.cli.core",
+          "to": "bausteinsicht.model.loader",
+          "label": "Load(model.jsonc)"
+        },
+        {
+          "index": 3,
+          "from": "bausteinsicht.model.loader",
+          "to": "bausteinsicht.cli.core",
+          "label": "BausteinsichtModel",
+          "type": "return"
+        },
+        {
+          "index": 4,
+          "from": "bausteinsicht.cli.core",
+          "to": "bausteinsicht.drawio.document",
+          "label": "LoadDocument(arch.drawio) + LoadTemplate(template.drawio)"
+        },
+        {
+          "index": 5,
+          "from": "bausteinsicht.drawio.document",
+          "to": "bausteinsicht.cli.core",
+          "label": "Document, TemplateSet",
+          "type": "return"
+        },
+        {
+          "index": 6,
+          "from": "bausteinsicht.cli.core",
+          "to": "bausteinsicht.sync.state",
+          "label": "LoadState(.bausteinsicht-sync)"
+        },
+        {
+          "index": 7,
+          "from": "bausteinsicht.sync.state",
+          "to": "bausteinsicht.cli.core",
+          "label": "SyncState",
+          "type": "return"
+        },
+        {
+          "index": 8,
+          "from": "bausteinsicht.cli.core",
+          "to": "bausteinsicht.sync.engine",
+          "label": "Run(model, document, state, templates, opts)"
+        },
+        {
+          "index": 9,
+          "from": "bausteinsicht.sync.engine",
+          "to": "bausteinsicht.sync.diff",
+          "label": "DetectChanges(model, document, state)"
+        },
+        {
+          "index": 10,
+          "from": "bausteinsicht.sync.diff",
+          "to": "bausteinsicht.sync.engine",
+          "label": "ChangeSet (conflicts resolved here: model wins)",
+          "type": "return"
+        },
+        {
+          "index": 11,
+          "from": "bausteinsicht.sync.engine",
+          "to": "bausteinsicht.sync.forward",
+          "label": "Apply(modelChanges, document, templates, opts)"
+        },
+        {
+          "index": 12,
+          "from": "bausteinsicht.sync.forward",
+          "to": "bausteinsicht.sync.engine",
+          "label": "forward result (adds metadata + legend per view)",
+          "type": "return"
+        },
+        {
+          "index": 13,
+          "from": "bausteinsicht.sync.engine",
+          "to": "bausteinsicht.sync.reverse",
+          "label": "Apply(drawioChanges, model)"
+        },
+        {
+          "index": 14,
+          "from": "bausteinsicht.sync.reverse",
+          "to": "bausteinsicht.sync.engine",
+          "label": "reverse result",
+          "type": "return"
+        },
+        {
+          "index": 15,
+          "from": "bausteinsicht.sync.engine",
+          "to": "bausteinsicht.cli.core",
+          "label": "SyncResult",
+          "type": "return"
+        },
+        {
+          "index": 16,
+          "from": "bausteinsicht.cli.core",
+          "to": "bausteinsicht.model.loader",
+          "label": "PatchSave(model.jsonc) — comment-preserving, full Save fallback"
+        },
+        {
+          "index": 17,
+          "from": "bausteinsicht.cli.core",
+          "to": "bausteinsicht.drawio.document",
+          "label": "SaveDocument(arch.drawio)"
+        },
+        {
+          "index": 18,
+          "from": "bausteinsicht.cli.core",
+          "to": "bausteinsicht.sync.state",
+          "label": "SaveState(.bausteinsicht-sync) — written last, only after both writes succeed"
+        },
+        {
+          "index": 19,
+          "from": "bausteinsicht.cli.core",
+          "to": "architect",
+          "label": "Summary of changes",
+          "type": "return"
+        }
+      ]
+    },
+    {
+      "key": "watch-mode",
+      "title": "Watch Mode",
+      "description": "The continuous sync loop triggered by file changes, with a 300ms debounce (editors often fire multiple save events per edit).",
+      "steps": [
+        {
+          "index": 1,
+          "from": "architect",
+          "to": "bausteinsicht.cli.core",
+          "label": "bausteinsicht watch"
+        },
+        {
+          "index": 2,
+          "from": "bausteinsicht.cli.core",
+          "to": "bausteinsicht.watcher",
+          "label": "Start(model.jsonc, arch.drawio)"
+        },
+        {
+          "index": 3,
+          "from": "bausteinsicht.watcher",
+          "to": "bausteinsicht.watcher",
+          "label": "on file change: debounce 300ms"
+        },
+        {
+          "index": 4,
+          "from": "bausteinsicht.watcher",
+          "to": "bausteinsicht.sync.engine",
+          "label": "Run(model, document, state, templates, opts)"
+        },
+        {
+          "index": 5,
+          "from": "bausteinsicht.sync.engine",
+          "to": "bausteinsicht.watcher",
+          "label": "SyncResult",
+          "type": "return"
+        },
+        {
+          "index": 6,
+          "from": "bausteinsicht.watcher",
+          "to": "architect",
+          "label": "Log + display summary of changes",
+          "type": "return"
+        },
+        {
+          "index": 7,
+          "from": "architect",
+          "to": "bausteinsicht.cli.core",
+          "label": "Ctrl+C"
+        },
+        {
+          "index": 8,
+          "from": "bausteinsicht.cli.core",
+          "to": "bausteinsicht.watcher",
+          "label": "Stop()"
+        }
+      ]
+    },
+    {
+      "key": "init-command",
+      "title": "Init Command",
+      "description": "Bootstraps a new project: sample model + default template + an initial sync against an empty draw.io document.",
+      "steps": [
+        {
+          "index": 1,
+          "from": "architect",
+          "to": "bausteinsicht.cli.core",
+          "label": "bausteinsicht init"
+        },
+        {
+          "index": 2,
+          "from": "bausteinsicht.cli.core",
+          "to": "bausteinsicht.cli.core",
+          "label": "check if files already exist (abort with error if so)"
+        },
+        {
+          "index": 3,
+          "from": "bausteinsicht.cli.core",
+          "to": "bausteinsicht.model.loader",
+          "label": "Save(model.jsonc, sample specification + example elements)"
+        },
+        {
+          "index": 4,
+          "from": "bausteinsicht.cli.core",
+          "to": "bausteinsicht.sync.engine",
+          "label": "Run(model, document=empty, state=empty, templates, opts)"
+        },
+        {
+          "index": 5,
+          "from": "bausteinsicht.sync.engine",
+          "to": "bausteinsicht.cli.core",
+          "label": "initial arch.drawio written",
+          "type": "return"
+        },
+        {
+          "index": 6,
+          "from": "bausteinsicht.cli.core",
+          "to": "architect",
+          "label": "Project initialized. Open arch.drawio in draw.io.",
+          "type": "return"
+        }
+      ]
+    },
+    {
+      "key": "llm-driven-modification",
+      "title": "LLM-Driven Modification",
+      "description": "How an LLM agent uses CLI commands to modify the architecture. `add` only edits the JSON model — it never triggers sync automatically (single responsibility, lets an agent batch changes before syncing).",
+      "steps": [
+        {
+          "index": 1,
+          "from": "llm_agent",
+          "to": "bausteinsicht.cli.add",
+          "label": "bausteinsicht add element --id cache --kind container --title \"Redis Cache\" --parent webshop --format json"
+        },
+        {
+          "index": 2,
+          "from": "bausteinsicht.cli.add",
+          "to": "bausteinsicht.model.loader",
+          "label": "Load(model.jsonc)"
+        },
+        {
+          "index": 3,
+          "from": "bausteinsicht.cli.add",
+          "to": "bausteinsicht.model.validate",
+          "label": "Validate(kind exists, parent exists)"
+        },
+        {
+          "index": 4,
+          "from": "bausteinsicht.model.validate",
+          "to": "bausteinsicht.cli.add",
+          "label": "ok, or { \"error\": ... }",
+          "type": "return"
+        },
+        {
+          "index": 5,
+          "from": "bausteinsicht.cli.add",
+          "to": "bausteinsicht.model.loader",
+          "label": "Save(model.jsonc, updatedModel)"
+        },
+        {
+          "index": 6,
+          "from": "bausteinsicht.cli.add",
+          "to": "llm_agent",
+          "label": "{ \"status\": \"added\", \"id\": \"webshop.cache\" }",
+          "type": "return"
+        },
+        {
+          "index": 7,
+          "from": "llm_agent",
+          "to": "bausteinsicht.cli.core",
+          "label": "bausteinsicht sync — separate command to update draw.io diagram"
+        }
+      ]
+    },
+    {
+      "key": "import-from-external-formats",
+      "title": "Import from Structurizr / LikeC4 / XMI",
+      "description": "How an existing model (Structurizr DSL, LikeC4, or XMI/Enterprise Architect) is brought into Bausteinsicht. The importer never touches draw.io — it only produces a model, immediately syncable with `bausteinsicht sync`. The XMI path additionally buffers the whole file in memory and converts Windows-1252 to UTF-8 before parsing (peak RSS ~2x file size, 200MB read cap) — a materially different cost profile from the other two formats, though the CLI-level flow shown here is the same.",
+      "steps": [
+        {
+          "index": 1,
+          "from": "architect",
+          "to": "bausteinsicht.cli.tooling",
+          "label": "bausteinsicht import workspace.dsl --from structurizr|likec4|xmi [--dry-run]"
+        },
+        {
+          "index": 2,
+          "from": "bausteinsicht.cli.tooling",
+          "to": "bausteinsicht.importer",
+          "label": "Import(file, format)"
+        },
+        {
+          "index": 3,
+          "from": "bausteinsicht.importer",
+          "to": "bausteinsicht.importer",
+          "label": "parse source, map people/systems/containers + relationships"
+        },
+        {
+          "index": 4,
+          "from": "bausteinsicht.importer",
+          "to": "bausteinsicht.cli.tooling",
+          "label": "ImportResult{Model, Warnings}",
+          "type": "return"
+        },
+        {
+          "index": 5,
+          "from": "bausteinsicht.cli.tooling",
+          "to": "architect",
+          "label": "--dry-run: print generated JSONC to stdout",
+          "type": "return"
+        },
+        {
+          "index": 6,
+          "from": "bausteinsicht.cli.tooling",
+          "to": "bausteinsicht.model.loader",
+          "label": "write: Save(architecture.jsonc, model) — exit 2 if exists without --force"
+        },
+        {
+          "index": 7,
+          "from": "bausteinsicht.cli.tooling",
+          "to": "architect",
+          "label": "\"Imported model written\" + warnings",
+          "type": "return"
+        }
+      ]
+    },
+    {
+      "key": "repl-save",
+      "title": "REPL Save: Patch vs. Full-Save Fallback",
+      "description": "The REPL keeps the model in memory and, on `save`, chooses how to persist so JSONC comments survive when possible — the key data-integrity flow. Validation runs before any write; pure additions take the comment-preserving patch path, modifications/deletions fall back to a full rewrite with a visible warning about comment loss. The same patch primitives back the non-interactive `add` commands.",
+      "steps": [
+        {
+          "index": 1,
+          "from": "architect",
+          "to": "bausteinsicht.cli.interactive",
+          "label": "add / remove / edit ... then `save`"
+        },
+        {
+          "index": 2,
+          "from": "bausteinsicht.cli.interactive",
+          "to": "bausteinsicht.model.validate",
+          "label": "Validate(in-memory model)"
+        },
+        {
+          "index": 3,
+          "from": "bausteinsicht.model.validate",
+          "to": "bausteinsicht.cli.interactive",
+          "label": "valid, or \"save aborted — N validation error(s)\"",
+          "type": "return"
+        },
+        {
+          "index": 4,
+          "from": "bausteinsicht.cli.interactive",
+          "to": "bausteinsicht.model.patch",
+          "label": "pure additions: PatchInsert / AppendArrayEntry (comments preserved)"
+        },
+        {
+          "index": 5,
+          "from": "bausteinsicht.cli.interactive",
+          "to": "bausteinsicht.model.loader",
+          "label": "any modification/deletion: Save(model.jsonc) full rewrite (comments may be lost)"
+        },
+        {
+          "index": 6,
+          "from": "bausteinsicht.cli.interactive",
+          "to": "architect",
+          "label": "\"Saved\"",
+          "type": "return"
+        }
+      ]
+    },
+    {
+      "key": "stale-detection",
+      "title": "Stale Detection",
+      "description": "How `bausteinsicht stale` flags forgotten elements using git history. Outside a git repository, git lookups degrade gracefully (no date) and detection falls back to view/relationship membership checks alone.",
+      "steps": [
+        {
+          "index": 1,
+          "from": "architect",
+          "to": "bausteinsicht.cli.analysis",
+          "label": "bausteinsicht stale [--days N]"
+        },
+        {
+          "index": 2,
+          "from": "bausteinsicht.cli.analysis",
+          "to": "bausteinsicht.model.loader",
+          "label": "Load(model.jsonc)"
+        },
+        {
+          "index": 3,
+          "from": "bausteinsicht.cli.analysis",
+          "to": "bausteinsicht.stale",
+          "label": "Detect(model, threshold)"
+        },
+        {
+          "index": 4,
+          "from": "bausteinsicht.stale",
+          "to": "bausteinsicht.stale",
+          "label": "per element: referenced by a view? by a relationship?"
+        },
+        {
+          "index": 5,
+          "from": "bausteinsicht.stale",
+          "to": "git",
+          "label": "last-modified date (git log --follow)"
+        },
+        {
+          "index": 6,
+          "from": "git",
+          "to": "bausteinsicht.stale",
+          "label": "date, or \"no history\"",
+          "type": "return"
+        },
+        {
+          "index": 7,
+          "from": "bausteinsicht.stale",
+          "to": "bausteinsicht.cli.analysis",
+          "label": "stale elements, deterministically sorted",
+          "type": "return"
+        },
+        {
+          "index": 8,
+          "from": "bausteinsicht.cli.analysis",
+          "to": "architect",
+          "label": "report (text / json)",
+          "type": "return"
+        }
+      ]
+    },
+    {
+      "key": "error-recovery",
+      "title": "Error & Recovery: Failed Write During Sync",
+      "description": "Why a failed or interrupted sync never corrupts the working files. The engine computes everything in memory first; each file is written afterwards via temp-file-plus-rename, and the state file is written last — so if an earlier write fails, state is left untouched and the next run re-detects and re-applies the same change with no manual repair. This linear rendering necessarily loses some of the branching/grouping nuance (\"atomic writes\" block, the write-fails/write-succeeds alt) that the hand-drawn version could show explicitly — see the step labels for the conditions that would otherwise be alt-branches.",
+      "steps": [
+        {
+          "index": 1,
+          "from": "architect",
+          "to": "bausteinsicht.cli.core",
+          "label": "bausteinsicht sync"
+        },
+        {
+          "index": 2,
+          "from": "bausteinsicht.cli.core",
+          "to": "bausteinsicht.sync.engine",
+          "label": "Run(...) — pure, in-memory"
+        },
+        {
+          "index": 3,
+          "from": "bausteinsicht.sync.engine",
+          "to": "bausteinsicht.cli.core",
+          "label": "SyncResult",
+          "type": "return"
+        },
+        {
+          "index": 4,
+          "from": "bausteinsicht.cli.core",
+          "to": "bausteinsicht.drawio.document",
+          "label": "SaveDocument(arch.drawio) — atomic temp-file + rename"
+        },
+        {
+          "index": 5,
+          "from": "bausteinsicht.cli.core",
+          "to": "bausteinsicht.sync.state",
+          "label": "if write succeeded: SaveState(.bausteinsicht-sync), SHA-256 checksummed"
+        },
+        {
+          "index": 6,
+          "from": "bausteinsicht.cli.core",
+          "to": "architect",
+          "label": "if write failed: exit 1, original files intact, state unchanged",
+          "type": "return"
+        },
+        {
+          "index": 7,
+          "from": "bausteinsicht.cli.core",
+          "to": "architect",
+          "label": "if write succeeded: summary",
+          "type": "return"
+        },
+        {
+          "index": 8,
+          "from": "architect",
+          "to": "bausteinsicht.cli.core",
+          "label": "next run: bausteinsicht sync"
+        },
+        {
+          "index": 9,
+          "from": "bausteinsicht.cli.core",
+          "to": "bausteinsicht.cli.core",
+          "label": "state unchanged from failed run → DetectChanges re-finds same delta"
+        },
+        {
+          "index": 10,
+          "from": "bausteinsicht.cli.core",
+          "to": "architect",
+          "label": "completes the interrupted change, no manual repair",
+          "type": "return"
+        }
+      ]
+    }
+  ]
 }

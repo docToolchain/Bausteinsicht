@@ -1,0 +1,18 @@
+@startuml watch_mode
+title Watch Mode
+
+participant "Software Architect" as architect
+participant "Core" as bausteinsicht_cli_core
+participant "Watcher" as bausteinsicht_watcher
+participant "Engine" as bausteinsicht_sync_engine
+
+architect -> bausteinsicht_cli_core : 1. bausteinsicht watch
+bausteinsicht_cli_core -> bausteinsicht_watcher : 2. Start(model.jsonc, arch.drawio)
+bausteinsicht_watcher -> bausteinsicht_watcher : 3. on file change: debounce 300ms
+bausteinsicht_watcher -> bausteinsicht_sync_engine : 4. Run(model, document, state, templates, opts)
+bausteinsicht_sync_engine --> bausteinsicht_watcher : 5. SyncResult
+bausteinsicht_watcher --> architect : 6. Log + display summary of changes
+architect -> bausteinsicht_cli_core : 7. Ctrl+C
+bausteinsicht_cli_core -> bausteinsicht_watcher : 8. Stop()
+
+@enduml

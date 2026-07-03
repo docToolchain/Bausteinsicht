@@ -1,0 +1,18 @@
+@startuml llm_driven_modification
+title LLM-Driven Modification
+
+participant "LLM Agent" as llm_agent
+participant "Add" as bausteinsicht_cli_add
+participant "Loader" as bausteinsicht_model_loader
+participant "Validate" as bausteinsicht_model_validate
+participant "Core" as bausteinsicht_cli_core
+
+llm_agent -> bausteinsicht_cli_add : 1. bausteinsicht add element --id cache --kind container --title 'Redis Cache' --parent webshop --format json
+bausteinsicht_cli_add -> bausteinsicht_model_loader : 2. Load(model.jsonc)
+bausteinsicht_cli_add -> bausteinsicht_model_validate : 3. Validate(kind exists, parent exists)
+bausteinsicht_model_validate --> bausteinsicht_cli_add : 4. ok, or { 'error': ... }
+bausteinsicht_cli_add -> bausteinsicht_model_loader : 5. Save(model.jsonc, updatedModel)
+bausteinsicht_cli_add --> llm_agent : 6. { 'status': 'added', 'id': 'webshop.cache' }
+llm_agent -> bausteinsicht_cli_core : 7. bausteinsicht sync — separate command to update draw.io diagram
+
+@enduml

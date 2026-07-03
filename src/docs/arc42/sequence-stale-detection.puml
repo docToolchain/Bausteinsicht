@@ -1,0 +1,19 @@
+@startuml stale_detection
+title Stale Detection
+
+participant "Software Architect" as architect
+participant "Analysis" as bausteinsicht_cli_analysis
+participant "Loader" as bausteinsicht_model_loader
+participant "Stale" as bausteinsicht_stale
+participant "Git" as git
+
+architect -> bausteinsicht_cli_analysis : 1. bausteinsicht stale [--days N]
+bausteinsicht_cli_analysis -> bausteinsicht_model_loader : 2. Load(model.jsonc)
+bausteinsicht_cli_analysis -> bausteinsicht_stale : 3. Detect(model, threshold)
+bausteinsicht_stale -> bausteinsicht_stale : 4. per element: referenced by a view? by a relationship?
+bausteinsicht_stale -> git : 5. last-modified date (git log --follow)
+git --> bausteinsicht_stale : 6. date, or 'no history'
+bausteinsicht_stale --> bausteinsicht_cli_analysis : 7. stale elements, deterministically sorted
+bausteinsicht_cli_analysis --> architect : 8. report (text / json)
+
+@enduml
