@@ -18,9 +18,9 @@ Test reports are stored as: `src/docs/e2e-test-report-YYYY-MM-DD.adoc`
 
 == Automation Status
 
-_Cross-checked 2026-07-02 against the automated Go suite in `e2e/*.go` (subprocess-level, black-box CLI tests — the same class of test this plan describes; unit tests in `internal/**/*_test.go` and `cmd/bausteinsicht/*_test.go` are a separate, complementary layer and are **not** counted here, per this doc's own stated purpose of catching what unit tests miss)._
+_Cross-checked 2026-07-03 against the automated Go suite in `e2e/*.go` (subprocess-level, black-box CLI tests — the same class of test this plan describes; unit tests in `internal/**/*_test.go` and `cmd/bausteinsicht/*_test.go` are a separate, complementary layer and are **not** counted here, per this doc's own stated purpose of catching what unit tests miss)._
 
-This is a grep/keyword-based pass, not an exhaustive row-by-row audit — treat percentages as directional, not exact. See #519 for the tracked follow-up work.
+This is a grep/keyword-based pass, not an exhaustive row-by-row audit — treat percentages as directional, not exact. #519 closed all 9 prioritized gap sections (4.4-4.7, 4.16-4.18, 5, 6.25-6.30, 9, 10, 11, 12, 13, 14, 15); only section 2 (Validate) remains from that issue's list, tracked as low-priority/optional since it's expected to already be covered at the unit level.
 
 [cols="1,3,1,1,4"]
 |===
@@ -37,13 +37,13 @@ This is a grep/keyword-based pass, not an exhaustive row-by-row audit — treat 
 | 8b | Export-Diagram | 10 | ~9/10 | Well covered after this session's work (plantuml/mermaid/structurizr/dot/d2/html); only the `--format json` unknown-format error (8b.4) unverified
 | 8c | Export-Table | 6 | ~5/6 | Well covered after this session's work
 | 8d | Export-Sequence | 4 | ~3/4 | Covered by `sequence_diagram_test.go`; the "no dynamicViews" case (8d.4) unverified
-| 9 | Draw.io File Integrity | 5 | 0/5 | Zero e2e coverage (no `xmllint`/structural-integrity checks after repeated cycles)
-| 10 | Security / Injection Testing | 9 | 0/9 | Zero e2e coverage; likely covered at the `internal/drawio`/`internal/model` unit level for XML escaping, but path-traversal and shell-injection-via-ID have no black-box confirmation
-| 11 | CLI Flag Interactions | 9 | 0/9 | Zero e2e coverage of `--verbose`, conflicting `--model`/`--template` types, or unknown-flag handling
+| 9 | Draw.io File Integrity | 5 | 5/5 | Closed by #519 (`drawio_file_integrity_test.go`); writing 9.3 found and fixed a real non-determinism bug in `mergeStyles` (#520)
+| 10 | Security / Injection Testing | 9 | 9/9 | Closed by #519 (`security_injection_test.go`) — XML/attribute injection, CDATA, NUL bytes, 100K-char strings, path traversal via `--parent`, shell-metacharacter IDs, JSON injection
+| 11 | CLI Flag Interactions | 9 | 9/9 | Closed by #519 (`cli_flag_interactions_test.go`) — `--verbose` across validate/sync/export, `--model`/`--template` wrong-type handling, `--format json` + `--verbose` stream separation, unknown flags, `--help`
 | 12 | Sync State Edge Cases | 6 | 6/6 | Closed by #519 (`sync_state_edge_cases_test.go`); found the 12.5 "Expected" was stale (see doc correction below)
-| 13 | Model File Edge Cases | 7 | 0/7 | Zero e2e coverage (BOM, line endings, minified JSON, 100-element performance)
-| 14 | Template Handling | 6 | 0/6 | Zero e2e coverage of `--template`
-| 15 | Error Output Formatting | 8 | 0/8 | Zero e2e coverage of the `{"error":"...","code":N}` JSON error contract across commands
+| 13 | Model File Edge Cases | 7 | 7/7 | Closed by #519 (`model_file_edge_cases_test.go`) — BOM, line endings, tabs, minified JSON, 100-element performance budget
+| 14 | Template Handling | 6 | 6/6 | Closed by #519 (`template_handling_test.go`) — custom `--template` styles actually applied, empty/invalid/missing template handling, `init`'s own template creation and collision check
+| 15 | Error Output Formatting | 8 | 8/8 | Closed by #519 (`error_output_format_test.go`) — the `{"error":"...","code":N}` JSON error contract verified stderr-only and consistent across commands, plus exit-code conventions
 | 16 | Analysis & Inspection | 15 | ~11/15 | Well covered after this session's work (`stale`, `status`, `health`, `graph`, `find`, `show`)
 | 17 | Evolution & Snapshots | 9 | ~6/9 | `snapshot`/`diff`/`changelog` covered; restore-over-existing-output and delete-snapshot edge cases unverified
 | 18 | Model Tooling & Import | 16 | ~11/16 | Well covered after this session's work (`schema`, `structurizr`/`likec4`/`xmi` import, `workspace`); `generate-template`/`layout` invalid-input cases unverified
