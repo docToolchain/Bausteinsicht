@@ -78,6 +78,24 @@ IMPORTANT: Before executing the tests, check whether new commands, flags, or fea
 . File a GitHub issue for each new failure immediately after discovering it.
 . Record results in a new test report file: `src/docs/e2e-test-report-YYYY-MM-DD.adoc`
 
+=== Generating a Line-Accurate Report Automatically
+
+_Added in #519._ For lines already covered by an automated `e2e/*_test.go` test, `scripts/e2e-test-report.sh`
+generates the mechanical PASS/FAIL/SKIP-per-line table straight from a real `go test ./e2e/...` run — no need to
+hand-transcribe results for those lines into the report file above:
+
+[source,bash]
+----
+scripts/e2e-test-report.sh > src/docs/e2e-test-report-generated-section.adoc
+----
+
+It cross-references `go test -json` output against `internal/e2eplan.Registry` plus an auto-detected naming
+convention (see that package's doc comment): name a subtest `t.Run("<planID>_<Description>", ...)` — e.g.
+`t.Run("5.1_ExactMatch", ...)` — and it's picked up with no registry entry needed. Lines with no matching test
+report as `SKIP: not automated`, which doubles as a to-do list for future automation work (same information the
+"Automation Status" table above summarizes per-section). It does not replace the narrative Environment/Failures/
+Skips write-up a manual report round needs — only the mechanical per-line table.
+
 === Result Template
 
 Copy this table into the test report:
