@@ -628,4 +628,5 @@ Record each test execution here:
 | 2026-03-02 | 5 | 204 | 4 (#175-#178) | `e2e-test-report-2026-03-02-round5.adoc`
 | 2026-03-02 | 6 | 211 | 7 (#183-#189) | `e2e-test-report-2026-03-02-round6.adoc`
 | 2026-03-05 | 7 | 215 | 6 (#236-#241) | `e2e-test-report-2026-03-05.adoc`
+| 2026-07-03 | 8 (automated) | 116 newly automated (279 total tracked) | 1 (#520) | `e2e-test-report-2026-07-03.adoc`
 |===
