@@ -26,10 +26,22 @@ jobs:
           # whitespace on every branch name (found via a live test run of
           # this workflow after #522/#523 fixed the YAML syntax that had
           # prevented it from ever reaching this code before).
-          DELETED_LOCAL=$(git branch -d $(git branch --format='%(refname:short)' --merged origin/main | grep -v main | tr '\n' ' ') 2>&1 || echo "")
+          # grep -x (exact-line) instead of substring match: a hypothetical
+          # branch that merely *contains* "main" (e.g. "maintenance-fix")
+          # must not be silently dropped.
+          DELETED_LOCAL=$(git branch -d $(git branch --format='%(refname:short)' --merged origin/main | grep -vx main | tr '\n' ' ') 2>&1 || echo "")
 
           # List remote branches that should be deleted (already merged to main)
-          MERGED_REMOTE=$(git branch -r --format='%(refname:short)' --merged origin/main | grep -v main | grep -v HEAD | sed 's|origin/||')
+          # grep -vx origin (post-strip): a run on 2026-07-03 produced one
+          # transient `origin/origin` entry (issue #532) — the `origin/`
+          # prefix strip left a bare "origin" line, which the summary/body
+          # then re-rendered as "- origin/origin" and even injected into the
+          # suggested `git push origin --delete ... origin ...` command. The
+          # exact upstream cause (a fleeting remote-tracking ref present only
+          # at fetch time on that runner) wasn't reproducible locally, so
+          # this filters the corrupted entry out defensively rather than
+          # leaving a misleading branch name in the generated issue.
+          MERGED_REMOTE=$(git branch -r --format='%(refname:short)' --merged origin/main | grep -vx 'origin/main' | grep -vx 'origin/HEAD' | sed 's|origin/||' | grep -vx '' | grep -vx origin)
 
           if [ ! -z "$MERGED_REMOTE" ]; then
             echo "## 🧹 Auto-Cleanup Summary" >> $GITHUB_STEP_SUMMARY

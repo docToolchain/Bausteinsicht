@@ -26,7 +26,13 @@ jobs:
           # --format='%(refname:short)' avoids raw `git branch -r`'s 2-space
           # indent surviving as literal whitespace (see weekly-maintenance.yml
           # for where this bit in practice — found via a live test run).
-          for branch in $(git branch -r --format='%(refname:short)' | grep -v main | grep -v HEAD | sed 's|origin/||'); do
+          # grep -x 'origin/main'/'origin/HEAD' (exact, pre-strip) instead of
+          # substring match, plus a post-strip drop of bare "origin"/empty
+          # entries: a live run on 2026-07-03 (issue #532) produced one
+          # transient `origin/origin` entry from this same pipeline shape in
+          # weekly-maintenance.yml; not locally reproducible, so filtered
+          # defensively here too since the pipeline is identical.
+          for branch in $(git branch -r --format='%(refname:short)' | grep -vx 'origin/main' | grep -vx 'origin/HEAD' | sed 's|origin/||' | grep -vx '' | grep -vx origin); do
             COMMIT_DATE=$(git log -1 --format=%ai origin/$branch 2>/dev/null | cut -d' ' -f1)
             if [ -z "$COMMIT_DATE" ]; then
               continue
