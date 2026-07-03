@@ -1,0 +1,17 @@
+@startuml repl_save
+title REPL Save: Patch vs. Full-Save Fallback
+
+participant "Software Architect" as architect
+participant "Interactive" as bausteinsicht_cli_interactive
+participant "Validate" as bausteinsicht_model_validate
+participant "Patch" as bausteinsicht_model_patch
+participant "Loader" as bausteinsicht_model_loader
+
+architect -> bausteinsicht_cli_interactive : 1. add / remove / edit ... then `save`
+bausteinsicht_cli_interactive -> bausteinsicht_model_validate : 2. Validate(in-memory model)
+bausteinsicht_model_validate --> bausteinsicht_cli_interactive : 3. valid, or 'save aborted — N validation error(s)'
+bausteinsicht_cli_interactive -> bausteinsicht_model_patch : 4. pure additions: PatchInsert / AppendArrayEntry (comments preserved)
+bausteinsicht_cli_interactive -> bausteinsicht_model_loader : 5. any modification/deletion: Save(model.jsonc) full rewrite (comments may be lost)
+bausteinsicht_cli_interactive --> architect : 6. 'Saved'
+
+@enduml

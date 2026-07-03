@@ -14,80 +14,8 @@ ifndef::imagesdir[:imagesdir: ../../images]
 
 The most important runtime scenario. Shows what happens when the user runs `bausteinsicht sync`.
 
-[plantuml, runtime-sync, png]
-....
-@startuml
-skinparam shadowing false
-
-actor User
-participant "cmd/sync" as cmd
-participant "model/loader" as loader
-participant "drawio/document" as doc
-participant "sync/state" as state
-participant "sync/engine" as engine
-participant "sync/diff" as diff
-participant "sync/forward" as fwd
-participant "sync/reverse" as rev
-
-User -> cmd : bausteinsicht sync
-activate cmd
-
-cmd -> loader : Load(model.jsonc)
-activate loader
-loader --> cmd : BausteinsichtModel
-deactivate loader
-
-cmd -> doc : LoadDocument(arch.drawio)
-activate doc
-doc --> cmd : Document
-deactivate doc
-
-cmd -> doc : LoadTemplate(template.drawio)
-activate doc
-doc --> cmd : TemplateSet
-deactivate doc
-
-cmd -> state : LoadState(.bausteinsicht-sync)
-activate state
-state --> cmd : SyncState
-deactivate state
-
-cmd -> engine : Run(model, document, state, templates, newPageIDs, opts)
-activate engine
-
-engine -> diff : DetectChanges(model, document, state, newPageIDs)
-activate diff
-diff --> engine : ChangeSet
-deactivate diff
-
-alt conflicts detected
-  engine -> engine : Resolve conflicts\n(model wins, log warnings)
-end
-
-engine -> fwd : Apply(modelChanges, document, templates, opts)
-activate fwd
-note right of fwd : Creates/updates metadata\nand legend boxes per view
-fwd --> engine : forward result
-deactivate fwd
-
-engine -> rev : Apply(drawioChanges, model)
-activate rev
-rev --> engine : reverse result
-deactivate rev
-
-engine --> cmd : SyncResult
-deactivate engine
-
-cmd -> loader : PatchSave(model.jsonc) — full Save fallback
-note right of loader : Comment-preserving patch when\nonly fields changed; full rewrite\notherwise
-cmd -> doc : SaveDocument(arch.drawio, updatedDoc)
-cmd -> state : SaveState(.bausteinsicht-sync, newState)
-
-cmd --> User : Summary of changes
-deactivate cmd
-
-@enduml
-....
+.Sync Command (generated from `dynamicViews.sync-command` in architecture.jsonc via `bausteinsicht export-sequence`)
+image::arc42/architecture-sequence-sync-command.png[Sync Command,width=80%]
 
 ==== Key Observations
 
@@ -101,39 +29,8 @@ deactivate cmd
 
 Shows the continuous sync loop triggered by file changes.
 
-[plantuml, runtime-watch, png]
-....
-@startuml
-skinparam shadowing false
-
-actor User
-participant "cmd/watch" as cmd
-participant "watcher" as w
-participant "sync/engine" as engine
-
-User -> cmd : bausteinsicht watch
-activate cmd
-
-cmd -> w : Start(model.jsonc, arch.drawio)
-activate w
-
-loop on file change
-  w -> w : Debounce (300ms)
-  w -> engine : Run(model, document, state, templates, opts)
-  activate engine
-  engine --> w : SyncResult
-  deactivate engine
-  w -> cmd : Log changes
-  cmd -> User : Display summary
-end
-
-User -> cmd : Ctrl+C
-cmd -> w : Stop()
-deactivate w
-deactivate cmd
-
-@enduml
-....
+.Watch Mode (generated from `dynamicViews.watch-mode` in architecture.jsonc via `bausteinsicht export-sequence`)
+image::arc42/architecture-sequence-watch-mode.png[Watch Mode,width=80%]
 
 ==== Debounce Strategy
 
@@ -141,152 +38,35 @@ File editors often trigger multiple save events in rapid succession (write + met
 
 === Init Command
 
-[plantuml, runtime-init, png]
-....
-@startuml
-skinparam shadowing false
-
-actor User
-participant "cmd/init" as cmd
-participant "model/loader" as loader
-participant "sync/engine" as engine
-
-User -> cmd : bausteinsicht init
-activate cmd
-
-cmd -> cmd : Check if files already exist
-alt files exist
-  cmd --> User : Error: project already initialized
-else no files
-  cmd -> cmd : Generate sample model\n(specification + example elements)
-  cmd -> loader : Save(model.jsonc, sampleModel)
-  cmd -> cmd : Copy default template\nto project directory
-  cmd -> engine : Run(model, document=empty,\nstate=empty, templates, opts)
-  cmd --> User : Project initialized.\nOpen arch.drawio in draw.io.
-end
-
-deactivate cmd
-
-@enduml
-....
+.Init Command (generated from `dynamicViews.init-command` in architecture.jsonc via `bausteinsicht export-sequence`)
+image::arc42/architecture-sequence-init-command.png[Init Command,width=80%]
 
 === LLM-Driven Modification
 
 Shows how an LLM agent uses CLI commands to modify the architecture.
 
-[plantuml, runtime-llm, png]
-....
-@startuml
-skinparam shadowing false
-
-actor "LLM Agent" as llm
-participant "cmd/add" as add
-participant "model/loader" as loader
-participant "model/validate" as val
-
-llm -> add : bausteinsicht add element\n--id cache --kind container\n--title "Redis Cache"\n--parent webshop\n--format json
-activate add
-
-add -> loader : Load(model.jsonc)
-add -> val : Validate(kind exists, parent exists)
-
-alt validation fails
-  add --> llm : { "error": "..." }
-else valid
-  add -> add : Add element to model
-  add -> loader : Save(model.jsonc, updatedModel)
-  add --> llm : { "status": "added",\n  "id": "webshop.cache" }
-end
-
-deactivate add
-
-llm -> llm : bausteinsicht sync
-note right: Separate command to\nupdate draw.io diagram
-
-@enduml
-....
+.LLM-Driven Modification (generated from `dynamicViews.llm-driven-modification` in architecture.jsonc via `bausteinsicht export-sequence`)
+image::arc42/architecture-sequence-llm-driven-modification.png[LLM-Driven Modification,width=80%]
 
 ==== Design Decision: Separate Add and Sync
 
 The `add` commands only modify the JSON model. They do **not** trigger a sync automatically. This keeps commands predictable (single responsibility) and allows LLMs to batch multiple model changes before syncing.
 
-=== Import from Structurizr / LikeC4
+=== Import from Structurizr / LikeC4 / XMI
 
-Shows how an existing model is brought into Bausteinsicht (`bausteinsicht import <file> --from structurizr|likec4`).
+Shows how an existing model is brought into Bausteinsicht (`bausteinsicht import <file> --from structurizr|likec4|xmi`).
 
-[plantuml, runtime-import, png]
-....
-@startuml
-skinparam shadowing false
+.Import from Structurizr / LikeC4 / XMI (generated from `dynamicViews.import-from-external-formats` in architecture.jsonc via `bausteinsicht export-sequence`)
+image::arc42/architecture-sequence-import-from-external-formats.png[Import from Structurizr / LikeC4 / XMI,width=80%]
 
-actor User
-participant "cmd/import" as cmd
-participant "importer" as imp
-participant "model/loader" as loader
-
-User -> cmd : bausteinsicht import workspace.dsl\n--from structurizr [--dry-run]
-activate cmd
-
-cmd -> imp : Import(file, format)
-activate imp
-note right of imp : Parse the source DSL,\nmap people/systems/containers\n+ relationships, generate a\nmatching specification
-imp --> cmd : ImportResult{Model, Warnings}
-deactivate imp
-
-alt --dry-run
-  cmd --> User : print generated JSONC to stdout
-else write
-  alt architecture.jsonc exists and no --force
-    cmd --> User : exit 2 "use --force to overwrite"
-  else
-    cmd -> loader : Save(architecture.jsonc, model)
-    cmd --> User : "Imported model written" + warnings
-  end
-end
-
-deactivate cmd
-@enduml
-....
-
-The result is immediately syncable with `bausteinsicht sync`. The importer never touches draw.io — it only produces the model.
+The result is immediately syncable with `bausteinsicht sync`. The importer never touches draw.io — it only produces the model. The XMI path additionally buffers the whole file in memory and converts Windows-1252 to UTF-8 before parsing (peak RSS ~2× the raw file size, 200 MB read cap enforced) — a materially different cost profile from the other two formats, though the CLI-level flow shown above is the same for all three.
 
 === REPL Save: Patch vs. Full-Save Fallback
 
 The REPL keeps the model in memory and, on `save`, chooses how to persist so JSONC comments survive when possible. This is the key data-integrity flow.
 
-[plantuml, runtime-repl-save, png]
-....
-@startuml
-skinparam shadowing false
-
-actor User
-participant "cmd/repl" as repl
-participant "model/validate" as val
-participant "model/patch" as patch
-participant "model/loader" as loader
-
-User -> repl : add / remove / edit ... then `save`
-activate repl
-
-repl -> val : Validate(in-memory model)
-alt model invalid
-  repl --> User : "save aborted — N validation error(s)"
-else valid
-  alt only pure additions since load
-    repl -> patch : PatchInsert / AppendArrayEntry
-    note right of patch : Surgical text insert —\ncomments preserved
-    patch --> repl : patched JSONC
-  else any modification or deletion
-    repl -> loader : Save(model.jsonc)  (full rewrite)
-    note right of loader : Falls back to full save;\nprints "comments may not be preserved"
-    loader --> repl : rewritten JSONC
-  end
-  repl --> User : "Saved"
-end
-
-deactivate repl
-@enduml
-....
+.REPL Save: Patch vs. Full-Save Fallback (generated from `dynamicViews.repl-save` in architecture.jsonc via `bausteinsicht export-sequence`)
+image::arc42/architecture-sequence-repl-save.png[REPL Save,width=80%]
 
 ==== Key Observations
 
@@ -298,38 +78,8 @@ deactivate repl
 
 Shows how `bausteinsicht stale` flags forgotten elements using git history.
 
-[plantuml, runtime-stale, png]
-....
-@startuml
-skinparam shadowing false
-
-actor User
-participant "cmd/stale" as cmd
-participant "model/loader" as loader
-participant "stale/detector" as det
-participant "stale/git" as git
-
-User -> cmd : bausteinsicht stale [--days N]
-activate cmd
-cmd -> loader : Load(model.jsonc)
-cmd -> det : Detect(model, threshold)
-activate det
-
-loop each element
-  det -> det : referenced by a view? by a relationship?
-  det -> git : last-modified date (git log --follow)
-  activate git
-  git --> det : date (or "no history")
-  deactivate git
-  det -> det : assess risk\n(unreferenced and/or older than threshold)
-end
-
-det --> cmd : stale elements (deterministically sorted)
-deactivate det
-cmd --> User : report (text / json)
-deactivate cmd
-@enduml
-....
+.Stale Detection (generated from `dynamicViews.stale-detection` in architecture.jsonc via `bausteinsicht export-sequence`)
+image::arc42/architecture-sequence-stale-detection.png[Stale Detection,width=80%]
 
 When run outside a git repository the git lookups degrade gracefully (no date), and detection falls back to the view/relationship membership checks.
 
@@ -337,43 +87,10 @@ When run outside a git repository the git lookups degrade gracefully (no date), 
 
 The contract requires at least one error/recovery scenario. This shows why a failed or interrupted sync never corrupts the working files.
 
-[plantuml, runtime-recovery, png]
-....
-@startuml
-skinparam shadowing false
+.Error & Recovery: Failed Write During Sync (generated from `dynamicViews.error-recovery` in architecture.jsonc via `bausteinsicht export-sequence`)
+image::arc42/architecture-sequence-error-recovery.png[Error and Recovery,width=80%]
 
-actor User
-participant "cmd/sync" as cmd
-participant "sync/engine" as engine
-participant "drawio/document" as doc
-participant "sync/state" as state
-
-User -> cmd : bausteinsicht sync
-activate cmd
-cmd -> engine : Run(...)  (pure, in-memory)
-engine --> cmd : SyncResult
-
-group atomic writes (temp file + rename)
-  cmd -> doc : SaveDocument(arch.drawio)
-  alt write fails (disk full / crash)
-    doc --> cmd : error
-    cmd --> User : exit 1, error — original files intact
-    note over state : SaveState NOT reached →\n.bausteinsicht-sync unchanged
-  else write succeeds
-    cmd -> state : SaveState(.bausteinsicht-sync)\n(SHA-256 checksummed)
-    cmd --> User : summary
-  end
-end
-deactivate cmd
-
-== next run recovers ==
-User -> cmd : bausteinsicht sync
-activate cmd
-note over cmd : State unchanged from the failed run,\nso DetectChanges re-finds the same delta\nand re-applies it — no manual repair
-cmd --> User : completes the interrupted change
-deactivate cmd
-@enduml
-....
+NOTE: `dynamicViews`/`SequenceStep` (the model type behind this generated diagram) only supports linear sync/async/return arrows — no `alt`/`opt`/`group` branching or notes, unlike hand-written PlantUML. The two write-outcome branches ("if write failed" / "if write succeeded") and the atomic-write grouping are represented as plain sequential steps with the condition folded into the label text instead of a true visual branch. If this loses too much clarity, this scenario is the best candidate in chapter 6 to stay hand-written rather than generated — see #535.
 
 ==== Key Observations
 

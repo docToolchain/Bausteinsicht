@@ -1,0 +1,34 @@
+@startuml sync_command
+title Sync Command
+
+participant "Software Architect" as architect
+participant "Core" as bausteinsicht_cli_core
+participant "Loader" as bausteinsicht_model_loader
+participant "Document" as bausteinsicht_drawio_document
+participant "State" as bausteinsicht_sync_state
+participant "Engine" as bausteinsicht_sync_engine
+participant "Diff" as bausteinsicht_sync_diff
+participant "Forward Sync" as bausteinsicht_sync_forward
+participant "Reverse Sync" as bausteinsicht_sync_reverse
+
+architect -> bausteinsicht_cli_core : 1. bausteinsicht sync
+bausteinsicht_cli_core -> bausteinsicht_model_loader : 2. Load(model.jsonc)
+bausteinsicht_model_loader --> bausteinsicht_cli_core : 3. BausteinsichtModel
+bausteinsicht_cli_core -> bausteinsicht_drawio_document : 4. LoadDocument(arch.drawio) + LoadTemplate(template.drawio)
+bausteinsicht_drawio_document --> bausteinsicht_cli_core : 5. Document, TemplateSet
+bausteinsicht_cli_core -> bausteinsicht_sync_state : 6. LoadState(.bausteinsicht-sync)
+bausteinsicht_sync_state --> bausteinsicht_cli_core : 7. SyncState
+bausteinsicht_cli_core -> bausteinsicht_sync_engine : 8. Run(model, document, state, templates, opts)
+bausteinsicht_sync_engine -> bausteinsicht_sync_diff : 9. DetectChanges(model, document, state)
+bausteinsicht_sync_diff --> bausteinsicht_sync_engine : 10. ChangeSet (conflicts resolved here: model wins)
+bausteinsicht_sync_engine -> bausteinsicht_sync_forward : 11. Apply(modelChanges, document, templates, opts)
+bausteinsicht_sync_forward --> bausteinsicht_sync_engine : 12. forward result (adds metadata + legend per view)
+bausteinsicht_sync_engine -> bausteinsicht_sync_reverse : 13. Apply(drawioChanges, model)
+bausteinsicht_sync_reverse --> bausteinsicht_sync_engine : 14. reverse result
+bausteinsicht_sync_engine --> bausteinsicht_cli_core : 15. SyncResult
+bausteinsicht_cli_core -> bausteinsicht_model_loader : 16. PatchSave(model.jsonc) — comment-preserving, full Save fallback
+bausteinsicht_cli_core -> bausteinsicht_drawio_document : 17. SaveDocument(arch.drawio)
+bausteinsicht_cli_core -> bausteinsicht_sync_state : 18. SaveState(.bausteinsicht-sync) — written last, only after both writes succeed
+bausteinsicht_cli_core --> architect : 19. Summary of changes
+
+@enduml
