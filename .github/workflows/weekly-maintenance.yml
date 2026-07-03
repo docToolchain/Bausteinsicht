@@ -20,10 +20,16 @@ jobs:
           git fetch origin
 
           # Delete local branches that are merged to main
-          DELETED_LOCAL=$(git branch -d $(git branch --merged origin/main | grep -v main | tr '\n' ' ') 2>&1 || echo "")
+          # --format='%(refname:short)' avoids the raw `git branch` listing
+          # format's 2-space indent / current-branch "* " marker, which
+          # otherwise survives into MERGED_REMOTE below as literal leading
+          # whitespace on every branch name (found via a live test run of
+          # this workflow after #522/#523 fixed the YAML syntax that had
+          # prevented it from ever reaching this code before).
+          DELETED_LOCAL=$(git branch -d $(git branch --format='%(refname:short)' --merged origin/main | grep -v main | tr '\n' ' ') 2>&1 || echo "")
 
           # List remote branches that should be deleted (already merged to main)
-          MERGED_REMOTE=$(git branch -r --merged origin/main | grep -v main | grep -v HEAD | sed 's|origin/||')
+          MERGED_REMOTE=$(git branch -r --format='%(refname:short)' --merged origin/main | grep -v main | grep -v HEAD | sed 's|origin/||')
 
           if [ ! -z "$MERGED_REMOTE" ]; then
             echo "## 🧹 Auto-Cleanup Summary" >> $GITHUB_STEP_SUMMARY

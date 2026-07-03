@@ -23,7 +23,10 @@ jobs:
           STALE_BRANCHES=""
           BRANCH_COUNT=0
 
-          for branch in $(git branch -r | grep -v main | grep -v HEAD | sed 's|origin/||'); do
+          # --format='%(refname:short)' avoids raw `git branch -r`'s 2-space
+          # indent surviving as literal whitespace (see weekly-maintenance.yml
+          # for where this bit in practice — found via a live test run).
+          for branch in $(git branch -r --format='%(refname:short)' | grep -v main | grep -v HEAD | sed 's|origin/||'); do
             COMMIT_DATE=$(git log -1 --format=%ai origin/$branch 2>/dev/null | cut -d' ' -f1)
             if [ -z "$COMMIT_DATE" ]; then
               continue
