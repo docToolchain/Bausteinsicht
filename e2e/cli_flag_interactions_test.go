@@ -62,7 +62,13 @@ func testFlagVerboseSync(t *testing.T) {
 // testFlagVerboseExport covers 11.3: --verbose prints which draw.io CLI
 // binary was resolved, before the actual export subprocess runs — so this
 // is observable even if headless draw.io export itself isn't exercised.
+// Still requires draw.io to be *found* on PATH (not run) — CI runners don't
+// have it installed, so this skips gracefully there, same as this suite's
+// other draw.io-dependent tests (see findDrawioCmd in bigbank_arc42_test.go).
 func testFlagVerboseExport(t *testing.T) {
+	if findDrawioCmd() == "" {
+		t.Skip("draw.io CLI not found on PATH — skipping (see e.g. bigbank_arc42_test.go for the same pattern)")
+	}
 	bin := buildBinary(t)
 	dir := t.TempDir()
 	runCLI(t, bin, dir, "init")
