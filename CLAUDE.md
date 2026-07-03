@@ -133,7 +133,7 @@ When starting work on a ticket:
 
 ### PR Merge Policy
 Before merging any PR:
-1. **Doc check** — run `/doc-check review` to verify spec/architecture is consistent with implementation and tests
+1. **Doc check** — run `/doc-check review` to verify spec/architecture is consistent with implementation and tests. If the diff adds/renames/removes an `internal/` or `cmd/` directory, also run `make arc42-drift-check` — it verifies every real package has a matching `container` element in the self-hosted `src/docs/arc42/architecture.jsonc`, and vice versa. This exists because that check used to be manual-judgment-only, and 11 packages drifted out of the model undetected for a long time before being caught (#524, #526); CI runs it on every PR (`arc42-drift-check` job in `go.yml`).
 2. **E2E coverage check** — part of `/doc-check review` (see "E2E test coverage" in the doc-check skill): every new CLI command, new flag, or bug fix that spans more than one command (e.g. import → sync → export pipelines) must have a corresponding scenario under `e2e/*_test.go`. A user-visible change with no e2e test is a blocking (❌) finding, not just a suggestion — see [Issue #512](https://github.com/docToolchain/Bausteinsicht/issues/512), where an import bug shipped in v1.2.0 with zero test coverage anywhere in the repo.
 3. **Security review** on the changes
 4. **Code review** on the changes

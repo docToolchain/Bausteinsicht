@@ -63,7 +63,7 @@ as the fallback — it covers the same doc gates.
    | New or changed `cmd/bausteinsicht/*.go` (non-test) | spec/01, spec/02 |
    | `internal/model/types.go` or `schemas/bausteinsicht.schema.json` or `internal/schema/` | spec/03 |
    | `internal/sync/` | spec/05 |
-   | New `internal/<pkg>/` directory | arc42/05, arc42/06 |
+   | New `internal/<pkg>/` directory | arc42/05, arc42/06, **and** `src/docs/arc42/architecture.jsonc` (the self-hosted model itself — run `make arc42-drift-check` to confirm; see #524/#526, where 11 packages went undetected in the model for a long time because this was only a manual judgment call) |
    | New runtime data flow within an existing package | arc42/06 |
    | New cross-cutting pattern (error handling, logging, concurrency model) | arc42/08 |
    | Any other existing `internal/<pkg>/` with user-visible output change | spec/01, spec/02 |
@@ -123,11 +123,17 @@ as the fallback — it covers the same doc gates.
    - `cmd/bausteinsicht/*.go` → `spec/02` and `spec/01`
    - `internal/model/types.go` / `schemas/` / `internal/schema/` → `spec/03`
    - `internal/sync/*.go` → `spec/05`
-   - New `internal/<pkg>/` directory → `arc42/05`, `arc42/06`
+   - New `internal/<pkg>/` directory → `arc42/05`, `arc42/06`, **and** `architecture.jsonc`
    - New runtime data flow in existing package → `arc42/06`
    - New cross-cutting pattern → `arc42/08`
    - Any other `internal/<pkg>/` with user-visible change → `spec/01`, `spec/02`
    - Significant design tradeoff → new ADR in `src/docs/arc42/ADRs/`
+
+   Always run this concrete check (not just judgment) when any `internal/` or `cmd/` directory was added, renamed, or removed in the diff:
+   ```bash
+   make arc42-drift-check
+   ```
+   Non-zero exit → **❌ blocking** (a real package has no `container` element in `architecture.jsonc`, or vice versa). This is a scripted version of the routing-table rule above — it exists because that rule was manual-judgment-only for a long time and 11 packages drifted out of the model undetected (#524).
 
    **B. Doc coverage in tests**
    For each new acceptance criterion or spec section added: is there a test covering it?
