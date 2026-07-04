@@ -1,0 +1,30 @@
+[cols="2,1,1,3"]
+|===
+| Element | Kind | Technology | Description
+
+| CLI
+| container
+| Go / Cobra
+| Command-line interface providing validate, sync, export, and watch commands
+
+| LikeC4
+| component
+| Go
+| LikeC4 DSL parsing and model conversion
+
+| Structurizr
+| component
+| Go
+| Structurizr DSL parsing and model conversion
+
+| XMI
+| component
+| Go
+| XMI/Enterprise Architect parsing and model conversion. Buffers the whole file in memory and converts Windows-1252 to UTF-8 before parsing (peak RSS ~2x file size); a 200MB read cap is enforced.
+
+| Model
+| container
+| Go
+| JSONC architecture model management — loading, validation, and mutation
+
+|===

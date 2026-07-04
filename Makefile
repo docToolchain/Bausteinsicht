@@ -6,7 +6,7 @@ DIST := dist
         build_windows_amd64 build_windows_arm64 \
         schema-generate schema-validate \
         build-extension package-extension \
-        test test-race bench coverage coverage-report e2e-test-report arc42-docs arc42-sequences arc42-drift-check arc42-process-coverage-check arc42-runtime-coverage-check vet staticcheck gosec nilaway govulncheck deadcode \
+        test test-race bench coverage coverage-report e2e-test-report arc42-docs arc42-sequences arc42-drift-check arc42-process-coverage-check arc42-runtime-coverage-check arc42-level2-coverage-check vet staticcheck gosec nilaway govulncheck deadcode \
         gitleaks golangci-lint check check-duplicates clean install-tools install-hooks
 
 # Ensure GOPATH/bin is in PATH for installed tools
@@ -130,6 +130,11 @@ arc42-process-coverage-check:
 
 arc42-runtime-coverage-check:
 	@scripts/check-arc42-runtime-coverage.sh
+
+# Structural: verify every *-components view in architecture.jsonc has a
+# matching "Level 2" section in chapter 5 (see #539/#526).
+arc42-level2-coverage-check:
+	@scripts/check-arc42-level2-coverage.sh
 
 # Run benchmarks
 bench:

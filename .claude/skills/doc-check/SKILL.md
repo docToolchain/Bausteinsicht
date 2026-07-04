@@ -142,6 +142,12 @@ as the fallback — it covers the same doc gates.
    ```
    Non-zero exit → **⚠️ non-blocking** (advisory only — a textual mention check, not a semantic one; see the script headers). Flags commands not yet mentioned in §3.1.1's process diagram (`chapters/03_context_and_scope.adoc`) or chapter 6's runtime scenarios (`chapters/06_runtime_view.adoc`). This exists because §3.1.1 and chapter 6 both drifted badly behind the CLI's real command set before being caught (#535).
 
+   Also run this when a new `*-components` view is added to `architecture.jsonc`:
+   ```bash
+   make arc42-level2-coverage-check
+   ```
+   Non-zero exit → **❌ blocking** (a structural check, like `arc42-drift-check` — not a text heuristic). Flags a view with no matching "Level 2" section in chapter 5. This exists because 4 of 10 views (`importer-components`/`exporter-components`/`search-components`/`diagram-components`) went undocumented for a long time — deliberately deferred in #526, then closed in #539.
+
    **B. Doc coverage in tests**
    For each new acceptance criterion or spec section added: is there a test covering it?
    ```bash

@@ -175,6 +175,54 @@ image::arc42/architecture-cli-components.png[CLI Package Components,width=80%]
 include::cli-components-elements.adoc[]
 
 
+=== Level 2: Diagram Package Components
+
+Text-based diagram export components (Mermaid C4, PlantUML) and markdown wrapping.
+
+.Diagram Package Components (generated from architecture model via draw.io export)
+image::arc42/architecture-diagram-components.png[Diagram Package Components,width=80%]
+
+==== Building Blocks
+
+include::diagram-components-elements.adoc[]
+
+
+=== Level 2: Importer Package Components
+
+Import components for Structurizr DSL and LikeC4 format conversion to Bausteinsicht model.
+
+.Importer Package Components (generated from architecture model via draw.io export)
+image::arc42/architecture-importer-components.png[Importer Package Components,width=80%]
+
+==== Building Blocks
+
+include::importer-components-elements.adoc[]
+
+
+=== Level 2: Exporter Package Components
+
+Export components for converting Bausteinsicht model to external formats (Structurizr DSL).
+
+.Exporter Package Components (generated from architecture model via draw.io export)
+image::arc42/architecture-exporter-components.png[Exporter Package Components,width=80%]
+
+==== Building Blocks
+
+include::exporter-components-elements.adoc[]
+
+
+=== Level 2: Search Package Components
+
+Element and relationship search with pattern matching and filtering.
+
+.Search Package Components (generated from architecture model via draw.io export)
+image::arc42/architecture-search-components.png[Search Package Components,width=80%]
+
+==== Building Blocks
+
+include::search-components-elements.adoc[]
+
+
 === Go Package Layout
 
 The directory structure maps directly to the building blocks above (packages, not every file):

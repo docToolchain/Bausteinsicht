@@ -183,7 +183,7 @@
         "importer": {
           "kind": "container",
           "title": "Importer",
-          "description": "Import architecture from Structurizr DSL and LikeC4 formats",
+          "description": "Import architecture from Structurizr DSL, LikeC4, and XMI/Enterprise Architect formats",
           "technology": "Go",
           "children": {
             "structurizr": {
@@ -196,6 +196,12 @@
               "kind": "component",
               "title": "LikeC4",
               "description": "LikeC4 DSL parsing and model conversion",
+              "technology": "Go"
+            },
+            "xmi": {
+              "kind": "component",
+              "title": "XMI",
+              "description": "XMI/Enterprise Architect parsing and model conversion. Buffers the whole file in memory and converts Windows-1252 to UTF-8 before parsing (peak RSS ~2x file size); a 200MB read cap is enforced.",
               "technology": "Go"
             }
           }

@@ -1,0 +1,13 @@
+@startuml
+!include <C4/C4_Container>
+
+Container(bausteinsicht_cli, "CLI", "Go / Cobra", "Command-line interface providing validate, sync, export, and watch commands")
+Container(bausteinsicht_model, "Model", "Go", "JSONC architecture model management — loading, validation, and mutation")
+Container(bausteinsicht_search, "Search", "Go", "Element and relationship search with filtering and pattern matching")
+Container_Boundary(bausteinsicht_search, "Search") {
+}
+
+Rel(bausteinsicht_cli, bausteinsicht_model, "loads/saves JSONC")
+Rel(bausteinsicht_cli, bausteinsicht_search, "searches elements")
+Rel(bausteinsicht_search, bausteinsicht_model, "searches elements")
+@enduml

@@ -15,7 +15,7 @@ System_Boundary(bausteinsicht, "Bausteinsicht") {
   Container(bausteinsicht_exporter, "Exporter", "Go", "Architecture export to Structurizr DSL and other formats")
   Container(bausteinsicht_graph, "Graph", "Go", "Relationship graph analysis — cycle detection and dependency depth")
   Container(bausteinsicht_health, "Health", "Go", "Architecture health scoring — completeness, conformance, and complexity")
-  Container(bausteinsicht_importer, "Importer", "Go", "Import architecture from Structurizr DSL and LikeC4 formats")
+  Container(bausteinsicht_importer, "Importer", "Go", "Import architecture from Structurizr DSL, LikeC4, and XMI/Enterprise Architect formats")
   Container(bausteinsicht_layout, "Layout", "Go", "Auto-layout algorithms for positioning elements in draw.io diagrams")
   Container(bausteinsicht_lsp, "Language Server", "Go", "Language Server Protocol implementation for VS Code and other editors")
   Container(bausteinsicht_model, "Model", "Go", "JSONC architecture model management — loading, validation, and mutation")

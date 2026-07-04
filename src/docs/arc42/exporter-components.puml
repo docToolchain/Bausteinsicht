@@ -1,0 +1,13 @@
+@startuml
+!include <C4/C4_Component>
+
+Container(bausteinsicht_cli, "CLI", "Go / Cobra", "Command-line interface providing validate, sync, export, and watch commands")
+Container(bausteinsicht_model, "Model", "Go", "JSONC architecture model management — loading, validation, and mutation")
+Container_Boundary(bausteinsicht_exporter, "Exporter") {
+  Component(bausteinsicht_exporter_structurizr, "Structurizr", "Go", "Structurizr DSL export with smart variable naming")
+}
+
+Rel(bausteinsicht_cli, bausteinsicht_model, "loads/saves JSONC")
+Rel(bausteinsicht_cli, bausteinsicht_exporter, "exports DSL")
+Rel(bausteinsicht_exporter_structurizr, bausteinsicht_model, "reads model")
+@enduml
