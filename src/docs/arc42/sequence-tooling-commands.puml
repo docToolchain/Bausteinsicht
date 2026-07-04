@@ -1,0 +1,24 @@
+@startuml tooling_commands
+title Tooling: Workspace, Layout, Generate-Template, Schema
+
+participant "Software Architect" as architect
+participant "Tooling" as bausteinsicht_cli_tooling
+participant "Workspace" as bausteinsicht_workspace
+participant "Layout" as bausteinsicht_layout
+participant "Template" as bausteinsicht_template
+participant "Schema" as bausteinsicht_schema
+
+architect -> bausteinsicht_cli_tooling : 1. bausteinsicht workspace validate (multi-model project)
+bausteinsicht_cli_tooling -> bausteinsicht_workspace : 2. load + merge multiple model files, cross-validate
+bausteinsicht_workspace --> architect : 3. merged view, or cross-model conflicts
+architect -> bausteinsicht_cli_tooling : 4. bausteinsicht layout ‑‑relayout
+bausteinsicht_cli_tooling -> bausteinsicht_layout : 5. compute hierarchical auto-layout positions
+bausteinsicht_layout --> architect : 6. repositioned elements written via next sync
+architect -> bausteinsicht_cli_tooling : 7. bausteinsicht generate-template
+bausteinsicht_cli_tooling -> bausteinsicht_template : 8. generate a draw.io template file from the specification's element kinds
+bausteinsicht_template --> architect : 9. template.drawio (styled reference shapes per kind)
+architect -> bausteinsicht_cli_tooling : 10. bausteinsicht schema generate
+bausteinsicht_cli_tooling -> bausteinsicht_schema : 11. reflect Go model types into JSON Schema
+bausteinsicht_schema --> architect : 12. bausteinsicht.schema.json (IDE autocompletion/validation)
+
+@enduml

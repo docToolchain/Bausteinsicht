@@ -1,0 +1,18 @@
+@startuml diff_and_changelog
+title As-Is/To-Be Diff and Changelog Generation
+
+participant "Software Architect" as architect
+participant "Evolution" as bausteinsicht_cli_evolution
+participant "Diff" as bausteinsicht_diff
+participant "Changelog" as bausteinsicht_changelog
+
+architect -> bausteinsicht_cli_evolution : 1. bausteinsicht diff ‑‑to-be target.jsonc
+bausteinsicht_cli_evolution -> bausteinsicht_diff : 2. compare(asIsModel, toBeModel)
+bausteinsicht_diff --> bausteinsicht_cli_evolution : 3. added / removed / changed elements and relationships
+architect -> bausteinsicht_cli_evolution : 4. bausteinsicht changelog ‑‑since v1.0.0
+bausteinsicht_cli_evolution -> bausteinsicht_changelog : 5. for each relevant git ref: load model at that ref
+bausteinsicht_changelog -> bausteinsicht_diff : 6. compare(modelAtRefN, modelAtRefN+1)
+bausteinsicht_diff --> bausteinsicht_changelog : 7. delta per ref
+bausteinsicht_changelog --> architect : 8. chronological architecture changelog (AsciiDoc/Markdown)
+
+@enduml

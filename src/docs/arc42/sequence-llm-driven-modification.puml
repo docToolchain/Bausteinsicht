@@ -7,7 +7,7 @@ participant "Loader" as bausteinsicht_model_loader
 participant "Validate" as bausteinsicht_model_validate
 participant "Core" as bausteinsicht_cli_core
 
-llm_agent -> bausteinsicht_cli_add : 1. bausteinsicht add element --id cache --kind container --title 'Redis Cache' --parent webshop --format json
+llm_agent -> bausteinsicht_cli_add : 1. bausteinsicht add element ‑‑id cache ‑‑kind container ‑‑title 'Redis Cache' ‑‑parent webshop ‑‑format json
 bausteinsicht_cli_add -> bausteinsicht_model_loader : 2. Load(model.jsonc)
 bausteinsicht_cli_add -> bausteinsicht_model_validate : 3. Validate(kind exists, parent exists)
 bausteinsicht_model_validate --> bausteinsicht_cli_add : 4. ok, or { 'error': ... }

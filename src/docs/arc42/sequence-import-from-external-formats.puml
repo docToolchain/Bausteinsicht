@@ -6,12 +6,12 @@ participant "Tooling" as bausteinsicht_cli_tooling
 participant "Importer" as bausteinsicht_importer
 participant "Loader" as bausteinsicht_model_loader
 
-architect -> bausteinsicht_cli_tooling : 1. bausteinsicht import workspace.dsl --from structurizr|likec4|xmi [--dry-run]
+architect -> bausteinsicht_cli_tooling : 1. bausteinsicht import workspace.dsl ‑‑from structurizr|likec4|xmi [‑‑dry-run]
 bausteinsicht_cli_tooling -> bausteinsicht_importer : 2. Import(file, format)
 bausteinsicht_importer -> bausteinsicht_importer : 3. parse source, map people/systems/containers + relationships
 bausteinsicht_importer --> bausteinsicht_cli_tooling : 4. ImportResult{Model, Warnings}
-bausteinsicht_cli_tooling --> architect : 5. --dry-run: print generated JSONC to stdout
-bausteinsicht_cli_tooling -> bausteinsicht_model_loader : 6. write: Save(architecture.jsonc, model) — exit 2 if exists without --force
+bausteinsicht_cli_tooling --> architect : 5. ‑‑dry-run: print generated JSONC to stdout
+bausteinsicht_cli_tooling -> bausteinsicht_model_loader : 6. write: Save(architecture.jsonc, model) — exit 2 if exists without ‑‑force
 bausteinsicht_cli_tooling --> architect : 7. 'Imported model written' + warnings
 
 @enduml
