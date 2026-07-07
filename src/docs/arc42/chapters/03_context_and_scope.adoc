@@ -108,7 +108,7 @@ fork again
   :Export (output side):\nbausteinsicht export\nbausteinsicht export-diagram\nbausteinsicht export-table;
   note right: Alternative to reviewing\ndiagrams directly in draw.io
 fork again
-  :Tooling & setup:\nbausteinsicht workspace\nbausteinsicht layout --relayout\nbausteinsicht overlay\nbausteinsicht generate-template\nbausteinsicht adr\nbausteinsicht repl\nbausteinsicht init\nbausteinsicht add relationship, add view,\nadd specification, add-from-pattern;
+  :Tooling & setup:\nbausteinsicht workspace merge, workspace validate,\nworkspace list\nbausteinsicht layout --relayout\nbausteinsicht overlay apply, overlay remove,\noverlay list\nbausteinsicht generate-template\nbausteinsicht schema generate\nbausteinsicht adr list, adr show\nbausteinsicht repl\nbausteinsicht init\nbausteinsicht add relationship, add view,\nadd specification\nbausteinsicht add-from-pattern list\nbausteinsicht add pattern list;
   note right: Setup, styling, and\nbulk/interactive model edits
 end fork
 
