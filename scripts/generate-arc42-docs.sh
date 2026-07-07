@@ -47,14 +47,20 @@ CHAPTERS_DIR="src/docs/arc42/chapters"
 PUML_DIR="src/docs/arc42"
 IMAGES_DIR="src/docs/images/arc42"
 
-mapfile -t VIEWS < <(python3 -c '
+# A plain `x=$(...)` assignment (unlike `mapfile -t VIEWS < <(...)` process
+# substitution) correctly triggers `set -e` if the python/JSON-parse
+# fails — process substitution failures are silently swallowed by `set -e`,
+# which would otherwise leave VIEWS empty and this whole script "succeed"
+# at regenerating nothing if architecture.jsonc were ever malformed.
+views_output="$(python3 -c '
 import json, re
 with open("'"$MODEL"'") as f:
     text = f.read()
 data = json.loads(re.sub(r"(?m)^\s*//.*$", "", text))
 for k in data["views"]:
     print(k)
-')
+')"
+mapfile -t VIEWS <<<"$views_output"
 
 BIN="${BAUSTEINSICHT_BIN:-}"
 if [ -z "$BIN" ]; then

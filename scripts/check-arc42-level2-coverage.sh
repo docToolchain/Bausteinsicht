@@ -48,7 +48,13 @@ echo "==> Checking Level-2 section coverage in $CHAPTER..." >&2
 while IFS= read -r view; do
   [ -z "$view" ] && continue
   checked=$((checked + 1))
-  if ! grep -q -- "architecture-$view.png\|$view-elements.adoc" "$CHAPTER"; then
+  # Two separate grep -q calls (not a single "a\|b" alternation): \| for
+  # alternation in BRE is a GNU extension, not POSIX-portable to BSD grep
+  # (e.g. macOS's default /usr/bin/grep) — there it degrades to a literal,
+  # never-matching string, falsely reporting every view as MISSING. Same
+  # class of portability bug as the -oP issue fixed in
+  # check-arc42-process-coverage.sh / check-arc42-runtime-coverage.sh.
+  if ! grep -q -- "architecture-$view.png" "$CHAPTER" && ! grep -q -- "$view-elements.adoc" "$CHAPTER"; then
     echo "  MISSING: view '$view' has no Level-2 section (no architecture-$view.png or $view-elements.adoc reference) in $CHAPTER" >&2
     exit_code=1
   fi
