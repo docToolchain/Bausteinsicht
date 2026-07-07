@@ -978,7 +978,7 @@
       "description": "CLI subcommand clusters, grouped by concern rather than one component per file"
     }
   },
-  "dynamicViews":   [
+  "dynamicViews": [
     {
       "key": "sync-command",
       "title": "Sync Command",

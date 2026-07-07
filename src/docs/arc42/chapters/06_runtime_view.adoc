@@ -100,7 +100,7 @@ NOTE: `dynamicViews`/`SequenceStep` (the model type behind this generated diagra
 
 === Add: Relationship / View / Specification / From-Pattern
 
-The non-element `add` subcommands — `add relationship`, `add view`, `add specification`, and `add-from-pattern` — cover relationships between existing elements, views, specification entries, and pattern-based bulk generation. `add-from-pattern list` (equivalently reachable as `add pattern list`) lists the patterns available to apply. All are pure model edits, same shape as `add element` (see LLM-Driven Modification above).
+The non-element `add` subcommands — `add relationship`, `add view`, `add specification` (with its own `add specification element` and `add specification relationship` children, for extending the specification itself rather than the model), and `add-from-pattern` — cover relationships between existing elements, views, specification entries, and pattern-based bulk generation. `bausteinsicht add-from-pattern` doesn't have its own list subcommand; the sibling `add pattern list` command (a separate group under `add`, not under `add-from-pattern`) lists the patterns available to apply. All are pure model edits, same shape as `add element` (see LLM-Driven Modification above).
 
 .Add: Relationship / View / Specification / From-Pattern (generated from `dynamicViews.add-family` in architecture.jsonc via `bausteinsicht export-sequence`)
 image::arc42/architecture-sequence-add-family.png[Add Family,width=80%]
