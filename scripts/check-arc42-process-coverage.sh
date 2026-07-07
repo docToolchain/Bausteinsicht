@@ -36,13 +36,16 @@ CMD_DIR="cmd/bausteinsicht"
 # via its own file).
 EXCLUDE_FILES=(main.go root.go repl_save.go template_resolve.go)
 
-# Subcommand files that define exactly one Cobra command whose own `Use:`
-# token is too generic to search for (e.g. "view", "save", "list") because
-# their parent command lives in a *different* file (add.go / snapshot.go) —
-# combine with that parent. Files where parent and subcommands are defined
-# together (workspace.go, overlay.go, adr.go, cmd_schema.go, add.go) don't
-# need an entry here: every Use: token in the file is extracted and the
-# first one is used as the local parent for the rest (see the loop below).
+# Subcommand files whose own first (or only) `Use:` token is too generic to
+# search for alone (e.g. "element", "view", "save") because their parent
+# command lives in a *different* file (add.go / snapshot.go) — prefix with
+# that parent. Composes with the multi-Use: local-parent logic below: e.g.
+# add_specification.go's three tokens (specification/element/relationship)
+# become "add specification", "add specification element", "add
+# specification relationship". Files where parent and subcommands are
+# defined together (workspace.go, overlay.go, adr.go, cmd_schema.go) don't
+# need an entry here — their own first Use: token is already a specific
+# enough parent on its own.
 declare -A PARENT_PREFIX=(
   [add_element.go]="add"
   [add_relationship.go]="add"
@@ -53,6 +56,28 @@ declare -A PARENT_PREFIX=(
   [snapshot_list.go]="snapshot"
   [snapshot_restore.go]="snapshot"
   [snapshot_save.go]="snapshot"
+)
+
+# add_from_pattern.go defines two Use: tokens ("add-from-pattern
+# <pattern-id>" and "list"), but they are *not* parent/child in the real
+# Cobra command tree: newListPatternsCmd()'s "list" is wired in add.go
+# under a completely separate "pattern" command group
+# (patternCmd.AddCommand(newListPatternsCmd())), never under
+# add-from-pattern. Combining them as "add-from-pattern list" would assert
+# a command that doesn't exist (verified: `bausteinsicht add-from-pattern`
+# errors "unknown command" — the real invocations are
+# `bausteinsicht add add-from-pattern <pattern-id>` and
+# `bausteinsicht add pattern list`). So this file's extra tokens are
+# ignored here, and the real 3-level term is listed in EXTRA_TERMS instead
+# — a cross-file relationship (add.go's "pattern" parent + this file's
+# "list" child) the per-file heuristic can't derive on its own.
+IGNORE_EXTRA_USES=(add_from_pattern.go)
+
+# Terms that can't be derived by the per-file heuristic above (cross-file
+# 3-level nesting, or any other real command the automatic derivation
+# can't reach) — checked in addition to the per-file loop.
+EXTRA_TERMS=(
+  "add pattern list"
 )
 
 is_excluded() {
@@ -92,18 +117,24 @@ for f in "$CMD_DIR"/*.go; do
   mapfile -t uses < <(sed -n 's/^[[:space:]]*Use:[[:space:]]*"\([a-zA-Z0-9_-]*\).*/\1/p' "$f")
   [ "${#uses[@]}" -eq 0 ] && continue
 
+  for ignore in "${IGNORE_EXTRA_USES[@]}"; do
+    [ "$base" = "$ignore" ] && uses=("${uses[0]}")
+  done
+
   prefix="${PARENT_PREFIX[$base]:-}"
   if [ -n "$prefix" ]; then
-    check_term "$prefix ${uses[0]}" "$base"
-  elif [ "${#uses[@]}" -eq 1 ]; then
-    check_term "${uses[0]}" "$base"
+    local_parent="$prefix ${uses[0]}"
   else
     local_parent="${uses[0]}"
-    check_term "$local_parent" "$base"
-    for ((i = 1; i < ${#uses[@]}; i++)); do
-      check_term "$local_parent ${uses[$i]}" "$base"
-    done
   fi
+  check_term "$local_parent" "$base"
+  for ((i = 1; i < ${#uses[@]}; i++)); do
+    check_term "$local_parent ${uses[$i]}" "$base"
+  done
+done
+
+for term in "${EXTRA_TERMS[@]}"; do
+  check_term "$term" "(EXTRA_TERMS)"
 done
 
 echo "==> Checked $checked commands." >&2
