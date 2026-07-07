@@ -13,9 +13,9 @@
 #
 # The check is deliberately a substring/case-insensitive text search, not a
 # semantic one — a command "counts" as covered if its name (or its
-# "<parent> <child>" form for add_*/snapshot_* subcommands) appears anywhere
-# in the chapter. That is a low bar on purpose: this script flags candidates
-# for a human/doc-check review, it does not judge documentation quality.
+# "<parent> <child>" form for subcommands) appears anywhere in the chapter.
+# That is a low bar on purpose: this script flags candidates for a
+# human/doc-check review, it does not judge documentation quality.
 #
 # Usage:
 #   scripts/check-arc42-process-coverage.sh
@@ -36,8 +36,13 @@ CMD_DIR="cmd/bausteinsicht"
 # via its own file).
 EXCLUDE_FILES=(main.go root.go repl_save.go template_resolve.go)
 
-# Subcommand files whose Cobra `Use:` token alone is too generic to search
-# for (e.g. "view", "save", "list") — combine with their parent command.
+# Subcommand files that define exactly one Cobra command whose own `Use:`
+# token is too generic to search for (e.g. "view", "save", "list") because
+# their parent command lives in a *different* file (add.go / snapshot.go) —
+# combine with that parent. Files where parent and subcommands are defined
+# together (workspace.go, overlay.go, adr.go, cmd_schema.go, add.go) don't
+# need an entry here: every Use: token in the file is extracted and the
+# first one is used as the local parent for the rest (see the loop below).
 declare -A PARENT_PREFIX=(
   [add_element.go]="add"
   [add_relationship.go]="add"
@@ -62,25 +67,42 @@ is_excluded() {
 exit_code=0
 checked=0
 
+check_term() {
+  local term="$1" base="$2"
+  checked=$((checked + 1))
+  if ! grep -qiF -- "$term" "$CHAPTER"; then
+    echo "  MISSING: '$term' (from $CMD_DIR/$base) not mentioned in $CHAPTER" >&2
+    exit_code=1
+  fi
+}
+
 echo "==> Checking command mentions in $CHAPTER..." >&2
 for f in "$CMD_DIR"/*.go; do
   base="$(basename "$f")"
   is_excluded "$base" && continue
 
-  use="$(grep -m1 -oP 'Use:\s*"\K[a-zA-Z0-9_-]+' "$f" || true)"
-  [ -z "$use" ] && continue
+  # Portable extraction (POSIX BRE via sed, not grep -P/PCRE — GNU grep's -P
+  # isn't available on BSD grep, e.g. macOS's default /usr/bin/grep, which
+  # would otherwise silently yield zero matches everywhere and make this
+  # script falsely report "no gaps"). Extracts *every* Use: token in the
+  # file, not just the first — a file can define a parent command and all
+  # its subcommands together (e.g. workspace.go: workspace/merge/validate/
+  # list), and only checking the first token used to leave every subcommand
+  # in such files permanently unchecked.
+  mapfile -t uses < <(sed -n 's/^[[:space:]]*Use:[[:space:]]*"\([a-zA-Z0-9_-]*\).*/\1/p' "$f")
+  [ "${#uses[@]}" -eq 0 ] && continue
 
   prefix="${PARENT_PREFIX[$base]:-}"
   if [ -n "$prefix" ]; then
-    term="$prefix $use"
+    check_term "$prefix ${uses[0]}" "$base"
+  elif [ "${#uses[@]}" -eq 1 ]; then
+    check_term "${uses[0]}" "$base"
   else
-    term="$use"
-  fi
-
-  checked=$((checked + 1))
-  if ! grep -qiF -- "$term" "$CHAPTER"; then
-    echo "  MISSING: '$term' (from $CMD_DIR/$base) not mentioned in $CHAPTER" >&2
-    exit_code=1
+    local_parent="${uses[0]}"
+    check_term "$local_parent" "$base"
+    for ((i = 1; i < ${#uses[@]}; i++)); do
+      check_term "$local_parent ${uses[$i]}" "$base"
+    done
   fi
 done
 
