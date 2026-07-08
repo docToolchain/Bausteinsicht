@@ -135,6 +135,13 @@ as the fallback — it covers the same doc gates.
    ```
    Non-zero exit → **❌ blocking** (a real package has no `container` element in `architecture.jsonc`, or vice versa). This is a scripted version of the routing-table rule above — it exists because that rule was manual-judgment-only for a long time and 11 packages drifted out of the model undetected (#524).
 
+   Also run this when a new `cmd/bausteinsicht/*.go` command or subcommand was added:
+   ```bash
+   make arc42-process-coverage-check
+   make arc42-runtime-coverage-check
+   ```
+   Non-zero exit → **⚠️ non-blocking** (advisory only — a textual mention check, not a semantic one; see the script headers). Flags commands not yet mentioned in §3.1.1's process diagram (`chapters/03_context_and_scope.adoc`) or chapter 6's runtime scenarios (`chapters/06_runtime_view.adoc`). This exists because §3.1.1 and chapter 6 both drifted badly behind the CLI's real command set before being caught (#535).
+
    **B. Doc coverage in tests**
    For each new acceptance criterion or spec section added: is there a test covering it?
    ```bash

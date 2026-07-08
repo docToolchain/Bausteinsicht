@@ -6,7 +6,7 @@ DIST := dist
         build_windows_amd64 build_windows_arm64 \
         schema-generate schema-validate \
         build-extension package-extension \
-        test test-race bench coverage coverage-report e2e-test-report arc42-docs arc42-sequences arc42-drift-check vet staticcheck gosec nilaway govulncheck deadcode \
+        test test-race bench coverage coverage-report e2e-test-report arc42-docs arc42-sequences arc42-drift-check arc42-process-coverage-check arc42-runtime-coverage-check vet staticcheck gosec nilaway govulncheck deadcode \
         gitleaks golangci-lint check check-duplicates clean install-tools install-hooks
 
 # Ensure GOPATH/bin is in PATH for installed tools
@@ -121,6 +121,15 @@ arc42-sequences:
 # element in architecture.jsonc, and vice versa (see #524, #526)
 arc42-drift-check:
 	@scripts/check-arc42-drift.sh
+
+# Advisory: verify every cmd/bausteinsicht command is at least mentioned in
+# §3.1.1's process diagram / chapter 6's runtime scenarios (see #535).
+# Textual heuristic, not a semantic check — see script headers.
+arc42-process-coverage-check:
+	@scripts/check-arc42-process-coverage.sh
+
+arc42-runtime-coverage-check:
+	@scripts/check-arc42-runtime-coverage.sh
 
 # Run benchmarks
 bench:
