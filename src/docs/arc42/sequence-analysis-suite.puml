@@ -1,0 +1,24 @@
+@startuml analysis_suite
+title Analysis: Health, Graph, Find, Lint
+
+participant "Software Architect" as architect
+participant "Analysis" as bausteinsicht_cli_analysis
+participant "Health" as bausteinsicht_health
+participant "Graph" as bausteinsicht_graph
+participant "Search" as bausteinsicht_search
+participant "Constraints" as bausteinsicht_constraints
+
+architect -> bausteinsicht_cli_analysis : 1. bausteinsicht health
+bausteinsicht_cli_analysis -> bausteinsicht_health : 2. score(model) across weighted categories
+bausteinsicht_health --> architect : 3. health score + category breakdown
+architect -> bausteinsicht_cli_analysis : 4. bausteinsicht graph ‑‑check-cycles
+bausteinsicht_cli_analysis -> bausteinsicht_graph : 5. analyze(relationships): cycles, dependency depth, centrality
+bausteinsicht_graph --> architect : 6. report (exit 1 if cycles found)
+architect -> bausteinsicht_cli_analysis : 7. bausteinsicht find 'cache*'
+bausteinsicht_cli_analysis -> bausteinsicht_search : 8. search(model, pattern) across elements/relationships/views
+bausteinsicht_search --> architect : 9. matching elements
+architect -> bausteinsicht_cli_analysis : 10. bausteinsicht lint
+bausteinsicht_cli_analysis -> bausteinsicht_constraints : 11. evaluate(model, rules)
+bausteinsicht_constraints --> architect : 12. violations (exit 1 if any)
+
+@enduml

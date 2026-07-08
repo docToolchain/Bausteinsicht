@@ -97,3 +97,59 @@ NOTE: `dynamicViews`/`SequenceStep` (the model type behind this generated diagra
 * The engine computes everything in memory first; files are written only afterwards, each via a temp-file-plus-rename so a partial write cannot truncate a real file.
 * The state file is written **last**. If any earlier write fails, the state is left untouched, so the next run re-detects the same change and retries — the operation is effectively idempotent and self-healing.
 * The state file carries a SHA-256 checksum, so external tampering or truncation is detected on load rather than silently trusted.
+
+=== Add: Relationship / View / Specification / From-Pattern
+
+The non-element `add` subcommands — `add relationship`, `add view`, `add specification` (with its own `add specification element` and `add specification relationship` children, for extending the specification itself rather than the model), and `add-from-pattern` — cover relationships between existing elements, views, specification entries, and pattern-based bulk generation. `bausteinsicht add-from-pattern` doesn't have its own list subcommand; the sibling `add pattern list` command (a separate group under `add`, not under `add-from-pattern`) lists the patterns available to apply. All are pure model edits, same shape as `add element` (see LLM-Driven Modification above).
+
+.Add: Relationship / View / Specification / From-Pattern (generated from `dynamicViews.add-family` in architecture.jsonc via `bausteinsicht export-sequence`)
+image::arc42/architecture-sequence-add-family.png[Add Family,width=80%]
+
+=== Snapshot: Save / List / Diff / Restore / Delete
+
+Versioned model captures: `snapshot save`, `snapshot list`, `snapshot diff`, `snapshot restore`, and `snapshot delete`. `snapshot restore` is destructive (overwrites the live model), so it's the one step here worth flagging as such.
+
+.Snapshot: Save / List / Diff / Restore / Delete (generated from `dynamicViews.snapshot-management` in architecture.jsonc via `bausteinsicht export-sequence`)
+image::arc42/architecture-sequence-snapshot-management.png[Snapshot Management,width=80%]
+
+=== As-Is/To-Be Diff and Changelog Generation
+
+`diff` compares two model states; `changelog` walks git history calling `diff` at each relevant commit to build a human-readable architecture changelog.
+
+.As-Is/To-Be Diff and Changelog Generation (generated from `dynamicViews.diff-and-changelog` in architecture.jsonc via `bausteinsicht export-sequence`)
+image::arc42/architecture-sequence-diff-and-changelog.png[Diff and Changelog,width=80%]
+
+=== Export: Diagrams, Tables, and Rendered Images
+
+The three export commands — `export`, `export-diagram`, and `export-table` — read the model (and, for `export`, the synced draw.io document) and render it to an external format — the output-side counterpart to `import`. None of them write back to the model or draw.io.
+
+.Export: Diagrams, Tables, and Rendered Images (generated from `dynamicViews.export-family` in architecture.jsonc via `bausteinsicht export-sequence`)
+image::arc42/architecture-sequence-export-family.png[Export Family,width=80%]
+
+=== Analysis: Health, Graph, Find, Lint
+
+Read-only architecture-quality checks, all following the same shape as Stale Detection (load model, analyze, report) — shown together since the flow is structurally identical across all four.
+
+.Analysis: Health, Graph, Find, Lint (generated from `dynamicViews.analysis-suite` in architecture.jsonc via `bausteinsicht export-sequence`)
+image::arc42/architecture-sequence-analysis-suite.png[Analysis Suite,width=80%]
+
+=== Validate as a Standalone Gate
+
+`validate` runs the same check other commands run internally before writing (see REPL Save, LLM-Driven Modification above), but as its own entry point — typically in CI or a pre-commit hook, checked before any file is touched.
+
+.Validate as a Standalone Gate (generated from `dynamicViews.validate-standalone` in architecture.jsonc via `bausteinsicht export-sequence`)
+image::arc42/architecture-sequence-validate-standalone.png[Validate Standalone,width=80%]
+
+=== Tooling: Workspace, Layout, Generate-Template, Schema
+
+Cross-cutting setup/maintenance commands, not part of the daily edit-sync loop: multi-model workspaces (`workspace merge`, `workspace validate`, `workspace list`), auto-layout, template scaffolding, and JSON Schema regeneration (`schema generate`) for IDE support.
+
+.Tooling: Workspace, Layout, Generate-Template, Schema (generated from `dynamicViews.tooling-commands` in architecture.jsonc via `bausteinsicht export-sequence`)
+image::arc42/architecture-sequence-tooling-commands.png[Tooling Commands,width=80%]
+
+=== Overlay and ADR
+
+Two `interactive`-group commands outside the REPL itself: metric heatmap overlays on diagrams (`overlay apply`, `overlay remove`, `overlay list`), and ADR (Architecture Decision Record) scaffolding (`adr list`, `adr show`).
+
+.Overlay and ADR (generated from `dynamicViews.interactive-extras` in architecture.jsonc via `bausteinsicht export-sequence`)
+image::arc42/architecture-sequence-interactive-extras.png[Overlay and ADR,width=80%]

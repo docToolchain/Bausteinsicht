@@ -1,0 +1,25 @@
+[cols="2,1,1,3"]
+|===
+| Element | Kind | Technology | Description
+
+| CLI
+| container
+| Go / Cobra
+| Command-line interface providing validate, sync, export, and watch commands
+
+| Markdown
+| component
+| Go
+| Markdown document wrapper for multiple diagram pages
+
+| Mermaid C4
+| component
+| Go
+| Mermaid C4 diagram generation with C4 level detection
+
+| Model
+| container
+| Go
+| JSONC architecture model management — loading, validation, and mutation
+
+|===

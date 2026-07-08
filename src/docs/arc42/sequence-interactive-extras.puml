@@ -1,0 +1,18 @@
+@startuml interactive_extras
+title Overlay and ADR
+
+participant "Software Architect" as architect
+participant "Interactive" as bausteinsicht_cli_interactive
+participant "Overlay" as bausteinsicht_overlay
+participant "Document" as bausteinsicht_drawio_document
+participant "Loader" as bausteinsicht_model_loader
+
+architect -> bausteinsicht_cli_interactive : 1. bausteinsicht overlay apply ‑‑metric health
+bausteinsicht_cli_interactive -> bausteinsicht_overlay : 2. apply(view, metric): color elements by score
+bausteinsicht_overlay -> bausteinsicht_drawio_document : 3. write heatmap fill colors onto the diagram
+bausteinsicht_overlay --> architect : 4. overlay applied (removable via overlay remove)
+architect -> bausteinsicht_cli_interactive : 5. bausteinsicht adr new 'Use JSONC for the DSL'
+bausteinsicht_cli_interactive -> bausteinsicht_model_loader : 6. scaffold ADR-NNN-Name.adoc from the Nygard template
+bausteinsicht_cli_interactive --> architect : 7. new ADR file ready for editing
+
+@enduml

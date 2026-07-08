@@ -183,7 +183,7 @@
         "importer": {
           "kind": "container",
           "title": "Importer",
-          "description": "Import architecture from Structurizr DSL and LikeC4 formats",
+          "description": "Import architecture from Structurizr DSL, LikeC4, and XMI/Enterprise Architect formats",
           "technology": "Go",
           "children": {
             "structurizr": {
@@ -196,6 +196,12 @@
               "kind": "component",
               "title": "LikeC4",
               "description": "LikeC4 DSL parsing and model conversion",
+              "technology": "Go"
+            },
+            "xmi": {
+              "kind": "component",
+              "title": "XMI",
+              "description": "XMI/Enterprise Architect parsing and model conversion. Buffers the whole file in memory and converts Windows-1252 to UTF-8 before parsing (peak RSS ~2x file size); a 200MB read cap is enforced.",
               "technology": "Go"
             }
           }
@@ -1219,7 +1225,7 @@
           "index": 1,
           "from": "llm_agent",
           "to": "bausteinsicht.cli.add",
-          "label": "bausteinsicht add element --id cache --kind container --title \"Redis Cache\" --parent webshop --format json"
+          "label": "bausteinsicht add element ‑‑id cache ‑‑kind container ‑‑title \"Redis Cache\" ‑‑parent webshop ‑‑format json"
         },
         {
           "index": 2,
@@ -1270,7 +1276,7 @@
           "index": 1,
           "from": "architect",
           "to": "bausteinsicht.cli.tooling",
-          "label": "bausteinsicht import workspace.dsl --from structurizr|likec4|xmi [--dry-run]"
+          "label": "bausteinsicht import workspace.dsl ‑‑from structurizr|likec4|xmi [‑‑dry-run]"
         },
         {
           "index": 2,
@@ -1295,14 +1301,14 @@
           "index": 5,
           "from": "bausteinsicht.cli.tooling",
           "to": "architect",
-          "label": "--dry-run: print generated JSONC to stdout",
+          "label": "‑‑dry-run: print generated JSONC to stdout",
           "type": "return"
         },
         {
           "index": 6,
           "from": "bausteinsicht.cli.tooling",
           "to": "bausteinsicht.model.loader",
-          "label": "write: Save(architecture.jsonc, model) — exit 2 if exists without --force"
+          "label": "write: Save(architecture.jsonc, model) — exit 2 if exists without ‑‑force"
         },
         {
           "index": 7,
@@ -1367,7 +1373,7 @@
           "index": 1,
           "from": "architect",
           "to": "bausteinsicht.cli.analysis",
-          "label": "bausteinsicht stale [--days N]"
+          "label": "bausteinsicht stale [‑‑days N]"
         },
         {
           "index": 2,
@@ -1391,7 +1397,7 @@
           "index": 5,
           "from": "bausteinsicht.stale",
           "to": "git",
-          "label": "last-modified date (git log --follow)"
+          "label": "last-modified date (git log ‑‑follow)"
         },
         {
           "index": 6,
@@ -1483,6 +1489,535 @@
           "from": "bausteinsicht.cli.core",
           "to": "architect",
           "label": "completes the interrupted change, no manual repair",
+          "type": "return"
+        }
+      ]
+    },
+    {
+      "key": "add-family",
+      "title": "Add: Relationship / View / Specification / From-Pattern",
+      "description": "The non-element `add` subcommands: relationships between existing elements, views (include/exclude filters), specification entries (new element kinds), and pattern-based bulk generation. All are pure model edits, same shape as `add element` (see LLM-Driven Modification) — shown once here rather than four near-identical diagrams.",
+      "steps": [
+        {
+          "index": 1,
+          "from": "architect",
+          "to": "bausteinsicht.cli.add",
+          "label": "bausteinsicht add relationship ‑‑from a ‑‑to b ‑‑kind uses"
+        },
+        {
+          "index": 2,
+          "from": "bausteinsicht.cli.add",
+          "to": "bausteinsicht.model.validate",
+          "label": "Validate(both ends exist)"
+        },
+        {
+          "index": 3,
+          "from": "bausteinsicht.cli.add",
+          "to": "bausteinsicht.model.loader",
+          "label": "Save(model.jsonc, updatedModel)"
+        },
+        {
+          "index": 4,
+          "from": "architect",
+          "to": "bausteinsicht.cli.add",
+          "label": "bausteinsicht add view / add specification"
+        },
+        {
+          "index": 5,
+          "from": "bausteinsicht.cli.add",
+          "to": "bausteinsicht.model.loader",
+          "label": "Save(model.jsonc, updatedModel)"
+        },
+        {
+          "index": 6,
+          "from": "architect",
+          "to": "bausteinsicht.cli.add",
+          "label": "bausteinsicht add-from-pattern ‑‑pattern <name>"
+        },
+        {
+          "index": 7,
+          "from": "bausteinsicht.cli.add",
+          "to": "bausteinsicht.model.resolve",
+          "label": "resolve pattern placeholders against existing elements"
+        },
+        {
+          "index": 8,
+          "from": "bausteinsicht.model.resolve",
+          "to": "bausteinsicht.cli.add",
+          "label": "resolved element set",
+          "type": "return"
+        },
+        {
+          "index": 9,
+          "from": "bausteinsicht.cli.add",
+          "to": "bausteinsicht.model.loader",
+          "label": "Save(model.jsonc, expandedModel)"
+        },
+        {
+          "index": 10,
+          "from": "bausteinsicht.cli.add",
+          "to": "architect",
+          "label": "confirmation per subcommand",
+          "type": "return"
+        }
+      ]
+    },
+    {
+      "key": "snapshot-management",
+      "title": "Snapshot: Save / List / Diff / Restore / Delete",
+      "description": "Versioned model captures. `save` writes a timestamped copy; `diff` compares two snapshots (or a snapshot against the live model) the same way `bausteinsicht diff` compares as-is vs. to-be; `restore` overwrites the live model from a snapshot (destructive, so it's the one step here worth calling out as such).",
+      "steps": [
+        {
+          "index": 1,
+          "from": "architect",
+          "to": "bausteinsicht.cli.evolution",
+          "label": "bausteinsicht snapshot save ‑‑label pre-refactor"
+        },
+        {
+          "index": 2,
+          "from": "bausteinsicht.cli.evolution",
+          "to": "bausteinsicht.snapshot",
+          "label": "capture current model.jsonc + metadata"
+        },
+        {
+          "index": 3,
+          "from": "bausteinsicht.snapshot",
+          "to": "bausteinsicht.cli.evolution",
+          "label": "written to .bausteinsicht-snapshots/",
+          "type": "return"
+        },
+        {
+          "index": 4,
+          "from": "architect",
+          "to": "bausteinsicht.cli.evolution",
+          "label": "bausteinsicht snapshot list"
+        },
+        {
+          "index": 5,
+          "from": "bausteinsicht.cli.evolution",
+          "to": "bausteinsicht.snapshot",
+          "label": "read snapshot index"
+        },
+        {
+          "index": 6,
+          "from": "bausteinsicht.snapshot",
+          "to": "architect",
+          "label": "labeled snapshots, newest first",
+          "type": "return"
+        },
+        {
+          "index": 7,
+          "from": "architect",
+          "to": "bausteinsicht.cli.evolution",
+          "label": "bausteinsicht snapshot diff pre-refactor ‑‑against current"
+        },
+        {
+          "index": 8,
+          "from": "bausteinsicht.cli.evolution",
+          "to": "bausteinsicht.snapshot",
+          "label": "load snapshot + current model, compute delta"
+        },
+        {
+          "index": 9,
+          "from": "bausteinsicht.snapshot",
+          "to": "architect",
+          "label": "added / removed / changed elements",
+          "type": "return"
+        },
+        {
+          "index": 10,
+          "from": "architect",
+          "to": "bausteinsicht.cli.evolution",
+          "label": "bausteinsicht snapshot restore pre-refactor (destructive: overwrites model.jsonc)"
+        },
+        {
+          "index": 11,
+          "from": "bausteinsicht.cli.evolution",
+          "to": "bausteinsicht.snapshot",
+          "label": "delete: remove a labeled snapshot"
+        }
+      ]
+    },
+    {
+      "key": "diff-and-changelog",
+      "title": "As-Is/To-Be Diff and Changelog Generation",
+      "description": "`diff` compares two model states (e.g. current vs. a target/to-be model); `changelog` walks git history calling `diff` at each relevant commit to build a human-readable architecture changelog.",
+      "steps": [
+        {
+          "index": 1,
+          "from": "architect",
+          "to": "bausteinsicht.cli.evolution",
+          "label": "bausteinsicht diff ‑‑to-be target.jsonc"
+        },
+        {
+          "index": 2,
+          "from": "bausteinsicht.cli.evolution",
+          "to": "bausteinsicht.diff",
+          "label": "compare(asIsModel, toBeModel)"
+        },
+        {
+          "index": 3,
+          "from": "bausteinsicht.diff",
+          "to": "bausteinsicht.cli.evolution",
+          "label": "added / removed / changed elements and relationships",
+          "type": "return"
+        },
+        {
+          "index": 4,
+          "from": "architect",
+          "to": "bausteinsicht.cli.evolution",
+          "label": "bausteinsicht changelog ‑‑since v1.0.0"
+        },
+        {
+          "index": 5,
+          "from": "bausteinsicht.cli.evolution",
+          "to": "bausteinsicht.changelog",
+          "label": "for each relevant git ref: load model at that ref"
+        },
+        {
+          "index": 6,
+          "from": "bausteinsicht.changelog",
+          "to": "bausteinsicht.diff",
+          "label": "compare(modelAtRefN, modelAtRefN+1)"
+        },
+        {
+          "index": 7,
+          "from": "bausteinsicht.diff",
+          "to": "bausteinsicht.changelog",
+          "label": "delta per ref",
+          "type": "return"
+        },
+        {
+          "index": 8,
+          "from": "bausteinsicht.changelog",
+          "to": "architect",
+          "label": "chronological architecture changelog (AsciiDoc/Markdown)",
+          "type": "return"
+        }
+      ]
+    },
+    {
+      "key": "export-family",
+      "title": "Export: Diagrams, Tables, and Rendered Images",
+      "description": "The three export commands read the model (and, for `export`, the synced draw.io document) and render it to an external format — the output-side counterpart to `import`. None of them write back to the model or draw.io.",
+      "steps": [
+        {
+          "index": 1,
+          "from": "architect",
+          "to": "bausteinsicht.cli.export_cmds",
+          "label": "bausteinsicht export-diagram ‑‑view containers ‑‑diagram-format plantuml"
+        },
+        {
+          "index": 2,
+          "from": "bausteinsicht.cli.export_cmds",
+          "to": "bausteinsicht.diagram",
+          "label": "render(view, format: plantuml|mermaid|dot|d2)"
+        },
+        {
+          "index": 3,
+          "from": "bausteinsicht.diagram",
+          "to": "architect",
+          "label": "text diagram source (stdout or file)",
+          "type": "return"
+        },
+        {
+          "index": 4,
+          "from": "architect",
+          "to": "bausteinsicht.cli.export_cmds",
+          "label": "bausteinsicht export-table ‑‑view containers ‑‑format adoc"
+        },
+        {
+          "index": 5,
+          "from": "bausteinsicht.cli.export_cmds",
+          "to": "bausteinsicht.table",
+          "label": "render(view, format: adoc|markdown)"
+        },
+        {
+          "index": 6,
+          "from": "bausteinsicht.table",
+          "to": "architect",
+          "label": "table source (stdout or file)",
+          "type": "return"
+        },
+        {
+          "index": 7,
+          "from": "architect",
+          "to": "bausteinsicht.cli.export_cmds",
+          "label": "bausteinsicht export ‑‑view containers"
+        },
+        {
+          "index": 8,
+          "from": "bausteinsicht.cli.export_cmds",
+          "to": "bausteinsicht.export",
+          "label": "read synced draw.io page, invoke headless draw.io CLI"
+        },
+        {
+          "index": 9,
+          "from": "bausteinsicht.export",
+          "to": "bausteinsicht.drawio.document",
+          "label": "read diagram page"
+        },
+        {
+          "index": 10,
+          "from": "bausteinsicht.export",
+          "to": "architect",
+          "label": "PNG / SVG file",
+          "type": "return"
+        }
+      ]
+    },
+    {
+      "key": "analysis-suite",
+      "title": "Analysis: Health, Graph, Find, Lint",
+      "description": "Read-only architecture-quality checks, all following the same shape as Stale Detection (load model, analyze, report) — shown together since the flow is structurally identical across all four.",
+      "steps": [
+        {
+          "index": 1,
+          "from": "architect",
+          "to": "bausteinsicht.cli.analysis",
+          "label": "bausteinsicht health"
+        },
+        {
+          "index": 2,
+          "from": "bausteinsicht.cli.analysis",
+          "to": "bausteinsicht.health",
+          "label": "score(model) across weighted categories"
+        },
+        {
+          "index": 3,
+          "from": "bausteinsicht.health",
+          "to": "architect",
+          "label": "health score + category breakdown",
+          "type": "return"
+        },
+        {
+          "index": 4,
+          "from": "architect",
+          "to": "bausteinsicht.cli.analysis",
+          "label": "bausteinsicht graph ‑‑check-cycles"
+        },
+        {
+          "index": 5,
+          "from": "bausteinsicht.cli.analysis",
+          "to": "bausteinsicht.graph",
+          "label": "analyze(relationships): cycles, dependency depth, centrality"
+        },
+        {
+          "index": 6,
+          "from": "bausteinsicht.graph",
+          "to": "architect",
+          "label": "report (exit 1 if cycles found)",
+          "type": "return"
+        },
+        {
+          "index": 7,
+          "from": "architect",
+          "to": "bausteinsicht.cli.analysis",
+          "label": "bausteinsicht find \"cache*\""
+        },
+        {
+          "index": 8,
+          "from": "bausteinsicht.cli.analysis",
+          "to": "bausteinsicht.search",
+          "label": "search(model, pattern) across elements/relationships/views"
+        },
+        {
+          "index": 9,
+          "from": "bausteinsicht.search",
+          "to": "architect",
+          "label": "matching elements",
+          "type": "return"
+        },
+        {
+          "index": 10,
+          "from": "architect",
+          "to": "bausteinsicht.cli.analysis",
+          "label": "bausteinsicht lint"
+        },
+        {
+          "index": 11,
+          "from": "bausteinsicht.cli.analysis",
+          "to": "bausteinsicht.constraints",
+          "label": "evaluate(model, rules)"
+        },
+        {
+          "index": 12,
+          "from": "bausteinsicht.constraints",
+          "to": "architect",
+          "label": "violations (exit 1 if any)",
+          "type": "return"
+        }
+      ]
+    },
+    {
+      "key": "validate-standalone",
+      "title": "Validate as a Standalone Gate",
+      "description": "`validate` runs the same check other commands run internally before writing (see REPL Save, LLM-Driven Modification), but as its own entry point — typically in CI or a pre-commit hook, checked before any file is touched.",
+      "steps": [
+        {
+          "index": 1,
+          "from": "architect",
+          "to": "bausteinsicht.cli.core",
+          "label": "bausteinsicht validate (CI job or pre-commit hook)"
+        },
+        {
+          "index": 2,
+          "from": "bausteinsicht.cli.core",
+          "to": "bausteinsicht.model.loader",
+          "label": "Load(model.jsonc)"
+        },
+        {
+          "index": 3,
+          "from": "bausteinsicht.cli.core",
+          "to": "bausteinsicht.model.validate",
+          "label": "Validate(schema, references, constraints)"
+        },
+        {
+          "index": 4,
+          "from": "bausteinsicht.model.validate",
+          "to": "bausteinsicht.cli.core",
+          "label": "ok, or field-level errors",
+          "type": "return"
+        },
+        {
+          "index": 5,
+          "from": "bausteinsicht.cli.core",
+          "to": "architect",
+          "label": "exit 0, or exit 1 with errors (blocks the commit/pipeline)",
+          "type": "return"
+        }
+      ]
+    },
+    {
+      "key": "tooling-commands",
+      "title": "Tooling: Workspace, Layout, Generate-Template, Schema",
+      "description": "Cross-cutting setup/maintenance commands, not part of the daily edit-sync loop: multi-model workspaces, auto-layout, template scaffolding, and JSON Schema regeneration for IDE support.",
+      "steps": [
+        {
+          "index": 1,
+          "from": "architect",
+          "to": "bausteinsicht.cli.tooling",
+          "label": "bausteinsicht workspace validate (multi-model project)"
+        },
+        {
+          "index": 2,
+          "from": "bausteinsicht.cli.tooling",
+          "to": "bausteinsicht.workspace",
+          "label": "load + merge multiple model files, cross-validate"
+        },
+        {
+          "index": 3,
+          "from": "bausteinsicht.workspace",
+          "to": "architect",
+          "label": "merged view, or cross-model conflicts",
+          "type": "return"
+        },
+        {
+          "index": 4,
+          "from": "architect",
+          "to": "bausteinsicht.cli.tooling",
+          "label": "bausteinsicht layout ‑‑relayout"
+        },
+        {
+          "index": 5,
+          "from": "bausteinsicht.cli.tooling",
+          "to": "bausteinsicht.layout",
+          "label": "compute hierarchical auto-layout positions"
+        },
+        {
+          "index": 6,
+          "from": "bausteinsicht.layout",
+          "to": "architect",
+          "label": "repositioned elements written via next sync",
+          "type": "return"
+        },
+        {
+          "index": 7,
+          "from": "architect",
+          "to": "bausteinsicht.cli.tooling",
+          "label": "bausteinsicht generate-template"
+        },
+        {
+          "index": 8,
+          "from": "bausteinsicht.cli.tooling",
+          "to": "bausteinsicht.template",
+          "label": "generate a draw.io template file from the specification's element kinds"
+        },
+        {
+          "index": 9,
+          "from": "bausteinsicht.template",
+          "to": "architect",
+          "label": "template.drawio (styled reference shapes per kind)",
+          "type": "return"
+        },
+        {
+          "index": 10,
+          "from": "architect",
+          "to": "bausteinsicht.cli.tooling",
+          "label": "bausteinsicht schema generate"
+        },
+        {
+          "index": 11,
+          "from": "bausteinsicht.cli.tooling",
+          "to": "bausteinsicht.schema",
+          "label": "reflect Go model types into JSON Schema"
+        },
+        {
+          "index": 12,
+          "from": "bausteinsicht.schema",
+          "to": "architect",
+          "label": "bausteinsicht.schema.json (IDE autocompletion/validation)",
+          "type": "return"
+        }
+      ]
+    },
+    {
+      "key": "interactive-extras",
+      "title": "Overlay and ADR",
+      "description": "Two `interactive`-group commands outside the REPL itself: metric heatmap overlays on diagrams, and ADR (Architecture Decision Record) scaffolding.",
+      "steps": [
+        {
+          "index": 1,
+          "from": "architect",
+          "to": "bausteinsicht.cli.interactive",
+          "label": "bausteinsicht overlay apply ‑‑metric health"
+        },
+        {
+          "index": 2,
+          "from": "bausteinsicht.cli.interactive",
+          "to": "bausteinsicht.overlay",
+          "label": "apply(view, metric): color elements by score"
+        },
+        {
+          "index": 3,
+          "from": "bausteinsicht.overlay",
+          "to": "bausteinsicht.drawio.document",
+          "label": "write heatmap fill colors onto the diagram"
+        },
+        {
+          "index": 4,
+          "from": "bausteinsicht.overlay",
+          "to": "architect",
+          "label": "overlay applied (removable via overlay remove)",
+          "type": "return"
+        },
+        {
+          "index": 5,
+          "from": "architect",
+          "to": "bausteinsicht.cli.interactive",
+          "label": "bausteinsicht adr new \"Use JSONC for the DSL\""
+        },
+        {
+          "index": 6,
+          "from": "bausteinsicht.cli.interactive",
+          "to": "bausteinsicht.model.loader",
+          "label": "scaffold ADR-NNN-Name.adoc from the Nygard template"
+        },
+        {
+          "index": 7,
+          "from": "bausteinsicht.cli.interactive",
+          "to": "architect",
+          "label": "new ADR file ready for editing",
           "type": "return"
         }
       ]

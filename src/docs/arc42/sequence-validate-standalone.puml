@@ -1,0 +1,15 @@
+@startuml validate_standalone
+title Validate as a Standalone Gate
+
+participant "Software Architect" as architect
+participant "Core" as bausteinsicht_cli_core
+participant "Loader" as bausteinsicht_model_loader
+participant "Validate" as bausteinsicht_model_validate
+
+architect -> bausteinsicht_cli_core : 1. bausteinsicht validate (CI job or pre-commit hook)
+bausteinsicht_cli_core -> bausteinsicht_model_loader : 2. Load(model.jsonc)
+bausteinsicht_cli_core -> bausteinsicht_model_validate : 3. Validate(schema, references, constraints)
+bausteinsicht_model_validate --> bausteinsicht_cli_core : 4. ok, or field-level errors
+bausteinsicht_cli_core --> architect : 5. exit 0, or exit 1 with errors (blocks the commit/pipeline)
+
+@enduml

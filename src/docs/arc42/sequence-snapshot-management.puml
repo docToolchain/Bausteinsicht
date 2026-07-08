@@ -1,0 +1,20 @@
+@startuml snapshot_management
+title Snapshot: Save / List / Diff / Restore / Delete
+
+participant "Software Architect" as architect
+participant "Evolution" as bausteinsicht_cli_evolution
+participant "Snapshot" as bausteinsicht_snapshot
+
+architect -> bausteinsicht_cli_evolution : 1. bausteinsicht snapshot save ‑‑label pre-refactor
+bausteinsicht_cli_evolution -> bausteinsicht_snapshot : 2. capture current model.jsonc + metadata
+bausteinsicht_snapshot --> bausteinsicht_cli_evolution : 3. written to .bausteinsicht-snapshots/
+architect -> bausteinsicht_cli_evolution : 4. bausteinsicht snapshot list
+bausteinsicht_cli_evolution -> bausteinsicht_snapshot : 5. read snapshot index
+bausteinsicht_snapshot --> architect : 6. labeled snapshots, newest first
+architect -> bausteinsicht_cli_evolution : 7. bausteinsicht snapshot diff pre-refactor ‑‑against current
+bausteinsicht_cli_evolution -> bausteinsicht_snapshot : 8. load snapshot + current model, compute delta
+bausteinsicht_snapshot --> architect : 9. added / removed / changed elements
+architect -> bausteinsicht_cli_evolution : 10. bausteinsicht snapshot restore pre-refactor (destructive: overwrites model.jsonc)
+bausteinsicht_cli_evolution -> bausteinsicht_snapshot : 11. delete: remove a labeled snapshot
+
+@enduml

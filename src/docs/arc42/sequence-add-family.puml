@@ -1,0 +1,21 @@
+@startuml add_family
+title Add: Relationship / View / Specification / From-Pattern
+
+participant "Software Architect" as architect
+participant "Add" as bausteinsicht_cli_add
+participant "Validate" as bausteinsicht_model_validate
+participant "Loader" as bausteinsicht_model_loader
+participant "Resolve" as bausteinsicht_model_resolve
+
+architect -> bausteinsicht_cli_add : 1. bausteinsicht add relationship ‑‑from a ‑‑to b ‑‑kind uses
+bausteinsicht_cli_add -> bausteinsicht_model_validate : 2. Validate(both ends exist)
+bausteinsicht_cli_add -> bausteinsicht_model_loader : 3. Save(model.jsonc, updatedModel)
+architect -> bausteinsicht_cli_add : 4. bausteinsicht add view / add specification
+bausteinsicht_cli_add -> bausteinsicht_model_loader : 5. Save(model.jsonc, updatedModel)
+architect -> bausteinsicht_cli_add : 6. bausteinsicht add-from-pattern ‑‑pattern <name>
+bausteinsicht_cli_add -> bausteinsicht_model_resolve : 7. resolve pattern placeholders against existing elements
+bausteinsicht_model_resolve --> bausteinsicht_cli_add : 8. resolved element set
+bausteinsicht_cli_add -> bausteinsicht_model_loader : 9. Save(model.jsonc, expandedModel)
+bausteinsicht_cli_add --> architect : 10. confirmation per subcommand
+
+@enduml

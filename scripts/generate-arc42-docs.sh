@@ -26,11 +26,16 @@
 #      src/docs/arc42/<view>.puml
 #   3. `export --view <view>` -> src/docs/images/arc42/architecture-<view>.png
 #
-# Only regenerates the views actually referenced by a chapter's include::/
-# image:: — not every view defined in the model (some, like
-# importer-components/exporter-components/search-components/
-# diagram-components, exist in the model but have no chapter section; see
-# #526's discussion of that separate question).
+# Regenerates every view defined in architecture.jsonc — the view list is
+# read from the model itself (not hardcoded), so a newly added view gets
+# its artifacts automatically instead of requiring this script to be
+# edited too. As of #539, all 10 views have a chapter section; the 4 that
+# used to have none (importer-components/exporter-components/
+# search-components/diagram-components, deferred in #526) now do — see
+# scripts/generate-arc42-level2-stub.sh for how their section text was
+# generated from the model's title/description, and
+# scripts/check-arc42-level2-coverage.sh for the check that catches the
+# next view added without a matching section.
 
 set -euo pipefail
 
@@ -42,7 +47,20 @@ CHAPTERS_DIR="src/docs/arc42/chapters"
 PUML_DIR="src/docs/arc42"
 IMAGES_DIR="src/docs/images/arc42"
 
-VIEWS=(containers context drawio-components model-components sync-components cli-components)
+# A plain `x=$(...)` assignment (unlike `mapfile -t VIEWS < <(...)` process
+# substitution) correctly triggers `set -e` if the python/JSON-parse
+# fails — process substitution failures are silently swallowed by `set -e`,
+# which would otherwise leave VIEWS empty and this whole script "succeed"
+# at regenerating nothing if architecture.jsonc were ever malformed.
+views_output="$(python3 -c '
+import json, re
+with open("'"$MODEL"'") as f:
+    text = f.read()
+data = json.loads(re.sub(r"(?m)^\s*//.*$", "", text))
+for k in data["views"]:
+    print(k)
+')"
+mapfile -t VIEWS <<<"$views_output"
 
 BIN="${BAUSTEINSICHT_BIN:-}"
 if [ -z "$BIN" ]; then

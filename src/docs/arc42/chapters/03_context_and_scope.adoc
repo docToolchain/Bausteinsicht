@@ -75,6 +75,49 @@ stop
 @enduml
 ....
 
+==== Extended Workflows
+
+The core loop above covers day-to-day editing. Bausteinsicht's other ~30 commands enter or feed off that loop at specific points rather than replacing it — grouped here by where they attach, not detailed step-by-step (chapter 6's Runtime View has the sequence diagrams for that level of detail, themselves generated via `bausteinsicht export-sequence` from `dynamicViews` in `architecture.jsonc`).
+
+[plantuml, business-context-extended, png]
+....
+@startuml
+skinparam shadowing false
+skinparam ActivityBackgroundColor #f0f0f0
+skinparam ActivityBorderColor #333333
+
+|Architect|
+start
+
+fork
+  :Alternate entry point:\nbausteinsicht import <file>\n--from structurizr|likec4|xmi;
+  note right: Feeds the core loop —\nimported model is immediately\nsyncable, same as a hand-written one
+fork again
+  :Quality gates:\nbausteinsicht validate\nbausteinsicht lint;
+  note right: Typically run in CI /\npre-commit, before commit
+fork again
+  :Continuous mode:\nbausteinsicht watch;
+  note right: Replaces manual\n"bausteinsicht sync" calls\nwith a debounced file watcher
+fork again
+  :Analysis (read-only):\nbausteinsicht stale\nbausteinsicht health\nbausteinsicht graph\nbausteinsicht find;
+  note right: Periodic architecture-quality\nchecks, independent of sync
+fork again
+  :Evolution:\nbausteinsicht snapshot save, snapshot list,\nsnapshot diff, snapshot restore, snapshot delete\nbausteinsicht diff --to-be\nbausteinsicht changelog;
+  note right: Versioning and\nas-is/to-be comparison,\nnot part of the edit-sync cycle
+fork again
+  :Export (output side):\nbausteinsicht export\nbausteinsicht export-diagram\nbausteinsicht export-table;
+  note right: Alternative to reviewing\ndiagrams directly in draw.io
+fork again
+  :Tooling & setup:\nbausteinsicht workspace merge, workspace validate,\nworkspace list\nbausteinsicht layout --relayout\nbausteinsicht overlay apply, overlay remove,\noverlay list\nbausteinsicht generate-template\nbausteinsicht schema generate\nbausteinsicht adr list, adr show\nbausteinsicht repl\nbausteinsicht init\nbausteinsicht add relationship, add view,\nadd specification element, add specification relationship\nbausteinsicht add-from-pattern\nbausteinsicht add pattern list;
+  note right: Setup, styling, and\nbulk/interactive model edits
+end fork
+
+:Core loop\n(sync, review, commit);
+
+stop
+@enduml
+....
+
 ==== System Context
 
 .System Context (generated from architecture model)

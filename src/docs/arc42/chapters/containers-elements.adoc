@@ -55,7 +55,7 @@
 | Importer
 | container
 | Go
-| Import architecture from Structurizr DSL and LikeC4 formats
+| Import architecture from Structurizr DSL, LikeC4, and XMI/Enterprise Architect formats
 
 | Layout
 | container

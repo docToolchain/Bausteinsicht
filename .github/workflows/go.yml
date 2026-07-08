@@ -436,6 +436,24 @@ jobs:
           go-version-file: go.mod
       - run: make arc42-drift-check
 
+  # Verifies every *-components view in architecture.jsonc has a matching
+  # "Level 2" section in chapter 5 — the class of gap deferred in #526 and
+  # closed in #539. Same shape as arc42-drift-check above (structural, no
+  # draw.io needed), added because #541's review pointed out that leaving
+  # this CI-less (only reachable via /doc-check) risks the same silent-
+  # drift failure mode #524/#526 already demonstrated for arc42-drift-check
+  # itself.
+  arc42-level2-coverage-check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        with:
+          go-version-file: go.mod
+      - run: make arc42-level2-coverage-check
+
   lint:
     runs-on: ubuntu-latest
     permissions:

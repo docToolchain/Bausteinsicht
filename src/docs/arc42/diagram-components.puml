@@ -1,0 +1,16 @@
+@startuml
+!include <C4/C4_Component>
+
+Container(bausteinsicht_cli, "CLI", "Go / Cobra", "Command-line interface providing validate, sync, export, and watch commands")
+Container(bausteinsicht_model, "Model", "Go", "JSONC architecture model management — loading, validation, and mutation")
+Container_Boundary(bausteinsicht_diagram, "Diagram") {
+  Component(bausteinsicht_diagram_markdown, "Markdown", "Go", "Markdown document wrapper for multiple diagram pages")
+  Component(bausteinsicht_diagram_mermaid_c4, "Mermaid C4", "Go", "Mermaid C4 diagram generation with C4 level detection")
+}
+
+Rel(bausteinsicht_cli, bausteinsicht_model, "loads/saves JSONC")
+Rel(bausteinsicht_cli, bausteinsicht_diagram, "exports Mermaid diagrams")
+Rel(bausteinsicht_diagram, bausteinsicht_model, "reads model for export")
+Rel(bausteinsicht_diagram_mermaid_c4, bausteinsicht_model, "renders elements")
+Rel(bausteinsicht_diagram_markdown, bausteinsicht_diagram_mermaid_c4, "wraps diagrams")
+@enduml
