@@ -919,6 +919,7 @@ Exports views as text diagrams in one of several formats (C4-PlantUML, Mermaid, 
 * Auto-detects the C4 level (Context, Container, or Component) from the view content.
 * Generates diagram source in the requested format. C4-PlantUML uses the stdlib include syntax (`!include <C4/C4_Context>`, etc.).
 * Relationships are filtered to those visible in the view. Endpoints are lifted to visible ancestor elements when the original endpoints are not included in the view.
+* A relationship whose `kind` resolves to `specification.relationships.<kind>.dashed: true` renders as a dashed line: `style="dashed"` edge attribute in DOT, a `style.stroke-dash` block in D2, a `stroke-dasharray` SVG line in HTML, and a raw `..>` arrow instead of the `Rel()` macro in PlantUML (C4-PlantUML's own dashed-line style override errors on the versions tested). Mermaid does not yet support a dashed-line override in its C4 syntax, so dashed relationships render the same as solid ones there (#518).
 * Without `--output`, the diagram(s) are written to stdout. With `--output <dir>`, per-view files are named `<view-key>.<ext>`, where `<ext>` is `puml`, `mmd`, `dot`, `d2`, or `html`.
 * `--diagram-format structurizr` is special: it exports the entire workspace as a single `workspace.dsl` file and rejects `--view` (exit code 1).
 * Creates the output directory if it does not exist.
