@@ -89,11 +89,16 @@ is_excluded() {
 exit_code=0
 checked=0
 
+# $2 is a human-readable source label — either "$CMD_DIR/<file>.go" for
+# terms derived from the per-file loop, or a plain description for
+# EXTRA_TERMS entries (not a real file, so it must not be dressed up as
+# one via "$CMD_DIR/$label" — that previously printed the confusing
+# "cmd/bausteinsicht/(EXTRA_TERMS)").
 check_term() {
-  local term="$1" base="$2"
+  local term="$1" source="$2"
   checked=$((checked + 1))
   if ! grep -qiF -- "$term" "$CHAPTER"; then
-    echo "  MISSING: '$term' (from $CMD_DIR/$base) not mentioned in $CHAPTER" >&2
+    echo "  MISSING: '$term' (from $source) not mentioned in $CHAPTER" >&2
     exit_code=1
   fi
 }
@@ -124,14 +129,14 @@ for f in "$CMD_DIR"/*.go; do
   else
     local_parent="${uses[0]}"
   fi
-  check_term "$local_parent" "$base"
+  check_term "$local_parent" "$CMD_DIR/$base"
   for ((i = 1; i < ${#uses[@]}; i++)); do
-    check_term "$local_parent ${uses[$i]}" "$base"
+    check_term "$local_parent ${uses[$i]}" "$CMD_DIR/$base"
   done
 done
 
 for term in "${EXTRA_TERMS[@]}"; do
-  check_term "$term" "(EXTRA_TERMS)"
+  check_term "$term" "EXTRA_TERMS (cross-file command, see script header)"
 done
 
 echo "==> Checked $checked commands." >&2
