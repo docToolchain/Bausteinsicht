@@ -1,0 +1,160 @@
+= Hexagonal Architecture + DDD — Starter Model
+:toc:
+:icons: font
+
+This example shows how to model a *Hexagonal Architecture* (Ports & Adapters) with tactical *Domain-Driven Design* building blocks in Bausteinsicht.
+Bausteinsicht has no built-in notion of "port", "adapter" or "aggregate" — you define your own vocabulary.
+This model demonstrates one consistent way to do that.
+
+== The conventions used here
+
+Three mechanisms carry the semantics, each with a distinct job:
+
+Element `kind`:: The *structural role*.
+This model defines `drivingAdapter`, `inboundPort`, `applicationService`, `aggregate`, `entity`, `valueObject`, `domainService`, `outboundPort`, `drivenAdapter`, `datastore` and `externalSystem`.
+The *order* of the kinds in `specification.elements` drives the top-to-bottom row order of the `layered` auto-layout, so the diagram already reads like a slice through the hexagon.
+
+Tags:: The *zone* used for coloring and view filtering: `adapter`, `port`, `application`, `domain`.
+Each zone gets a `style` under `specification.tags`, so elements are color-coded automatically.
+
+Metadata:: Fine-grained, machine-readable *stereotypes* that you do not want to render visually, e.g. `hex-role: inbound-port` or `ddd-role: aggregate-root`.
+Useful for LLM-driven queries and later tooling.
+
+== Views
+
+The model defines three views, each becoming one draw.io page:
+
+`context`:: The `ordering` bounded context as a black box, plus the actor and external systems around it.
+`ports-and-adapters`:: The hexagonal boundary (driving adapters -> inbound ports -> application -> outbound ports -> driven adapters); the domain internals are hidden via `exclude-tags: ["domain"]`.
+`domain-model`:: Only the DDD tactical building blocks, selected via `filter-tags: ["domain"]`.
+
+== Visual styling and the hexagon shape
+
+Because the element kinds here are custom, the built-in template does not know how to
+draw them.
+This example therefore ships its own `template.drawio` next to the model — `sync` picks up
+a local `template.drawio` automatically (explicit `--template` flag > local file > embedded
+default).
+
+The template maps each custom kind to a draw.io shape:
+
+* inbound/outbound ports -> `shape=hexagon` (they sit on the hexagon's edge),
+* the `boundedContext` boundary -> a *hexagon container*, so the `ports-and-adapters` view
+  frames the application core as a hexagon,
+* actor -> person, datastore -> cylinder, adapters/application/domain -> rounded boxes.
+
+The four zone colors (adapter/port/application/domain) come from `specification.tags` and
+are merged on top of the template style.
+
+NOTE: Bausteinsicht auto-layout is `layered`/`grid`/`none` only.
+It arranges elements in rows *inside* the hexagon; it does not place adapters *outside* the
+hexagon with ports exactly on the edges.
+
+[TIP]
+====
+For the textbook "adapters outside, ports on the edges" picture, arrange it once by hand:
+set the view to `"layout": "none"`, run `sync` to create the shapes, drag them into place in
+draw.io, then `sync` again.
+Reverse sync preserves manual positions (only labels follow the model), so your arrangement
+survives subsequent syncs.
+====
+
+== Trying it out (inside this repo)
+
+[source,bash]
+----
+# Validate the model
+go run ./cmd/bausteinsicht validate --model examples/hexagonal-ddd/architecture.jsonc
+
+# Generate architecture.drawio next to the model
+go run ./cmd/bausteinsicht sync --model examples/hexagonal-ddd/architecture.jsonc
+
+# Render the views to SVG (requires a draw.io CLI; see the devcontainer)
+go run ./cmd/bausteinsicht export --model examples/hexagonal-ddd/architecture.jsonc \
+  --image-format svg --output examples/hexagonal-ddd/out
+----
+
+== Using Bausteinsicht in your own (foreign) project
+
+This is the part most people need.
+Assume you have an unrelated code repository and want architecture-as-code in it.
+
+=== Install the CLI
+
+Bausteinsicht is a single self-contained Go binary — no Node.js, no plugins.
+
+[source,bash]
+----
+# Option A: install with the Go toolchain (pin a released version)
+go install github.com/docToolchain/Bausteinsicht/cmd/bausteinsicht@latest
+
+# Option B: download a prebuilt binary from the GitHub Releases page
+#   https://github.com/docToolchain/Bausteinsicht/releases
+----
+
+Verify:
+
+[source,bash]
+----
+bausteinsicht --version
+----
+
+=== Bootstrap the model
+
+. Pick a home for the model in your repo, e.g. `docs/architecture/`.
+. Create the first model — either scaffold an empty one or start from this example:
++
+[source,bash]
+----
+mkdir -p docs/architecture
+# scaffold:
+bausteinsicht init --model docs/architecture/architecture.jsonc
+# ...or copy this starter and adapt the specification to your domain:
+cp architecture.jsonc docs/architecture/architecture.jsonc
+----
+. Keep the `$schema` line at the top of the file.
+It gives you *autocompletion and validation in any JSON-Schema-aware IDE* (VS Code, IntelliJ) with no plugin — one of the tool's core goals.
+. Adapt `specification.elements`, `specification.relationships` and `specification.tags` to *your* vocabulary, then fill `model`, `relationships` and `views`.
+
+=== The daily loop
+
+[source,bash]
+----
+cd docs/architecture
+
+# 1. Edit architecture.jsonc (in your IDE, with schema autocompletion)
+
+# 2. Sync: model -> architecture.drawio (and label edits back from draw.io -> model)
+bausteinsicht sync --model architecture.jsonc
+
+# 3. Open architecture.drawio to arrange/annotate visually
+#    (draw.io desktop, app.diagrams.net, or the VS Code "Draw.io Integration" extension)
+
+# 4. Sync again to pull any label edits back into the model
+bausteinsicht sync --model architecture.jsonc
+
+# 5. Render docs artifacts
+bausteinsicht export --model architecture.jsonc --image-format svg --output out
+bausteinsicht export-diagram --diagram-format plantuml --output out   # or mermaid
+bausteinsicht export-table    --table-format adoc      --output out   # element inventory
+----
+
+The bidirectional source of truth is `architecture.jsonc` <-> `architecture.drawio`, anchored by the `bausteinsicht_id` attribute; a hidden `.bausteinsicht-sync` file tracks state between runs.
+The model always wins on conflicts.
+
+=== Commit these, ignore those
+
+[source,gitignore]
+----
+# commit: architecture.jsonc, architecture.drawio, exported svg/png you reference in docs
+# ignore: transient render output directory, if you regenerate it in CI
+docs/architecture/out/
+----
+
+Keep `.bausteinsicht-sync` under version control so every clone shares the same sync baseline.
+
+== Notes and limits
+
+* SVG/PNG exported with `--embed-diagram` carry a copy of the draw.io XML (including `bausteinsicht_id`), so they are self-contained artifacts.
+* Syncing *from* an embedded SVG/PNG back into the model is not yet supported — only `architecture.jsonc` and `architecture.drawio` are sync sources today.
+* `bausteinsicht import --from {structurizr,likec4,xmi}` can bootstrap a model from an existing description in those formats.
