@@ -33,7 +33,7 @@ func RenderD2(m *model.BausteinsichtModel, viewKey string) (string, error) {
 	}
 
 	// Filter relationships
-	rels := filterRelationships(m.Relationships, elemSet)
+	rels := filterRelationships(m.Relationships, elemSet, &m.Specification)
 
 	var b strings.Builder
 	b.WriteString("direction: right\n\n")
@@ -68,13 +68,19 @@ func RenderD2(m *model.BausteinsichtModel, viewKey string) (string, error) {
 		b.WriteString("}\n\n")
 	}
 
-	// Write relationships
+	// Write relationships. Dashed ones use D2's edge style block
+	// (style.stroke-dash) — always paired with an explicit (possibly empty)
+	// label, since that's the documented/verified form for attaching a
+	// style block to an edge.
 	for _, r := range rels {
 		fromID := sanitizeD2ID(r.From)
 		toID := sanitizeD2ID(r.To)
-		if r.Label != "" {
+		switch {
+		case r.Dashed:
+			fmt.Fprintf(&b, "%s -> %s: %s {\n  style.stroke-dash: 3\n}\n", fromID, toID, escapeD2String(r.Label))
+		case r.Label != "":
 			fmt.Fprintf(&b, "%s -> %s: %s\n", fromID, toID, escapeD2String(r.Label))
-		} else {
+		default:
 			fmt.Fprintf(&b, "%s -> %s\n", fromID, toID)
 		}
 	}

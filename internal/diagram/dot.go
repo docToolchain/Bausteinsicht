@@ -33,7 +33,7 @@ func RenderDOT(m *model.BausteinsichtModel, viewKey string) (string, error) {
 	}
 
 	// Filter relationships
-	rels := filterRelationships(m.Relationships, elemSet)
+	rels := filterRelationships(m.Relationships, elemSet, &m.Specification)
 
 	var b strings.Builder
 	b.WriteString("digraph \"" + escapeQuotes(view.Title) + "\" {\n")
@@ -69,8 +69,15 @@ func RenderDOT(m *model.BausteinsichtModel, viewKey string) (string, error) {
 		for _, r := range rels {
 			fromID := sanitizeID(r.From)
 			toID := sanitizeID(r.To)
+			var attrs []string
 			if r.Label != "" {
-				fmt.Fprintf(&b, "  %s -> %s [label=\"%s\"]\n", fromID, toID, escapeQuotes(r.Label))
+				attrs = append(attrs, fmt.Sprintf("label=\"%s\"", escapeQuotes(r.Label)))
+			}
+			if r.Dashed {
+				attrs = append(attrs, `style="dashed"`)
+			}
+			if len(attrs) > 0 {
+				fmt.Fprintf(&b, "  %s -> %s [%s]\n", fromID, toID, strings.Join(attrs, " "))
 			} else {
 				fmt.Fprintf(&b, "  %s -> %s\n", fromID, toID)
 			}

@@ -340,6 +340,24 @@ func populateNewPage(
 	}
 }
 
+// connectorStyle returns baseStyle with "dashed=1;" appended if the given
+// relationship kind is defined in the specification with Dashed: true (#518).
+// kind may be empty (no kind set on the relationship) or unknown (not found
+// in spec.Relationships), in which case baseStyle is returned unchanged.
+func connectorStyle(baseStyle, kind string, spec *model.Specification) string {
+	if kind == "" || spec == nil {
+		return baseStyle
+	}
+	rk, ok := spec.Relationships[kind]
+	if !ok || !rk.Dashed {
+		return baseStyle
+	}
+	if baseStyle != "" && !strings.HasSuffix(baseStyle, ";") {
+		baseStyle += ";"
+	}
+	return baseStyle + "dashed=1;"
+}
+
 // populateConnectors creates connectors for all model relationships whose
 // (possibly lifted) endpoints are both on the page but no connector exists yet.
 // This ensures relationships involving newly populated elements are rendered (#231).
@@ -386,7 +404,7 @@ func populateConnectors(
 		if page.FindConnector(srcRef, tgtRef, i) != nil {
 			continue // Already exists.
 		}
-		style := templates.GetConnectorStyle()
+		style := connectorStyle(templates.GetConnectorStyle(), rel.Kind, &m.Specification)
 		data := drawio.ConnectorData{
 			From:      from,
 			To:        to,
@@ -606,7 +624,7 @@ func applyChangesToPage(
 				if pass == 1 && !isLifted {
 					continue // Second pass: only lifted relationships
 				}
-				lifted := RelationshipChange{From: from, To: to, Index: ch.Index, Type: ch.Type, NewValue: ch.NewValue}
+				lifted := RelationshipChange{From: from, To: to, Index: ch.Index, Type: ch.Type, NewValue: ch.NewValue, Kind: ch.Kind}
 				switch ch.Type {
 				case Added:
 					// Only deduplicate lifted relationships. When multiple
@@ -628,7 +646,7 @@ func applyChangesToPage(
 						// the same pair are suppressed in pass 1. (#197)
 						liftedSeen[pairKey] = true
 					}
-					applyRelAdded(lifted, viewID, page, templates, result)
+					applyRelAdded(lifted, viewID, page, templates, spec, result)
 				case Modified:
 					page.UpdateConnectorLabel(from, to, ch.Index, ch.NewValue)
 					result.ConnectorsUpdated++
@@ -1074,6 +1092,7 @@ func applyRelAdded(
 	viewID string,
 	page *drawio.Page,
 	templates *drawio.TemplateSet,
+	spec *model.Specification,
 	result *ForwardResult,
 ) {
 	srcRef := scopedCellID(viewID, ch.From)
@@ -1084,7 +1103,7 @@ func applyRelAdded(
 		return
 	}
 
-	style := templates.GetConnectorStyle()
+	style := connectorStyle(templates.GetConnectorStyle(), ch.Kind, spec)
 	data := drawio.ConnectorData{
 		From:      ch.From,
 		To:        ch.To,
