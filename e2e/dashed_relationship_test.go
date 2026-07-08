@@ -79,9 +79,7 @@ func TestDashedRelationship(t *testing.T) {
 	dir := t.TempDir()
 
 	modelPath := filepath.Join(dir, "architecture.jsonc")
-	if err := os.WriteFile(modelPath, []byte(dashedRelModelJSON), 0o644); err != nil {
-		t.Fatalf("write model: %v", err)
-	}
+	writeFile(t, modelPath, dashedRelModelJSON)
 
 	// ── Step 1: sync — draw.io connector style ──────────────────────────────
 	runCLI(t, bin, dir, "sync", "--model", "architecture.jsonc")

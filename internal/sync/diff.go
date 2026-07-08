@@ -700,10 +700,10 @@ func detectRelationshipChanges(
 			cs.ModelRelationshipChanges = append(cs.ModelRelationshipChanges, RelationshipChange{
 				From: from, To: to, Index: index, Type: Deleted,
 			})
-		case inModel && inLast && mr.Label != lr.Label:
+		case inModel && inLast && (mr.Label != lr.Label || mr.Kind != lr.Kind):
 			cs.ModelRelationshipChanges = append(cs.ModelRelationshipChanges, RelationshipChange{
 				From: from, To: to, Index: index, Type: Modified, Field: "label",
-				OldValue: lr.Label, NewValue: mr.Label,
+				OldValue: lr.Label, NewValue: mr.Label, Kind: mr.Kind,
 			})
 		}
 

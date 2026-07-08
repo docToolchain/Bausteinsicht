@@ -273,6 +273,115 @@ func TestApplyForward_NewRelationship(t *testing.T) {
 	}
 }
 
+// TestApplyForward_RelationshipModifiedKindAppliesDashedStyle verifies that a
+// Modified relationship change re-applies the connector style so a kind
+// change to a dashed kind is reflected on an already-existing connector, not
+// just on newly-created ones. Regression test for #518.
+func TestApplyForward_RelationshipModifiedKindAppliesDashedStyle(t *testing.T) {
+	doc := drawio.NewDocument()
+	page := doc.AddPage("p1", "Page 1")
+	_ = page.CreateElement(drawio.ElementData{
+		ID: "a", CellID: "a", Kind: "container", Title: "A",
+	}, "")
+	_ = page.CreateElement(drawio.ElementData{
+		ID: "b", CellID: "b", Kind: "container", Title: "B",
+	}, "")
+	page.CreateConnector(drawio.ConnectorData{
+		From: "a", To: "b", Label: "calls",
+		SourceRef: "a", TargetRef: "b",
+	}, "endArrow=block;")
+
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"a": {Kind: "container", Title: "A"},
+			"b": {Kind: "container", Title: "B"},
+		},
+		Relationships: []model.Relationship{
+			{From: "a", To: "b", Label: "calls", Kind: "async"},
+		},
+		Specification: model.Specification{
+			Relationships: map[string]model.RelationshipKind{
+				"async": {Notation: "async", Dashed: true},
+			},
+		},
+	}
+	ts := minimalTemplates(t)
+
+	cs := &ChangeSet{
+		ModelRelationshipChanges: []RelationshipChange{
+			{From: "a", To: "b", Type: Modified, Field: "label", OldValue: "calls", NewValue: "calls", Kind: "async"},
+		},
+	}
+
+	ApplyForward(cs, doc, ts, m)
+
+	conn := page.FindConnector("a", "b", 0)
+	if conn == nil {
+		t.Fatal("connector 'a->b' not found")
+	}
+	style := conn.SelectAttrValue("style", "")
+	if !strings.Contains(style, "dashed=1") {
+		t.Errorf("expected connector style to contain dashed=1 after kind changed to a dashed kind, got: %q", style)
+	}
+}
+
+// TestPopulateConnectors_LiftedDashedIsOrderIndependent verifies that when two
+// relationships with different kinds lift to the same visible connector pair,
+// the rendered connector is dashed if ANY of the contributing relationships
+// is dashed — regardless of which one happens to be processed first.
+// Regression test for #518.
+func TestPopulateConnectors_LiftedDashedIsOrderIndependent(t *testing.T) {
+	newModel := func(rels []model.Relationship) *model.BausteinsichtModel {
+		return &model.BausteinsichtModel{
+			Model: map[string]model.Element{
+				"api": {Kind: "container", Title: "API", Children: map[string]model.Element{
+					"sub1": {Kind: "component", Title: "Sub1"},
+					"sub2": {Kind: "component", Title: "Sub2"},
+				}},
+				"queue": {Kind: "container", Title: "Queue"},
+			},
+			Relationships: rels,
+			Specification: model.Specification{
+				Relationships: map[string]model.RelationshipKind{
+					"sync":  {Notation: "sync"},
+					"async": {Notation: "async", Dashed: true},
+				},
+			},
+		}
+	}
+	elemSet := map[string]bool{"api": true, "queue": true}
+	ts := minimalTemplates(t)
+
+	// Non-dashed relationship first, dashed one second.
+	doc1 := drawio.NewDocument()
+	page1 := doc1.AddPage("p1", "Page 1")
+	m1 := newModel([]model.Relationship{
+		{From: "api.sub1", To: "queue", Kind: "sync"},
+		{From: "api.sub2", To: "queue", Kind: "async"},
+	})
+	populateConnectors(page1, "", "", m1, elemSet, ts, &ForwardResult{})
+
+	// Dashed relationship first, non-dashed one second (reversed order).
+	doc2 := drawio.NewDocument()
+	page2 := doc2.AddPage("p1", "Page 1")
+	m2 := newModel([]model.Relationship{
+		{From: "api.sub2", To: "queue", Kind: "async"},
+		{From: "api.sub1", To: "queue", Kind: "sync"},
+	})
+	populateConnectors(page2, "", "", m2, elemSet, ts, &ForwardResult{})
+
+	for i, page := range []*drawio.Page{page1, page2} {
+		conn := page.FindConnector("api", "queue", 0)
+		if conn == nil {
+			t.Fatalf("case %d: connector 'api->queue' not found", i)
+		}
+		style := conn.SelectAttrValue("style", "")
+		if !strings.Contains(style, "dashed=1") {
+			t.Errorf("case %d: expected lifted connector to be dashed regardless of relationship order, got style: %q", i, style)
+		}
+	}
+}
+
 // TestApplyForward_MultipleNewElementsNoOverlap verifies placement doesn't overlap elements.
 func TestApplyForward_MultipleNewElementsNoOverlap(t *testing.T) {
 	doc := emptyDoc()

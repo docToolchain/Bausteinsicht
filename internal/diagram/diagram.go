@@ -171,11 +171,13 @@ type relEntry struct {
 
 // filterRelationships lifts relationship endpoints to visible elements,
 // deduplicates by (from, to) pair, and resolves each relationship's Dashed
-// flag from its kind in spec.Relationships (#518). spec may be nil, in
-// which case Dashed is always false.
+// flag from its kind in spec.Relationships (#518). When multiple
+// relationships collapse onto the same (from, to) pair (e.g. via endpoint
+// lifting), the rendered connector is dashed if any of them is, regardless
+// of iteration order.
 func filterRelationships(rels []model.Relationship, elemSet map[string]bool, spec *model.Specification) []relEntry {
 	var result []relEntry
-	seen := make(map[string]bool)
+	seenAt := make(map[string]int) // key -> index into result
 	for _, r := range rels {
 		from := liftToVisible(r.From, elemSet)
 		to := liftToVisible(r.To, elemSet)
@@ -183,14 +185,14 @@ func filterRelationships(rels []model.Relationship, elemSet map[string]bool, spe
 			continue
 		}
 		key := from + ":" + to
-		if seen[key] {
+		dashed := spec.IsDashed(r.Kind)
+		if idx, ok := seenAt[key]; ok {
+			if dashed {
+				result[idx].Dashed = true
+			}
 			continue
 		}
-		seen[key] = true
-		dashed := false
-		if spec != nil {
-			dashed = spec.Relationships[r.Kind].Dashed
-		}
+		seenAt[key] = len(result)
 		result = append(result, relEntry{from, to, r.Label, dashed})
 	}
 	return result

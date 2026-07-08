@@ -47,6 +47,40 @@ func testModel() *model.BausteinsichtModel {
 	}
 }
 
+// TestFilterRelationships_LiftedDashedIsOrderIndependent verifies that when
+// two relationships with different kinds lift to the same visible (from, to)
+// pair, the resulting entry is dashed if ANY contributing relationship is
+// dashed — regardless of which one is encountered first. Regression test
+// for #518.
+func TestFilterRelationships_LiftedDashedIsOrderIndependent(t *testing.T) {
+	spec := &model.Specification{
+		Relationships: map[string]model.RelationshipKind{
+			"sync":  {Notation: "sync"},
+			"async": {Notation: "async", Dashed: true},
+		},
+	}
+	elemSet := map[string]bool{"a": true, "b": true}
+
+	nonDashedFirst := []model.Relationship{
+		{From: "a", To: "b", Kind: "sync"},
+		{From: "a", To: "b", Kind: "async"},
+	}
+	dashedFirst := []model.Relationship{
+		{From: "a", To: "b", Kind: "async"},
+		{From: "a", To: "b", Kind: "sync"},
+	}
+
+	for i, rels := range [][]model.Relationship{nonDashedFirst, dashedFirst} {
+		result := filterRelationships(rels, elemSet, spec)
+		if len(result) != 1 {
+			t.Fatalf("case %d: expected 1 deduplicated entry, got %d", i, len(result))
+		}
+		if !result[0].Dashed {
+			t.Errorf("case %d: expected deduplicated entry to be dashed regardless of order, got %+v", i, result[0])
+		}
+	}
+}
+
 // --- PlantUML Tests ---
 
 func TestPlantUML_ContextView(t *testing.T) {

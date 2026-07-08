@@ -97,6 +97,22 @@ func (p *Page) UpdateConnectorLabel(from, to string, index int, label string) {
 	}
 }
 
+// SetConnectorStyle overwrites the style attribute on the connector between
+// from and to, mirroring UpdateElementKind's full-replacement approach when
+// an element's kind (and therefore its template style) changes.
+func (p *Page) SetConnectorStyle(from, to string, index int, style string) {
+	conn := p.FindConnector(from, to, index)
+	if conn == nil {
+		return
+	}
+	attr := conn.SelectAttr("style")
+	if attr != nil {
+		attr.Value = style
+	} else {
+		conn.CreateAttr("style", style)
+	}
+}
+
 // DeleteConnector removes the connector between from and to at the given index.
 func (p *Page) DeleteConnector(from, to string, index int) {
 	root := p.Root()

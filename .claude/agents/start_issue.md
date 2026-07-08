@@ -1,33 +1,33 @@
 ---
 name: start_issue
 description: >
-  Startet die Arbeit an einem GitHub Issue nach der docs-first-Konvention des Projekts:
-  führt das doc-check Skill im start-Modus für dieses Issue aus (identifiziert betroffene
-  Spec-/Architektur-Dokumente und aktualisiert sie vor der Implementierung).
-  Aufrufen mit "@start_issue 123" oder "@start_issue #123".
+  Starts work on a GitHub issue following the project's docs-first convention:
+  runs the doc-check skill in start mode for this issue (identifies affected
+  spec/architecture docs and updates them before implementation begins).
+  Invoke with "@start_issue 123" or "@start_issue #123".
 tools: Bash, Read, Write, Edit, Glob, Grep
 model: sonnet
 ---
 
-Du startest die Arbeit an einem GitHub Issue für Bausteinsicht, gemäß der "Ticket Start"-Regel
-in CLAUDE.md: docs-first, bevor Implementierung beginnt.
+You are starting work on a GitHub issue for Bausteinsicht, per the "Ticket Start" rule
+in CLAUDE.md: docs-first, before implementation begins.
 
-## Aufgabe
+## Task
 
-Du erhältst eine Issue-Nummer als Argument (z.B. `123` oder `#123`). Führe exakt das aus, was
-`/doc-check start #<issue>` tun würde:
+You receive an issue number as an argument (e.g. `123` or `#123`). Do exactly what
+`/doc-check start #<issue>` would do:
 
-1. Lies `.claude/skills/doc-check/SKILL.md` vollständig.
-2. Führe den Abschnitt **"Mode: start"** dieses Skills für die übergebene Issue-Nummer aus —
-   Schritt für Schritt, mit den dort beschriebenen `gh`/`git`-Befehlen und Doc-Update-Regeln.
-3. Wende die dort identifizierten Doku-Updates tatsächlich an (nicht nur auflisten).
-4. Fasse am Ende zusammen: welche Docs aktualisiert wurden, welche bewusst unverändert blieben
-   (mit Begründung), und was als Nächstes (Implementierung) ansteht.
+1. Read `.claude/skills/doc-check/SKILL.md` in full.
+2. Execute the **"Mode: start"** section of that skill for the given issue number —
+   step by step, using the `gh`/`git` commands and doc-update rules described there.
+3. Actually apply the doc updates identified there (not just list them).
+4. Summarize at the end: which docs were updated, which were deliberately left
+   unchanged (with reasoning), and what's next (implementation).
 
-Falls keine Issue-Nummer übergeben wurde: frage nach, statt ohne Nummer weiterzumachen — das
-Skill fällt sonst auf den aktuellen Branch zurück statt auf ein konkretes Ticket, was hier nicht
-gewollt ist.
+If no issue number was given: ask for one instead of proceeding without it — otherwise
+the skill falls back to the current branch instead of a specific ticket, which is not
+wanted here.
 
-Halte dich strikt an die im Skill beschriebene Logik (Quelle der Wahrheit); dupliziere sie hier
-nicht, sondern lies sie bei jedem Aufruf frisch aus `.claude/skills/doc-check/SKILL.md`, damit
-Änderungen am Skill automatisch übernommen werden.
+Stick strictly to the logic described in the skill (source of truth); don't duplicate it
+here — instead, read it fresh from `.claude/skills/doc-check/SKILL.md` on every invocation,
+so changes to the skill are picked up automatically.

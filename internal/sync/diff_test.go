@@ -258,6 +258,30 @@ func TestDetectChanges_RelationshipModifiedLabel(t *testing.T) {
 	}
 }
 
+func TestDetectChanges_RelationshipModifiedKind(t *testing.T) {
+	state := emptyState()
+	state.Relationships = []RelationshipState{
+		{From: "a", To: "b", Label: "calls", Kind: "sync"},
+	}
+	m := &model.BausteinsichtModel{
+		Model:         map[string]model.Element{},
+		Relationships: []model.Relationship{{From: "a", To: "b", Label: "calls", Kind: "async"}},
+	}
+	doc := emptyDoc()
+
+	cs := DetectChanges(m, doc, state, nil)
+
+	found := false
+	for _, ch := range cs.ModelRelationshipChanges {
+		if ch.From == "a" && ch.To == "b" && ch.Type == Modified && ch.Kind == "async" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected kind-only change (sync -> async) to be reported as Modified, changes: %+v", cs.ModelRelationshipChanges)
+	}
+}
+
 func TestDetectChanges_RelationshipDeleted(t *testing.T) {
 	state := emptyState()
 	state.Relationships = []RelationshipState{

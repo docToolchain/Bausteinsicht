@@ -340,22 +340,15 @@ func populateNewPage(
 	}
 }
 
-// connectorStyle returns baseStyle with "dashed=1;" appended if the given
+// connectorStyle returns baseStyle merged with "dashed=1;" if the given
 // relationship kind is defined in the specification with Dashed: true (#518).
-// kind may be empty (no kind set on the relationship) or unknown (not found
-// in spec.Relationships), in which case baseStyle is returned unchanged.
+// Uses mergeStyles so a baseStyle that already sets dashed= (e.g. from a
+// user-edited connector template) is overridden rather than duplicated.
 func connectorStyle(baseStyle, kind string, spec *model.Specification) string {
-	if kind == "" || spec == nil {
+	if !spec.IsDashed(kind) {
 		return baseStyle
 	}
-	rk, ok := spec.Relationships[kind]
-	if !ok || !rk.Dashed {
-		return baseStyle
-	}
-	if baseStyle != "" && !strings.HasSuffix(baseStyle, ";") {
-		baseStyle += ";"
-	}
-	return baseStyle + "dashed=1;"
+	return mergeStyles(baseStyle, "dashed=1;")
 }
 
 // populateConnectors creates connectors for all model relationships whose
@@ -370,6 +363,26 @@ func populateConnectors(
 	templates *drawio.TemplateSet,
 	result *ForwardResult,
 ) {
+	// Pre-compute, per lifted (from,to) pair, whether ANY contributing
+	// relationship is dashed. Multiple relationships can collapse onto the
+	// same rendered connector (endpoint lifting); without this, only the
+	// first-processed relationship's kind would decide the connector's
+	// style, making it depend on m.Relationships array order (#518).
+	dashedForPair := make(map[string]bool)
+	for _, rel := range m.Relationships {
+		from := liftEndpoint(rel.From, elemSet)
+		to := liftEndpoint(rel.To, elemSet)
+		if from == "" || to == "" || (from == to && (from != rel.From || to != rel.To)) {
+			continue
+		}
+		if scopeID != "" && isScopeExternalConnector(from, to, scopeID) {
+			continue
+		}
+		if m.Specification.IsDashed(rel.Kind) {
+			dashedForPair[from+"->"+to] = true
+		}
+	}
+
 	liftedSeen := make(map[string]bool)
 	for i, rel := range m.Relationships {
 		from := liftEndpoint(rel.From, elemSet)
@@ -404,7 +417,10 @@ func populateConnectors(
 		if page.FindConnector(srcRef, tgtRef, i) != nil {
 			continue // Already exists.
 		}
-		style := connectorStyle(templates.GetConnectorStyle(), rel.Kind, &m.Specification)
+		style := templates.GetConnectorStyle()
+		if dashedForPair[pairKey] {
+			style = mergeStyles(style, "dashed=1;")
+		}
 		data := drawio.ConnectorData{
 			From:      from,
 			To:        to,
@@ -649,6 +665,11 @@ func applyChangesToPage(
 					applyRelAdded(lifted, viewID, page, templates, spec, result)
 				case Modified:
 					page.UpdateConnectorLabel(from, to, ch.Index, ch.NewValue)
+					// Recompute style from the template base rather than
+					// patching the existing style, so a kind change that
+					// flips dashed on or off is reflected either way (#518),
+					// mirroring UpdateElementKind's full-replacement approach.
+					page.SetConnectorStyle(from, to, ch.Index, connectorStyle(templates.GetConnectorStyle(), ch.Kind, spec))
 					result.ConnectorsUpdated++
 				}
 			}
