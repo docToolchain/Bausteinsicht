@@ -278,12 +278,19 @@ func writePlantUML(b *strings.Builder, view model.View, level string, inside, ou
 		}
 	}
 
-	// Relationships. Dashed ones bypass the C4-PlantUML Rel() macro in favor
-	// of a raw dashed arrow (..>): C4-PlantUML's own per-relationship line
-	// style override (UpdateRelStyle($lineStyle=DashedLine())) errors with
-	// "Function not found" on the PlantUML versions tested (#518) — a plain
-	// PlantUML arrow renders correctly alongside C4-macro-created elements,
-	// since element aliases are valid regardless of which macro created them.
+	writePlantUMLRelationships(b, rels)
+
+	b.WriteString("@enduml\n")
+}
+
+// writePlantUMLRelationships writes the Rel() lines for a view. Dashed ones
+// bypass the C4-PlantUML Rel() macro in favor of a raw dashed arrow (..>):
+// C4-PlantUML's own per-relationship line style override
+// (UpdateRelStyle($lineStyle=DashedLine())) errors with "Function not found"
+// on the PlantUML versions tested (#518) — a plain PlantUML arrow renders
+// correctly alongside C4-macro-created elements, since element aliases are
+// valid regardless of which macro created them.
+func writePlantUMLRelationships(b *strings.Builder, rels []relEntry) {
 	if len(rels) > 0 {
 		b.WriteString("\n")
 	}
@@ -294,8 +301,6 @@ func writePlantUML(b *strings.Builder, view model.View, level string, inside, ou
 			fmt.Fprintf(b, "Rel(%s, %s, \"%s\")\n", sanitizeID(r.From), sanitizeID(r.To), escapeQuotes(r.Label))
 		}
 	}
-
-	b.WriteString("@enduml\n")
 }
 
 func writePlantUMLElement(b *strings.Builder, e elemEntry, indent string) {
