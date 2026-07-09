@@ -116,7 +116,7 @@ analysis) also run in CI but non-blocking (`continue-on-error: true`) for now: `
 reports 35 pre-existing file-permission findings (tracked separately), and `nilaway`'s memory/time
 footprint on a GitHub-hosted runner hasn't been validated as reliably fast/light enough to gate every
 PR on. `test-race` excludes `internal/importer/xmi` — its ~118MB `BigData.xmi` test fixture makes
-race instrumentation's memory overhead impractical; the other 32 packages are raced normally. See
+race instrumentation's memory overhead impractical; the other 33 packages are raced normally. See
 link:https://github.com/docToolchain/Bausteinsicht/issues/550[issue #550] for the follow-up to make
 `gosec`/`nilaway` blocking once their respective backlogs are addressed.
 
