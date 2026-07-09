@@ -57,7 +57,7 @@ func RenderHTML(m *model.BausteinsichtModel, viewKey string) (string, error) {
 	}
 
 	// Filter relationships
-	rels := filterRelationships(m.Relationships, elemSet)
+	rels := filterRelationships(m.Relationships, elemSet, &m.Specification)
 
 	// Build node list with simple grid layout
 	nodes := []HTMLNode{}
@@ -266,6 +266,9 @@ func generateHTMLTemplate(title, dataJSON string) string {
           line.setAttribute('y2', toNode.y + 40);
           line.setAttribute('stroke', '#999');
           line.setAttribute('stroke-width', '2');
+          if (edge.dashed) {
+            line.setAttribute('stroke-dasharray', '6,4');
+          }
           line.setAttribute('marker-end', 'url(#arrowhead)');
           line.classList.add('edge');
           line.dataset.from = edge.from;

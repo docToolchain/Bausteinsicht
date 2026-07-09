@@ -235,6 +235,15 @@ type RelationshipKind struct {
 	Dashed   bool   `json:"dashed,omitempty"`
 }
 
+// IsDashed reports whether the given relationship kind is defined in the
+// specification with Dashed: true. An empty or unknown kind is never dashed.
+func (s *Specification) IsDashed(kind string) bool {
+	if s == nil || kind == "" {
+		return false
+	}
+	return s.Relationships[kind].Dashed
+}
+
 type Element struct {
 	Kind         string             `json:"kind"`
 	Title        string             `json:"title"`

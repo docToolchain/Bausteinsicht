@@ -36,6 +36,7 @@ type RelationshipChange struct {
 	Field    string // "label", "" for add/delete
 	OldValue string
 	NewValue string
+	Kind     string // relationship kind key into Specification.Relationships, for style lookup (e.g. dashed)
 }
 
 // ChangeSet contains all detected changes from both sides.
@@ -693,16 +694,16 @@ func detectRelationshipChanges(
 		switch {
 		case inModel && !inLast:
 			cs.ModelRelationshipChanges = append(cs.ModelRelationshipChanges, RelationshipChange{
-				From: from, To: to, Index: index, Type: Added, NewValue: mr.Label,
+				From: from, To: to, Index: index, Type: Added, NewValue: mr.Label, Kind: mr.Kind,
 			})
 		case !inModel && inLast:
 			cs.ModelRelationshipChanges = append(cs.ModelRelationshipChanges, RelationshipChange{
 				From: from, To: to, Index: index, Type: Deleted,
 			})
-		case inModel && inLast && mr.Label != lr.Label:
+		case inModel && inLast && (mr.Label != lr.Label || mr.Kind != lr.Kind):
 			cs.ModelRelationshipChanges = append(cs.ModelRelationshipChanges, RelationshipChange{
 				From: from, To: to, Index: index, Type: Modified, Field: "label",
-				OldValue: lr.Label, NewValue: mr.Label,
+				OldValue: lr.Label, NewValue: mr.Label, Kind: mr.Kind,
 			})
 		}
 

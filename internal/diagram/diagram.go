@@ -110,7 +110,7 @@ func FormatView(m *model.BausteinsichtModel, viewKey string, f Format) (string, 
 	if view.Scope != "" {
 		elemSet[view.Scope] = true
 	}
-	rels := filterRelationships(m.Relationships, elemSet)
+	rels := filterRelationships(m.Relationships, elemSet, &m.Specification)
 
 	var b strings.Builder
 	switch f {
@@ -163,14 +163,21 @@ func partitionElements(resolved []string, flat map[string]*model.Element, scope 
 }
 
 type relEntry struct {
-	From  string `json:"from"`
-	To    string `json:"to"`
-	Label string `json:"label,omitempty"`
+	From   string `json:"from"`
+	To     string `json:"to"`
+	Label  string `json:"label,omitempty"`
+	Dashed bool   `json:"dashed,omitempty"`
 }
 
-func filterRelationships(rels []model.Relationship, elemSet map[string]bool) []relEntry {
+// filterRelationships lifts relationship endpoints to visible elements,
+// deduplicates by (from, to) pair, and resolves each relationship's Dashed
+// flag from its kind in spec.Relationships (#518). When multiple
+// relationships collapse onto the same (from, to) pair (e.g. via endpoint
+// lifting), the rendered connector is dashed if any of them is, regardless
+// of iteration order.
+func filterRelationships(rels []model.Relationship, elemSet map[string]bool, spec *model.Specification) []relEntry {
 	var result []relEntry
-	seen := make(map[string]bool)
+	seenAt := make(map[string]int) // key -> index into result
 	for _, r := range rels {
 		from := liftToVisible(r.From, elemSet)
 		to := liftToVisible(r.To, elemSet)
@@ -178,11 +185,15 @@ func filterRelationships(rels []model.Relationship, elemSet map[string]bool) []r
 			continue
 		}
 		key := from + ":" + to
-		if seen[key] {
+		dashed := spec.IsDashed(r.Kind)
+		if idx, ok := seenAt[key]; ok {
+			if dashed {
+				result[idx].Dashed = true
+			}
 			continue
 		}
-		seen[key] = true
-		result = append(result, relEntry{from, to, r.Label})
+		seenAt[key] = len(result)
+		result = append(result, relEntry{from, to, r.Label, dashed})
 	}
 	return result
 }
@@ -267,15 +278,29 @@ func writePlantUML(b *strings.Builder, view model.View, level string, inside, ou
 		}
 	}
 
-	// Relationships.
+	writePlantUMLRelationships(b, rels)
+
+	b.WriteString("@enduml\n")
+}
+
+// writePlantUMLRelationships writes the Rel() lines for a view. Dashed ones
+// bypass the C4-PlantUML Rel() macro in favor of a raw dashed arrow (..>):
+// C4-PlantUML's own per-relationship line style override
+// (UpdateRelStyle($lineStyle=DashedLine())) errors with "Function not found"
+// on the PlantUML versions tested (#518) — a plain PlantUML arrow renders
+// correctly alongside C4-macro-created elements, since element aliases are
+// valid regardless of which macro created them.
+func writePlantUMLRelationships(b *strings.Builder, rels []relEntry) {
 	if len(rels) > 0 {
 		b.WriteString("\n")
 	}
 	for _, r := range rels {
-		fmt.Fprintf(b, "Rel(%s, %s, \"%s\")\n", sanitizeID(r.From), sanitizeID(r.To), escapeQuotes(r.Label))
+		if r.Dashed {
+			fmt.Fprintf(b, "%s ..> %s : \"%s\"\n", sanitizeID(r.From), sanitizeID(r.To), escapeQuotes(r.Label))
+		} else {
+			fmt.Fprintf(b, "Rel(%s, %s, \"%s\")\n", sanitizeID(r.From), sanitizeID(r.To), escapeQuotes(r.Label))
+		}
 	}
-
-	b.WriteString("@enduml\n")
 }
 
 func writePlantUMLElement(b *strings.Builder, e elemEntry, indent string) {
@@ -322,6 +347,13 @@ func writeMermaid(b *strings.Builder, view model.View, level string, inside, out
 		}
 	}
 
+	// Relationships. r.Dashed is intentionally not applied here: Mermaid's
+	// own C4 diagram docs mark UpdateRelStyle's $lineStyle=DashedLine() as
+	// "not yet implemented" (https://mermaid.js.org/syntax/c4.html, checked
+	// 2026-07 — #518) — there is currently no dashed-line mechanism in
+	// Mermaid's C4 syntax to fall back to (unlike PlantUML, C4 diagrams
+	// don't support mixing in a raw arrow outside the C4 macro set). Revisit
+	// once Mermaid ships the feature.
 	if len(rels) > 0 {
 		b.WriteString("\n")
 	}

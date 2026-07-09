@@ -113,7 +113,7 @@ Triggered when the JSON model changes.
 | Remove `<object>`, its child text sub-cells, and all connectors where `source` or `target` matches the element's cell ID.
 
 | New relationship
-| Create `<mxCell>` with `edge="1"`, `source`, `target`, and label. Use `id="rel-<from>-<to>-<index>"`. No `exitX`/`entryX` (auto-routing). Use `parent="1"` (layer, not container).
+| Create `<mxCell>` with `edge="1"`, `source`, `target`, and label. Use `id="rel-<from>-<to>-<index>"`. No `exitX`/`entryX` (auto-routing). Use `parent="1"` (layer, not container). If the relationship's `kind` resolves to a `specification.relationships.<kind>.dashed: true` entry, append `dashed=1;` to the connector style (#518).
 
 | Updated relationship (label)
 | Update `value` attribute on the connector `<mxCell>`.
