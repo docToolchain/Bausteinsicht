@@ -47,6 +47,34 @@ func testModel() *model.BausteinsichtModel {
 	}
 }
 
+// dashedTestModel returns a model with one dashed ("async") and one
+// non-dashed ("sync") relationship kind, used to test that #518's dashed
+// rendering is applied per renderer.
+func dashedTestModel() *model.BausteinsichtModel {
+	return &model.BausteinsichtModel{
+		Specification: model.Specification{
+			Elements: map[string]model.ElementKind{
+				"container": {Notation: "Container"},
+			},
+			Relationships: map[string]model.RelationshipKind{
+				"sync":  {Notation: "calls"},
+				"async": {Notation: "publishes/subscribes", Dashed: true},
+			},
+		},
+		Model: map[string]model.Element{
+			"api":   {Kind: "container", Title: "API"},
+			"queue": {Kind: "container", Title: "Queue"},
+		},
+		Relationships: []model.Relationship{
+			{From: "api", To: "queue", Label: "calls", Kind: "sync"},
+			{From: "queue", To: "api", Label: "notifies", Kind: "async"},
+		},
+		Views: map[string]model.View{
+			"context": {Title: "Context", Include: []string{"api", "queue"}},
+		},
+	}
+}
+
 // TestFilterRelationships_LiftedDashedIsOrderIndependent verifies that when
 // two relationships with different kinds lift to the same visible (from, to)
 // pair, the resulting entry is dashed if ANY contributing relationship is
@@ -146,6 +174,27 @@ func TestPlantUML_Relationships(t *testing.T) {
 	}
 }
 
+// TestPlantUML_DashedRelationship verifies that a relationship whose kind is
+// marked dashed renders as a raw "..>" arrow instead of the Rel() macro,
+// while a non-dashed relationship keeps using Rel(). Regression test for #518.
+func TestPlantUML_DashedRelationship(t *testing.T) {
+	m := dashedTestModel()
+	result, err := FormatView(m, "context", PlantUML)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(result, "Rel(api, queue") {
+		t.Errorf("expected Rel() macro for non-dashed relationship, got:\n%s", result)
+	}
+	if !strings.Contains(result, "queue ..> api") {
+		t.Errorf("expected raw dashed arrow for dashed relationship, got:\n%s", result)
+	}
+	if strings.Contains(result, "Rel(queue, api") {
+		t.Errorf("dashed relationship should not use the Rel() macro, got:\n%s", result)
+	}
+}
+
 func TestPlantUML_InvalidView(t *testing.T) {
 	m := testModel()
 	_, err := FormatView(m, "nonexistent", PlantUML)
@@ -210,6 +259,24 @@ func TestMermaid_Relationships(t *testing.T) {
 	}
 }
 
+// TestMermaid_DashedRelationshipUnsupported documents that Mermaid's C4
+// syntax has no dashed-line mechanism (#518): a dashed-kind relationship
+// renders identically to a non-dashed one via the plain Rel() macro.
+func TestMermaid_DashedRelationshipUnsupported(t *testing.T) {
+	m := dashedTestModel()
+	result, err := FormatView(m, "context", Mermaid)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(result, `Rel(api, queue, "calls")`) {
+		t.Errorf("expected Rel() macro for non-dashed relationship, got:\n%s", result)
+	}
+	if !strings.Contains(result, `Rel(queue, api, "notifies")`) {
+		t.Errorf("expected the dashed-kind relationship to still use the plain Rel() macro (no Mermaid dashed support), got:\n%s", result)
+	}
+}
+
 // --- DOT Tests ---
 
 func TestDOT_ContextView(t *testing.T) {
@@ -245,6 +312,23 @@ func TestDOT_WithColor(t *testing.T) {
 	}
 	if !strings.Contains(result, "color=") {
 		t.Error("expected color attribute for edges")
+	}
+}
+
+// TestDOT_DashedRelationship verifies a dashed-kind relationship gets
+// style="dashed" while a non-dashed one does not. Regression test for #518.
+func TestDOT_DashedRelationship(t *testing.T) {
+	m := dashedTestModel()
+	result, err := RenderDOT(m, "context")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(result, `queue -> api [label="notifies" style="dashed"]`) {
+		t.Errorf("expected dashed style on dashed-kind edge, got:\n%s", result)
+	}
+	if !strings.Contains(result, `api -> queue [label="calls"]`) {
+		t.Errorf("expected plain (non-dashed) edge for non-dashed relationship, got:\n%s", result)
 	}
 }
 
@@ -288,6 +372,24 @@ func TestD2_WithRelationships(t *testing.T) {
 	}
 	if !strings.Contains(result, "uses") {
 		t.Error("expected relationship labels")
+	}
+}
+
+// TestD2_DashedRelationship verifies a dashed-kind relationship gets a
+// style.stroke-dash edge block while a non-dashed one uses the plain
+// "from -> to: label" form. Regression test for #518.
+func TestD2_DashedRelationship(t *testing.T) {
+	m := dashedTestModel()
+	result, err := RenderD2(m, "context")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(result, "queue -> api: \"notifies\" {\n  style.stroke-dash: 3\n}") {
+		t.Errorf("expected style.stroke-dash block for dashed relationship, got:\n%s", result)
+	}
+	if !strings.Contains(result, "api -> queue: \"calls\"\n") {
+		t.Errorf("expected plain (non-block) edge for non-dashed relationship, got:\n%s", result)
 	}
 }
 
@@ -351,6 +453,48 @@ func TestHTML_ValidJSON(t *testing.T) {
 	}
 	if len(data.Nodes) == 0 {
 		t.Error("expected nodes in diagram data")
+	}
+}
+
+// TestHTML_DashedRelationship verifies the embedded diagram-data JSON marks
+// a dashed-kind relationship's edge as dashed, and a non-dashed one as not.
+// Regression test for #518.
+func TestHTML_DashedRelationship(t *testing.T) {
+	m := dashedTestModel()
+	result, err := RenderHTML(m, "context")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	start := strings.Index(result, "const DIAGRAM_DATA = ")
+	if start < 0 {
+		t.Fatal("could not find DIAGRAM_DATA in HTML")
+	}
+	start += len("const DIAGRAM_DATA = ")
+	end := strings.Index(result[start:], ";")
+	if end < 0 {
+		t.Fatal("could not find end of DIAGRAM_DATA")
+	}
+
+	var data HTMLDiagramData
+	if err := json.Unmarshal([]byte(result[start:start+end]), &data); err != nil {
+		t.Fatalf("embedded JSON is invalid: %v", err)
+	}
+
+	var sawDashed, sawPlain bool
+	for _, e := range data.Edges {
+		switch {
+		case e.From == "queue" && e.To == "api":
+			sawDashed = e.Dashed
+		case e.From == "api" && e.To == "queue":
+			sawPlain = !e.Dashed
+		}
+	}
+	if !sawDashed {
+		t.Errorf("expected dashed-kind edge queue->api to have Dashed=true, edges: %+v", data.Edges)
+	}
+	if !sawPlain {
+		t.Errorf("expected non-dashed edge api->queue to have Dashed=false, edges: %+v", data.Edges)
 	}
 }
 

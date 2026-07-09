@@ -106,6 +106,32 @@ func TestUpdateConnectorLabel(t *testing.T) {
 	}
 }
 
+func TestSetConnectorStyle(t *testing.T) {
+	p := newTestPage(t)
+	p.CreateConnector(drawio.ConnectorData{From: "x", To: "y"}, testStyle)
+
+	p.SetConnectorStyle("x", "y", 0, "endArrow=block;dashed=1;")
+
+	conn := p.FindConnector("x", "y", 0)
+	if conn == nil {
+		t.Fatal("connector not found after style update")
+	}
+	if got := conn.SelectAttrValue("style", ""); got != "endArrow=block;dashed=1;" {
+		t.Errorf("style = %q, want %q", got, "endArrow=block;dashed=1;")
+	}
+}
+
+func TestSetConnectorStyle_MissingConnectorIsNoop(t *testing.T) {
+	p := newTestPage(t)
+
+	// Should not panic when the connector doesn't exist.
+	p.SetConnectorStyle("nonexistent", "also-nonexistent", 0, "dashed=1;")
+
+	if p.FindConnector("nonexistent", "also-nonexistent", 0) != nil {
+		t.Error("expected no connector to be created by SetConnectorStyle")
+	}
+}
+
 func TestDeleteConnector(t *testing.T) {
 	p := newTestPage(t)
 	p.CreateConnector(drawio.ConnectorData{From: "a", To: "b"}, testStyle)

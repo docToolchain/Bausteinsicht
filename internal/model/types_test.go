@@ -199,3 +199,32 @@ func TestNestedChildren(t *testing.T) {
 		t.Errorf("expected handler title 'Handler', got '%s'", handler.Title)
 	}
 }
+
+func TestSpecification_IsDashed(t *testing.T) {
+	spec := &Specification{
+		Relationships: map[string]RelationshipKind{
+			"uses":  {Notation: "uses"},
+			"async": {Notation: "async", Dashed: true},
+		},
+	}
+
+	cases := []struct {
+		name string
+		spec *Specification
+		kind string
+		want bool
+	}{
+		{"dashed kind", spec, "async", true},
+		{"non-dashed kind", spec, "uses", false},
+		{"unknown kind", spec, "nonexistent", false},
+		{"empty kind", spec, "", false},
+		{"nil specification", nil, "async", false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := c.spec.IsDashed(c.kind); got != c.want {
+				t.Errorf("IsDashed(%q) = %v, want %v", c.kind, got, c.want)
+			}
+		})
+	}
+}
