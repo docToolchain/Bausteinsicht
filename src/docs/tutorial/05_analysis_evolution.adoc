@@ -82,6 +82,21 @@ All constraints passed.
 
 Rules live in the model itself under `constraints` — for example "nothing may depend on a deprecated element" or "UI containers must not talk to datastores directly". `lint` (and `health`, which weighs conformance at 30 %) enforce them on every run.
 
+Layering rules like the datastore example need more than `kind` to express: an admin console and a database can both be kind `container`, so a kind-based `no-relationship` constraint can't tell them apart. Tag the elements instead (`"adminConsole": {"tags": ["ui"]}`, `"database": {"tags": ["datastore"]}`) and target the tags:
+
+[source,jsonc]
+----
+{
+  "id": "ui-not-to-datastore",
+  "description": "UI must not talk to a datastore directly",
+  "rule": "no-relationship",
+  "from-tag": "ui",
+  "to-tag": "datastore"
+}
+----
+
+`from-tag`/`to-tag` (and `from`/`to` for an exact element ID) work anywhere `from-kind`/`to-kind` do — on `no-relationship`, and as an allow-list (`from-tags`) on `allowed-relationship`. `required-field` accepts a `tag` selector the same way, in place of `element-kind`.
+
 == Stale: find the forgotten corners
 
 [source,bash]

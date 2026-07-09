@@ -141,18 +141,30 @@ type DynamicView struct {
 }
 
 // Constraint defines an architectural rule that can be enforced via `bausteinsicht lint`.
+//
+// no-relationship / allowed-relationship endpoint selectors: each side ("from"/"to")
+// can be targeted by exact element ID, by tag, or by kind (#542). When more than one
+// selector is set for the same side, the most specific one wins: exact ID > tag > kind.
 type Constraint struct {
 	ID          string `json:"id"`
 	Description string `json:"description"`
 	Rule        string `json:"rule"`
 
-	// no-relationship / allowed-relationship
+	// no-relationship / allowed-relationship: "from" endpoint selector.
+	From      string   `json:"from,omitempty"`
+	FromTag   string   `json:"from-tag,omitempty"`
 	FromKind  string   `json:"from-kind,omitempty"`
-	ToKind    string   `json:"to-kind,omitempty"`
+	FromTags  []string `json:"from-tags,omitempty"`
 	FromKinds []string `json:"from-kinds,omitempty"`
 
-	// required-field
+	// no-relationship / allowed-relationship: "to" endpoint selector.
+	To     string `json:"to,omitempty"`
+	ToTag  string `json:"to-tag,omitempty"`
+	ToKind string `json:"to-kind,omitempty"`
+
+	// required-field: element selector — Tag takes precedence over ElementKind if both are set.
 	ElementKind string `json:"element-kind,omitempty"`
+	Tag         string `json:"tag,omitempty"`
 	Field       string `json:"field,omitempty"`
 
 	// max-depth

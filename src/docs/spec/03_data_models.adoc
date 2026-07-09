@@ -879,6 +879,36 @@ const (
     StepReturn StepType = "return"
 )
 
+// Constraint defines an architectural rule enforced via `bausteinsicht lint`.
+// no-relationship/allowed-relationship endpoint selectors (from/to) and the
+// required-field element selector (tag/element-kind) are checked in order of
+// specificity — exact ID > tag > kind — whichever field is non-empty wins.
+type Constraint struct {
+    ID          string `json:"id"`
+    Description string `json:"description"`
+    Rule        string `json:"rule"` // no-relationship|allowed-relationship|required-field|max-depth|no-circular-dependency|technology-allowed
+
+    // no-relationship / allowed-relationship: "from" endpoint selector
+    From      string   `json:"from,omitempty"`       // exact element ID
+    FromTag   string   `json:"from-tag,omitempty"`   // element must have this tag
+    FromKind  string   `json:"from-kind,omitempty"`  // element must have this kind
+    FromTags  []string `json:"from-tags,omitempty"`  // allow-list: element must have ANY of these tags (allowed-relationship only)
+    FromKinds []string `json:"from-kinds,omitempty"` // allow-list: element must have this kind (allowed-relationship only)
+
+    // no-relationship / allowed-relationship: "to" endpoint selector
+    To     string `json:"to,omitempty"`
+    ToTag  string `json:"to-tag,omitempty"`
+    ToKind string `json:"to-kind,omitempty"`
+
+    // required-field: element selector (Tag takes precedence over ElementKind if both are set)
+    ElementKind string `json:"element-kind,omitempty"`
+    Tag         string `json:"tag,omitempty"`
+    Field       string `json:"field,omitempty"` // description|technology|title
+
+    Max          int      `json:"max,omitempty"`          // max-depth
+    Technologies []string `json:"technologies,omitempty"` // technology-allowed
+}
+
 // Config holds top-level configuration for diagram generation
 type Config struct {
     Metadata *bool  `json:"metadata,omitempty"`

@@ -66,6 +66,88 @@ func TestNoRelationship_Violation(t *testing.T) {
 	}
 }
 
+// TestNoRelationship_TagBased_Violation verifies the motivating case from #542:
+// two elements of the SAME kind (both "container") can still be distinguished
+// by tag, so "UI must not talk to datastore directly" becomes expressible.
+func TestNoRelationship_TagBased_Violation(t *testing.T) {
+	m := makeModel(
+		map[string]model.Element{
+			"adminConsole": {Kind: "container", Tags: []string{"ui"}},
+			"database":     {Kind: "container", Tags: []string{"datastore"}},
+		},
+		[]model.Relationship{{From: "adminConsole", To: "database"}},
+		[]model.Constraint{{
+			ID: "c1", Rule: "no-relationship",
+			FromTag: "ui", ToTag: "datastore",
+		}},
+	)
+	r := constraints.Evaluate(m)
+	if r.Total != 1 {
+		t.Errorf("expected 1 violation, got %d", r.Total)
+	}
+}
+
+func TestNoRelationship_TagBased_NoViolation(t *testing.T) {
+	m := makeModel(
+		map[string]model.Element{
+			"adminConsole": {Kind: "container", Tags: []string{"ui"}},
+			"api":          {Kind: "container", Tags: []string{"service"}},
+		},
+		[]model.Relationship{{From: "adminConsole", To: "api"}},
+		[]model.Constraint{{
+			ID: "c1", Rule: "no-relationship",
+			FromTag: "ui", ToTag: "datastore",
+		}},
+	)
+	r := constraints.Evaluate(m)
+	if r.Total != 0 {
+		t.Errorf("expected 0 violations, got %d: %v", r.Total, r.Violations)
+	}
+}
+
+// TestNoRelationship_ElementID_Violation verifies exact-ID endpoint targeting.
+func TestNoRelationship_ElementID_Violation(t *testing.T) {
+	m := makeModel(
+		map[string]model.Element{
+			"legacyBatch": {Kind: "container"},
+			"coreApi":     {Kind: "container"},
+		},
+		[]model.Relationship{{From: "legacyBatch", To: "coreApi"}},
+		[]model.Constraint{{
+			ID: "c1", Rule: "no-relationship",
+			From: "legacyBatch", To: "coreApi",
+		}},
+	)
+	r := constraints.Evaluate(m)
+	if r.Total != 1 {
+		t.Errorf("expected 1 violation, got %d", r.Total)
+	}
+}
+
+// TestNoRelationship_IDTakesPrecedenceOverTag verifies that when both an
+// exact-ID selector and a tag selector are set on the same endpoint, the
+// more specific ID selector wins (#542).
+func TestNoRelationship_IDTakesPrecedenceOverTag(t *testing.T) {
+	m := makeModel(
+		map[string]model.Element{
+			"adminConsole": {Kind: "container", Tags: []string{"ui"}},
+			"other":        {Kind: "container", Tags: []string{"ui"}},
+			"database":     {Kind: "container", Tags: []string{"datastore"}},
+		},
+		// "other" also has the "ui" tag but the constraint pins "from" to the
+		// exact ID "adminConsole" — "other" -> "database" must NOT violate.
+		[]model.Relationship{{From: "other", To: "database"}},
+		[]model.Constraint{{
+			ID: "c1", Rule: "no-relationship",
+			From: "adminConsole", FromTag: "ui", ToTag: "datastore",
+		}},
+	)
+	r := constraints.Evaluate(m)
+	if r.Total != 0 {
+		t.Errorf("expected 0 violations (ID selector should override tag selector), got %d: %v", r.Total, r.Violations)
+	}
+}
+
 // ─── allowed-relationship ────────────────────────────────────────────────────
 
 func TestAllowedRelationship_NoViolation(t *testing.T) {
@@ -101,6 +183,46 @@ func TestAllowedRelationship_Violation(t *testing.T) {
 	r := constraints.Evaluate(m)
 	if r.Total != 1 {
 		t.Errorf("expected 1 violation, got %d", r.Total)
+	}
+}
+
+// TestAllowedRelationship_TagBased_Violation verifies from-tags allow-list
+// targeting (#542), analogous to from-kinds but for elements of the same
+// kind distinguished only by tag.
+func TestAllowedRelationship_TagBased_Violation(t *testing.T) {
+	m := makeModel(
+		map[string]model.Element{
+			"adminConsole": {Kind: "container", Tags: []string{"ui"}},
+			"batchJob":     {Kind: "container", Tags: []string{"internal"}},
+			"database":     {Kind: "container", Tags: []string{"datastore"}},
+		},
+		[]model.Relationship{{From: "batchJob", To: "database"}},
+		[]model.Constraint{{
+			ID: "c1", Rule: "allowed-relationship",
+			FromTags: []string{"internal"}, ToTag: "datastore",
+		}},
+	)
+	r := constraints.Evaluate(m)
+	if r.Total != 0 {
+		t.Errorf("expected 0 violations (batchJob is tagged 'internal', allowed), got %d: %v", r.Total, r.Violations)
+	}
+}
+
+func TestAllowedRelationship_TagBased_ViolationBlocked(t *testing.T) {
+	m := makeModel(
+		map[string]model.Element{
+			"adminConsole": {Kind: "container", Tags: []string{"ui"}},
+			"database":     {Kind: "container", Tags: []string{"datastore"}},
+		},
+		[]model.Relationship{{From: "adminConsole", To: "database"}},
+		[]model.Constraint{{
+			ID: "c1", Rule: "allowed-relationship",
+			FromTags: []string{"internal"}, ToTag: "datastore",
+		}},
+	)
+	r := constraints.Evaluate(m)
+	if r.Total != 1 {
+		t.Errorf("expected 1 violation (adminConsole is tagged 'ui', not in allow-list), got %d", r.Total)
 	}
 }
 
@@ -158,6 +280,31 @@ func TestRequiredField_Technology(t *testing.T) {
 	r := constraints.Evaluate(m)
 	if r.Total != 1 {
 		t.Errorf("expected 1 violation, got %d", r.Total)
+	}
+}
+
+// TestRequiredField_TagBased verifies element selection by Tag instead of
+// ElementKind (#542) — e.g. requiring a description on all "public-api"
+// tagged elements regardless of their kind.
+func TestRequiredField_TagBased(t *testing.T) {
+	m := makeModel(
+		map[string]model.Element{
+			"a": {Kind: "container", Tags: []string{"public-api"}},
+			"b": {Kind: "component", Tags: []string{"public-api"}, Description: "documented"},
+			"c": {Kind: "container"}, // no tag — not selected, would otherwise fail
+		},
+		nil,
+		[]model.Constraint{{
+			ID: "c1", Rule: "required-field",
+			Tag: "public-api", Field: "description",
+		}},
+	)
+	r := constraints.Evaluate(m)
+	if r.Total != 1 {
+		t.Errorf("expected 1 violation (only 'a' is public-api tagged and missing description), got %d: %v", r.Total, r.Violations)
+	}
+	if len(r.Violations) > 0 && len(r.Violations[0].Elements) != 1 {
+		t.Errorf("expected 1 offending element, got %d", len(r.Violations[0].Elements))
 	}
 }
 

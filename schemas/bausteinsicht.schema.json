@@ -91,10 +91,22 @@
         "field": {
           "type": "string"
         },
+        "from": {
+          "type": "string"
+        },
         "from-kind": {
           "type": "string"
         },
         "from-kinds": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "from-tag": {
+          "type": "string"
+        },
+        "from-tags": {
           "items": {
             "type": "string"
           },
@@ -109,13 +121,22 @@
         "rule": {
           "type": "string"
         },
+        "tag": {
+          "type": "string"
+        },
         "technologies": {
           "items": {
             "type": "string"
           },
           "type": "array"
         },
+        "to": {
+          "type": "string"
+        },
         "to-kind": {
+          "type": "string"
+        },
+        "to-tag": {
           "type": "string"
         }
       },
