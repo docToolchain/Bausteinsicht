@@ -34,12 +34,14 @@ type ElementState struct {
 }
 
 // RelationshipState captures a relationship's synced values.
+// Note: PageIDs is not persisted to JSON as page names can change (e.g., view renamed).
 type RelationshipState struct {
-	From  string `json:"from"`
-	To    string `json:"to"`
-	Index int    `json:"index"`
-	Label string `json:"label,omitempty"`
-	Kind  string `json:"kind,omitempty"`
+	From    string   `json:"from"`
+	To      string   `json:"to"`
+	Index   int      `json:"index"`
+	Label   string   `json:"label,omitempty"`
+	Kind    string   `json:"kind,omitempty"`
+	PageIDs []string `json:"-"` // transient: only used during change detection
 }
 
 // LoadState reads a SyncState from the given path.

@@ -22,7 +22,10 @@ type ReverseResult struct {
 }
 
 // ApplyReverse applies draw.io-side changes back to the model.
-func ApplyReverse(changes *ChangeSet, m *model.BausteinsichtModel) *ReverseResult {
+// lastState is the sync state from the previous sync - used to detect whether
+// an element or relationship was already synced (to avoid false "duplicate" warnings when
+// the same element/relationship appears on multiple draw.io pages).
+func ApplyReverse(changes *ChangeSet, m *model.BausteinsichtModel, lastState *SyncState) *ReverseResult {
 	result := &ReverseResult{}
 
 	// Pre-compute the flat model for accurate existence checks.
@@ -30,8 +33,25 @@ func ApplyReverse(changes *ChangeSet, m *model.BausteinsichtModel) *ReverseResul
 	// there directly. We need the flattened view to properly detect nested elements.
 	flatModel, _ := model.FlattenElements(m)
 
+	// Build a set of elements that were already synced in the last sync.
+	lastElemMap := make(map[string]bool)
+	if lastState != nil {
+		for id := range lastState.Elements {
+			lastElemMap[id] = true
+		}
+	}
+
+	// Build a set of relationships that were already synced in the last sync.
+	lastRelMap := make(map[string]bool)
+	if lastState != nil {
+		for _, r := range lastState.Relationships {
+			key := fmt.Sprintf("%s->%s", r.From, r.To)
+			lastRelMap[key] = true
+		}
+	}
+
 	for _, ch := range changes.DrawioElementChanges {
-		applyElementChange(ch, m, flatModel, result)
+		applyElementChange(ch, m, flatModel, lastElemMap, result)
 	}
 
 	// Detect direction-swap pairs (Deleted a→b + Added b→a) so we can
@@ -42,7 +62,7 @@ func ApplyReverse(changes *ChangeSet, m *model.BausteinsichtModel) *ReverseResul
 		if swaps[relSwapKey{ch.From, ch.To, ch.Type}] {
 			continue // handled as part of a swap pair
 		}
-		applyRelationshipChange(ch, m, flatModel, result)
+		applyRelationshipChange(ch, m, flatModel, lastRelMap, result)
 	}
 
 	// Apply swaps: update direction in-place, preserving kind/label/description.
@@ -116,7 +136,7 @@ func applyRelSwap(newFrom, newTo string, m *model.BausteinsichtModel, result *Re
 	result.RelationshipsCreated++
 }
 
-func applyElementChange(ch ElementChange, m *model.BausteinsichtModel, flatModel map[string]*model.Element, result *ReverseResult) {
+func applyElementChange(ch ElementChange, m *model.BausteinsichtModel, flatModel map[string]*model.Element, lastElemMap map[string]bool, result *ReverseResult) {
 	switch ch.Type {
 	case Modified:
 		// Reject empty title updates from draw.io (#150).
@@ -180,8 +200,19 @@ func applyElementChange(ch ElementChange, m *model.BausteinsichtModel, flatModel
 		// IDs are dot-paths (e.g. "parent.child"), causing them to be
 		// re-created as spurious top-level entries with empty titles (#307).
 		if _, exists := flatModel[ch.ID]; exists {
-			result.Warnings = append(result.Warnings,
-				fmt.Sprintf("New element %q from draw.io skipped: ID already exists in model.", ch.ID))
+			// Check if this element was already synced from draw.io in a previous sync.
+			// If it was, it's on a different page now - that's normal, skip silently.
+			if lastElemMap[ch.ID] {
+				// Already synced before (possibly on another page) - no action needed.
+				return
+			}
+			// Element exists in model but wasn't synced from draw.io before - that's a
+			// genuine conflict. Only warn if we've done a previous sync (lastElemMap exists).
+			hasLastState := len(lastElemMap) > 0
+			if hasLastState {
+				result.Warnings = append(result.Warnings,
+					fmt.Sprintf("Element %q from draw.io skipped: ID already exists in model (not synced from draw.io)", ch.ID))
+			}
 			return
 		}
 		kind := firstSpecKind(m)
@@ -195,7 +226,7 @@ func applyElementChange(ch ElementChange, m *model.BausteinsichtModel, flatModel
 	}
 }
 
-func applyRelationshipChange(ch RelationshipChange, m *model.BausteinsichtModel, flatModel map[string]*model.Element, result *ReverseResult) {
+func applyRelationshipChange(ch RelationshipChange, m *model.BausteinsichtModel, flatModel map[string]*model.Element, lastRelMap map[string]bool, result *ReverseResult) {
 	switch ch.Type {
 	case Modified:
 		updated := false
@@ -256,6 +287,33 @@ func applyRelationshipChange(ch RelationshipChange, m *model.BausteinsichtModel,
 			result.Warnings = append(result.Warnings,
 				fmt.Sprintf("Relationship %q->%q rejected: To element %q does not exist in model", ch.From, ch.To, ch.To))
 			return
+		}
+		// Check if this relationship was already synced from draw.io in a previous sync.
+		// If it was, it's on a different page now - that's normal, skip silently.
+		lastRelKey := fmt.Sprintf("%s->%s", ch.From, ch.To)
+		if lastRelMap[lastRelKey] {
+			// Already synced before (possibly on another page) - no action needed.
+			return
+		}
+		// Check if relationship already exists in the model.
+		// On first sync (lastState is nil or empty), this is expected - user manually added
+		// relationships to both places. Skip silently.
+		// Only warn if we've done a previous sync (lastRelMap exists) and this relationship
+		// was NOT synced from draw.io before - that's a genuine conflict.
+		hasLastState := len(lastRelMap) > 0
+		for _, r := range m.Relationships {
+			if r.From == ch.From && r.To == ch.To {
+				if hasLastState {
+					// Genuine conflict: model has relationship that wasn't synced from draw.io
+					pageInfo := ""
+					if ch.PageID != "" {
+						pageInfo = fmt.Sprintf(" (on draw.io page %q)", ch.PageID)
+					}
+					result.Warnings = append(result.Warnings,
+						fmt.Sprintf("Relationship %q->%q already exists in model (not synced from draw.io), skipping duplicate%s", ch.From, ch.To, pageInfo))
+				}
+				return
+			}
 		}
 		m.Relationships = append(m.Relationships, model.Relationship{
 			From:  ch.From,
