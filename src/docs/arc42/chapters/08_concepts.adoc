@@ -106,8 +106,16 @@ Security controls implemented across the codebase, keyed to threat IDs:
 
 | Dependency scanning
 | All
-| `govulncheck` in CI and Makefile; no CVEs in called code (verified 2026-04-27)
+| `govulncheck` via `make govulncheck`; no CVEs in called code as of last local run (2026-04-27)
 |===
+
+NOTE: As of 2026-07-09, `gosec` (SAST), `nilaway` (nil-pointer analysis), `govulncheck` (dependency
+scanning), `gitleaks` (secret scanning), and `go test -race` are runnable locally via `make check` /
+`make gitleaks`, but **none of them run in CI** — `.github/workflows/go.yml` only enforces
+`golangci-lint`, `go vet` (via the `lint` job), `gofmt` (via the `format` job), and `go test` without
+`-race` (via `build-and-test`). A PR with a real `gosec` finding, a known CVE in a dependency, or a
+race condition currently passes CI green. Wiring these into `go.yml` is tracked in
+link:https://github.com/docToolchain/Bausteinsicht/issues/550[issue #550].
 
 === 8.3 Test Strategy
 
