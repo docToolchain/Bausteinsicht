@@ -467,6 +467,90 @@ jobs:
         with:
           version: latest
 
+  # `make check` (vet staticcheck gosec nilaway govulncheck test-race
+  # schema-validate) previously only ran locally — a PR with a real gosec
+  # finding, a nilaway-catchable nil-pointer bug, a CVE in a dependency, a
+  # leaked secret, or a race condition passed CI green with none of these
+  # tools ever seeing it, even though CLAUDE.md's Risk Radar Assessment
+  # lists all of them as active mitigations. Closes #550.
+  #
+  # test-race and gitleaks run as blocking gates below (both verified clean
+  # against the current codebase, see #550). gosec and nilaway run
+  # non-blocking for now: gosec currently reports 35 pre-existing findings
+  # (file-permission hardening, tracked separately) and nilaway's memory/time
+  # footprint on a GitHub-hosted runner hasn't been validated yet — making
+  # either blocking today would fail CI on backlog unrelated to a given PR's
+  # own changes. Flip continue-on-error to false once each is clean/verified.
+
+  test-race:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        with:
+          go-version-file: go.mod
+      - name: go test -race
+        # internal/importer/xmi is excluded: its BigData.xmi test fixture is
+        # ~118MB, and race instrumentation's memory overhead on top of
+        # parsing it exhausts memory well before the package's own (fast,
+        # non-race) tests would ever suggest a problem. The other 32
+        # packages are raced normally.
+        run: go test -race $(go list ./... | grep -v '/internal/importer/xmi$')
+
+  govulncheck:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        with:
+          go-version-file: go.mod
+      - run: go install golang.org/x/vuln/cmd/govulncheck@latest
+      - run: make govulncheck
+
+  gitleaks:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        with:
+          go-version-file: go.mod
+      - run: go install github.com/zricethezav/gitleaks/v8@latest
+      - run: make gitleaks
+
+  gosec:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        with:
+          go-version-file: go.mod
+      - run: go install github.com/securego/gosec/v2/cmd/gosec@latest
+      - name: make gosec
+        continue-on-error: true # 35 pre-existing findings, see #550
+        run: make gosec
+
+  nilaway:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        with:
+          go-version-file: go.mod
+      - run: go install go.uber.org/nilaway/cmd/nilaway@latest
+      - name: make nilaway
+        continue-on-error: true # runtime/memory footprint on GH-hosted runners not yet validated, see #550
+        run: make nilaway
+
   format:
     runs-on: ubuntu-latest
     permissions:
