@@ -31,6 +31,22 @@ var syntheticStereotypes = []string{
 // for most of its occurrences.
 const stereotypeEvery = 7
 
+// syntheticWriter wraps a *bufio.Writer and captures the first write error
+// instead of requiring every fmt.Fprintf call site to check one — with dozens
+// of writes in writeSyntheticXMI, checking each individually would swamp the
+// generation logic; sink() below reports whatever was captured once, at the end.
+type syntheticWriter struct {
+	bw  *bufio.Writer
+	err error
+}
+
+func (w *syntheticWriter) printf(format string, args ...any) {
+	if w.err != nil {
+		return
+	}
+	_, w.err = fmt.Fprintf(w.bw, format, args...)
+}
+
 // writeSyntheticXMI writes a synthetic XMI 2.1 / UML 2.1 document to w that
 // mirrors the shape of a real large Enterprise Architect / AUTOSAR export —
 // numBranches top-level packages (real exports have several, e.g. AUTOSAR /
@@ -44,17 +60,17 @@ const stereotypeEvery = 7
 // so the generated fixture doesn't introduce non-determinism into the test.
 func writeSyntheticXMI(w io.Writer, numElements, depth, numBranches int) error {
 	rng := rand.New(rand.NewSource(42)) // #nosec G404 -- deterministic test fixture, not security-sensitive
-	bw := bufio.NewWriter(w)
+	sw := &syntheticWriter{bw: bufio.NewWriter(w)}
 
 	genID := func(prefix string) string {
 		return fmt.Sprintf("%s_%08X_%04X_%04x_%04X_%012X",
 			prefix, rng.Uint32(), rng.Uint32()&0xFFFF, rng.Uint32()&0xFFFF, rng.Uint32()&0xFFFF, rng.Uint64()&0xFFFFFFFFFFFF)
 	}
 
-	fmt.Fprint(bw, "<?xml version='1.0' encoding='windows-1252' ?>\n")
-	fmt.Fprint(bw, "<xmi:XMI xmlns:xmi=\"http://schema.omg.org/spec/XMI/2.1\" xmi:version=\"2.1\" xmlns:uml=\"http://schema.omg.org/spec/UML/2.1\">\n")
-	fmt.Fprint(bw, "\t<xmi:Documentation exporter=\"Bausteinsicht synthetic generator\" exporterVersion=\"1.0\"/>\n")
-	fmt.Fprint(bw, "\t<uml:Model xmi:type=\"uml:Model\" name=\"EA_Model\" visibility=\"public\">\n")
+	sw.printf("<?xml version='1.0' encoding='windows-1252' ?>\n")
+	sw.printf("<xmi:XMI xmlns:xmi=\"http://schema.omg.org/spec/XMI/2.1\" xmi:version=\"2.1\" xmlns:uml=\"http://schema.omg.org/spec/UML/2.1\">\n")
+	sw.printf("\t<xmi:Documentation exporter=\"Bausteinsicht synthetic generator\" exporterVersion=\"1.0\"/>\n")
+	sw.printf("\t<uml:Model xmi:type=\"uml:Model\" name=\"EA_Model\" visibility=\"public\">\n")
 
 	generatedIDs := make([]string, 0, numElements)
 	elementsPerBranch := numElements / numBranches
@@ -67,7 +83,7 @@ func writeSyntheticXMI(w io.Writer, numElements, depth, numBranches int) error {
 		// like a real export's AUTOSAR/ReadMe/ExportConfiguration/... roots.
 		indent := "\t\t"
 		for i := 0; i < depth; i++ {
-			fmt.Fprintf(bw, "%s<packagedElement xmi:type=\"uml:Package\" xmi:id=\"%s\" name=\"Branch%d_Package%d\" visibility=\"public\">\n",
+			sw.printf("%s<packagedElement xmi:type=\"uml:Package\" xmi:id=\"%s\" name=\"Branch%d_Package%d\" visibility=\"public\">\n",
 				indent, genID("EAPK"), b, i)
 			indent += "\t"
 		}
@@ -85,43 +101,46 @@ func writeSyntheticXMI(w io.Writer, numElements, depth, numBranches int) error {
 			id := genID("EAID")
 			generatedIDs = append(generatedIDs, id)
 
-			fmt.Fprintf(bw, "%s<packagedElement xmi:type=\"uml:%s\" xmi:id=\"%s\" name=\"Element%d\" visibility=\"public\">\n",
+			sw.printf("%s<packagedElement xmi:type=\"uml:%s\" xmi:id=\"%s\" name=\"Element%d\" visibility=\"public\">\n",
 				indent, kind, id, elemIdx)
 
 			if elemIdx%3 == 0 {
-				fmt.Fprintf(bw, "%s\t<ownedAttribute xmi:type=\"uml:Property\" xmi:id=\"%s\" name=\"attr%d\" visibility=\"private\"/>\n",
+				sw.printf("%s\t<ownedAttribute xmi:type=\"uml:Property\" xmi:id=\"%s\" name=\"attr%d\" visibility=\"private\"/>\n",
 					indent, genID("EAID"), elemIdx)
 			}
 			if elemIdx%4 == 0 {
-				fmt.Fprintf(bw, "%s\t<ownedComment xmi:type=\"uml:Comment\" xmi:id=\"%s\" body=\"Synthetic comment for element %d, used for scale testing only.\"/>\n",
+				sw.printf("%s\t<ownedComment xmi:type=\"uml:Comment\" xmi:id=\"%s\" body=\"Synthetic comment for element %d, used for scale testing only.\"/>\n",
 					indent, genID("EAID"), elemIdx)
 			}
 			if elemIdx%stereotypeEvery == 0 {
 				stereo := syntheticStereotypes[(elemIdx/stereotypeEvery)%len(syntheticStereotypes)]
-				fmt.Fprintf(bw, "%s\t<xmi:Extension extender=\"Bausteinsicht synthetic generator\">\n", indent)
-				fmt.Fprintf(bw, "%s\t\t<stereotype xmi:id=\"%s\" name=\"%s\"/>\n", indent, genID("EAID"), stereo)
-				fmt.Fprintf(bw, "%s\t</xmi:Extension>\n", indent)
+				sw.printf("%s\t<xmi:Extension extender=\"Bausteinsicht synthetic generator\">\n", indent)
+				sw.printf("%s\t\t<stereotype xmi:id=\"%s\" name=\"%s\"/>\n", indent, genID("EAID"), stereo)
+				sw.printf("%s\t</xmi:Extension>\n", indent)
 			}
 
 			// Every 5th element depends on an earlier one, once enough exist.
 			if elemIdx%5 == 0 && len(generatedIDs) > 1 {
 				target := generatedIDs[rng.Intn(len(generatedIDs)-1)]
-				fmt.Fprintf(bw, "%s\t<packagedElement xmi:type=\"uml:Dependency\" xmi:id=\"%s\" name=\"dep%d\" client=\"%s\" supplier=\"%s\"/>\n",
+				sw.printf("%s\t<packagedElement xmi:type=\"uml:Dependency\" xmi:id=\"%s\" name=\"dep%d\" client=\"%s\" supplier=\"%s\"/>\n",
 					indent, genID("EAID"), elemIdx, id, target)
 			}
 
-			fmt.Fprintf(bw, "%s</packagedElement>\n", indent)
+			sw.printf("%s</packagedElement>\n", indent)
 		}
 
 		// Close this branch's package chain in reverse order.
 		for i := depth - 1; i >= 0; i-- {
 			indent = indent[:len(indent)-1]
-			fmt.Fprintf(bw, "%s</packagedElement>\n", indent)
+			sw.printf("%s</packagedElement>\n", indent)
 		}
 	}
 
-	fmt.Fprint(bw, "\t</uml:Model>\n")
-	fmt.Fprint(bw, "</xmi:XMI>\n")
+	sw.printf("\t</uml:Model>\n")
+	sw.printf("</xmi:XMI>\n")
 
-	return bw.Flush()
+	if sw.err != nil {
+		return sw.err
+	}
+	return sw.bw.Flush()
 }

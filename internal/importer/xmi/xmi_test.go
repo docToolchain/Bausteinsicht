@@ -394,7 +394,7 @@ func TestImport_SyntheticBigData(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create synthetic fixture: %v", err)
 	}
-	defer f.Close() // in addition to the explicit Close below, so t.Fatalf (Goexit) can't skip it
+	defer f.Close() //nolint:errcheck // in addition to the explicit Close below, so t.Fatalf (Goexit) can't skip it
 
 	if err := writeSyntheticXMI(f, 20000, 23, 12); err != nil {
 		t.Fatalf("generate synthetic fixture: %v", err)
