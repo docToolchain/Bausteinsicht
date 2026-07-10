@@ -146,7 +146,7 @@ check-duplicates:
 	bash scripts/check-duplicate-branches.sh
 
 # Fetch the large XMI integration-test fixture from the separate
-# docToolchain/bausteinsicht-testdata repo (#553). Safe to skip if the
+# docToolchain/Bausteinsicht-Testdata repo (#553). Safe to skip if the
 # fixture repo is unreachable — see script header for details.
 fetch-testdata:
 	bash scripts/fetch-xmi-testdata.sh

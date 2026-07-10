@@ -345,7 +345,7 @@ func TestImport_XXEDoctype(t *testing.T) {
 // (AUTOSAR model, windows-1252 encoding, ~114 MB, depth >20).
 // The fixture is gitignored (not committed, not Git-LFS-tracked, see #553) —
 // fetch it with `make fetch-testdata` (scripts/fetch-xmi-testdata.sh), which
-// pulls it from the separate docToolchain/bausteinsicht-testdata repo. This
+// pulls it from the separate docToolchain/Bausteinsicht-Testdata repo. This
 // test skips itself when the fixture is absent or too small (offline/local
 // dev without having fetched it); the xmi-bigdata-integration CI job in
 // go.yml fetches it explicitly and fails if the test unexpectedly skips.

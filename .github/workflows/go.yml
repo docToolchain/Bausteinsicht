@@ -489,7 +489,7 @@ jobs:
 
   # internal/importer/xmi/testdata/BigData.xmi (a real ~118MB Enterprise
   # Architect/AUTOSAR export) is fetched from the separate
-  # docToolchain/bausteinsicht-testdata repo rather than committed/Git-LFS-
+  # docToolchain/Bausteinsicht-Testdata repo rather than committed/Git-LFS-
   # tracked here (#553) — the repo was previously paying Git LFS's
   # complexity/quota cost without CI ever actually exercising the real-file
   # integration test (no `actions/checkout` step anywhere set `lfs: true`,

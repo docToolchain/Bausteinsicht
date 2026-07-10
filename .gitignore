@@ -51,7 +51,7 @@ coverage-report.md
 coverage/
 
 # Large XMI integration-test fixture, fetched on demand from the separate
-# docToolchain/bausteinsicht-testdata repo instead of being committed/LFS-
+# docToolchain/Bausteinsicht-Testdata repo instead of being committed/LFS-
 # tracked here (#553). See scripts/fetch-xmi-testdata.sh / `make fetch-testdata`.
 internal/importer/xmi/testdata/BigData.xmi
 

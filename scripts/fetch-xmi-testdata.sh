@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # scripts/fetch-xmi-testdata.sh — fetch the large XMI integration-test
 # fixture (internal/importer/xmi/testdata/BigData.xmi, a real ~118MB
-# Enterprise Architect/AUTOSAR export) from the separate, lightweight
-# docToolchain/bausteinsicht-testdata repo, instead of committing or
-# Git-LFS-tracking it in this repository (#553).
+# Enterprise Architect/AUTOSAR export) from a GitHub Release asset on the
+# separate, lightweight docToolchain/Bausteinsicht-Testdata repo, instead of
+# committing or Git-LFS-tracking it in this repository (#553). A Release
+# asset (not a committed/raw file) because the fixture is ~118MB — over
+# GitHub's ~100MB per-file limit for a normal git blob.
 #
 # Usage:
 #   scripts/fetch-xmi-testdata.sh
@@ -21,7 +23,7 @@ set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEST="$ROOT/internal/importer/xmi/testdata/BigData.xmi"
-URL="https://raw.githubusercontent.com/docToolchain/bausteinsicht-testdata/main/BigData.xmi"
+URL="https://github.com/docToolchain/Bausteinsicht-Testdata/releases/download/testdata-v1/BigData.xmi"
 MIN_SIZE=1048576 # 1 MiB — matches TestImport_BigData's own presence check
 
 file_size() {
@@ -33,7 +35,7 @@ if [ -f "$DEST" ] && [ "$(file_size "$DEST")" -gt "$MIN_SIZE" ]; then
     exit 0
 fi
 
-echo "Fetching BigData.xmi from docToolchain/bausteinsicht-testdata..."
+echo "Fetching BigData.xmi from docToolchain/Bausteinsicht-Testdata (release testdata-v1)..."
 if curl -fsSL --retry 2 -o "$DEST.tmp" "$URL" && mv "$DEST.tmp" "$DEST"; then
     echo "Fetched BigData.xmi ($(file_size "$DEST") bytes)."
 else
