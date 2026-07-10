@@ -500,6 +500,11 @@ jobs:
   # can't recur unnoticed. Isolated from build-and-test/test-race/coverage
   # so the ~118MB download only happens once, in one job, not multiplied
   # across the OS matrix or every test-running job.
+  #
+  # TestImport_SyntheticBigData (same package) complements this: it exercises
+  # the importer at the same rough scale/depth via a generated fixture, with
+  # no fetch dependency, so every other job still gets baseline scale
+  # coverage even if this job's fetch ever fails or the fixture repo is down.
   xmi-bigdata-integration:
     runs-on: ubuntu-latest
     permissions:
