@@ -518,8 +518,20 @@ jobs:
       - name: go test -run TestImport_BigData (must not skip)
         shell: bash
         run: |
+          # GitHub Actions runs bash steps with `-e` by default, which would
+          # abort this script at the `OUTPUT=$(...)` line (before printing
+          # anything) if `go test` itself fails outright — masking the very
+          # diagnostics this step exists to surface. Disable it around the
+          # capture so a real test failure's full -v output reaches the log.
+          set +e
           OUTPUT=$(go test -run TestImport_BigData -v ./internal/importer/xmi/... 2>&1)
+          CODE=$?
+          set -e
           echo "$OUTPUT"
+          if [ "$CODE" -ne 0 ]; then
+            echo "::error::TestImport_BigData failed (exit $CODE) — see output above."
+            exit 1
+          fi
           if echo "$OUTPUT" | grep -q -- '--- SKIP'; then
             echo "::error::TestImport_BigData was skipped — the BigData.xmi fetch likely failed silently."
             exit 1

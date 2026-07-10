@@ -372,6 +372,9 @@ func TestImport_BigData(t *testing.T) {
 	if len(r.Model.Specification.Elements) == 0 {
 		t.Error("expected non-empty specification")
 	}
+	if len(r.Model.Relationships) == 0 {
+		t.Error("expected non-empty relationships")
+	}
 	t.Logf("BigData: %d top-level elements, %d relationships, %d spec kinds, %d warnings",
 		len(r.Model.Model), len(r.Model.Relationships),
 		len(r.Model.Specification.Elements), len(r.Warnings))
@@ -391,6 +394,8 @@ func TestImport_SyntheticBigData(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create synthetic fixture: %v", err)
 	}
+	defer f.Close() // in addition to the explicit Close below, so t.Fatalf (Goexit) can't skip it
+
 	if err := writeSyntheticXMI(f, 20000, 23, 12); err != nil {
 		t.Fatalf("generate synthetic fixture: %v", err)
 	}

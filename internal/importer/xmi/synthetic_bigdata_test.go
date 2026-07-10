@@ -16,10 +16,20 @@ var syntheticElementKinds = []string{
 }
 
 // syntheticStereotypes mirrors common AUTOSAR/EA stereotype names — applied
-// to a fraction of generated elements to exercise the stereotype-as-kind path.
+// to a fraction of generated elements to exercise the stereotype-as-kind path
+// (xmi.go's resolveKind checks stereotype before the UML-type kindMap).
 var syntheticStereotypes = []string{
-	"SWComponent", "BSWModule", "PortInterface", "ECUAbstraction", "",
+	"SWComponent", "BSWModule", "PortInterface", "ECUAbstraction",
 }
+
+// stereotypeEvery gates how often a stereotype is attached, keyed off elemIdx
+// directly rather than off the same modulus as syntheticElementKinds'
+// len(10) cycle. 7 and 10 are coprime, so which of the 10 UML kinds gets a
+// stereotype varies across elements instead of always/never pairing the same
+// kind with the same stereotype-presence — every kind still gets exercised
+// via defaultKindMap's plain UML-type path (not just the stereotype path)
+// for most of its occurrences.
+const stereotypeEvery = 7
 
 // writeSyntheticXMI writes a synthetic XMI 2.1 / UML 2.1 document to w that
 // mirrors the shape of a real large Enterprise Architect / AUTOSAR export —
@@ -86,7 +96,8 @@ func writeSyntheticXMI(w io.Writer, numElements, depth, numBranches int) error {
 				fmt.Fprintf(bw, "%s\t<ownedComment xmi:type=\"uml:Comment\" xmi:id=\"%s\" body=\"Synthetic comment for element %d, used for scale testing only.\"/>\n",
 					indent, genID("EAID"), elemIdx)
 			}
-			if stereo := syntheticStereotypes[elemIdx%len(syntheticStereotypes)]; stereo != "" {
+			if elemIdx%stereotypeEvery == 0 {
+				stereo := syntheticStereotypes[(elemIdx/stereotypeEvery)%len(syntheticStereotypes)]
 				fmt.Fprintf(bw, "%s\t<xmi:Extension extender=\"Bausteinsicht synthetic generator\">\n", indent)
 				fmt.Fprintf(bw, "%s\t\t<stereotype xmi:id=\"%s\" name=\"%s\"/>\n", indent, genID("EAID"), stereo)
 				fmt.Fprintf(bw, "%s\t</xmi:Extension>\n", indent)

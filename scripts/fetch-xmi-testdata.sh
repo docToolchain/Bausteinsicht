@@ -34,11 +34,10 @@ if [ -f "$DEST" ] && [ "$(file_size "$DEST")" -gt "$MIN_SIZE" ]; then
 fi
 
 echo "Fetching BigData.xmi from docToolchain/bausteinsicht-testdata..."
-if curl -fsSL --retry 2 -o "$DEST.tmp" "$URL"; then
-    mv "$DEST.tmp" "$DEST"
+if curl -fsSL --retry 2 -o "$DEST.tmp" "$URL" && mv "$DEST.tmp" "$DEST"; then
     echo "Fetched BigData.xmi ($(file_size "$DEST") bytes)."
 else
-    echo "Warning: could not fetch BigData.xmi from $URL (network issue or fixture repo unavailable)." >&2
+    echo "Warning: could not fetch/place BigData.xmi from $URL (network issue, fixture repo unavailable, or move failed)." >&2
     echo "TestImport_BigData will skip itself; this is not treated as a hard failure here." >&2
     rm -f "$DEST.tmp"
 fi
