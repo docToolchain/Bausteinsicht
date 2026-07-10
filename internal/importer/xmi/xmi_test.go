@@ -343,7 +343,12 @@ func TestImport_XXEDoctype(t *testing.T) {
 
 // TestImport_BigData runs against a real Enterprise Architect XMI export
 // (AUTOSAR model, windows-1252 encoding, ~114 MB, depth >20).
-// The fixture is gitignored due to its size; the test is skipped in CI when absent.
+// The fixture is gitignored (not committed, not Git-LFS-tracked, see #553) —
+// fetch it with `make fetch-testdata` (scripts/fetch-xmi-testdata.sh), which
+// pulls it from the separate docToolchain/bausteinsicht-testdata repo. This
+// test skips itself when the fixture is absent or too small (offline/local
+// dev without having fetched it); the xmi-bigdata-integration CI job in
+// go.yml fetches it explicitly and fails if the test unexpectedly skips.
 func TestImport_BigData(t *testing.T) {
 	const minSize = 1 * 1024 * 1024 // 1 MB — stub is only a few hundred bytes
 	path := td("BigData.xmi")

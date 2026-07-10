@@ -14,4 +14,3 @@
 *.gif  binary
 *.ico  binary
 *.pdf  binary
-BigData.xmi filter=lfs diff=lfs merge=lfs -text

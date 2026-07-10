@@ -486,3 +486,36 @@ jobs:
             exit 1
           fi
           echo "All Go files are gofmt-clean."
+
+  # internal/importer/xmi/testdata/BigData.xmi (a real ~118MB Enterprise
+  # Architect/AUTOSAR export) is fetched from the separate
+  # docToolchain/bausteinsicht-testdata repo rather than committed/Git-LFS-
+  # tracked here (#553) — the repo was previously paying Git LFS's
+  # complexity/quota cost without CI ever actually exercising the real-file
+  # integration test (no `actions/checkout` step anywhere set `lfs: true`,
+  # so every CI checkout only ever saw the ~130-byte LFS pointer, and
+  # TestImport_BigData's own >1MB presence check silently skipped it in
+  # every run). This dedicated job fetches the real fixture and explicitly
+  # fails if the test unexpectedly skips, so that class of silent drift
+  # can't recur unnoticed. Isolated from build-and-test/test-race/coverage
+  # so the ~118MB download only happens once, in one job, not multiplied
+  # across the OS matrix or every test-running job.
+  xmi-bigdata-integration:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        with:
+          go-version-file: go.mod
+      - run: make fetch-testdata
+      - name: go test -run TestImport_BigData (must not skip)
+        shell: bash
+        run: |
+          OUTPUT=$(go test -run TestImport_BigData -v ./internal/importer/xmi/... 2>&1)
+          echo "$OUTPUT"
+          if echo "$OUTPUT" | grep -q -- '--- SKIP'; then
+            echo "::error::TestImport_BigData was skipped — the BigData.xmi fetch likely failed silently."
+            exit 1
+          fi

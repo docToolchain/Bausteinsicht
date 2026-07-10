@@ -1,0 +1,21 @@
+title = "Bausteinsicht gitleaks config"
+
+[extend]
+useDefault = true
+
+# internal/importer/xmi/testdata/BigData.xmi is fetched on demand from a
+# separate repo (#553), gitignored here, never committed. Still allowlisted
+# defensively: if a contributor runs `make fetch-testdata` locally and then
+# `make gitleaks` / the pre-commit hook (which scan the working directory,
+# not just tracked/committed files), the real file's EAID_* GUIDs would
+# otherwise false-positive as generic-api-key/square-access-token secrets.
+#
+# Scoped to this exact file, not the whole testdata/ directory — a broader
+# glob would silently allowlist any future real secret placed anywhere else
+# under testdata/ too (verified: an injected fake secret in a sibling
+# testdata file went undetected under a directory-wide pattern).
+[allowlist]
+description = "Non-secret high-entropy IDs in the BigData.xmi test fixture"
+paths = [
+  '''internal/importer/xmi/testdata/BigData\.xmi$''',
+]
