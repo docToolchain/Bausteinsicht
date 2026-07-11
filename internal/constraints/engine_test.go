@@ -269,8 +269,8 @@ func TestConstraints_UnsetSelectorNeverMatches(t *testing.T) {
 		},
 		[]model.Relationship{{From: "a", To: "b"}},
 		[]model.Constraint{
-			{ID: "c1", Rule: "no-relationship"},          // no from/to selector set at all
-			{ID: "c2", Rule: "allowed-relationship"},      // no from/to selector set at all
+			{ID: "c1", Rule: "no-relationship"},                      // no from/to selector set at all
+			{ID: "c2", Rule: "allowed-relationship"},                 // no from/to selector set at all
 			{ID: "c3", Rule: "required-field", Field: "description"}, // no element selector set
 		},
 	)
