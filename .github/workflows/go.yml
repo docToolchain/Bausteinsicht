@@ -140,19 +140,22 @@ jobs:
           retention-days: 90
 
   report-pr-comment:
-    # always() so the report still posts even when build-and-test fails the
+    # always() so the report is still staged even when build-and-test fails the
     # job on a test failure (the artifacts are uploaded before that happens).
+    # Renders the comment body and uploads it as an artifact; the trusted
+    # "PR Comments" workflow (workflow_run) posts it, so this job needs no
+    # pull-requests:write and stays green on fork PRs (see #549).
     if: always() && github.event_name == 'pull_request'
     needs: [build-and-test, merge-reports]
     runs-on: ubuntu-latest
     permissions:
-      pull-requests: write
+      contents: read
     steps:
       - uses: actions/download-artifact@v4
         with:
           pattern: test-reports-*
           merge-multiple: true
-      - name: Post test report comment
+      - name: Render test report comment body
         uses: actions/github-script@v7
         with:
           script: |
@@ -185,8 +188,10 @@ jobs:
             const windowsMetrics = getMetrics(windows);
             const macosMetrics = getMetrics(macos);
 
-            // Generate Markdown report with multi-OS comparison
-            let markdown = '## 📊 Test Report (Multi-OS)\n\n';
+            // Generate Markdown report with multi-OS comparison. The first line
+            // is the marker the trusted poster uses to find/update this comment.
+            let markdown = '<!-- bsx-multi-os-test-report -->\n';
+            markdown += '## 📊 Test Report (Multi-OS)\n\n';
             markdown += '| Metric | 🐧 Linux | 🪟 Windows | 🍎 macOS |\n';
             markdown += '|--------|----------|-----------|--------|\n';
             markdown += `| Total Tests | ${linuxMetrics.tests} | ${windowsMetrics.tests} | ${macosMetrics.tests} |\n`;
@@ -196,19 +201,21 @@ jobs:
             markdown += `| 📦 Coverage | ${linuxMetrics.coverage}% | ${windowsMetrics.coverage}% | ${macosMetrics.coverage}% |\n\n`;
             markdown += '💡 Full report: Download artifacts from this workflow run.';
 
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: markdown
-            });
+            fs.mkdirSync('pr-comment-body', { recursive: true });
+            fs.writeFileSync('pr-comment-body/report.md', markdown);
+      - name: Upload rendered comment body
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-comment-body-report
+          path: pr-comment-body/
+          retention-days: 1
+          if-no-files-found: error
 
   coverage-report:
     name: Coverage Report (unit vs. E2E)
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: write
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
@@ -234,45 +241,32 @@ jobs:
           name: coverage-report-unit-vs-e2e
           path: coverage-report.md
           retention-days: 30
-      - name: Post or update PR comment
+      # Render the comment body and stage it as an artifact; the trusted
+      # "PR Comments" workflow posts it. The first line is the marker the
+      # poster uses to find/update the existing comment.
+      - name: Render coverage comment body
         if: github.event_name == 'pull_request' && always()
-        uses: actions/github-script@v7
+        run: |
+          if [ ! -f coverage-report.md ]; then exit 0; fi
+          mkdir -p pr-comment-body
+          {
+            printf '<!-- bsx-coverage-report-unit-vs-e2e -->\n'
+            cat coverage-report.md
+          } > pr-comment-body/coverage.md
+      - name: Upload rendered comment body
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/upload-artifact@v4
         with:
-          script: |
-            const fs = require('fs');
-            if (!fs.existsSync('coverage-report.md')) return;
-            const body = fs.readFileSync('coverage-report.md', 'utf8');
-            const marker = '<!-- bsx-coverage-report-unit-vs-e2e -->';
-            const fullBody = marker + '\n' + body;
-
-            const comments = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-            });
-            const existing = comments.data.find(c => c.body && c.body.includes(marker));
-            if (existing) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: existing.id,
-                body: fullBody,
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body: fullBody,
-              });
-            }
+          name: pr-comment-body-coverage
+          path: pr-comment-body/
+          retention-days: 1
+          if-no-files-found: ignore
 
   e2e-plan-report:
     name: E2E Test Plan Report (line-accurate)
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: write
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
@@ -305,41 +299,71 @@ jobs:
           name: e2e-test-plan-report
           path: e2e-test-report.adoc
           retention-days: 30
-      - name: Post or update PR comment
+      # Render the comment body and stage it as an artifact; the trusted
+      # "PR Comments" workflow posts it. The first line is the marker the
+      # poster uses to find/update the existing comment.
+      - name: Render E2E plan comment body
         if: github.event_name == 'pull_request' && always()
-        uses: actions/github-script@v7
+        run: |
+          if [ ! -f e2e-test-report.adoc ]; then exit 0; fi
+          mkdir -p pr-comment-body
+          {
+            printf '%s\n' '<!-- bsx-e2e-plan-report -->'
+            printf '%s\n' '## 🧪 E2E Test Plan Report (generated)'
+            printf '\n'
+            printf '%s\n' '<details><summary>Per-line PASS/FAIL/SKIP (click to expand)</summary>'
+            printf '\n'
+            printf '%s\n' '```asciidoc'
+            cat e2e-test-report.adoc
+            printf '%s\n' '```'
+            printf '\n'
+            printf '%s\n' '</details>'
+            printf '\n'
+            printf '%s\n' '💡 `SKIP: not automated` means no `e2e/*_test.go` test is mapped to that line yet — see `internal/e2eplan` and `E2E-Test-Plan.adoc`'"'"'s "Generating a Line-Accurate Report Automatically" section.'
+          } > pr-comment-body/e2e.md
+      - name: Upload rendered comment body
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/upload-artifact@v4
         with:
-          script: |
-            const fs = require('fs');
-            if (!fs.existsSync('e2e-test-report.adoc')) return;
-            const body = fs.readFileSync('e2e-test-report.adoc', 'utf8');
-            const marker = '<!-- bsx-e2e-plan-report -->';
-            const fullBody = marker + '\n## 🧪 E2E Test Plan Report (generated)\n\n'
-              + '<details><summary>Per-line PASS/FAIL/SKIP (click to expand)</summary>\n\n'
-              + '```asciidoc\n' + body + '\n```\n\n</details>\n\n'
-              + '💡 `SKIP: not automated` means no `e2e/*_test.go` test is mapped to that line yet — see `internal/e2eplan` and `E2E-Test-Plan.adoc`\'s "Generating a Line-Accurate Report Automatically" section.';
+          name: pr-comment-body-e2e
+          path: pr-comment-body/
+          retention-days: 1
+          if-no-files-found: ignore
 
-            const comments = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-            });
-            const existing = comments.data.find(c => c.body && c.body.includes(marker));
-            if (existing) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: existing.id,
-                body: fullBody,
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body: fullBody,
-              });
-            }
+  # Stages the PR number (and head info) for the trusted "PR Comments"
+  # workflow. Needed because github.event.workflow_run.pull_requests is empty
+  # for fork PRs, so the poster cannot otherwise learn which PR to comment on.
+  stage-pr-meta:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Write PR metadata
+        env:
+          # Bind attacker-controllable PR fields via env; never interpolate
+          # them into the script body (shell-injection safety).
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          mkdir -p pr-comment-meta
+          {
+            printf 'pr_number=%s\n' "$PR_NUMBER"
+            printf 'head_repo=%s\n' "$HEAD_REPO"
+            printf 'head_ref=%s\n'  "$HEAD_REF"
+            printf 'head_sha=%s\n'  "$HEAD_SHA"
+            printf 'base_ref=%s\n'  "$BASE_REF"
+          } > pr-comment-meta/pr-meta.env
+      - name: Upload PR metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-comment-meta
+          path: pr-comment-meta/
+          retention-days: 1
+          if-no-files-found: error
 
   coverage:
     runs-on: ubuntu-latest

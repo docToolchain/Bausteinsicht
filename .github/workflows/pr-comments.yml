@@ -1,0 +1,106 @@
+name: PR Comments
+
+# Posts/updates the PR report comments (multi-OS test report, coverage
+# unit-vs-E2E, E2E test plan) produced by the "Go CI" workflow. Go CI runs in
+# the (untrusted) PR context and therefore only renders each comment body and
+# uploads it as an artifact — on fork PRs it has a read-only GITHUB_TOKEN and
+# cannot post. This workflow is triggered by workflow_run and runs in the BASE
+# repository context, so it has a writable token for both same-repo and fork
+# PRs. It never runs untrusted code: it only downloads the staged artifacts and
+# posts their contents as comments. See docToolchain/Bausteinsicht#549.
+#
+# NOTE: workflow_run always uses the version of this file on the default branch,
+# so changes here only take effect after they are merged to main.
+
+on:
+  workflow_run:
+    workflows: ["Go CI"]
+    types:
+      - completed
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  post-comments:
+    runs-on: ubuntu-latest
+    name: Post PR report comments
+    # Only for PR-triggered Go CI runs (same-repo or fork). Pushes to main have
+    # no PR to comment on. Rendered comments are staged even when tests fail
+    # (the report shows the failures), so we do not gate on conclusion.
+    if: github.event.workflow_run.event == 'pull_request'
+
+    steps:
+      - name: Download staged comment artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: pr-comment-*
+          path: ${{ runner.temp }}/pr-comments
+          merge-multiple: true
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Parse and validate PR metadata
+        id: meta
+        run: |
+          f="${{ runner.temp }}/pr-comments/pr-meta.env"
+          # cut -f2- captures values literally; their content is never evaluated.
+          get() { grep "^$1=" "$f" | head -n1 | cut -d= -f2-; }
+          pr_number="$(get pr_number)"
+          # pr_number is the only field interpolated into later steps; validate it.
+          case "$pr_number" in ''|*[!0-9]*) echo "invalid pr_number"; exit 1;; esac
+          printf 'pr_number=%s\n' "$pr_number" >> "$GITHUB_OUTPUT"
+
+      - name: Post or update PR comments
+        uses: actions/github-script@v7
+        env:
+          BODIES_DIR: ${{ runner.temp }}/pr-comments
+          PR_NUMBER: ${{ steps.meta.outputs.pr_number }}
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const dir = process.env.BODIES_DIR;
+            const issue_number = parseInt(process.env.PR_NUMBER, 10);
+
+            const files = fs.readdirSync(dir).filter(f => f.endsWith('.md'));
+            if (files.length === 0) {
+              core.info('No comment bodies were staged — nothing to post.');
+              return;
+            }
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number,
+            });
+
+            for (const file of files.sort()) {
+              const body = fs.readFileSync(path.join(dir, file), 'utf8');
+              // Convention: the first line of every staged body is the HTML-comment
+              // marker used to find and update the previous version of this comment.
+              const marker = body.split('\n', 1)[0].trim();
+              if (!marker.startsWith('<!--')) {
+                core.warning(`Skipping ${file}: first line is not a marker.`);
+                continue;
+              }
+              const existing = comments.find(c => c.body && c.body.includes(marker));
+              if (existing) {
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: existing.id,
+                  body,
+                });
+                core.info(`Updated comment for ${file} (${marker}).`);
+              } else {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number,
+                  body,
+                });
+                core.info(`Created comment for ${file} (${marker}).`);
+              }
+            }
