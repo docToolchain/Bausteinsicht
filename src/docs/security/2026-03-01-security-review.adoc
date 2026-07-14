@@ -49,6 +49,12 @@
 
 | 2026-06-29 (XMI review fixes)
 | Reverted `MaxModelFileSize` in `loader.go` back to 10 MB (SEC-006). The XMI importer uses `os.ReadFile` directly and is not subject to the JSONC file size limit; the 100 MB bump was unnecessary and would have silently relaxed SEC-006 for all JSONC model loading.
+
+| 2026-07-14 (XMI fixture fetch)
+| #553/#554: removed Git-LFS tracking for the `BigData.xmi` test fixture (CI never actually pulled the real file — every checkout only saw the LFS pointer) in favor of a fetch script pulling a Release asset from the separate `docToolchain/Bausteinsicht-Testdata` repo. Added SEC-019: the replacement fetch initially checked size only, not content — fixed by pinning the original LFS `sha256` digest in the script (PR #561).
+
+| 2026-07-14 (history rewrite)
+| Purged the historical `BigData.xmi` Git-LFS pointer object from `main`'s history via `git filter-repo` (object was never reachable by CI anyway; this reclaims it from the object graph). Tags `v1.0.0`–`v1.2.0` preserved bit-identical (verified via hash comparison); `v1.2.1` (the only tag descending from the commit that introduced the fixture) was necessarily rewritten to a new commit hash as a result — `go install ...@v1.2.1` will now fail its `sum.golang.org` checksum. Older tags/releases are unaffected.
 |===
 
 === Scope
@@ -168,6 +174,11 @@ The primary risk scenario is a **malicious or crafted model/drawio file** shared
 | Medium
 | Typo-squatting risk: Go module path, README `go install`, and landing page all used misspelled `Bauteinsicht` or wrong owner `rdmueller`
 | Fixed
+
+| SEC-019
+| Low
+| `scripts/fetch-xmi-testdata.sh` fetched the `BigData.xmi` test fixture from a separate repo's Release asset with only a size check, no checksum — a corrupted/replaced asset would silently pass and the integration test would run against the wrong fixture
+| Fixed (pinned sha256, verified against known LFS digest; PR #561)
 |===
 
 === Findings
@@ -383,6 +394,19 @@ Medium. Users copying the `go install` command from the README would fetch from 
 **Fix:**
 Renamed the Go module to `github.com/docToolchain/Bausteinsicht` across the entire codebase (go.mod, all imports, schema URLs, documentation). Corrected landing page URLs to `docToolchain/Bausteinsicht`.
 
+==== SEC-019: Unverified Test Fixture Fetch (Low) — Fixed
+
+_Added 2026-07-14_
+
+**Description:**
+#553/#554 removed Git-LFS tracking for `internal/importer/xmi/testdata/BigData.xmi` (a ~118MB real Enterprise Architect/AUTOSAR export used only as a test fixture) and replaced it with `scripts/fetch-xmi-testdata.sh` downloading a GitHub Release asset from the separate `docToolchain/Bausteinsicht-Testdata` repo. Git LFS had guaranteed the exact content via a pinned `sha256` OID, verified at smudge time; the replacement script only checked the downloaded file's size (`>1MB`). A corrupted download, or the Release asset being unexpectedly replaced (accidental re-upload, or an unauthorized push to that repo), would silently pass the size check and `TestImport_BigData` would run against the wrong fixture with no error — the exact "silent drift" failure mode #553/#554 otherwise closed.
+
+**Risk:**
+Low. Test-fixture integrity only (Blast Radius 0 per the Risk Radar assessment) — no production code path is affected.
+
+**Fix:**
+Pinned the known digest (`sha256:7b761872b0f773caac76446b857162986761500d625c9bd3514d55bd1f63f5b0`, the same OID the original LFS pointer carried) in `scripts/fetch-xmi-testdata.sh`. On mismatch, the script discards the download and falls back to its existing "fetch failed" behavior (warn, exit 0, leave fixture absent) — `TestImport_BigData` skips itself and the dedicated `xmi-bigdata-integration` CI job still fails loudly if the test unexpectedly skips. PR #561.
+
 === Not Vulnerable
 
 The following attack vectors were explicitly tested and confirmed **not exploitable**:
@@ -479,6 +503,7 @@ All dependencies at latest versions. No known CVEs. `go mod verify` — **PASS**
 
 SEC-002 (PR #77), SEC-003 (PR #77), SEC-009 (PR #77), SEC-010 (PR #77), SEC-012 (#235).
 SEC-004, SEC-007, SEC-011 verified fixed 2026-03-30 (see individual findings above).
+SEC-019 (PR #561).
 
 ==== Remaining Open
 
