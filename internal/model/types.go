@@ -145,6 +145,8 @@ type DynamicView struct {
 // no-relationship / allowed-relationship endpoint selectors: each side ("from"/"to")
 // can be targeted by exact element ID, by tag, or by kind (#542). When more than one
 // selector is set for the same side, the most specific one wins: exact ID > tag > kind.
+// The allow-list forms (FromTags/FromKinds) rank with their singular counterpart:
+// tag/FromTags outrank kind/FromKinds, but not the exact-ID selector.
 type Constraint struct {
 	ID          string `json:"id"`
 	Description string `json:"description"`

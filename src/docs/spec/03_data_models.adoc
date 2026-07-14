@@ -883,6 +883,8 @@ const (
 // no-relationship/allowed-relationship endpoint selectors (from/to) and the
 // required-field element selector (tag/element-kind) are checked in order of
 // specificity — exact ID > tag > kind — whichever field is non-empty wins.
+// The allow-list forms (from-tags/from-kinds) rank with their singular
+// counterpart: tag/from-tags outrank kind/from-kinds, but not exact ID.
 type Constraint struct {
     ID          string `json:"id"`
     Description string `json:"description"`
