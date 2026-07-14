@@ -508,7 +508,11 @@ jobs:
       - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
         with:
           go-version-file: go.mod
-      - run: go install golang.org/x/vuln/cmd/govulncheck@latest
+      # Pinned (same reasoning as gitleaks below): this is a blocking gate, so
+      # an unrelated upstream @latest release could start failing every PR's
+      # CI for reasons unconnected to that PR's own changes. Verified clean
+      # (0 vulnerabilities) against the current codebase before pinning.
+      - run: go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
       - run: make govulncheck
 
   gitleaks:
