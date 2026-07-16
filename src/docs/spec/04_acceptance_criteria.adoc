@@ -397,3 +397,37 @@ Feature: Connector to scope element
     Then a connector is drawn from "api" to the scope boundary of the view
     And the connector is correctly attached
 ----
+
+==== AC-9.5: Tag-based and element-ID-based constraint targeting (#542)
+
+[source,gherkin]
+----
+Feature: Constraint endpoint selectors beyond kind
+
+  Scenario: no-relationship distinguishes same-kind elements by tag
+    Given a model where "adminConsole" and "database" both have kind "container"
+    And "adminConsole" is tagged "ui" and "database" is tagged "datastore"
+    And a constraint "no-relationship" with from-tag "ui" and to-tag "datastore"
+    When the user runs "bausteinsicht lint"
+    Then a violation is reported for the "adminConsole" -> "database" relationship
+
+  Scenario: allowed-relationship uses a tag-based allow-list
+    Given a constraint "allowed-relationship" with from-tags ["internal"] and to-tag "datastore"
+    And element "batchJob" is tagged "internal" and relates to a "datastore"-tagged element
+    And element "adminConsole" is tagged "ui" and relates to the same "datastore"-tagged element
+    When the user runs "bausteinsicht lint"
+    Then no violation is reported for "batchJob"
+    And a violation is reported for "adminConsole"
+
+  Scenario: required-field selects elements by tag instead of kind
+    Given a constraint "required-field" with tag "public-api" and field "description"
+    And an element tagged "public-api" has no description
+    When the user runs "bausteinsicht lint"
+    Then a violation is reported for that element
+
+  Scenario: exact element ID takes precedence over tag and kind selectors
+    Given a constraint's "from" endpoint sets both an exact element ID and a from-tag
+    And another element shares the from-tag but not the ID
+    When the user runs "bausteinsicht lint"
+    Then only relationships from the exact element ID are checked
+----

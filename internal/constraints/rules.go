@@ -7,18 +7,95 @@ import (
 	"github.com/docToolchain/Bausteinsicht/internal/model"
 )
 
-// noRelationship enforces that no relationship exists from any element of
-// fromKind to any element of toKind.
+// elementSelector describes how a constraint targets elements: by exact ID,
+// by tag, by an any-of tag allow-list, by kind, or by an any-of kind
+// allow-list — checked in that order of specificity (#542). Whichever field
+// is non-empty is used; if none is set, matches nothing (a constraint that
+// leaves every selector field empty is a misconfiguration, not a
+// match-everything wildcard).
+//
+// Single-value fields (id/tag/kind) serve no-relationship's from/to sides
+// and required-field's element selector. The allow-list fields (tags/kinds)
+// additionally serve allowed-relationship's "from" side, where an element is
+// allowed if it has ANY of the listed tags/kinds.
+type elementSelector struct {
+	id    string
+	tag   string
+	tags  []string
+	kind  string
+	kinds []string
+}
+
+func (s elementSelector) describe() string {
+	switch {
+	case s.id != "":
+		return fmt.Sprintf("element %q", s.id)
+	case s.tag != "":
+		return fmt.Sprintf("%q tag", s.tag)
+	case len(s.tags) > 0:
+		return fmt.Sprintf("tagged [%s]", strings.Join(s.tags, ", "))
+	case s.kind != "":
+		return fmt.Sprintf("%q kind", s.kind)
+	case len(s.kinds) > 0:
+		return fmt.Sprintf("[%s] kind", strings.Join(s.kinds, ", "))
+	default:
+		return "(unset)"
+	}
+}
+
+func (s elementSelector) matches(elemID string, el *model.Element) bool {
+	switch {
+	case s.id != "":
+		return elemID == s.id
+	case s.tag != "":
+		return el != nil && hasTag(el.Tags, s.tag)
+	case len(s.tags) > 0:
+		return el != nil && hasAnyTag(el.Tags, s.tags)
+	case s.kind != "":
+		return el != nil && el.Kind == s.kind
+	case len(s.kinds) > 0:
+		return el != nil && contains(s.kinds, el.Kind)
+	default:
+		return false
+	}
+}
+
+// contains reports whether items contains target.
+func contains(items []string, target string) bool {
+	for _, item := range items {
+		if item == target {
+			return true
+		}
+	}
+	return false
+}
+
+// hasTag reports whether tags contains tag.
+func hasTag(tags []string, tag string) bool { return contains(tags, tag) }
+
+// hasAnyTag reports whether tags contains any element of candidates.
+func hasAnyTag(tags, candidates []string) bool {
+	for _, c := range candidates {
+		if hasTag(tags, c) {
+			return true
+		}
+	}
+	return false
+}
+
+// noRelationship enforces that no relationship exists from any element
+// matching the "from" selector to any element matching the "to" selector.
 func noRelationship(c model.Constraint, m *model.BausteinsichtModel) []Violation {
 	flat, err := model.FlattenElements(m)
 	if err != nil {
 		return []Violation{{ConstraintID: c.ID, Message: err.Error()}}
 	}
-	kindOf := buildKindMap(flat)
+	from := elementSelector{id: c.From, tag: c.FromTag, kind: c.FromKind}
+	to := elementSelector{id: c.To, tag: c.ToTag, kind: c.ToKind}
 
 	var bad []string
 	for _, rel := range m.Relationships {
-		if kindOf[rel.From] == c.FromKind && kindOf[rel.To] == c.ToKind {
+		if from.matches(rel.From, flat[rel.From]) && to.matches(rel.To, flat[rel.To]) {
 			bad = append(bad, fmt.Sprintf("%s → %s", rel.From, rel.To))
 		}
 	}
@@ -27,29 +104,32 @@ func noRelationship(c model.Constraint, m *model.BausteinsichtModel) []Violation
 	}
 	return []Violation{{
 		ConstraintID: c.ID,
-		Message:      fmt.Sprintf("%s: %s kind must not relate to %s kind", c.Description, c.FromKind, c.ToKind),
+		Message:      fmt.Sprintf("%s: %s must not relate to %s", c.Description, from.describe(), to.describe()),
 		Elements:     bad,
 	}}
 }
 
-// allowedRelationship enforces that only elements whose kind is in fromKinds
-// may have relationships pointing to elements of toKind.
+// allowedRelationship enforces that only elements matching the "from"
+// allow-list selector may have relationships pointing to elements matching
+// the "to" selector. The "from" side additionally supports FromTags/FromKinds
+// (any-of allow-lists), on top of the single-value From/FromTag/FromKind
+// selectors shared with no-relationship.
 func allowedRelationship(c model.Constraint, m *model.BausteinsichtModel) []Violation {
 	flat, err := model.FlattenElements(m)
 	if err != nil {
 		return []Violation{{ConstraintID: c.ID, Message: err.Error()}}
 	}
-	kindOf := buildKindMap(flat)
-
-	allowed := make(map[string]bool, len(c.FromKinds))
-	for _, k := range c.FromKinds {
-		allowed[k] = true
-	}
+	from := elementSelector{id: c.From, tag: c.FromTag, tags: c.FromTags, kind: c.FromKind, kinds: c.FromKinds}
+	to := elementSelector{id: c.To, tag: c.ToTag, kind: c.ToKind}
 
 	var bad []string
 	for _, rel := range m.Relationships {
-		if kindOf[rel.To] == c.ToKind && !allowed[kindOf[rel.From]] {
-			bad = append(bad, fmt.Sprintf("%s (%s) → %s", rel.From, kindOf[rel.From], rel.To))
+		if to.matches(rel.To, flat[rel.To]) && !from.matches(rel.From, flat[rel.From]) {
+			fromKind := ""
+			if el := flat[rel.From]; el != nil {
+				fromKind = el.Kind
+			}
+			bad = append(bad, fmt.Sprintf("%s (%s) → %s", rel.From, fromKind, rel.To))
 		}
 	}
 	if len(bad) == 0 {
@@ -57,22 +137,24 @@ func allowedRelationship(c model.Constraint, m *model.BausteinsichtModel) []Viol
 	}
 	return []Violation{{
 		ConstraintID: c.ID,
-		Message:      fmt.Sprintf("%s: only [%s] may relate to %s kind", c.Description, strings.Join(c.FromKinds, ", "), c.ToKind),
+		Message:      fmt.Sprintf("%s: only %s may relate to %s", c.Description, from.describe(), to.describe()),
 		Elements:     bad,
 	}}
 }
 
-// requiredField enforces that all elements of elementKind have the given field
-// set to a non-empty value. Supported fields: "description", "technology", "title".
+// requiredField enforces that all elements matching the constraint's element
+// selector have the given field set to a non-empty value. Supported fields:
+// "description", "technology", "title".
 func requiredField(c model.Constraint, m *model.BausteinsichtModel) []Violation {
 	flat, err := model.FlattenElements(m)
 	if err != nil {
 		return []Violation{{ConstraintID: c.ID, Message: err.Error()}}
 	}
+	sel := elementSelector{tag: c.Tag, kind: c.ElementKind}
 
 	var bad []string
 	for id, el := range flat {
-		if el.Kind != c.ElementKind {
+		if !sel.matches(id, el) {
 			continue
 		}
 		var missing bool
@@ -99,7 +181,7 @@ func requiredField(c model.Constraint, m *model.BausteinsichtModel) []Violation 
 	}
 	return []Violation{{
 		ConstraintID: c.ID,
-		Message:      fmt.Sprintf("%s: all %s elements must have %q set", c.Description, c.ElementKind, c.Field),
+		Message:      fmt.Sprintf("%s: elements matching %s must have %q set", c.Description, sel.describe(), c.Field),
 		Elements:     bad,
 	}}
 }
@@ -221,13 +303,4 @@ func technologyAllowed(c model.Constraint, m *model.BausteinsichtModel) []Violat
 		Message:      fmt.Sprintf("%s: %s elements must use one of [%s]", c.Description, c.ElementKind, strings.Join(c.Technologies, ", ")),
 		Elements:     bad,
 	}}
-}
-
-// buildKindMap returns a map from element ID to its kind for all flattened elements.
-func buildKindMap(flat map[string]*model.Element) map[string]string {
-	m := make(map[string]string, len(flat))
-	for id, el := range flat {
-		m[id] = el.Kind
-	}
-	return m
 }
