@@ -223,13 +223,13 @@ _Updated by `/risk-mitigate` on 2026-03-04_
 | Linter & Formatter | ✅ Present | `golangci-lint` in CI (`go.yml`), `go vet`, `staticcheck` via Makefile |
 | Type Checking | ✅ Present | Go is statically typed; `go build` enforces types |
 | Pre-Commit Hooks | ✅ Set up | `scripts/pre-commit` — gofmt, go vet, golangci-lint, gitleaks; install via `make install-hooks` |
-| Dependency Check | ✅ Present | `govulncheck` via Makefile; `gosec` for security scanning |
-| CI Build & Unit Tests | ✅ Present | GitHub Actions `go.yml`: build + test + golangci-lint |
+| Dependency Check | ✅ Present | `govulncheck` blocking in CI (`go.yml`) and via Makefile; `gosec` non-blocking in CI, tracked in #551 |
+| CI Build & Unit Tests | ✅ Present | GitHub Actions `go.yml`: build + test (+ `-race`, see below) + golangci-lint |
 
 #### Tier 2 — Extended Assurance
 | Measure | Status | Details |
 |---------|--------|---------|
-| SAST | ✅ Present | `gosec` (security scanner), `nilaway` (nil pointer analysis), `staticcheck` |
+| SAST | ✅ Present | `staticcheck` blocking (via `lint` job); `gosec`/`nilaway` run in CI non-blocking for now, tracked in #551 |
 | AI Code Review | ✅ Present | Claude Code with code-review plugin; PR merge policy requires review |
 | Property-Based Tests | ✅ Set up | `pgregory.net/rapid` — label roundtrip + escapeHTML + trimBrackets property tests |
 | SonarQube Quality Gate | ✅ Present | SonarCloud on all PRs; new-code coverage gate ≥ 80% (see override policy in PR Merge Policy section); `sonar.qualitygate.wait=true` in `sonar-project.properties` |
