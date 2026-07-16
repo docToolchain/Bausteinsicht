@@ -41,34 +41,48 @@ jobs:
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Parse and validate PR metadata
-        id: meta
-        run: |
-          f="${{ runner.temp }}/pr-comments/pr-meta.env"
-          # cut -f2- captures values literally; their content is never evaluated.
-          get() { grep "^$1=" "$f" | head -n1 | cut -d= -f2-; }
-          pr_number="$(get pr_number)"
-          # pr_number is the only field interpolated into later steps; validate it.
-          case "$pr_number" in ''|*[!0-9]*) echo "invalid pr_number"; exit 1;; esac
-          printf 'pr_number=%s\n' "$pr_number" >> "$GITHUB_OUTPUT"
-
       - name: Post or update PR comments
         uses: actions/github-script@v7
         env:
           BODIES_DIR: ${{ runner.temp }}/pr-comments
-          PR_NUMBER: ${{ steps.meta.outputs.pr_number }}
+          # Trusted fields from the workflow_run event itself — NOT the staged
+          # artifact. A fork PR's stage-1 run controls the artifact contents, so
+          # anything self-reported there (e.g. a spoofed pr_number) must never
+          # gate a privileged action. head_sha / head_repository are reliably
+          # populated by GitHub for workflow_run regardless of fork status.
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          HEAD_REPO: ${{ github.event.workflow_run.head_repository.full_name }}
         with:
           script: |
             const fs = require('fs');
             const path = require('path');
             const dir = process.env.BODIES_DIR;
-            const issue_number = parseInt(process.env.PR_NUMBER, 10);
 
-            const files = fs.readdirSync(dir).filter(f => f.endsWith('.md'));
+            const files = fs.existsSync(dir)
+              ? fs.readdirSync(dir).filter(f => f.endsWith('.md'))
+              : [];
             if (files.length === 0) {
               core.info('No comment bodies were staged — nothing to post.');
               return;
             }
+
+            // Resolve the real PR from the trusted head SHA, never the staged
+            // pr_number. listPullRequestsAssociatedWithCommit works for fork PRs
+            // because the base repo holds refs/pull/N/head at this commit.
+            const baseRepo = `${context.repo.owner}/${context.repo.repo}`;
+            const assoc = await github.paginate(
+              github.rest.repos.listPullRequestsAssociatedWithCommit,
+              { owner: context.repo.owner, repo: context.repo.repo, commit_sha: process.env.HEAD_SHA },
+            );
+            const pr = assoc.find(p =>
+              p.head.repo && p.head.repo.full_name === process.env.HEAD_REPO &&
+              p.base.repo.full_name === baseRepo);
+            if (!pr) {
+              core.warning(`No PR found for ${process.env.HEAD_REPO}@${process.env.HEAD_SHA}; nothing to post.`);
+              return;
+            }
+            const issue_number = pr.number;
+            core.info(`Resolved PR #${issue_number} for ${process.env.HEAD_REPO}@${process.env.HEAD_SHA}.`);
 
             const comments = await github.paginate(github.rest.issues.listComments, {
               owner: context.repo.owner,

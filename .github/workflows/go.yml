@@ -330,41 +330,6 @@ jobs:
           retention-days: 1
           if-no-files-found: ignore
 
-  # Stages the PR number (and head info) for the trusted "PR Comments"
-  # workflow. Needed because github.event.workflow_run.pull_requests is empty
-  # for fork PRs, so the poster cannot otherwise learn which PR to comment on.
-  stage-pr-meta:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Write PR metadata
-        env:
-          # Bind attacker-controllable PR fields via env; never interpolate
-          # them into the script body (shell-injection safety).
-          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
-          HEAD_REF: ${{ github.event.pull_request.head.ref }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          BASE_REF: ${{ github.event.pull_request.base.ref }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          mkdir -p pr-comment-meta
-          {
-            printf 'pr_number=%s\n' "$PR_NUMBER"
-            printf 'head_repo=%s\n' "$HEAD_REPO"
-            printf 'head_ref=%s\n'  "$HEAD_REF"
-            printf 'head_sha=%s\n'  "$HEAD_SHA"
-            printf 'base_ref=%s\n'  "$BASE_REF"
-          } > pr-comment-meta/pr-meta.env
-      - name: Upload PR metadata
-        uses: actions/upload-artifact@v4
-        with:
-          name: pr-comment-meta
-          path: pr-comment-meta/
-          retention-days: 1
-          if-no-files-found: error
-
   coverage:
     runs-on: ubuntu-latest
     permissions:
