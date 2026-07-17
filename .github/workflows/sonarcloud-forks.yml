@@ -1,0 +1,142 @@
+name: SonarCloud Analysis (fork PRs)
+
+# Runs the SonarCloud scan for pull requests opened from forks. A fork PR's own
+# (untrusted) "SonarCloud Analysis" run cannot access SONAR_TOKEN, so it only
+# stages the coverage report as an artifact. This workflow is triggered by
+# workflow_run and therefore executes in the BASE repository context with access
+# to secrets. It never runs untrusted code: it checks out the PR's sources only
+# for static analysis and reuses the coverage report produced by the fork run.
+#
+# SECURITY: PR identity (repo/sha/PR number) is taken ONLY from the trusted
+# github.event.workflow_run event, never from the staged artifact (which the
+# fork's stage-1 run controls). The fork's own sonar-project.properties is
+# overwritten with the trusted base-repo copy before scanning, so an
+# attacker-supplied sonar.host.url cannot survive into the SONAR_TOKEN-bearing
+# scan step. See docToolchain/Bausteinsicht#549.
+#
+# NOTE: workflow_run always uses the version of this file on the default branch,
+# so changes here only take effect after they are merged to main.
+
+on:
+  workflow_run:
+    workflows: ["SonarCloud Analysis"]
+    types:
+      - completed
+
+permissions:
+  contents: read
+  # Needed for the "Resolve pull request from trusted event fields" step's
+  # listPullRequestsAssociatedWithCommit call — without this the lookup
+  # fails with 403 (declaring any `permissions:` block sets all unlisted
+  # scopes to none, so this must be explicit).
+  pull-requests: read
+
+jobs:
+  sonarcloud-fork:
+    runs-on: ubuntu-latest
+    name: SonarCloud Analysis (fork PRs)
+    # Only for successful fork PR runs; same-repo PRs and pushes are already
+    # scanned inline by the "SonarCloud Analysis" workflow.
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_repository.full_name != github.repository
+
+    steps:
+      # Resolve the PR from the trusted head SHA. workflow_run.pull_requests is
+      # empty for fork PRs, so we look the commit up in the base repo (which
+      # holds refs/pull/N/head at this SHA). This yields a trustworthy PR number
+      # and base branch — unlike the self-reported values a fork could stage.
+      - name: Resolve pull request from trusted event fields
+        id: resolve
+        uses: actions/github-script@v7
+        env:
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          HEAD_REPO: ${{ github.event.workflow_run.head_repository.full_name }}
+        with:
+          script: |
+            const baseRepo = `${context.repo.owner}/${context.repo.repo}`;
+            const assoc = await github.paginate(
+              github.rest.repos.listPullRequestsAssociatedWithCommit,
+              { owner: context.repo.owner, repo: context.repo.repo, commit_sha: process.env.HEAD_SHA },
+            );
+            const pr = assoc.find(p =>
+              p.head.repo && p.head.repo.full_name === process.env.HEAD_REPO &&
+              p.base.repo.full_name === baseRepo);
+            if (!pr) {
+              core.warning(`No PR found for ${process.env.HEAD_REPO}@${process.env.HEAD_SHA}; skipping scan.`);
+              core.setOutput('found', 'false');
+              return;
+            }
+            core.setOutput('found', 'true');
+            core.setOutput('pr_number', String(pr.number));
+            core.setOutput('base_ref', pr.base.ref);
+            core.info(`Resolved PR #${pr.number} (base ${pr.base.ref}).`);
+
+      # Download to runner.temp (outside the workspace) so it survives the
+      # checkout below, which cleans GITHUB_WORKSPACE.
+      - name: Download staged coverage report
+        if: steps.resolve.outputs.found == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: sonar-inputs
+          path: ${{ runner.temp }}/sonar-inputs
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Fork sources are used for static analysis only and never executed. The
+      # checkout target is the TRUSTED workflow_run event, not the artifact, so
+      # it cannot be redirected to an arbitrary attacker-owned repository.
+      - name: Checkout PR head (sources only, never executed)
+        if: steps.resolve.outputs.found == 'true'
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          repository: ${{ github.event.workflow_run.head_repository.full_name }}
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      # The checked-out tree contains the fork's OWN sonar-project.properties,
+      # which is attacker-controlled (e.g. a spoofed sonar.host.url could
+      # exfiltrate SONAR_TOKEN). Fetch the trusted copy from the base repo's
+      # default branch into a side directory and use that instead.
+      - name: Checkout trusted Sonar config from base
+        if: steps.resolve.outputs.found == 'true'
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          path: .sonar-base
+          sparse-checkout: sonar-project.properties
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      - name: Apply trusted Sonar config and PR parameters
+        if: steps.resolve.outputs.found == 'true'
+        env:
+          # pr_number / base_ref are trusted (resolved via API above); head_sha /
+          # head_branch come from the trusted workflow_run event. All bound via
+          # env, never interpolated into the script body.
+          PR_NUMBER: ${{ steps.resolve.outputs.pr_number }}
+          BASE_REF: ${{ steps.resolve.outputs.base_ref }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          # Replace the fork's config with the trusted base copy, then append the
+          # PR analysis parameters.
+          cp .sonar-base/sonar-project.properties sonar-project.properties
+          cp "${{ runner.temp }}/sonar-inputs/coverage.out" coverage.out
+          {
+            printf '\n# --- injected for fork PR analysis (workflow_run) ---\n'
+            printf 'sonar.scm.revision=%s\n'        "$HEAD_SHA"
+            printf 'sonar.pullrequest.key=%s\n'     "$PR_NUMBER"
+            printf 'sonar.pullrequest.branch=%s\n'  "$HEAD_BRANCH"
+            printf 'sonar.pullrequest.base=%s\n'    "$BASE_REF"
+          } >> sonar-project.properties
+
+      - name: SonarCloud Scan
+        if: steps.resolve.outputs.found == 'true'
+        uses: SonarSource/sonarqube-scan-action@713881670b6b3676cda39549040e2d88c70d582e # v8.2.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          # Pin the host explicitly as defence-in-depth, independent of the
+          # (now trusted) properties file.
+          SONAR_HOST_URL: https://sonarcloud.io

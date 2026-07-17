@@ -1,0 +1,120 @@
+name: PR Comments
+
+# Posts/updates the PR report comments (multi-OS test report, coverage
+# unit-vs-E2E, E2E test plan) produced by the "Go CI" workflow. Go CI runs in
+# the (untrusted) PR context and therefore only renders each comment body and
+# uploads it as an artifact — on fork PRs it has a read-only GITHUB_TOKEN and
+# cannot post. This workflow is triggered by workflow_run and runs in the BASE
+# repository context, so it has a writable token for both same-repo and fork
+# PRs. It never runs untrusted code: it only downloads the staged artifacts and
+# posts their contents as comments. See docToolchain/Bausteinsicht#549.
+#
+# NOTE: workflow_run always uses the version of this file on the default branch,
+# so changes here only take effect after they are merged to main.
+
+on:
+  workflow_run:
+    workflows: ["Go CI"]
+    types:
+      - completed
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  post-comments:
+    runs-on: ubuntu-latest
+    name: Post PR report comments
+    # Only for PR-triggered Go CI runs (same-repo or fork). Pushes to main have
+    # no PR to comment on. Rendered comments are staged even when tests fail
+    # (the report shows the failures), so we do not gate on conclusion.
+    if: github.event.workflow_run.event == 'pull_request'
+
+    steps:
+      - name: Download staged comment artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: pr-comment-*
+          path: ${{ runner.temp }}/pr-comments
+          merge-multiple: true
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Post or update PR comments
+        uses: actions/github-script@v7
+        env:
+          BODIES_DIR: ${{ runner.temp }}/pr-comments
+          # Trusted fields from the workflow_run event itself — NOT the staged
+          # artifact. A fork PR's stage-1 run controls the artifact contents, so
+          # anything self-reported there (e.g. a spoofed pr_number) must never
+          # gate a privileged action. head_sha / head_repository are reliably
+          # populated by GitHub for workflow_run regardless of fork status.
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          HEAD_REPO: ${{ github.event.workflow_run.head_repository.full_name }}
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const dir = process.env.BODIES_DIR;
+
+            const files = fs.existsSync(dir)
+              ? fs.readdirSync(dir).filter(f => f.endsWith('.md'))
+              : [];
+            if (files.length === 0) {
+              core.info('No comment bodies were staged — nothing to post.');
+              return;
+            }
+
+            // Resolve the real PR from the trusted head SHA, never the staged
+            // pr_number. listPullRequestsAssociatedWithCommit works for fork PRs
+            // because the base repo holds refs/pull/N/head at this commit.
+            const baseRepo = `${context.repo.owner}/${context.repo.repo}`;
+            const assoc = await github.paginate(
+              github.rest.repos.listPullRequestsAssociatedWithCommit,
+              { owner: context.repo.owner, repo: context.repo.repo, commit_sha: process.env.HEAD_SHA },
+            );
+            const pr = assoc.find(p =>
+              p.head.repo && p.head.repo.full_name === process.env.HEAD_REPO &&
+              p.base.repo.full_name === baseRepo);
+            if (!pr) {
+              core.warning(`No PR found for ${process.env.HEAD_REPO}@${process.env.HEAD_SHA}; nothing to post.`);
+              return;
+            }
+            const issue_number = pr.number;
+            core.info(`Resolved PR #${issue_number} for ${process.env.HEAD_REPO}@${process.env.HEAD_SHA}.`);
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number,
+            });
+
+            for (const file of files.sort()) {
+              const body = fs.readFileSync(path.join(dir, file), 'utf8');
+              // Convention: the first line of every staged body is the HTML-comment
+              // marker used to find and update the previous version of this comment.
+              const marker = body.split('\n', 1)[0].trim();
+              if (!marker.startsWith('<!--')) {
+                core.warning(`Skipping ${file}: first line is not a marker.`);
+                continue;
+              }
+              const existing = comments.find(c => c.body && c.body.includes(marker));
+              if (existing) {
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: existing.id,
+                  body,
+                });
+                core.info(`Updated comment for ${file} (${marker}).`);
+              } else {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number,
+                  body,
+                });
+                core.info(`Created comment for ${file} (${marker}).`);
+              }
+            }

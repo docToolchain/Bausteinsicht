@@ -45,14 +45,48 @@ jobs:
           flags: go-coverage
           fail_ci_if_error: false
 
+      # SONAR_TOKEN is not exposed to workflows triggered by a fork PR, so the
+      # scan below cannot run for forks. Stage only the coverage report as an
+      # artifact; the trusted "SonarCloud Analysis (fork PRs)" workflow_run
+      # workflow downloads it and scans in the base-repo context. PR identity
+      # (repo/sha/number) is deliberately NOT staged here — the fork controls
+      # this step, so stage 2 derives identity from the trusted workflow_run
+      # event instead. See docToolchain/Bausteinsicht#549.
+      - name: Stage SonarCloud inputs (fork PRs)
+        if: >-
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name != github.repository
+        run: |
+          mkdir -p sonar-inputs
+          cp coverage.out sonar-inputs/coverage.out
+
+      - name: Upload SonarCloud inputs (fork PRs)
+        if: >-
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name != github.repository
+        uses: actions/upload-artifact@v4
+        with:
+          name: sonar-inputs
+          path: sonar-inputs/
+          retention-days: 1
+          if-no-files-found: error
+
       - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@master
+        # Runs directly for pushes, workflow_dispatch and same-repo PRs, which
+        # have access to SONAR_TOKEN. Fork PRs are scanned by the companion
+        # "SonarCloud Analysis (fork PRs)" workflow instead.
+        if: >-
+          github.event_name != 'pull_request' ||
+          github.event.pull_request.head.repo.full_name == github.repository
+        uses: SonarSource/sonarqube-scan-action@713881670b6b3676cda39549040e2d88c70d582e # v8.2.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
       - name: Check quality gate
-        if: github.event_name == 'pull_request'
+        if: >-
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name == github.repository
         run: |
           echo "Quality gate check: SonarCloud analysis complete."
           echo "View detailed report: https://sonarcloud.io/project/overview?id=docToolchain_Bausteinsicht"
