@@ -25,6 +25,11 @@ on:
 
 permissions:
   contents: read
+  # Needed for the "Resolve pull request from trusted event fields" step's
+  # listPullRequestsAssociatedWithCommit call — without this the lookup
+  # fails with 403 (declaring any `permissions:` block sets all unlisted
+  # scopes to none, so this must be explicit).
+  pull-requests: read
 
 jobs:
   sonarcloud-fork:
