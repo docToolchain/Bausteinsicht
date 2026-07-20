@@ -1,0 +1,35 @@
+name: Lint Workflows
+
+# Lints the GitHub Actions workflows themselves with actionlint (structure,
+# expressions, action references) plus its embedded shellcheck on `run:`
+# scripts. Runs only when a workflow file changes.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/**"
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  actionlint:
+    runs-on: ubuntu-latest
+    name: actionlint
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: Run actionlint
+        uses: raven-actions/actionlint@3d39aea434753780c3b3d4a1a31c854b4dbf49d7 # v2.2.0
+        env:
+          # Gate on shellcheck error+warning only. The repo still carries ~40
+          # info/style shellcheck findings (mostly SC2086 "quote your
+          # variables") across the branch-management workflows; those are
+          # non-blocking here and left for a follow-up cleanup so this check is
+          # green on arrival. Raise to the default (info) once they are fixed.
+          SHELLCHECK_OPTS: --severity=warning

@@ -29,7 +29,12 @@ jobs:
           # grep -x (exact-line) instead of substring match: a hypothetical
           # branch that merely *contains* "main" (e.g. "maintenance-fix")
           # must not be silently dropped.
-          DELETED_LOCAL=$(git branch -d $(git branch --format='%(refname:short)' --merged origin/main | grep -vx main | tr '\n' ' ') 2>&1 || echo "")
+          # The inner $() is intentionally word-split into one argument per
+          # merged branch for `git branch -d`; output is discarded (the point is
+          # the deletion side effect, and on a fresh runner there is usually
+          # nothing to delete).
+          # shellcheck disable=SC2046
+          git branch -d $(git branch --format='%(refname:short)' --merged origin/main | grep -vx main | tr '\n' ' ') >/dev/null 2>&1 || true
 
           # List remote branches that should be deleted (already merged to main)
           # grep -vx origin (post-strip): a run on 2026-07-03 produced one

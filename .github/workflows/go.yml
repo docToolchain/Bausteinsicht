@@ -486,7 +486,11 @@ jobs:
         # parsing it exhausts memory well before the package's own (fast,
         # non-race) tests would ever suggest a problem. The other 33
         # packages are raced normally.
-        run: go test -race $(go list ./... | grep -v '/internal/importer/xmi$')
+        run: |
+          # The package list from $() is intentionally word-split into one
+          # argument per package for `go test`.
+          # shellcheck disable=SC2046
+          go test -race $(go list ./... | grep -v '/internal/importer/xmi$')
 
   govulncheck:
     runs-on: ubuntu-latest
