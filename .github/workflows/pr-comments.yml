@@ -52,6 +52,7 @@ jobs:
           # populated by GitHub for workflow_run regardless of fork status.
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           HEAD_REPO: ${{ github.event.workflow_run.head_repository.full_name }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
         with:
           script: |
             const fs = require('fs');
@@ -66,19 +67,22 @@ jobs:
               return;
             }
 
-            // Resolve the real PR from the trusted head SHA, never the staged
-            // pr_number. listPullRequestsAssociatedWithCommit works for fork PRs
-            // because the base repo holds refs/pull/N/head at this commit.
-            const baseRepo = `${context.repo.owner}/${context.repo.repo}`;
-            const assoc = await github.paginate(
-              github.rest.repos.listPullRequestsAssociatedWithCommit,
-              { owner: context.repo.owner, repo: context.repo.repo, commit_sha: process.env.HEAD_SHA },
-            );
-            const pr = assoc.find(p =>
-              p.head.repo && p.head.repo.full_name === process.env.HEAD_REPO &&
-              p.base.repo.full_name === baseRepo);
+            // Resolve the real PR from the trusted head repo + branch, never the
+            // staged pr_number. listPullRequestsAssociatedWithCommit does NOT
+            // return fork PRs when queried on the base repo (the fork-head commit
+            // is not associated there), so list open PRs by head "owner:branch" —
+            // every field comes from the trusted workflow_run event — and confirm
+            // the head SHA matches the commit that triggered this run.
+            const headOwner = process.env.HEAD_REPO.split('/')[0];
+            const prs = await github.paginate(github.rest.pulls.list, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              head: `${headOwner}:${process.env.HEAD_BRANCH}`,
+            });
+            const pr = prs.find(p => p.head.sha === process.env.HEAD_SHA);
             if (!pr) {
-              core.warning(`No PR found for ${process.env.HEAD_REPO}@${process.env.HEAD_SHA}; nothing to post.`);
+              core.warning(`No open PR found for ${headOwner}:${process.env.HEAD_BRANCH}@${process.env.HEAD_SHA}; nothing to post.`);
               return;
             }
             const issue_number = pr.number;
