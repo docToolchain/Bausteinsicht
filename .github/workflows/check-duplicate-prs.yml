@@ -15,6 +15,7 @@ jobs:
       - name: Detect duplicate functionality
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           # Get files changed in this PR
           BASE_COMMIT=$(git merge-base origin/main HEAD)
@@ -27,7 +28,7 @@ jobs:
           # Check for similar changes in other open PRs
           DUPLICATES=""
           for pr in $(gh pr list --state open --json number -q '.[].number'); do
-            if [ "$pr" -ne "${{ github.event.pull_request.number }}" ]; then
+            if [ "$pr" != "$PR_NUMBER" ]; then
               PR_FILES=$(gh pr view "$pr" --json files -q '.files[].path' | tr '\n' ' ')
 
               # Check for overlapping packages/modules
@@ -47,7 +48,7 @@ jobs:
             echo ""
 
             BODY=$(printf '⚠️ **Potential Duplicate Work Detected**\n\nThis PR may overlap with other open PRs:%s\n\nPlease review and coordinate:\n1. Confirm this PR does not duplicate existing work\n2. If duplicate, consider closing this PR\n3. If improvements, consider cherry-picking into existing PR instead' "$(echo -e "$DUPLICATES")")
-            gh pr comment ${{ github.event.pull_request.number }} --body "$BODY"
+            gh pr comment "$PR_NUMBER" --body "$BODY"
           else
             echo "✅ No overlapping work detected"
           fi

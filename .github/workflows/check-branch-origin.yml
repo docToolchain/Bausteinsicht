@@ -29,8 +29,7 @@ jobs:
             exit 0
           fi
 
-          # Check if branch has diverged (contains commits not in main)
-          COMMITS_AHEAD=$(git rev-list --count origin/main..HEAD)
+          # Check if branch has diverged (is behind main)
           COMMITS_BEHIND=$(git rev-list --count HEAD..origin/main)
 
           if [ "$COMMITS_BEHIND" -gt 0 ]; then
