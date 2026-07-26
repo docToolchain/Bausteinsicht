@@ -164,7 +164,7 @@ func noOutgoingDependency(c model.Constraint, m *model.BausteinsichtModel) []Vio
 	}
 	return []Violation{{
 		ConstraintID: c.ID,
-		Message:      fmt.Sprintf("%s: %s is an interface and must not have outgoing dependencies", c.Description, sel.describe()),
+		Message:      fmt.Sprintf("%s: %s must not have outgoing dependencies", c.Description, sel.describe()),
 		Elements:     bad,
 	}}
 }
