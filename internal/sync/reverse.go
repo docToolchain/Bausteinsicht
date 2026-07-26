@@ -33,20 +33,28 @@ func ApplyReverse(changes *ChangeSet, m *model.BausteinsichtModel, lastState *Sy
 	// there directly. We need the flattened view to properly detect nested elements.
 	flatModel, _ := model.FlattenElements(m)
 
-	// Build a set of elements that were already synced in the last sync.
-	lastElemMap := make(map[string]bool)
+	// Build a set of elements that were already synced in the last sync. The map
+	// is left nil when there is no previous sync so callers can distinguish
+	// "first sync" (nil) from "previous sync that happened to have no elements"
+	// (non-nil, empty).
+	var lastElemMap map[string]bool
 	if lastState != nil {
+		lastElemMap = make(map[string]bool)
 		for id := range lastState.Elements {
 			lastElemMap[id] = true
 		}
 	}
 
 	// Build a set of relationships that were already synced in the last sync.
-	lastRelMap := make(map[string]bool)
+	// Key by the same relKey(from, to, index) used everywhere else so that
+	// multiple relationships between the same pair (#142) stay distinct - keying
+	// by "from->to" alone would treat a newly-added second relationship as
+	// already-synced and drop it. Left nil when there is no previous sync.
+	var lastRelMap map[string]bool
 	if lastState != nil {
+		lastRelMap = make(map[string]bool)
 		for _, r := range lastState.Relationships {
-			key := fmt.Sprintf("%s->%s", r.From, r.To)
-			lastRelMap[key] = true
+			lastRelMap[relKey(r.From, r.To, r.Index)] = true
 		}
 	}
 
@@ -207,8 +215,9 @@ func applyElementChange(ch ElementChange, m *model.BausteinsichtModel, flatModel
 				return
 			}
 			// Element exists in model but wasn't synced from draw.io before - that's a
-			// genuine conflict. Only warn if we've done a previous sync (lastElemMap exists).
-			hasLastState := len(lastElemMap) > 0
+			// genuine conflict. Only warn if we've done a previous sync (lastElemMap
+			// is non-nil, even if that prior sync recorded no elements).
+			hasLastState := lastElemMap != nil
 			if hasLastState {
 				result.Warnings = append(result.Warnings,
 					fmt.Sprintf("Element %q from draw.io skipped: ID already exists in model (not synced from draw.io)", ch.ID))
@@ -288,32 +297,39 @@ func applyRelationshipChange(ch RelationshipChange, m *model.BausteinsichtModel,
 				fmt.Sprintf("Relationship %q->%q rejected: To element %q does not exist in model", ch.From, ch.To, ch.To))
 			return
 		}
-		// Check if this relationship was already synced from draw.io in a previous sync.
-		// If it was, it's on a different page now - that's normal, skip silently.
-		lastRelKey := fmt.Sprintf("%s->%s", ch.From, ch.To)
-		if lastRelMap[lastRelKey] {
+		// Check if this relationship was already synced from draw.io in a previous
+		// sync. Match on the per-pair index so a newly-added second relationship
+		// between the same pair (#142) is not mistaken for the already-synced
+		// first one. If it was synced before, it's on a different page now -
+		// that's normal, skip silently. (Reading a nil map yields false.)
+		if lastRelMap[relKey(ch.From, ch.To, ch.Index)] {
 			// Already synced before (possibly on another page) - no action needed.
 			return
 		}
-		// Check if relationship already exists in the model.
-		// On first sync (lastState is nil or empty), this is expected - user manually added
-		// relationships to both places. Skip silently.
-		// Only warn if we've done a previous sync (lastRelMap exists) and this relationship
-		// was NOT synced from draw.io before - that's a genuine conflict.
-		hasLastState := len(lastRelMap) > 0
+		// Check whether the model already holds a relationship at this per-pair
+		// index. Multiple relationships between the same pair are supported (#142)
+		// and disambiguated by index, so only a relationship at the SAME index
+		// counts as "already present"; a higher index is a genuinely new one.
+		existing := 0
 		for _, r := range m.Relationships {
 			if r.From == ch.From && r.To == ch.To {
-				if hasLastState {
-					// Genuine conflict: model has relationship that wasn't synced from draw.io
-					pageInfo := ""
-					if ch.PageID != "" {
-						pageInfo = fmt.Sprintf(" (on draw.io page %q)", ch.PageID)
-					}
-					result.Warnings = append(result.Warnings,
-						fmt.Sprintf("Relationship %q->%q already exists in model (not synced from draw.io), skipping duplicate%s", ch.From, ch.To, pageInfo))
-				}
-				return
+				existing++
 			}
+		}
+		if ch.Index < existing {
+			// A relationship at this position already exists in the model but was
+			// not synced from draw.io before. On first sync (lastRelMap is nil)
+			// this is expected - the user added it to both places - so skip
+			// silently; once a previous sync exists it is a genuine conflict.
+			if lastRelMap != nil {
+				pageInfo := ""
+				if ch.PageID != "" {
+					pageInfo = fmt.Sprintf(" (on draw.io page %q)", ch.PageID)
+				}
+				result.Warnings = append(result.Warnings,
+					fmt.Sprintf("Relationship %q->%q already exists in model (not synced from draw.io), skipping duplicate%s", ch.From, ch.To, pageInfo))
+			}
+			return
 		}
 		m.Relationships = append(m.Relationships, model.Relationship{
 			From:  ch.From,

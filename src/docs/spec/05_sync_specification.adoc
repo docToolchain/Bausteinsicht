@@ -157,8 +157,10 @@ Triggered when the draw.io file changes.
 | Generate ID via `sanitizeID` (lowercase, hyphen-separated from title). Default kind = first alphabetically-sorted kind from `specification.elements` (#206). Collision guard: skip import if generated ID already exists in the model (#203). Navigation buttons (`nav-back-*`) are excluded from import (#205). Bare `<mxCell>` elements without an `<object>` wrapper are excluded.
 
 | New relationship (from draw.io)
-| `<mxCell>` with `edge="1"`, `source` and `target` matching known element IDs, not present in model
-| Add relationship to model. Connector label captured from `value` attribute (#204).
+| `<mxCell>` with `edge="1"`, `source` and `target` matching known element IDs, whose per-pair index (`rel-<from>-<to>-<index>`) is neither already recorded in the last-sync state nor already held by the model
+| Add relationship to model, capturing the connector label from `value` (#204).
+Duplicate detection is index-aware (#142): a relationship already in the last-sync state — e.g. the same connector re-appearing on another view page — is skipped silently, and a newly-drawn second relationship between the same pair is imported as new rather than dropped (#547, #548).
+A same-index relationship the model already holds but that was never synced from draw.io is skipped as a conflict with a warning.
 
 | Element deleted in draw.io
 | Known `bausteinsicht_id` no longer present in any `<object>` on visible view pages

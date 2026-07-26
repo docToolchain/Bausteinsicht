@@ -660,6 +660,82 @@ func TestRun_MultipleRelsSamePair(t *testing.T) {
 	}
 }
 
+// --- Test: reverse sync imports a newly-drawn second relationship (#548) ---
+//
+// After a first relationship a->b was synced, the user draws a SECOND a->b
+// connector in draw.io. Reverse sync must import it as a new relationship (#142)
+// rather than mistaking it for the already-synced first one and dropping it.
+func TestRun_ReverseImportsSecondRelSamePair(t *testing.T) {
+	ts := minimalTemplates(t)
+
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"a": {Kind: "container", Title: "A"},
+			"b": {Kind: "container", Title: "B"},
+		},
+		Relationships: []model.Relationship{
+			{From: "a", To: "b", Label: "uses"},
+		},
+	}
+
+	doc := emptyDoc()
+
+	// Round 1: first sync populates the doc with one a->b connector.
+	r1 := Run(m, doc, emptyState(), ts, nil)
+	if r1.Forward.ConnectorsCreated != 1 {
+		t.Fatalf("round 1: expected 1 connector created, got %d", r1.Forward.ConnectorsCreated)
+	}
+
+	// State after round 1: a->b at index 0 was synced.
+	state1 := &SyncState{
+		Elements: map[string]ElementState{
+			"a": {Title: "A", Kind: "container"},
+			"b": {Title: "B", Kind: "container"},
+		},
+		Relationships: []RelationshipState{
+			{From: "a", To: "b", Index: 0, Label: "uses"},
+		},
+	}
+
+	// The user draws a SECOND a->b connector (index 1) in draw.io. Reuse the
+	// first connector's endpoint refs so the new edge references the same cells.
+	page := requireFirstPage(t, doc)
+	conn0 := page.FindConnector("a", "b", 0)
+	if conn0 == nil {
+		t.Fatal("round 1 should have created connector a->b#0")
+	}
+	page.CreateConnector(drawio.ConnectorData{
+		From:      "a",
+		To:        "b",
+		Label:     "calls",
+		SourceRef: conn0.SelectAttrValue("source", ""),
+		TargetRef: conn0.SelectAttrValue("target", ""),
+		Index:     1,
+	}, ts.GetConnectorStyle())
+
+	// Round 2: reverse sync must import the new a->b relationship into the model.
+	r2 := Run(m, doc, state1, ts, nil)
+
+	if r2.Reverse.RelationshipsCreated != 1 {
+		t.Errorf("round 2: expected RelationshipsCreated=1, got %d", r2.Reverse.RelationshipsCreated)
+	}
+	if len(m.Relationships) != 2 {
+		t.Fatalf("round 2: expected 2 model relationships, got %d", len(m.Relationships))
+	}
+	labels := map[string]bool{}
+	for _, r := range m.Relationships {
+		if r.From == "a" && r.To == "b" {
+			labels[r.Label] = true
+		}
+	}
+	if !labels["uses"] || !labels["calls"] {
+		t.Errorf("expected both 'uses' and 'calls' a->b relationships, got %+v", m.Relationships)
+	}
+	if len(r2.Conflicts) != 0 {
+		t.Errorf("round 2: expected no conflicts, got %d", len(r2.Conflicts))
+	}
+}
+
 // --- Test: Sync warns when model elements aren't visible in any view (#183) ---
 //
 // Model has 3 elements: "a", "b", "c".

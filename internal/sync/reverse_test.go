@@ -373,6 +373,47 @@ func TestApplyReverse_RelationshipAddedDuplicateSkipped(t *testing.T) {
 	}
 }
 
+// TestApplyReverse_RelationshipAddedSecondBetweenSamePair verifies that a
+// newly-drawn SECOND relationship between the same pair (#142) is imported even
+// when a FIRST relationship between that pair was already synced. Keying the
+// last-sync set by "from->to" (ignoring the per-pair index) previously matched
+// the already-synced first relationship and dropped the new one silently (#548).
+func TestApplyReverse_RelationshipAddedSecondBetweenSamePair(t *testing.T) {
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"a": {Kind: "container", Title: "A"},
+			"b": {Kind: "container", Title: "B"},
+		},
+		Relationships: []model.Relationship{
+			{From: "a", To: "b", Label: "uses"}, // index 0, previously synced
+		},
+	}
+	// Previous sync recorded a->b at index 0 only.
+	lastState := &SyncState{
+		Relationships: []RelationshipState{
+			{From: "a", To: "b", Index: 0, Label: "uses"},
+		},
+	}
+	// draw.io now has a SECOND a->b connector (index 1) - a genuinely new relationship.
+	cs := &ChangeSet{
+		DrawioRelationshipChanges: []RelationshipChange{
+			{From: "a", To: "b", Index: 1, Type: Added, NewValue: "calls"},
+		},
+	}
+
+	r := ApplyReverse(cs, m, lastState)
+
+	if len(m.Relationships) != 2 {
+		t.Fatalf("expected 2 relationships (new one imported), got %d", len(m.Relationships))
+	}
+	if r.RelationshipsCreated != 1 {
+		t.Errorf("expected RelationshipsCreated=1, got %d", r.RelationshipsCreated)
+	}
+	if len(r.Warnings) != 0 {
+		t.Errorf("unexpected warnings: %v", r.Warnings)
+	}
+}
+
 // TestApplyReverse_RelationshipAddedStaleElementsRejected verifies that
 // relationships referencing non-existent elements are rejected during reverse sync (#329).
 func TestApplyReverse_RelationshipAddedStaleElementsRejected(t *testing.T) {

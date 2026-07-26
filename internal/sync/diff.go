@@ -398,7 +398,7 @@ func extractDrawioRelationships(doc *drawio.Document) map[string]RelationshipSta
 			key := relKey(from, to, index)
 			if existing, exists := result[key]; exists {
 				// If relationship already exists on another page, append this page to the list.
-				// This is stored as a comma-separated list for later use in warnings.
+				// PageIDs is a []string of page identifiers, used later in warnings.
 				existing.PageIDs = append(existing.PageIDs, pageID)
 				result[key] = existing
 			} else {
