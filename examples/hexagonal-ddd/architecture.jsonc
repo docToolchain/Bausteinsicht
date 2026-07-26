@@ -271,5 +271,70 @@
       "filter-tags": ["domain"],
       "description": "Tactical DDD view: aggregate, entities, value objects and domain services only"
     }
-  }
+  },
+
+  // ---------------------------------------------------------------------------
+  // Constraints — architectural fitness functions checked by `bausteinsicht lint`.
+  // They encode the hexagonal dependency rules so CI fails if someone wires the
+  // model against the architecture. All rules below pass on this model.
+  // ---------------------------------------------------------------------------
+  "constraints": [
+    // Ports are pure interfaces: they are implemented and used by others, but
+    // depend on nothing themselves. This is the core decoupling guarantee —
+    // an adapter is reachable only THROUGH its port, never the other way round.
+    {
+      "id": "HEX-001",
+      "rule": "no-outgoing-dependency",
+      "from-kind": "inboundPort",
+      "description": "Inbound ports are interfaces and must not depend on anything"
+    },
+    {
+      "id": "HEX-002",
+      "rule": "no-outgoing-dependency",
+      "from-kind": "outboundPort",
+      "description": "Outbound ports are interfaces and must not depend on anything"
+    },
+
+    // Infrastructure is only reachable through a driven adapter — the domain and
+    // the application layer must never touch a data store or external system.
+    {
+      "id": "HEX-003",
+      "rule": "allowed-relationship",
+      "to-kind": "datastore",
+      "from-kinds": ["drivenAdapter"],
+      "description": "Only driven adapters may access a data store"
+    },
+    {
+      "id": "HEX-004",
+      "rule": "allowed-relationship",
+      "to-kind": "externalSystem",
+      "from-kinds": ["drivenAdapter"],
+      "description": "Only driven adapters may talk to external systems"
+    },
+
+    // Inbound ports are reached only from the driving side (adapter) or from the
+    // application service that implements them.
+    {
+      "id": "HEX-005",
+      "rule": "allowed-relationship",
+      "to-kind": "inboundPort",
+      "from-kinds": ["drivingAdapter", "applicationService"],
+      "description": "Only driving adapters or the implementing app service may use an inbound port"
+    },
+    // Outbound ports are used by the application and implemented by driven adapters.
+    {
+      "id": "HEX-006",
+      "rule": "allowed-relationship",
+      "to-kind": "outboundPort",
+      "from-kinds": ["applicationService", "drivenAdapter"],
+      "description": "Only the app service (uses) or driven adapters (implements) may relate to an outbound port"
+    },
+
+    // Dependencies flow inward — the graph across the hexagon must be acyclic.
+    {
+      "id": "HEX-007",
+      "rule": "no-circular-dependency",
+      "description": "The dependency graph must be acyclic (dependencies point inward)"
+    }
+  ]
 }

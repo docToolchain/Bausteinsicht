@@ -28,6 +28,22 @@ The model defines three views, each becoming one draw.io page:
 `ports-and-adapters`:: The hexagonal boundary (driving adapters -> inbound ports -> application -> outbound ports -> driven adapters); the domain internals are hidden via `exclude-tags: ["domain"]`.
 `domain-model`:: Only the DDD tactical building blocks, selected via `filter-tags: ["domain"]`.
 
+== Constraints (architectural fitness functions)
+
+The `constraints` section turns the hexagonal dependency rules into checks that `bausteinsicht lint` enforces — run it in CI to fail the build when the model is wired against the architecture.
+All rules in this example pass on the shipped model.
+
+The central rule is that *ports are pure interfaces*:
+
+`HEX-001` / `HEX-002`:: `no-outgoing-dependency` on `inboundPort` and `outboundPort`.
+                        A port may be implemented and used by others, but must not itself be the source of any relationship.
+                        This is what decouples an adapter from its use in the application/domain layer — the adapter is reachable only _through_ its port, never the other way round.
+`HEX-003` / `HEX-004`:: `allowed-relationship` restricting `datastore` and `externalSystem` targets to `drivenAdapter` sources, so the domain and application layers can never touch infrastructure directly.
+`HEX-005` / `HEX-006`:: `allowed-relationship` guarding who may reach the inbound and outbound ports (the driving side and the implementing application service / driven adapters).
+`HEX-007`:: `no-circular-dependency` — dependencies must flow inward, so the graph stays acyclic.
+
+Try it: add a relationship whose `from` is one of the ports (e.g. `ordering.orderRepo`) and run `bausteinsicht lint` — it fails with a `HEX-002` violation naming the offending edge.
+
 == Visual styling and the hexagon shape
 
 Because the element kinds here are custom, the built-in template does not know how to

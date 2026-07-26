@@ -1,0 +1,75 @@
+= Hexagonal Architecture — xMolecules / jMolecules Mapping (minimal)
+:toc: macro
+:icons: font
+:repo-issues: https://github.com/docToolchain/Bausteinsicht/issues
+
+This minimal example shows how a Bausteinsicht model can keep _didactic_ hexagonal terms as element kinds while mapping every element 1:1 onto the technology-neutral https://xmolecules.org/[xMolecules] stereotype vocabulary.
+xMolecules is the language-agnostic umbrella; its members realise the same concepts in code — https://github.com/xmolecules/jmolecules[jMolecules] (Java/Kotlin), nMolecules (.NET), phpMolecules (PHP).
+Bausteinsicht adds the _model / diagram_ level to that family.
+
+toc::[]
+
+== The idea (Option A)
+
+Each element carries two names for the same thing:
+
+`kind`:: The term you want to *read and draw* — Cockburn's `drivingAdapter` / `inboundPort` / `outboundPort` / `drivenAdapter`.
+`metadata.jmolecules`:: The *machine-readable* stereotype in xMolecules speak (`PrimaryPort`, `SecondaryAdapter`, `AggregateRoot`, …) — the anchor a tool uses.
+
+[source,jsonc]
+----
+"placeOrder": {
+  "kind": "inboundPort",                          // <1>
+  "metadata": { "jmolecules": "PrimaryPort" }     // <2>
+}
+----
+<1> Didactic term — what a reader sees in the model and the diagram.
+<2> xMolecules stereotype — the anchor for ArchUnit / code verification.
+
+== Mapping table
+
+[cols="1,1",options="header"]
+|===
+| Bausteinsicht `kind` (didactic) | xMolecules / jMolecules stereotype
+
+| `drivingAdapter`     | `PrimaryAdapter`
+| `inboundPort`        | `PrimaryPort`
+| `applicationService` | `Application`
+| `aggregate`          | `AggregateRoot`
+| `entity`             | `Entity`
+| `valueObject`        | `ValueObject`
+| `domainService`      | `Service`
+| `outboundPort`       | `SecondaryPort`
+| `drivenAdapter`      | `SecondaryAdapter`
+| (a repository)       | `Repository`
+|===
+
+`drivingAdapter`/`inboundPort` and `PrimaryAdapter`/`PrimaryPort` are *synonyms*: Cockburn's original "driving/driven" terminology and the "primary/secondary" wording jMolecules adopted describe the same roles.
+
+== The mapping is deterministic — you don't repeat it
+
+Because the `kind` already fixes the stereotype, the table above is a pure lookup.
+A generator applies it automatically from `kind`.
+This example writes `metadata.jmolecules` inline on every element *only for clarity*.
+In a real model you set `metadata.jmolecules` **only to override** the default for a specific element (for example, marking one particular `outboundPort` as a `Repository` rather than a plain `SecondaryPort`).
+
+== Why this shape matters for ArchUnit (issue {repo-issues}/562[#562])
+
+The stereotype is the bridge between architecture-as-code (this model) and code-level architecture:
+
+* jMolecules ships https://github.com/xmolecules/jmolecules-integrations/tree/main/jmolecules-archunit[jmolecules-archunit] with ready-made rules (`JMoleculesDddRules`, hexagonal architecture rules) derived from exactly these stereotypes.
+* A future generator can turn each element's stereotype into the matching ArchUnit expectation — or, conversely, verify jMolecules-annotated code against this model.
+* The hexagonal dependency rules in the sibling xref:../hexagonal-ddd/README.adoc[hexagonal-ddd example] (`no-outgoing-dependency` on ports, `allowed-relationship`, `no-circular-dependency`) line up with the jmolecules-archunit rule set, so they translate rather than get reinvented.
+
+Reference target: Oliver Drotbohm's https://github.com/odrotbohm/spring-restbucks[Spring RESTBucks] has a `hacking/hexagonal` branch that assigns its code types to _Application / Ports / Adapters_ and verifies them with jmolecules-archunit — the natural codebase to validate a generated rule set against.
+
+== Try it
+
+[source,bash]
+----
+bausteinsicht validate --model examples/hexagonal-jmolecules/architecture.jsonc
+bausteinsicht sync --model examples/hexagonal-jmolecules/architecture.jsonc   # generate the draw.io diagram
+----
+
+The model validates as-is.
+It intentionally defines no constraints — see the xref:../hexagonal-ddd/README.adoc[hexagonal-ddd example] for the full fitness-function set.
