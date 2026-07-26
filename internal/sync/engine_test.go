@@ -688,6 +688,7 @@ func TestRun_ReverseImportsSecondRelSamePair(t *testing.T) {
 
 	// State after round 1: a->b at index 0 was synced.
 	state1 := &SyncState{
+		Timestamp: "2026-07-26T00:00:00Z",
 		Elements: map[string]ElementState{
 			"a": {Title: "A", Kind: "container"},
 			"b": {Title: "B", Kind: "container"},

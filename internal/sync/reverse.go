@@ -33,10 +33,9 @@ func ApplyReverse(changes *ChangeSet, m *model.BausteinsichtModel, lastState *Sy
 	// there directly. We need the flattened view to properly detect nested elements.
 	flatModel, _ := model.FlattenElements(m)
 
-	// Build a set of elements that were already synced in the last sync. The map
-	// is left nil when there is no previous sync so callers can distinguish
-	// "first sync" (nil) from "previous sync that happened to have no elements"
-	// (non-nil, empty).
+	// Build the set of elements already synced in the last sync, used to skip
+	// re-importing an element that simply re-appears (e.g. on another page).
+	// Whether a prior sync happened at all is tracked separately via priorSync.
 	var lastElemMap map[string]bool
 	if lastState != nil {
 		lastElemMap = make(map[string]bool)
@@ -45,11 +44,10 @@ func ApplyReverse(changes *ChangeSet, m *model.BausteinsichtModel, lastState *Sy
 		}
 	}
 
-	// Build a set of relationships that were already synced in the last sync.
-	// Key by the same relKey(from, to, index) used everywhere else so that
-	// multiple relationships between the same pair (#142) stay distinct - keying
-	// by "from->to" alone would treat a newly-added second relationship as
-	// already-synced and drop it. Left nil when there is no previous sync.
+	// Build the set of relationships already synced in the last sync. Key by the
+	// same relKey(from, to, index) used everywhere else so multiple relationships
+	// between the same pair (#142) stay distinct - keying by "from->to" alone
+	// would treat a newly-added second relationship as already-synced and drop it.
 	var lastRelMap map[string]bool
 	if lastState != nil {
 		lastRelMap = make(map[string]bool)
@@ -58,8 +56,19 @@ func ApplyReverse(changes *ChangeSet, m *model.BausteinsichtModel, lastState *Sy
 		}
 	}
 
+	// A prior sync only happened if the state carries a recorded timestamp.
+	// LoadState fabricates a non-nil empty state (Timestamp == "") on the very
+	// first sync, so nil-ness alone cannot distinguish "no prior sync" from
+	// "a prior sync that recorded nothing" - use the timestamp instead.
+	priorSync := lastState != nil && lastState.Timestamp != ""
+
+	// Snapshot the model's current relationships keyed by relKey(from, to, global
+	// index) - the same key used for connectors and the last-sync state - so that
+	// "already present" is a direct key lookup rather than a numeric coincidence.
+	modelRelMap := buildModelRelMap(m)
+
 	for _, ch := range changes.DrawioElementChanges {
-		applyElementChange(ch, m, flatModel, lastElemMap, result)
+		applyElementChange(ch, m, flatModel, lastElemMap, priorSync, result)
 	}
 
 	// Detect direction-swap pairs (Deleted a→b + Added b→a) so we can
@@ -70,7 +79,7 @@ func ApplyReverse(changes *ChangeSet, m *model.BausteinsichtModel, lastState *Sy
 		if swaps[relSwapKey{ch.From, ch.To, ch.Type}] {
 			continue // handled as part of a swap pair
 		}
-		applyRelationshipChange(ch, m, flatModel, lastRelMap, result)
+		applyRelationshipChange(ch, m, flatModel, lastRelMap, modelRelMap, priorSync, result)
 	}
 
 	// Apply swaps: update direction in-place, preserving kind/label/description.
@@ -144,7 +153,7 @@ func applyRelSwap(newFrom, newTo string, m *model.BausteinsichtModel, result *Re
 	result.RelationshipsCreated++
 }
 
-func applyElementChange(ch ElementChange, m *model.BausteinsichtModel, flatModel map[string]*model.Element, lastElemMap map[string]bool, result *ReverseResult) {
+func applyElementChange(ch ElementChange, m *model.BausteinsichtModel, flatModel map[string]*model.Element, lastElemMap map[string]bool, priorSync bool, result *ReverseResult) {
 	switch ch.Type {
 	case Modified:
 		// Reject empty title updates from draw.io (#150).
@@ -215,9 +224,9 @@ func applyElementChange(ch ElementChange, m *model.BausteinsichtModel, flatModel
 				return
 			}
 			// Element exists in model but wasn't synced from draw.io before - that's a
-			// genuine conflict. Only warn if we've done a previous sync (lastElemMap
-			// is non-nil, even if that prior sync recorded no elements).
-			hasLastState := lastElemMap != nil
+			// genuine conflict. Only warn if a prior sync actually happened; on the
+			// very first sync the user legitimately has it in both places.
+			hasLastState := priorSync
 			if hasLastState {
 				result.Warnings = append(result.Warnings,
 					fmt.Sprintf("Element %q from draw.io skipped: ID already exists in model (not synced from draw.io)", ch.ID))
@@ -235,7 +244,7 @@ func applyElementChange(ch ElementChange, m *model.BausteinsichtModel, flatModel
 	}
 }
 
-func applyRelationshipChange(ch RelationshipChange, m *model.BausteinsichtModel, flatModel map[string]*model.Element, lastRelMap map[string]bool, result *ReverseResult) {
+func applyRelationshipChange(ch RelationshipChange, m *model.BausteinsichtModel, flatModel map[string]*model.Element, lastRelMap map[string]bool, modelRelMap map[string]RelationshipState, priorSync bool, result *ReverseResult) {
 	switch ch.Type {
 	case Modified:
 		updated := false
@@ -298,30 +307,25 @@ func applyRelationshipChange(ch RelationshipChange, m *model.BausteinsichtModel,
 			return
 		}
 		// Check if this relationship was already synced from draw.io in a previous
-		// sync. Match on the per-pair index so a newly-added second relationship
-		// between the same pair (#142) is not mistaken for the already-synced
-		// first one. If it was synced before, it's on a different page now -
-		// that's normal, skip silently. (Reading a nil map yields false.)
+		// sync. Match on the connector index (relKey) so a genuinely new second
+		// relationship between the same pair (#142) stays distinct from the
+		// already-synced first one. If synced before, it's on a different page
+		// now - skip silently. (Reading a nil map yields false.)
 		if lastRelMap[relKey(ch.From, ch.To, ch.Index)] {
 			// Already synced before (possibly on another page) - no action needed.
 			return
 		}
-		// Check whether the model already holds a relationship at this per-pair
-		// index. Multiple relationships between the same pair are supported (#142)
-		// and disambiguated by index, so only a relationship at the SAME index
-		// counts as "already present"; a higher index is a genuinely new one.
-		existing := 0
-		for _, r := range m.Relationships {
-			if r.From == ch.From && r.To == ch.To {
-				existing++
-			}
-		}
-		if ch.Index < existing {
-			// A relationship at this position already exists in the model but was
-			// not synced from draw.io before. On first sync (lastRelMap is nil)
-			// this is expected - the user added it to both places - so skip
-			// silently; once a previous sync exists it is a genuine conflict.
-			if lastRelMap != nil {
+		// Check whether the model already holds this exact relationship, keyed the
+		// same way as the connector and the last-sync state (relKey over the global
+		// relationship index). This answers "does the model already have this
+		// relationship" directly, regardless of how many others share the pair, so
+		// a genuinely new connector (whose key is absent) is always imported.
+		if _, present := modelRelMap[relKey(ch.From, ch.To, ch.Index)]; present {
+			// Present in the model but not synced from draw.io. On the very first
+			// sync (no prior sync) this is expected - the user added it to both
+			// places - so skip silently; once a prior sync exists it is a genuine
+			// conflict, so warn.
+			if priorSync {
 				pageInfo := ""
 				if ch.PageID != "" {
 					pageInfo = fmt.Sprintf(" (on draw.io page %q)", ch.PageID)

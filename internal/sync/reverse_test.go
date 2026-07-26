@@ -336,6 +336,7 @@ func TestApplyReverse_RelationshipAddedDuplicateSkipped(t *testing.T) {
 	// (not synced from draw.io), and now draw.io also has it.
 	// This is a genuine conflict: model has relationship that wasn't synced from draw.io.
 	lastState := &SyncState{
+		Timestamp: "2026-07-26T00:00:00Z", // a prior sync completed
 		Relationships: []RelationshipState{
 			// Some OTHER relationship that was synced before
 			{From: "other", To: "thing"},
@@ -390,6 +391,7 @@ func TestApplyReverse_RelationshipAddedSecondBetweenSamePair(t *testing.T) {
 	}
 	// Previous sync recorded a->b at index 0 only.
 	lastState := &SyncState{
+		Timestamp: "2026-07-26T00:00:00Z", // a prior sync completed
 		Relationships: []RelationshipState{
 			{From: "a", To: "b", Index: 0, Label: "uses"},
 		},
@@ -411,6 +413,91 @@ func TestApplyReverse_RelationshipAddedSecondBetweenSamePair(t *testing.T) {
 	}
 	if len(r.Warnings) != 0 {
 		t.Errorf("unexpected warnings: %v", r.Warnings)
+	}
+}
+
+// TestApplyReverse_RelationshipAddedWithUnrelatedAhead exercises the
+// global-index-vs-per-pair-count distinction (#548 review): an unrelated
+// relationship sits AHEAD of the target pair in m.Relationships, so a per-pair
+// count would not equal the global connector index. A genuinely new hand-drawn
+// a->b connector (parseConnectorIndex yields 0 for non-"rel-a-b-N" ids) must
+// still be imported, not dropped.
+func TestApplyReverse_RelationshipAddedWithUnrelatedAhead(t *testing.T) {
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"x": {Kind: "container", Title: "X"},
+			"y": {Kind: "container", Title: "Y"},
+			"a": {Kind: "container", Title: "A"},
+			"b": {Kind: "container", Title: "B"},
+		},
+		Relationships: []model.Relationship{
+			{From: "x", To: "y", Label: "unrelated"}, // global index 0
+			{From: "a", To: "b", Label: "uses"},      // global index 1
+		},
+	}
+	// Prior sync recorded both, a->b at its global index 1.
+	lastState := &SyncState{
+		Timestamp: "2026-07-26T00:00:00Z",
+		Relationships: []RelationshipState{
+			{From: "x", To: "y", Index: 0, Label: "unrelated"},
+			{From: "a", To: "b", Index: 1, Label: "uses"},
+		},
+	}
+	// A genuinely new, hand-drawn second a->b connector: its id is not a
+	// bausteinsicht-generated "rel-a-b-N", so parseConnectorIndex yields 0.
+	cs := &ChangeSet{
+		DrawioRelationshipChanges: []RelationshipChange{
+			{From: "a", To: "b", Index: 0, Type: Added, NewValue: "calls"},
+		},
+	}
+
+	r := ApplyReverse(cs, m, lastState)
+
+	if len(m.Relationships) != 3 {
+		t.Fatalf("expected 3 relationships (new a->b imported), got %d", len(m.Relationships))
+	}
+	if r.RelationshipsCreated != 1 {
+		t.Errorf("expected RelationshipsCreated=1, got %d", r.RelationshipsCreated)
+	}
+	if len(r.Warnings) != 0 {
+		t.Errorf("unexpected warnings: %v", r.Warnings)
+	}
+}
+
+// TestApplyReverse_RelationshipAddedFirstSyncNoWarning verifies the first-sync
+// gate works for real callers (#548 review): production callers pass a non-nil
+// but timestamp-less state on the first sync (LoadState fabricates it), so the
+// "already exists" conflict warning must be suppressed via the timestamp, not
+// via nil-ness. A user who added the same relationship to both the model and
+// draw.io on their very first sync should get no warning.
+func TestApplyReverse_RelationshipAddedFirstSyncNoWarning(t *testing.T) {
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"a": {Kind: "container", Title: "A"},
+			"b": {Kind: "container", Title: "B"},
+		},
+		Relationships: []model.Relationship{
+			{From: "a", To: "b", Label: "uses"}, // global index 0
+		},
+	}
+	// First sync: non-nil state as LoadState fabricates it, but no timestamp.
+	lastState := &SyncState{
+		Elements:      map[string]ElementState{},
+		Relationships: []RelationshipState{},
+		// Timestamp intentionally empty: no prior sync has completed.
+	}
+	cs := relChangeSet("a", "b", Added, "", "", "uses")
+
+	r := ApplyReverse(cs, m, lastState)
+
+	if len(m.Relationships) != 1 {
+		t.Fatalf("expected 1 relationship (no duplicate), got %d", len(m.Relationships))
+	}
+	if r.RelationshipsCreated != 0 {
+		t.Errorf("expected RelationshipsCreated=0, got %d", r.RelationshipsCreated)
+	}
+	if len(r.Warnings) != 0 {
+		t.Errorf("expected no warning on first sync, got %v", r.Warnings)
 	}
 }
 
@@ -609,6 +696,7 @@ func TestApplyReverse_NewElementCollidingIDSkipped(t *testing.T) {
 	// (not synced from draw.io), and now draw.io also has it.
 	// This is a genuine conflict: model has element that wasn't synced from draw.io.
 	lastState := &SyncState{
+		Timestamp: "2026-07-26T00:00:00Z", // a prior sync completed
 		Elements: map[string]ElementState{
 			// Some OTHER element that was synced before
 			"other": {Title: "Other", Kind: "system"},
