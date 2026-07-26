@@ -37,7 +37,7 @@ type RelationshipChange struct {
 	OldValue string
 	NewValue string
 	Kind     string // relationship kind key into Specification.Relationships, for style lookup (e.g. dashed)
-	PageID   string // draw.io page where this relationship exists (for debugging/warnings)
+	PageID   string // draw.io page name (page.Name()) where this relationship exists (for debugging/warnings)
 }
 
 // ChangeSet contains all detected changes from both sides.
@@ -398,7 +398,7 @@ func extractDrawioRelationships(doc *drawio.Document) map[string]RelationshipSta
 			key := relKey(from, to, index)
 			if existing, exists := result[key]; exists {
 				// If relationship already exists on another page, append this page to the list.
-				// PageIDs is a []string of page identifiers, used later in warnings.
+				// PageIDs is a []string of page names (page.Name()), used later in warnings.
 				existing.PageIDs = append(existing.PageIDs, pageID)
 				result[key] = existing
 			} else {
