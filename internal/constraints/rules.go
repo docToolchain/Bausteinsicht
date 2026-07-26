@@ -142,6 +142,33 @@ func allowedRelationship(c model.Constraint, m *model.BausteinsichtModel) []Viol
 	}}
 }
 
+// noOutgoingDependency enforces that no element matching the constraint's "from"
+// selector is the source of any relationship. This models a "pure interface"
+// role — e.g. a hexagonal port: it may be implemented and used by others, but
+// must not itself depend on anything.
+func noOutgoingDependency(c model.Constraint, m *model.BausteinsichtModel) []Violation {
+	flat, err := model.FlattenElements(m)
+	if err != nil {
+		return []Violation{{ConstraintID: c.ID, Message: err.Error()}}
+	}
+	sel := elementSelector{id: c.From, tag: c.FromTag, tags: c.FromTags, kind: c.FromKind, kinds: c.FromKinds}
+
+	var bad []string
+	for _, rel := range m.Relationships {
+		if sel.matches(rel.From, flat[rel.From]) {
+			bad = append(bad, fmt.Sprintf("%s → %s", rel.From, rel.To))
+		}
+	}
+	if len(bad) == 0 {
+		return nil
+	}
+	return []Violation{{
+		ConstraintID: c.ID,
+		Message:      fmt.Sprintf("%s: %s is an interface and must not have outgoing dependencies", c.Description, sel.describe()),
+		Elements:     bad,
+	}}
+}
+
 // requiredField enforces that all elements matching the constraint's element
 // selector have the given field set to a non-empty value. Supported fields:
 // "description", "technology", "title".
