@@ -23,19 +23,22 @@ jobs:
 
           if [ "$BASE" != "$MAIN_HEAD" ]; then
             COMMITS_BEHIND=$(git rev-list --count HEAD..origin/main)
-            COMMITS_ON_BRANCH=$(git rev-list --count $BASE..HEAD)
+            COMMITS_ON_BRANCH=$(git rev-list --count "$BASE"..HEAD)
 
-            echo "## 📊 Branch Status" >> $GITHUB_STEP_SUMMARY
-            echo "- Commits on this branch: $COMMITS_ON_BRANCH" >> $GITHUB_STEP_SUMMARY
-            echo "- Commits main is ahead: $COMMITS_BEHIND" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
+            {
+              echo "## 📊 Branch Status"
+              echo "- Commits on this branch: $COMMITS_ON_BRANCH"
+              echo "- Commits main is ahead: $COMMITS_BEHIND"
+              echo ""
+            } >> "$GITHUB_STEP_SUMMARY"
 
             if [ "$COMMITS_BEHIND" -gt 0 ]; then
-              echo "- ⚠️ Branch is behind main" >> $GITHUB_STEP_SUMMARY
+              echo "- ⚠️ Branch is behind main" >> "$GITHUB_STEP_SUMMARY"
 
+              # shellcheck disable=SC2016  # backticks are literal markdown code-fence text in the PR comment body, not command substitution
               BODY=$(printf '⚠️ **Branch is behind main by %s commit(s)**\n\nThis may cause merge conflicts or miss recent bug fixes/improvements.\n\n**Recommended action:**\n```bash\ngit fetch origin\ngit rebase origin/main\ngit push --force-with-lease\n```\n\nThis ensures compatibility with the latest main and prevents conflicts.' "$COMMITS_BEHIND")
               gh pr comment ${{ github.event.pull_request.number }} --body "$BODY"
             fi
           else
-            echo "✅ Branch is up-to-date with main" >> $GITHUB_STEP_SUMMARY
+            echo "✅ Branch is up-to-date with main" >> "$GITHUB_STEP_SUMMARY"
           fi

@@ -40,6 +40,7 @@ jobs:
             echo "  git push --force-with-lease"
             echo ""
 
+            # shellcheck disable=SC2016  # backticks are literal markdown code-fence text in the PR comment body, not command substitution
             BODY=$(printf '⚠️ **Branch Behind Main**\n\nThis branch is based on an older commit from main and is behind by **%s commit(s)**.\n\nThis often happens when a feature branch is created from another feature branch instead of from main directly.\n\n**Recommendation:**\n```bash\ngit fetch origin\ngit rebase origin/main\ngit push --force-with-lease\n```\n\nAfter rebasing, this warning will disappear.' "$COMMITS_BEHIND")
             gh pr comment ${{ github.event.pull_request.number }} --body "$BODY"
 

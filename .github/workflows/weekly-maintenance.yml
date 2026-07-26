@@ -49,16 +49,20 @@ jobs:
           MERGED_REMOTE=$(git branch -r --format='%(refname:short)' --merged origin/main | grep -vx 'origin/main' | grep -vx 'origin/HEAD' | sed 's|origin/||' | grep -vx '' | grep -vx origin)
 
           if [ ! -z "$MERGED_REMOTE" ]; then
-            echo "## 🧹 Auto-Cleanup Summary" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**Merged branches ready for deletion:**" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "$MERGED_REMOTE" | sed 's/^/- /' >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
+            {
+              echo "## 🧹 Auto-Cleanup Summary"
+              echo ""
+              echo "**Merged branches ready for deletion:**"
+              echo ""
+              # shellcheck disable=SC2001  # per-line '^' prepend; ${var//search/replace} can't anchor per line
+              echo "$MERGED_REMOTE" | sed 's/^/- /'
+              echo ""
+            } >> "$GITHUB_STEP_SUMMARY"
 
             BRANCH_LIST=$(echo "$MERGED_REMOTE" | tr '\n' ' ')
 
             # Create issue for notification
+            # shellcheck disable=SC2016  # backticks are literal markdown code-fence text in the issue body, not command substitution
             BODY=$(printf 'Found branches merged to main. Safe to delete:\n\n%s\n\n**How to clean up:**\n```bash\ngit fetch origin\ngit branch -d %s\ngit push origin %s\n```\n\nOr delete individually in GitHub web UI: Settings → Branches' \
               "$(echo "$MERGED_REMOTE" | sed 's/^/- origin\//')" \
               "$BRANCH_LIST" \
@@ -69,5 +73,5 @@ jobs:
               --label infrastructure \
               2>/dev/null || echo "Issue creation skipped (may already exist)"
           else
-            echo "✅ No merged branches to clean up" >> $GITHUB_STEP_SUMMARY
+            echo "✅ No merged branches to clean up" >> "$GITHUB_STEP_SUMMARY"
           fi
