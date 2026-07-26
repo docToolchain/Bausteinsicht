@@ -63,7 +63,7 @@ jobs:
         run: |
           GOEXE=$(go env GOEXE)
           cd scripts/test-report-generator
-          go build -o test-report-generator${GOEXE} .
+          go build -o "test-report-generator${GOEXE}" .
           cd ../..
 
           # Determine OS key from matrix.os
@@ -74,10 +74,10 @@ jobs:
             echo "Generating reports for ${OS_KEY} from test-results.json"
             # Only pass coverage.out if it exists (it may not exist on failed runs or Windows)
             if [ -f coverage.out ]; then
-              ./scripts/test-report-generator/test-report-generator${GOEXE} -coverage=coverage.out -format=json < test-results.json > test-report-${OS_KEY}.json
+              "./scripts/test-report-generator/test-report-generator${GOEXE}" -coverage=coverage.out -format=json < test-results.json > "test-report-${OS_KEY}.json"
             else
               echo "Warning: coverage.out not found, generating report without coverage data"
-              ./scripts/test-report-generator/test-report-generator${GOEXE} -format=json < test-results.json > test-report-${OS_KEY}.json
+              "./scripts/test-report-generator/test-report-generator${GOEXE}" -format=json < test-results.json > "test-report-${OS_KEY}.json"
             fi
           else
             echo "test-results.json not found!"
@@ -319,6 +319,7 @@ jobs:
             printf '\n'
             printf '%s\n' '</details>'
             printf '\n'
+            # shellcheck disable=SC2016  # backticks are literal markdown inline-code in the PR comment body, not command substitution
             printf '%s\n' '💡 `SKIP: not automated` means no `e2e/*_test.go` test is mapped to that line yet — see `internal/e2eplan` and `E2E-Test-Plan.adoc`'"'"'s "Generating a Line-Accurate Report Automatically" section.'
           } > pr-comment-body/e2e.md
       - name: Upload rendered comment body
@@ -349,7 +350,7 @@ jobs:
         run: |
           if [ -f coverage/coverage.out ]; then
             COVERAGE=$(go tool cover -func=coverage/coverage.out | grep total | awk '{print $NF}')
-            echo "percentage=${COVERAGE}" >> $GITHUB_OUTPUT
+            echo "percentage=${COVERAGE}" >> "$GITHUB_OUTPUT"
             echo "📊 Code Coverage: ${COVERAGE}"
           fi
       - name: Create coverage markdown summary
@@ -380,7 +381,7 @@ jobs:
           } > coverage/COVERAGE.md
 
           # Append to job summary for visibility in workflow run
-          cat coverage/COVERAGE.md >> $GITHUB_STEP_SUMMARY
+          cat coverage/COVERAGE.md >> "$GITHUB_STEP_SUMMARY"
       - name: Upload coverage report
         uses: actions/upload-artifact@6f51ac03b9356f520e9adb1b1b7802705f340c2b # v4
         if: always()

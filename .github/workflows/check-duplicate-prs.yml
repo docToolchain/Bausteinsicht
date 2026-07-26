@@ -19,7 +19,7 @@ jobs:
         run: |
           # Get files changed in this PR
           BASE_COMMIT=$(git merge-base origin/main HEAD)
-          FILES=$(git diff --name-only $BASE_COMMIT HEAD)
+          FILES=$(git diff --name-only "$BASE_COMMIT" HEAD)
 
           echo "Files changed in this PR:"
           echo "$FILES"
@@ -42,7 +42,7 @@ jobs:
             fi
           done
 
-          if [ ! -z "$DUPLICATES" ]; then
+          if [ -n "$DUPLICATES" ]; then
             echo "⚠️ Potential duplicates detected:"
             echo -e "$DUPLICATES"
             echo ""
