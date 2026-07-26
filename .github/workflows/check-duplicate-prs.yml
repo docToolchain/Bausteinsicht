@@ -42,7 +42,7 @@ jobs:
             fi
           done
 
-          if [ ! -z "$DUPLICATES" ]; then
+          if [ -n "$DUPLICATES" ]; then
             echo "⚠️ Potential duplicates detected:"
             echo -e "$DUPLICATES"
             echo ""

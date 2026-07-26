@@ -48,7 +48,7 @@ jobs:
           # leaving a misleading branch name in the generated issue.
           MERGED_REMOTE=$(git branch -r --format='%(refname:short)' --merged origin/main | grep -vx 'origin/main' | grep -vx 'origin/HEAD' | sed 's|origin/||' | grep -vx '' | grep -vx origin)
 
-          if [ ! -z "$MERGED_REMOTE" ]; then
+          if [ -n "$MERGED_REMOTE" ]; then
             {
               echo "## 🧹 Auto-Cleanup Summary"
               echo ""
