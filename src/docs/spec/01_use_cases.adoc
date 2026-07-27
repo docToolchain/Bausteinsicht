@@ -472,6 +472,8 @@ stop
 
 2b. The element has no detail view but carries a user-defined `link` field: the element is clickable and opens the linked URL or document anchor. In SVG export embedded in HTML/PDF, the link is preserved as a native `<a href>` element. If a detail view is later added for the same element, the drill-down link takes priority (the user-defined link is overridden; a sync warning is emitted).
 
+2c. The element carries `link`, `decisions`, and/or `docLinks`: sync additionally renders small clickable icons next to the element — independent of whichever link (if any) owns the element's own shape — so the architect can jump straight from a diagram element into its governing documentation (arc42 chapter, ADR, PRD/persona) without leaving the drill-down flow. A matching icon row renders for a view's own `docLinks`. In PNG export the icons remain visible but are not clickable (PNG discards `link` information, same as the element shape itself). See link:../arc42/ADRs/ADR-009-Drill-Down-Navigation.html[ADR-009]'s "Extension: Doc/ADR Drilldown Icons (#543)". (#543)
+
 ==== Postconditions
 
 *Success guarantee:* The architect can navigate between abstraction levels by clicking linked elements; each level is a dedicated page, and a generated back-navigation button returns to the parent view.
@@ -630,6 +632,15 @@ The `BR-NNN` IDs are the traceability anchors: acceptance criteria (`04_acceptan
 | BR-028 | Referencing a decision whose status is `superseded` produces a warning. | warning | `validate.go` `validateSupersededDecisions`
 |===
 
+=== Documentation link rules
+
+[cols="1,5,1,3"]
+|===
+| BR | Rule | Severity | Source
+
+| BR-034 | A `docLinks` entry (on an element or a view) must set both `type` and `href`. | error | `validate.go` `validateDocLinks`
+|===
+
 === Lifecycle rules
 
 [cols="1,5,1,3"]
@@ -654,7 +665,7 @@ The `BR-NNN` IDs are the traceability anchors: acceptance criteria (`04_acceptan
 [[traceability]]
 == Traceability
 
-Each use case maps to its acceptance criteria (`04_acceptance_criteria.adoc`) and the business rules it exercises. Error-level rules (BR-001–BR-026) are enforced by `bausteinsicht validate`, which runs standalone, at the start of forward sync (UC-3), and on demand by LLM agents (UC-6); warning-level rules (BR-027–BR-033) are reported by the same pass.
+Each use case maps to its acceptance criteria (`04_acceptance_criteria.adoc`) and the business rules it exercises. Error-level rules (BR-001–BR-026, plus BR-034) are enforced by `bausteinsicht validate`, which runs standalone, at the start of forward sync (UC-3), and on demand by LLM agents (UC-6); warning-level rules (BR-027–BR-033) are reported by the same pass. Severity is authoritative per-rule in the tables above — BR-034 breaks the otherwise-contiguous error/warning ranges because it was added after the lifecycle/completeness rules.
 
 [cols="1,2,3"]
 |===
@@ -662,11 +673,11 @@ Each use case maps to its acceptance criteria (`04_acceptance_criteria.adoc`) an
 
 | UC-1 Initialize Architecture Model | AC-1.1 | BR-032, BR-033 (the generated sample model satisfies them)
 | UC-2 Define Architecture Elements | AC-2.1, AC-2.2 | BR-001–BR-012, BR-024, BR-025
-| UC-3 Generate draw.io Diagrams (Forward Sync) | AC-3.1, AC-3.2 | BR-001–BR-033 (full validation pass before sync)
+| UC-3 Generate draw.io Diagrams (Forward Sync) | AC-3.1, AC-3.2 | BR-001–BR-034 (full validation pass before sync)
 | UC-4 Edit in draw.io and Reverse Sync | AC-4.1, AC-4.2 | BR-005 (generated IDs must be non-empty), BR-007, BR-008 (new relationships must resolve)
 | UC-5 Watch Mode | AC-5.1 | inherits UC-3 / UC-4
-| UC-6 LLM-Driven Architecture Modification | AC-6.1, AC-6.2 | BR-001–BR-033 (validate before sync)
-| UC-7 Drill-Down Navigation | AC-7.1 | — (rendering/navigation only)
+| UC-6 LLM-Driven Architecture Modification | AC-6.1, AC-6.2 | BR-001–BR-034 (validate before sync)
+| UC-7 Drill-Down Navigation | AC-7.1 | BR-034 (element/view `docLinks` icons, #543)
 | UC-8 Export Diagram Views | AC-8.1 | — (rendering only)
 |===
 

@@ -75,6 +75,54 @@ func TestValidate_MissingElementTitle(t *testing.T) {
 	}
 }
 
+func TestValidate_ElementDocLinkMissingType(t *testing.T) {
+	m := buildValidModel()
+	elem := m.Model["customer"]
+	elem.DocLinks = []DocLink{{Href: "docs/prd.html"}}
+	m.Model["customer"] = elem
+
+	errs := Validate(m)
+	if !containsPath(errs, "model.customer.docLinks[0]") {
+		t.Errorf("expected error for model.customer.docLinks[0], got %v", errs)
+	}
+}
+
+func TestValidate_ElementDocLinkMissingHref(t *testing.T) {
+	m := buildValidModel()
+	elem := m.Model["customer"]
+	elem.DocLinks = []DocLink{{Type: "persona"}}
+	m.Model["customer"] = elem
+
+	errs := Validate(m)
+	if !containsPath(errs, "model.customer.docLinks[0]") {
+		t.Errorf("expected error for model.customer.docLinks[0], got %v", errs)
+	}
+}
+
+func TestValidate_ElementDocLinkValid(t *testing.T) {
+	m := buildValidModel()
+	elem := m.Model["customer"]
+	elem.DocLinks = []DocLink{{Type: "persona", Href: "docs/prd.html#felix", Title: "Felix"}}
+	m.Model["customer"] = elem
+
+	errs := Validate(m)
+	if containsPath(errs, "model.customer.docLinks[0]") {
+		t.Errorf("expected no error for a valid docLinks entry, got %v", errs)
+	}
+}
+
+func TestValidate_ViewDocLinkMissingFields(t *testing.T) {
+	m := buildValidModel()
+	v := m.Views["main"]
+	v.DocLinks = []DocLink{{Title: "no type or href"}}
+	m.Views["main"] = v
+
+	errs := Validate(m)
+	if !containsPath(errs, "views.main.docLinks[0]") {
+		t.Errorf("expected error for views.main.docLinks[0], got %v", errs)
+	}
+}
+
 func TestValidate_UnknownElementKind(t *testing.T) {
 	m := buildValidModel()
 	elem := m.Model["customer"]

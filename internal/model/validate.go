@@ -115,6 +115,8 @@ func validateElement(m *BausteinsichtModel, path string, elem Element, depth int
 		errs = append(errs, ValidationError{Path: path, Message: "missing required field \"title\""})
 	}
 
+	errs = append(errs, validateDocLinks(path+".docLinks", elem.DocLinks)...)
+
 	for childID, child := range elem.Children {
 		if err := validateElementID(childID); err != nil {
 			errs = append(errs, ValidationError{Path: path + "." + childID, Message: err.Error()})
@@ -122,6 +124,23 @@ func validateElement(m *BausteinsichtModel, path string, elem Element, depth int
 		errs = append(errs, validateElement(m, path+"."+childID, child, depth+1)...)
 	}
 
+	return errs
+}
+
+// validateDocLinks checks that every DocLink entry (on an element or a view,
+// #543) has both a type and an href — both are required for the link to be
+// renderable as a clickable icon with a meaningful glyph.
+func validateDocLinks(path string, links []DocLink) []ValidationError {
+	var errs []ValidationError
+	for i, dl := range links {
+		entryPath := fmt.Sprintf("%s[%d]", path, i)
+		if dl.Type == "" {
+			errs = append(errs, ValidationError{Path: entryPath, Message: "missing required field \"type\""})
+		}
+		if dl.Href == "" {
+			errs = append(errs, ValidationError{Path: entryPath, Message: "missing required field \"href\""})
+		}
+	}
 	return errs
 }
 
@@ -225,6 +244,7 @@ func validateViews(m *BausteinsichtModel) []ValidationError {
 				Message: fmt.Sprintf("invalid layout %q (must be \"layered\", \"grid\", \"none\", or empty)", view.Layout),
 			})
 		}
+		errs = append(errs, validateDocLinks(path+".docLinks", view.DocLinks)...)
 		if view.Scope != "" {
 			if _, err := lookupElement(m, view.Scope); err != nil {
 				errs = append(errs, ValidationError{
