@@ -12,7 +12,7 @@
 Accepted.
 
 Realised in the `examples/hexagonal-jmolecules/` example; the broader initiative it serves is tracked in the plan `docs/features/plans/570-feat-ddd-hex-xmolecules.md` and in {repo-issues}/570[#570].
-The code-level rule integration that builds on this vocabulary is the ArchUnit Rule Integration ADR (planned ADR-013).
+The code-level rule integration that builds on this vocabulary is the ArchUnit Rule Integration ADR (planned).
 
 == Context
 
@@ -20,7 +20,7 @@ Bausteinsicht has no built-in Hexagonal/DDD semantics — a model defines its ow
 The example models (`examples/hexagonal-ddd/`) coined didactic kinds from Cockburn's Ports & Adapters terminology: `drivingAdapter`, `inboundPort`, `applicationService`, `aggregate`, `entity`, `valueObject`, `domainService`, `outboundPort`, `drivenAdapter`.
 
 We want the model to align with the language-neutral https://xmolecules.org/[xMolecules] vocabulary — the umbrella whose members realise the same concepts in code (jMolecules/Java+Kotlin, nMolecules/.NET, phpMolecules/PHP).
-Alignment gives the model a recognised, cross-language mapping and is the anchor for the planned code-level rule integration (ArchUnit) — see the ArchUnit Rule Integration ADR (planned ADR-013) and {repo-issues}/562[#562].
+Alignment gives the model a recognised, cross-language mapping and is the anchor for the planned code-level rule integration (ArchUnit) — see the ArchUnit Rule Integration ADR (planned) and {repo-issues}/562[#562].
 
 The xMolecules stereotypes are close to a 1:1 rename of the current kinds:
 
@@ -52,7 +52,7 @@ The two are synonyms, and showing both has teaching value.
 Language neutrality:: Bausteinsicht is language-agnostic.
 Using jMolecules' exact names as `kind` subtly implies a Java binding, which the tool does not have.
 
-Tool anchor:: Whatever we choose must give a future ArchUnit generator a stable stereotype per element (see the ArchUnit Rule Integration ADR, planned ADR-013).
+Tool anchor:: Whatever we choose must give a future ArchUnit generator a stable stereotype per element (see the ArchUnit Rule Integration ADR, planned).
 
 == Evaluated Options
 
@@ -126,7 +126,7 @@ Adopt *Option A*: keep the didactic Ports & Adapters terms as element `kind`, an
 Positive::
 * Non-breaking — `template.drawio` and the existing constraints are unchanged.
 * Teaches both vocabularies; stays language-neutral (kinds are not Java-specific).
-* Gives the ArchUnit Rule Integration ADR (planned ADR-013) a clean stereotype anchor: the generator reads `kind` for the default stereotype and `metadata.jmolecules` for overrides.
+* Gives the ArchUnit Rule Integration ADR (planned) a clean stereotype anchor: the generator reads `kind` for the default stereotype and `metadata.jmolecules` for overrides.
 * Per-element overrides (e.g. `Repository`) need no new kind.
 
 Negative / trade-offs::
@@ -135,8 +135,8 @@ Negative / trade-offs::
 
 == Related
 
-* ADR-013 _(planned)_ — Code-Level Architecture-Rule Integration (ArchUnit).
-Currently drafted as `ADR-XXX-ArchUnit-Rule-Integration.adoc` on the `feature/archunit` branch; to be renumbered to ADR-013 before it merges (this vocabulary ADR takes slot 012 because the DDD/Hex work lands first).
+* Code-Level Architecture-Rule Integration (ArchUnit) — _planned, ADR number assigned when it is written_.
+Currently drafted as `ADR-XXX-ArchUnit-Rule-Integration.adoc` on the `feature/archunit` branch; it stays unnumbered until merged (planned ADRs are not pre-assigned numbers).
 * Plan: `docs/features/plans/570-feat-ddd-hex-xmolecules.md` — the umbrella vision and the model/code seam.
 * Examples: `examples/hexagonal-ddd/` (full), `examples/hexagonal-jmolecules/` (minimal, demonstrates this decision).
 * Umbrella issue: {repo-issues}/570[#570] — Model DDD / Hexagonal Architecture with xMolecules-aligned vocabulary.
