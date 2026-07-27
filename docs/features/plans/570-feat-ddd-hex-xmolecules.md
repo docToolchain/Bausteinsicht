@@ -74,6 +74,7 @@ They are complementary axes, not competitors. Modelling with xMolecules and vali
 **Available today:**
 
 - Model Hexagonal + DDD with custom kinds/tags/metadata; real hexagon rendering via `template.drawio`.
+- **Concentric hexagonal rings** via the `nested` layout mode: nest zone containers (`adapterZone` ⊃ `portZone` ⊃ `domainZone`) and Bausteinsicht renders them as concentric hexagons, sized bottom-up; `metadata.side` (`top`/`bottom`) places driving/inbound on top and driven/outbound below (see the `hexagonal-ddd` Ports & Adapters view). Documented in ADR-005 and `05_sync_specification.adoc`.
 - Enforce hexagonal rules via `constraints` + `bausteinsicht lint`.
 - xMolecules vocabulary alignment via `metadata.jmolecules` (see the `hexagonal-jmolecules` example).
 
@@ -92,6 +93,11 @@ They are complementary axes, not competitors. Modelling with xMolecules and vali
 - **Publishing (docToolchain blog), two tiers:**
   1. A known C4 model imported today (Structurizr DSL / LikeC4) — a quick proof, not the DDD story.
   2. Flagship: a jMolecules / Spring-Modulith reference app — the missing importer *is* the story and motivates [#562](https://github.com/docToolchain/Bausteinsicht/issues/562). State honestly "hand-modelled from source X" until an importer exists.
+
+## Backlog / future ideas (beyond this plan's scope)
+
+- **Shared / imported specification (`$ref`), or reusable constraint presets.** Today each model is self-contained — Bausteinsicht cannot share a `specification` across models, so the two hexagonal examples redefine the same kinds/relationship-kinds (vocabulary redundancy). Note: the *constraints* are **not** duplicated — only `hexagonal-ddd` carries them; the overlap is purely the vocabulary. Accepted for now (self-contained examples are a feature; each runs standalone). A future capability — an importable/shared spec (`$ref`) and/or the hexagonal constraint set as a reusable **pattern/preset** (relates to "Element Patterns / Topology Templates", #366) — would remove this redundancy generally, not just for these two examples. Candidate for its own issue.
+- _(Shipped — moved to "Available today".)_ Concentric hexagonal-rings layout: implemented as the `nested` layout mode (zone containers `adapterZone`/`portZone`/`domainZone` rendered as concentric hexagons, `metadata.side` for vertical placement). Reads the model's **container nesting** (not the zone tags, as originally sketched here). Follow-ups: (i) incremental nested re-parenting — today `nested` only guarantees containment on a fresh page or after `sync --relayout`, so elements added to an existing nested page are placed flat until the next relayout; making the incremental path (`computePlacement`) nest-aware would remove that caveat; (ii) an optional tag→zone synthesis so flat, tag-only models also get rings without restructuring; (iii) minor layout polish (edge-label position, aggregate container sizing).
 
 ## Related documents
 

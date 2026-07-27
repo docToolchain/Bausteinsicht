@@ -1,0 +1,188 @@
+{
+  "checksum": "sha256:c7aad08e52cf2507686dabf6752fd10c60ea495c4e2df25626581ed141ae5a5a",
+  "timestamp": "2026-07-26T19:20:20Z",
+  "model_hash": "sha256:8793c44ec8c5ab838db8f7edff91f95f71f7e9f33fa3118250ddecc872038949",
+  "drawio_hash": "sha256:ab81e2c53d2ab1433ca4e82df4563a3c0e243781edd8fe02a4aa42bcc03d09e5",
+  "elements": {
+    "customer": {
+      "title": "Customer",
+      "description": "Places orders through the web frontend",
+      "kind": "actor"
+    },
+    "ordering": {
+      "title": "Ordering",
+      "description": "Bounded context responsible for the order lifecycle",
+      "kind": "boundedContext"
+    },
+    "ordering.adapters": {
+      "title": "Adapters",
+      "kind": "adapterZone"
+    },
+    "ordering.adapters.ordersAdapter": {
+      "title": "Postgres Order Adapter",
+      "technology": "Go / pgx",
+      "kind": "drivenAdapter"
+    },
+    "ordering.adapters.paymentAdapter": {
+      "title": "Stripe Payment Adapter",
+      "technology": "Go / stripe-go",
+      "kind": "drivenAdapter"
+    },
+    "ordering.adapters.ports": {
+      "title": "Ports",
+      "kind": "portZone"
+    },
+    "ordering.adapters.ports.domain": {
+      "title": "Domain Core",
+      "kind": "domainZone"
+    },
+    "ordering.adapters.ports.domain.appService": {
+      "title": "Order Application Service",
+      "technology": "Go",
+      "kind": "applicationService"
+    },
+    "ordering.adapters.ports.domain.order": {
+      "title": "Order",
+      "kind": "aggregate"
+    },
+    "ordering.adapters.ports.domain.order.line": {
+      "title": "Order Line",
+      "kind": "entity"
+    },
+    "ordering.adapters.ports.domain.order.total": {
+      "title": "Money",
+      "kind": "valueObject"
+    },
+    "ordering.adapters.ports.domain.pricing": {
+      "title": "Pricing Service",
+      "kind": "domainService"
+    },
+    "ordering.adapters.ports.orderRepo": {
+      "title": "OrderRepository Port",
+      "kind": "outboundPort"
+    },
+    "ordering.adapters.ports.payment": {
+      "title": "Payment Port",
+      "kind": "outboundPort"
+    },
+    "ordering.adapters.ports.placeOrder": {
+      "title": "PlaceOrder Use Case",
+      "kind": "inboundPort"
+    },
+    "ordering.adapters.rest": {
+      "title": "Order REST Controller",
+      "technology": "Go / net/http",
+      "kind": "drivingAdapter"
+    },
+    "ordersDb": {
+      "title": "Orders Database",
+      "technology": "PostgreSQL",
+      "kind": "datastore"
+    },
+    "stripe": {
+      "title": "Stripe",
+      "description": "Third-party payment provider",
+      "technology": "Stripe API",
+      "kind": "externalSystem"
+    }
+  },
+  "relationships": [
+    {
+      "from": "customer",
+      "to": "ordering.adapters.rest",
+      "index": 0,
+      "label": "places order",
+      "kind": "drives"
+    },
+    {
+      "from": "ordering.adapters.rest",
+      "to": "ordering.adapters.ports.placeOrder",
+      "index": 1,
+      "label": "calls",
+      "kind": "uses"
+    },
+    {
+      "from": "ordering.adapters.ports.domain.appService",
+      "to": "ordering.adapters.ports.placeOrder",
+      "index": 2,
+      "label": "implements",
+      "kind": "implements"
+    },
+    {
+      "from": "ordering.adapters.ports.domain.appService",
+      "to": "ordering.adapters.ports.domain.order",
+      "index": 3,
+      "label": "orchestrates",
+      "kind": "uses"
+    },
+    {
+      "from": "ordering.adapters.ports.domain.appService",
+      "to": "ordering.adapters.ports.domain.pricing",
+      "index": 4,
+      "label": "prices via",
+      "kind": "uses"
+    },
+    {
+      "from": "ordering.adapters.ports.domain.appService",
+      "to": "ordering.adapters.ports.orderRepo",
+      "index": 5,
+      "label": "persists via",
+      "kind": "uses"
+    },
+    {
+      "from": "ordering.adapters.ports.domain.appService",
+      "to": "ordering.adapters.ports.payment",
+      "index": 6,
+      "label": "pays via",
+      "kind": "uses"
+    },
+    {
+      "from": "ordering.adapters.ordersAdapter",
+      "to": "ordering.adapters.ports.orderRepo",
+      "index": 7,
+      "label": "implements",
+      "kind": "implements"
+    },
+    {
+      "from": "ordering.adapters.paymentAdapter",
+      "to": "ordering.adapters.ports.payment",
+      "index": 8,
+      "label": "implements",
+      "kind": "implements"
+    },
+    {
+      "from": "ordering.adapters.ordersAdapter",
+      "to": "ordersDb",
+      "index": 9,
+      "label": "reads/writes",
+      "kind": "uses"
+    },
+    {
+      "from": "ordering.adapters.paymentAdapter",
+      "to": "stripe",
+      "index": 10,
+      "label": "charges card",
+      "kind": "uses"
+    }
+  ],
+  "rendered_elements": {
+    "customer": true,
+    "ordering": true,
+    "ordering.adapters": true,
+    "ordering.adapters.ordersAdapter": true,
+    "ordering.adapters.paymentAdapter": true,
+    "ordering.adapters.ports": true,
+    "ordering.adapters.ports.domain": true,
+    "ordering.adapters.ports.domain.appService": true,
+    "ordering.adapters.ports.domain.order": true,
+    "ordering.adapters.ports.domain.order.line": true,
+    "ordering.adapters.ports.domain.order.total": true,
+    "ordering.adapters.ports.domain.pricing": true,
+    "ordering.adapters.ports.orderRepo": true,
+    "ordering.adapters.ports.payment": true,
+    "ordering.adapters.ports.placeOrder": true,
+    "ordering.adapters.rest": true,
+    "ordersDb": true,
+    "stripe": true
+  }
+}

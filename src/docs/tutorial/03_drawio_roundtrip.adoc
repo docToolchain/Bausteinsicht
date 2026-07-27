@@ -160,7 +160,7 @@ Each view can choose its layout in the model:
 "context": {
   "title": "System Context",
   "include": ["customer", "onlineshop"],
-  "layout": "layered"     // layered (default) | grid | none
+  "layout": "layered"     // layered (default) | grid | none | nested
 }
 ----
 

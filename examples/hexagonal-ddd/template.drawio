@@ -106,6 +106,40 @@
             <mxGeometry width="240" height="160" as="geometry" />
           </mxCell>
         </object>
+
+        <!-- ===== Zone containers (concentric rings, "nested" layout) ===== -->
+        <object label="" bausteinsicht_template="adapterZone" id="tpl-adapterZone">
+          <mxCell parent="1" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=#3b5b8c;fontStyle=1;verticalAlign=top;container=1;collapsible=0;fontSize=13;" vertex="1">
+            <mxGeometry width="760" height="520" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="" bausteinsicht_template="portZone" id="tpl-portZone">
+          <mxCell parent="1" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#b06a00;fontStyle=1;verticalAlign=top;container=1;collapsible=0;fontSize=13;" vertex="1">
+            <mxGeometry width="560" height="400" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="" bausteinsicht_template="domainZone" id="tpl-domainZone">
+          <mxCell parent="1" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#4a7a3a;fontStyle=1;verticalAlign=top;container=1;collapsible=0;fontSize=13;" vertex="1">
+            <mxGeometry width="340" height="260" as="geometry" />
+          </mxCell>
+        </object>
+
+        <!-- Zone boundaries (used when a zone container is a view scope) -->
+        <object label="Adapters" bausteinsicht_template="adapterZone_boundary" id="tpl-adapterZone-b">
+          <mxCell parent="1" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=#3b5b8c;fontStyle=1;verticalAlign=top;container=1;collapsible=0;fontSize=13;" vertex="1">
+            <mxGeometry width="760" height="520" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="Ports" bausteinsicht_template="portZone_boundary" id="tpl-portZone-b">
+          <mxCell parent="1" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#b06a00;fontStyle=1;verticalAlign=top;container=1;collapsible=0;fontSize=13;" vertex="1">
+            <mxGeometry width="560" height="400" as="geometry" />
+          </mxCell>
+        </object>
+        <object label="Domain Core" bausteinsicht_template="domainZone_boundary" id="tpl-domainZone-b">
+          <mxCell parent="1" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#4a7a3a;fontStyle=1;verticalAlign=top;container=1;collapsible=0;fontSize=13;" vertex="1">
+            <mxGeometry width="340" height="260" as="geometry" />
+          </mxCell>
+        </object>
       </root>
     </mxGraphModel>
   </diagram>

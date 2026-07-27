@@ -589,7 +589,7 @@ The `BR-NNN` IDs are the traceability anchors: acceptance criteria (`04_acceptan
 | BR | Rule | Severity | Source
 
 | BR-013 | A view must declare a `title`. | error | `validate.go` `validateViews`
-| BR-014 | A view's `layout`, if set, must be one of `layered`, `grid`, `none`. | error | `validate.go` `validateViews`
+| BR-014 | A view's `layout`, if set, must be one of `layered`, `grid`, `none`, `nested`. | error | `validate.go` `validateViews`
 | BR-015 | A view's `scope`, if set, must resolve to an existing element. | error | `validate.go` `validateViews`
 | BR-016 | Non-wildcard `include`/`exclude` entries must resolve to an existing element. | error | `validate.go` `validateViews`
 | BR-017 | `filter-tags`/`exclude-tags` must reference tags defined in `specification.tags`. | error | `validate.go` `validateViews`

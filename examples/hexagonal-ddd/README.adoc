@@ -10,22 +10,20 @@ This model demonstrates one consistent way to do that.
 
 Three mechanisms carry the semantics, each with a distinct job:
 
-Element `kind`:: The *structural role*.
-This model defines `drivingAdapter`, `inboundPort`, `applicationService`, `aggregate`, `entity`, `valueObject`, `domainService`, `outboundPort`, `drivenAdapter`, `datastore` and `externalSystem`.
-The *order* of the kinds in `specification.elements` drives the top-to-bottom row order of the `layered` auto-layout, so the diagram already reads like a slice through the hexagon.
+Element `kind`:: The *structural role* — `drivingAdapter`, `inboundPort`, `applicationService`, `aggregate`, `entity`, `valueObject`, `domainService`, `outboundPort`, `drivenAdapter`, `datastore`, `externalSystem`.
+The four hexagonal zones are modelled as *nested container kinds* — `adapterZone` ⊃ `portZone` ⊃ `domainZone` — so the `nested` layout renders them as concentric hexagon rings (see below).
 
-Tags:: The *zone* used for coloring and view filtering: `adapter`, `port`, `application`, `domain`.
+Tags:: The *zone* used for coloring and the `domain-model` view filter: `adapter`, `port`, `application`, `domain`.
 Each zone gets a `style` under `specification.tags`, so elements are color-coded automatically.
 
-Metadata:: Fine-grained, machine-readable *stereotypes* that you do not want to render visually, e.g. `hex-role: inbound-port` or `ddd-role: aggregate-root`.
-Useful for LLM-driven queries and later tooling.
+Metadata:: `metadata.side` (`top` / `bottom`) drives *vertical* placement in the rings view: driving adapters and inbound ports on top, driven adapters and outbound ports at the bottom.
 
 == Views
 
 The model defines three views, each becoming one draw.io page:
 
 `context`:: The `ordering` bounded context as a black box, plus the actor and external systems around it.
-`ports-and-adapters`:: The hexagonal boundary (driving adapters -> inbound ports -> application -> outbound ports -> driven adapters); the domain internals are hidden via `exclude-tags: ["domain"]`.
+`ports-and-adapters`:: The concentric hexagon rings (`"layout": "nested"`): adapters ⊃ ports ⊃ domain core, with driving/inbound on top and driven/outbound below; the actor and external systems sit around the hexagon.
 `domain-model`:: Only the DDD tactical building blocks, selected via `filter-tags: ["domain"]`.
 
 == Constraints (architectural fitness functions)
@@ -42,7 +40,7 @@ The central rule is that *ports are pure interfaces*:
 `HEX-005` / `HEX-006`:: `allowed-relationship` guarding who may reach the inbound and outbound ports (the driving side and the implementing application service / driven adapters).
 `HEX-007`:: `no-circular-dependency` — dependencies must flow inward, so the graph stays acyclic.
 
-Try it: add a relationship whose `from` is one of the ports (e.g. `ordering.orderRepo`) and run `bausteinsicht lint` — it fails with a `HEX-002` violation naming the offending edge.
+Try it: add a relationship whose `from` is one of the ports (e.g. `ordering.adapters.ports.orderRepo`) and run `bausteinsicht lint` — it fails with a `HEX-002` violation naming the offending edge.
 
 == Visual styling and the hexagon shape
 
@@ -52,27 +50,34 @@ This example therefore ships its own `template.drawio` next to the model — `sy
 a local `template.drawio` automatically (explicit `--template` flag > local file > embedded
 default).
 
-The template maps each custom kind to a draw.io shape:
+The template maps each kind to a draw.io shape:
 
+* the zone containers (`boundedContext`, `adapterZone`, `portZone`, `domainZone`) -> *hexagon
+  containers*, so nesting them renders concentric hexagon rings,
 * inbound/outbound ports -> `shape=hexagon` (they sit on the hexagon's edge),
-* the `boundedContext` boundary -> a *hexagon container*, so the `ports-and-adapters` view
-  frames the application core as a hexagon,
-* actor -> person, datastore -> cylinder, adapters/application/domain -> rounded boxes.
+* actor -> person, datastore -> cylinder, the rest -> rounded boxes.
 
-The four zone colors (adapter/port/application/domain) come from `specification.tags` and
-are merged on top of the template style.
+The four zone colors come from `specification.tags`, merged on top of the template style.
 
-NOTE: Bausteinsicht auto-layout is `layered`/`grid`/`none` only.
-It arranges elements in rows *inside* the hexagon; it does not place adapters *outside* the
-hexagon with ports exactly on the edges.
+The `ports-and-adapters` view uses `"layout": "nested"`: Bausteinsicht renders each container's
+children *inside* it and sizes the containers bottom-up, so the model's nesting
+(`ordering ⊃ adapters ⊃ ports ⊃ domain`) becomes concentric rings automatically — no manual
+arrangement needed.
+`metadata.side` places driving/inbound on top and driven/outbound at the bottom; elements
+outside the context (actor, data store, external system) are placed around the hexagon.
 
-[TIP]
+The generated diagram is committed as `architecture.drawio` (it also carries any manual layout
+tweaks, which reverse sync preserves). Regenerate it with `bausteinsicht sync --model architecture.jsonc`.
+
+NOTE: The rings need the *nested-container* model structure shown here (zones as `adapterZone`/
+`portZone`/`domainZone`).
+A flat, tag-only model still works with the `layered`/`grid` layouts, but does not produce
+concentric rings.
+
+[NOTE]
 ====
-For the textbook "adapters outside, ports on the edges" picture, arrange it once by hand:
-set the view to `"layout": "none"`, run `sync` to create the shapes, drag them into place in
-draw.io, then `sync` again.
-Reverse sync preserves manual positions (only labels follow the model), so your arrangement
-survives subsequent syncs.
+The `nested` layout produces the rings on a *fresh* page — the first sync of a view, or after `sync --relayout`.
+If you later add an element to the model and sync again, that element is placed flat under the context boundary (like any incremental addition) until you run `sync --relayout`, which rebuilds the rings from scratch.
 ====
 
 == Trying it out (inside this repo)
@@ -168,6 +173,12 @@ docs/architecture/out/
 ----
 
 Keep `.bausteinsicht-sync` under version control so every clone shares the same sync baseline.
+
+[NOTE]
+====
+This example commits `architecture.drawio` and `.bausteinsicht-sync` — its `.gitignore` ignores only `out/`.
+So the generated diagram (including any manual layout tweaks, which reverse sync preserves) and the sync baseline are versioned, exactly as recommended above; only the transient render output is regenerated on demand.
+====
 
 == Notes and limits
 

@@ -212,6 +212,26 @@ func applyForwardPerView(
 			elemSet[scopeID] = true
 		}
 
+		// Nested layout renders the model's container nesting as concentric
+		// containers by walking each container's children, so it needs the full
+		// containment chain of every scoped element in the resolved set. A view
+		// that includes a deep leaf without its intermediate container IDs (a
+		// hand-written, non-wildcard include list) would otherwise leave those
+		// leaves unplaced and silently dropped. Close the resolved set under the
+		// missing ancestor containers (within the scope) so both placement and
+		// reconciliation keep them, and the rings stay robust (#571 review).
+		if view.Layout == "nested" && scopeID != "" {
+			var ids []string
+			for id := range elemSet {
+				ids = append(ids, id)
+			}
+			for _, id := range ids {
+				for _, anc := range ancestorContainersWithinScope(id, scopeID, flat) {
+					elemSet[anc] = true
+				}
+			}
+		}
+
 		// Populate resolved elements that aren't already on the page.
 		// This runs BEFORE applyChangesToPage so the layout engine can
 		// position elements on fresh pages. applyChangesToPage will then
@@ -324,6 +344,20 @@ func populateNewPage(
 				continue
 			}
 			placeSingleElement(id, viewID, scopeID, page, templates, flat, &m.Specification, pos.X, pos.Y, false, result)
+		}
+
+		// Nested layout ("layout": "nested"): placeSingleElement parents every
+		// element to the scope boundary. Re-parent each element to its immediate
+		// container and size the intermediate containers so draw.io renders true
+		// multi-level (concentric) containment. Positions from computeNestedLayout
+		// are already relative to each element's immediate parent.
+		for id, parentID := range lr.ParentOf {
+			if parentID != scopeID {
+				setCellParent(page, id, scopedCellID(viewID, parentID))
+			}
+		}
+		for id, sz := range lr.ContainerSizes {
+			setCellSize(page, id, sz.W, sz.H)
 		}
 	} else {
 		// Incremental: fall back to cursor-based placement.
@@ -447,6 +481,27 @@ func scopedCellID(viewID, elemID string) string {
 // Example: isChildOf("shop.api", "shop") → true
 func isChildOf(id, parentID string) bool {
 	return strings.HasPrefix(id, parentID+".")
+}
+
+// ancestorContainersWithinScope returns the container IDs strictly between
+// scopeID and id (both excluded), in outer→inner order, that exist in flat.
+// Example: ("a.b.c.d", "a") → ["a.b", "a.b.c"] (those present in flat).
+// Used by the nested layout to ensure every intermediate container of a scoped
+// element is placed, so a deep leaf included without its parents still renders.
+func ancestorContainersWithinScope(id, scopeID string, flat map[string]*model.Element) []string {
+	if scopeID == "" || !strings.HasPrefix(id, scopeID+".") {
+		return nil
+	}
+	parts := strings.Split(id[len(scopeID)+1:], ".")
+	var out []string
+	prefix := scopeID
+	for i := 0; i < len(parts)-1; i++ { // exclude id's own last segment
+		prefix += "." + parts[i]
+		if _, ok := flat[prefix]; ok {
+			out = append(out, prefix)
+		}
+	}
+	return out
 }
 
 // isScopeExternalConnector returns true if one endpoint is the scope and
@@ -868,6 +923,39 @@ func resizeScopeBoundary(page *drawio.Page, scopeID string, x, y, width, height 
 	geo.CreateAttr("y", strconv.FormatFloat(y, 'f', -1, 64))
 	geo.CreateAttr("width", strconv.FormatFloat(width, 'f', -1, 64))
 	geo.CreateAttr("height", strconv.FormatFloat(height, 'f', -1, 64))
+}
+
+// setCellParent re-parents an element's draw.io cell to parentCellID (used by
+// the nested layout to build multi-level containment).
+func setCellParent(page *drawio.Page, elemID, parentCellID string) {
+	obj := page.FindElement(elemID)
+	if obj == nil {
+		return
+	}
+	cell := obj.FindElement("mxCell")
+	if cell == nil {
+		return
+	}
+	cell.CreateAttr("parent", parentCellID)
+}
+
+// setCellSize sets an element's cell width/height (used by the nested layout to
+// size intermediate containers to fit their children).
+func setCellSize(page *drawio.Page, elemID string, w, h float64) {
+	obj := page.FindElement(elemID)
+	if obj == nil {
+		return
+	}
+	cell := obj.FindElement("mxCell")
+	if cell == nil {
+		return
+	}
+	geo := cell.FindElement("mxGeometry")
+	if geo == nil {
+		return
+	}
+	geo.CreateAttr("width", strconv.FormatFloat(w, 'f', -1, 64))
+	geo.CreateAttr("height", strconv.FormatFloat(h, 'f', -1, 64))
 }
 
 // expandScopeToFitChildren resizes the scope boundary so all child elements
