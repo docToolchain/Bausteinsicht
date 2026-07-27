@@ -210,6 +210,7 @@ var validLayouts = map[string]bool{
 	"layered": true,
 	"grid":    true,
 	"none":    true,
+	"nested":  true,
 }
 
 func validateViews(m *BausteinsichtModel) []ValidationError {
@@ -222,7 +223,13 @@ func validateViews(m *BausteinsichtModel) []ValidationError {
 		if !validLayouts[view.Layout] {
 			errs = append(errs, ValidationError{
 				Path:    path,
-				Message: fmt.Sprintf("invalid layout %q (must be \"layered\", \"grid\", \"none\", or empty)", view.Layout),
+				Message: fmt.Sprintf("invalid layout %q (must be \"layered\", \"grid\", \"none\", \"nested\", or empty)", view.Layout),
+			})
+		}
+		if view.Layout == "nested" && view.Scope == "" {
+			errs = append(errs, ValidationError{
+				Path:    path,
+				Message: "layout \"nested\" requires a \"scope\" (it renders the scope's container nesting as concentric containers)",
 			})
 		}
 		if view.Scope != "" {

@@ -1,0 +1,3 @@
+# Only the render output is transient; architecture.drawio + .bausteinsicht-sync
+# are committed (they carry the layout / sync baseline — see README).
+out/

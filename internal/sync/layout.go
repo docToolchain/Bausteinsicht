@@ -29,6 +29,8 @@ var defaultLayoutConfig = layoutConfig{
 	startY:     40,
 }
 
+type sizePair struct{ W, H float64 }
+
 // layoutResult holds computed positions and optional boundary dimensions.
 type layoutResult struct {
 	Positions      map[string]position
@@ -36,6 +38,8 @@ type layoutResult struct {
 	BoundaryY      float64
 	BoundaryWidth  float64
 	BoundaryHeight float64
+	ContainerSizes map[string]sizePair // "nested" layout: per-container computed size
+	ParentOf       map[string]string   // "nested" layout: element ID → immediate container ID
 }
 
 // computeLayout returns positions for elements to place on a fresh page.
@@ -54,9 +58,236 @@ func computeLayout(
 		return computeGridLayout(ids, flat, templates)
 	case "none":
 		return computeNoneLayout(ids, flat, templates)
+	case "nested":
+		return computeNestedLayout(ids, flat, templates, scopeID)
 	default: // "layered" or ""
 		return computeLayeredLayout(ids, flat, templates, elementOrder, scopeID, relationships)
 	}
+}
+
+// computeNestedLayout lays out a scope's subtree as true multi-level containment:
+// each container element gets its immediate children placed inside it (relative
+// coordinates), and every container is sized to fit its children. This is what
+// makes draw.io render concentric hexagonal rings when zone kinds carry a
+// hexagon-container style. Positions are relative to each element's IMMEDIATE
+// parent; forward sync re-parents cells accordingly (see populateNewPage).
+func computeNestedLayout(
+	ids []string,
+	flat map[string]*model.Element,
+	templates *drawio.TemplateSet,
+	scopeID string,
+) layoutResult {
+	res := layoutResult{
+		Positions:      make(map[string]position),
+		ContainerSizes: make(map[string]sizePair),
+		ParentOf:       make(map[string]string),
+	}
+	if scopeID == "" {
+		// Nested mode targets scoped views. Validation (BR-014a) rejects a
+		// scope-less nested view, so this is an unreachable safety net for
+		// direct callers; fall back to grid rather than produce no layout.
+		return computeGridLayout(ids, flat, templates)
+	}
+
+	idset := make(map[string]bool, len(ids)+1)
+	for _, id := range ids {
+		idset[id] = true
+	}
+	idset[scopeID] = true
+
+	immediateChildren := func(id string) []string {
+		prefix := id + "."
+		var cs []string
+		for cid := range idset {
+			if strings.HasPrefix(cid, prefix) && !strings.Contains(cid[len(prefix):], ".") {
+				cs = append(cs, cid)
+			}
+		}
+		sort.Strings(cs)
+		return cs
+	}
+
+	const (
+		pad    = 26.0 // inner padding of a container
+		titleH = 46.0 // room for the container's title band (clears crossing edge labels)
+		gap    = 40.0 // gap between siblings (also gives edges room for their labels)
+	)
+
+	// layoutOf arranges a container's children as concentric vertical bands:
+	// a TOP row (leaves with metadata.side != "bottom"), the inner ring(s) in
+	// the MIDDLE, and a BOTTOM row (leaves with metadata.side == "bottom"),
+	// each horizontally centered. This gives the classic hexagonal look with
+	// driving/inbound on top and driven/outbound at the bottom. A hexagon
+	// margin widens the container so a hexagon zone does not clip content at
+	// its slanted sides. Recursion yields true concentric rings.
+	rowDims := func(ids []string, size map[string]sizePair) (w, h float64) {
+		for i, k := range ids {
+			w += size[k].W
+			if i > 0 {
+				w += gap
+			}
+			if size[k].H > h {
+				h = size[k].H
+			}
+		}
+		return
+	}
+
+	var layoutOf func(id string) sizePair
+	layoutOf = func(id string) sizePair {
+		kids := immediateChildren(id)
+		if len(kids) == 0 {
+			w, h := elementSize(id, flat, templates)
+			return sizePair{W: w, H: h}
+		}
+
+		var subs, top, bottom []string
+		size := make(map[string]sizePair, len(kids))
+		for _, k := range kids {
+			if len(immediateChildren(k)) > 0 {
+				subs = append(subs, k)
+				size[k] = layoutOf(k) // size inner rings first
+				continue
+			}
+			w, h := elementSize(k, flat, templates)
+			size[k] = sizePair{W: w, H: h}
+			if el, ok := flat[k]; ok && el.Metadata["side"] == "bottom" {
+				bottom = append(bottom, k)
+			} else {
+				top = append(top, k)
+			}
+		}
+
+		topW, topH := rowDims(top, size)
+		botW, botH := rowDims(bottom, size)
+		var innerW, innerH float64
+		for i, k := range subs {
+			if size[k].W > innerW {
+				innerW = size[k].W
+			}
+			innerH += size[k].H
+			if i > 0 {
+				innerH += gap
+			}
+		}
+
+		localPad := pad
+		if len(subs) == 0 { // innermost ring (e.g. domain core): give it more room
+			localPad = pad * 2.5
+		}
+
+		contentW := math.Max(topW, math.Max(innerW, botW))
+		if contentW == 0 {
+			contentW = defaultWidth
+		}
+		if len(subs) == 0 && contentW < 320 { // make the domain core visually substantial
+			contentW = 320
+		}
+		bandH, bands := 0.0, 0
+		for _, h := range []float64{topH, innerH, botH} {
+			if h > 0 {
+				bandH += h
+				bands++
+			}
+		}
+		contentH := bandH
+		if bands > 1 {
+			contentH += float64(bands-1) * gap
+		}
+
+		hexMargin := contentH * 0.30
+		x0 := localPad + hexMargin
+		y := titleH + localPad
+
+		placeRow := func(ids []string) {
+			if len(ids) == 0 {
+				return
+			}
+			rowW, rowH := rowDims(ids, size)
+			cx := x0 + (contentW-rowW)/2
+			for _, k := range ids {
+				sz := size[k]
+				res.Positions[k] = position{X: cx, Y: y + (rowH-sz.H)/2}
+				res.ParentOf[k] = id
+				cx += sz.W + gap
+			}
+			y += rowH + gap
+		}
+		placeRow(top)
+		if len(subs) > 0 && len(top) > 0 {
+			y += gap // extra clearance so an edge crossing into the inner ring clears its title band
+		}
+		for _, k := range subs { // inner ring(s), horizontally centered
+			sz := size[k]
+			res.Positions[k] = position{X: x0 + (contentW-sz.W)/2, Y: y}
+			res.ParentOf[k] = id
+			y += sz.H + gap
+		}
+		if len(subs) > 0 && len(bottom) > 0 {
+			y += gap
+		}
+		placeRow(bottom)
+
+		result := sizePair{W: contentW + 2*(localPad+hexMargin), H: y - gap + localPad}
+		res.ContainerSizes[id] = result
+		return result
+	}
+
+	top := layoutOf(scopeID)
+	res.BoundaryX = defaultLayoutConfig.startX
+	res.BoundaryWidth = top.W
+	res.BoundaryHeight = top.H
+	delete(res.ContainerSizes, scopeID) // the scope is sized via Boundary* above
+
+	// Elements outside the scope (externals) are placed around the ring hexagon:
+	// actor-like ones above, the rest below, each centered to the boundary width.
+	var actors, others []string
+	for _, id := range ids {
+		if id == scopeID || isChildOf(id, scopeID) {
+			continue
+		}
+		if isActorKind(id, flat) {
+			actors = append(actors, id)
+		} else {
+			others = append(others, id)
+		}
+	}
+	const extGap = 60.0
+	placeExternRow := func(rowIDs []string, y float64) float64 {
+		if len(rowIDs) == 0 {
+			return 0
+		}
+		sort.Strings(rowIDs)
+		widths := make([]float64, len(rowIDs))
+		heights := make([]float64, len(rowIDs))
+		totalW, maxH := 0.0, 0.0
+		for i, id := range rowIDs {
+			w, h := elementSize(id, flat, templates)
+			widths[i] = w
+			heights[i] = h
+			totalW += w
+			if i > 0 {
+				totalW += extGap
+			}
+			if h > maxH {
+				maxH = h
+			}
+		}
+		cx := res.BoundaryX + (res.BoundaryWidth-totalW)/2
+		for i, id := range rowIDs {
+			res.Positions[id] = position{X: cx, Y: y + (maxH-heights[i])/2}
+			cx += widths[i] + extGap
+		}
+		return maxH
+	}
+
+	y := defaultLayoutConfig.startY
+	if h := placeExternRow(actors, y); h > 0 {
+		y += h + extGap
+	}
+	res.BoundaryY = y
+	placeExternRow(others, y+res.BoundaryHeight+extGap)
+	return res
 }
 
 // computeLayeredLayout arranges elements in horizontal rows grouped by kind.

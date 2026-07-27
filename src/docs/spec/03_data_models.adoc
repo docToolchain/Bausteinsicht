@@ -394,7 +394,7 @@ The transitions themselves are not enforced — `status` is a plain string — b
 | `layout`
 | string
 | no
-| Auto-layout mode for new pages: `"layered"` (default), `"grid"`, or `"none"`. Layered groups elements by kind tier; grid places alphabetically in a grid; none uses a horizontal row.
+| Auto-layout mode for new pages: `"layered"` (default), `"grid"`, `"none"`, or `"nested"`. Layered groups elements by kind tier; grid places alphabetically in a grid; none uses a horizontal row; nested renders the model's container nesting as concentric containers, sized bottom-up (used for hexagonal Ports & Adapters rings).
 |===
 
 [[Wildcard Patterns]]
@@ -851,7 +851,7 @@ type View struct {
     FilterTags  []string `json:"filter-tags,omitempty"`  // include only elements with ALL of these tags
     ExcludeTags []string `json:"exclude-tags,omitempty"` // exclude elements with ANY of these tags
     Description string   `json:"description,omitempty"`
-    Layout      string   `json:"layout,omitempty"` // layered (default)|grid|none
+    Layout      string   `json:"layout,omitempty"` // layered (default)|grid|none|nested
 }
 
 // DynamicView describes a sequence diagram scenario

@@ -70,6 +70,7 @@ func computeVisibleElements(m *model.BausteinsichtModel) map[string]bool {
 	if len(m.Views) == 0 {
 		return nil // all elements visible
 	}
+	flat, flatErr := model.FlattenElements(m)
 	visible := make(map[string]bool)
 	for _, view := range m.Views {
 		v := view
@@ -83,6 +84,17 @@ func computeVisibleElements(m *model.BausteinsichtModel) map[string]bool {
 		// The scope element itself is also visible (rendered as boundary).
 		if view.Scope != "" {
 			visible[view.Scope] = true
+		}
+		// Nested layout implicitly renders every intermediate container between
+		// the scope and each included element (see ApplyForward), so count them
+		// as visible too — otherwise they are falsely reported as not in any
+		// view even though the diagram draws them (#571 review).
+		if view.Layout == "nested" && view.Scope != "" && flatErr == nil {
+			for _, id := range resolved {
+				for _, anc := range ancestorContainersWithinScope(id, view.Scope, flat) {
+					visible[anc] = true
+				}
+			}
 		}
 	}
 	return visible

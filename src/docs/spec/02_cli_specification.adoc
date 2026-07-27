@@ -1077,6 +1077,41 @@ Evaluates the architectural constraints defined in the model and reports violati
 
 **Behavior:** loads the model and evaluates each constraint. Prints `All constraints passed.` when constraints exist with no violations, `No constraints defined.` when the model declares none, or the list of violations otherwise. Use in CI as an architecture gate.
 
+**Constraint rule types:** each entry in the model's `constraints` array selects one `rule` and supplies its parameters. Rules evaluate over the flattened element set and the `relationships` list. Endpoint/element selectors are flexible — beyond the `*-kind` forms shown below, they also accept an exact ID (`from`/`to`/`element`), a tag (`from-tag`/…), or an any-of allow-list (`from-tags`/`from-kinds`/…), matched in that order of specificity (#542).
+
+[cols="2,3,3"]
+|===
+| Rule | Parameters | Enforces
+
+| `no-relationship`
+| `from-kind`, `to-kind`
+| No element of `from-kind` may relate to any element of `to-kind`.
+
+| `allowed-relationship`
+| `to-kind`, `from-kinds`
+| Only elements whose kind is in `from-kinds` may point at `to-kind`.
+
+| `no-outgoing-dependency`
+| `from-kind`
+| No element of `from-kind` may be the source of any relationship. Use it for pure-interface roles such as a hexagonal port, which is implemented and used by others but must depend on nothing itself.
+
+| `required-field`
+| `element-kind`, `field`
+| Every element of `element-kind` must set `field` (`title`, `description`, or `technology`).
+
+| `max-depth`
+| `max`
+| No element may be nested deeper than `max` levels (root elements are depth 1).
+
+| `no-circular-dependency`
+| (none)
+| The relationship graph must be acyclic.
+
+| `technology-allowed`
+| `element-kind`, `technologies`
+| Elements of `element-kind` that declare a technology may only use one from `technologies` (unset technology is not flagged).
+|===
+
 ==== `bausteinsicht health`
 
 Computes an architecture health score (0–100, with a letter grade) across weighted categories such as completeness, conformance, and complexity.
