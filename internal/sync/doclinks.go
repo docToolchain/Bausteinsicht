@@ -65,6 +65,16 @@ type docIcon struct {
 func createDocIcon(root *etree.Element, parentCellID string, icon docIcon, x, y float64) {
 	obj := root.CreateElement("object")
 	obj.CreateAttr("id", icon.id)
+	// The glyph must be the <object>'s own "label" attribute, not a "value"
+	// attribute on the inner <mxCell> — draw.io's SVG exporter only wraps a
+	// shape in a clickable <a href> when the cell's displayed value comes
+	// from the <object> wrapper's UserObject attributes (label/link/tooltip,
+	// same as every other <object link=...> in this codebase: CreateElement,
+	// createBackNavButton, createInfoBox). A "value" set directly on the
+	// inner mxCell instead is still rendered visually (confirmed: the glyph
+	// still shows, rasterized), but silently breaks link export — verified
+	// against a real draw.io 31.0.2 SVG export while investigating #543.
+	obj.CreateAttr("label", icon.glyph)
 	if icon.href != "" {
 		obj.CreateAttr("link", icon.href)
 	}
@@ -73,7 +83,6 @@ func createDocIcon(root *etree.Element, parentCellID string, icon docIcon, x, y 
 	}
 
 	cell := obj.CreateElement("mxCell")
-	cell.CreateAttr("value", icon.glyph)
 	cell.CreateAttr("style", fmt.Sprintf(
 		"rounded=1;fillColor=%s;strokeColor=%s;fontSize=11;fontColor=#000000;"+
 			"whiteSpace=wrap;overflow=hidden;connectable=0;align=center;verticalAlign=middle;html=1;",

@@ -196,13 +196,49 @@ func TestDocLinkIcons(t *testing.T) {
 		t.Fatalf("bausteinsicht export: %v\n%s", err, out)
 	}
 
-	expectedHrefs := map[string]string{
-		"element link":    "architecture.adoc#sec-api",
-		"decision":        "ADRs/ADR-001-DSL-Format.html",
-		"element docLink": "docs/arc42/05-building-blocks.html#api",
-		"view docLink":    "docs/prd.html",
+	// draw.io resolves a relative href differently depending on whether it
+	// carries a "#fragment": fragment-bearing hrefs come back as just the
+	// bare fragment (e.g. "architecture.adoc#sec-api" -> "#sec-api", stripped
+	// by extractSVGHrefsRaw/validateSVGLinks's own file:// handling
+	// elsewhere); fragment-less hrefs come back as a full
+	// "file:///<local drawio install path>/<original relative path>" URL,
+	// which is NOT portable across machines with draw.io installed
+	// elsewhere. So fragment hrefs are checked by exact suffix match on the
+	// fragment; fragment-less hrefs are checked by suffix match on the
+	// original relative path instead of requiring the full file:// URL.
+	wantSuffixes := []string{
+		"#sec-api",                     // element link
+		"ADRs/ADR-001-DSL-Format.html", // decision
+		"#api",                         // element docLink
+		"docs/prd.html",                // view docLink
 	}
-	validateSVGLinks(t, filepath.Join(svgDir, "architecture-overview.svg"), expectedHrefs)
+	svgData, err := os.ReadFile(filepath.Join(svgDir, "architecture-overview.svg"))
+	if err != nil {
+		t.Fatalf("read exported SVG: %v", err)
+	}
+	gotHrefs := extractSVGHrefs(svgData)
+	for _, want := range wantSuffixes {
+		found := false
+		for href := range gotHrefs {
+			if strings.HasSuffix(href, want) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("expected an exported SVG href ending in %q, got hrefs: %v", want, hrefKeys(gotHrefs))
+		}
+	}
+}
+
+func hrefKeys(m map[string]bool) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		if !strings.HasPrefix(k, "data:") {
+			keys = append(keys, k)
+		}
+	}
+	return keys
 }
 
 func requirePageE2E(t *testing.T, doc *drawio.Document, pageID string) *drawio.Page {

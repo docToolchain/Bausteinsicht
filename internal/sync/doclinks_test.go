@@ -317,6 +317,8 @@ func iconX(t *testing.T, obj *etree.Element) float64 {
 }
 
 func TestDocLinkGlyph_AllTypesDistinct(t *testing.T) {
+	isFallbackType := func(s string) bool { return s == "unknown-type" || s == "" }
+
 	types := []string{"arc42", "adr", "persona", "prd", "spec", "unknown-type", ""}
 	seen := make(map[string]string, len(types))
 	for _, typ := range types {
@@ -330,7 +332,7 @@ func TestDocLinkGlyph_AllTypesDistinct(t *testing.T) {
 		if other, ok := seen[glyph]; ok && other != typ {
 			// "unknown-type" and "" both intentionally fall back to the same
 			// generic glyph — that's the one allowed collision.
-			if !((typ == "unknown-type" || typ == "") && (other == "unknown-type" || other == "")) {
+			if !isFallbackType(typ) || !isFallbackType(other) {
 				t.Errorf("type %q: glyph %q collides with type %q", typ, glyph, other)
 			}
 		}

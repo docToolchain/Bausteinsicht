@@ -802,25 +802,29 @@ Back-navigation buttons are generated in detail views:
 [source,xml]
 ----
 <!-- Element-level icons: parented to the element's own on-page cell ID -->
-<object id="doclink-webshop.api-link" link="architecture.adoc#sec-api" tooltip="Open linked document">
-  <mxCell style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;..." value="&#128279;"
+<object id="doclink-webshop.api-link" label="&#128279;" link="architecture.adoc#sec-api" tooltip="Open linked document">
+  <mxCell style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;..."
           vertex="1" parent="webshop.api">
     <mxGeometry x="..." y="2" width="18" height="18" as="geometry" />
   </mxCell>
 </object>
-<object id="doclink-webshop.api-decision-0" link="ADRs/ADR-001-DSL-Format.html" tooltip="ADR-001: Use JSONC">
-  <mxCell style="..." value="&#9878;" vertex="1" parent="webshop.api">
+<object id="doclink-webshop.api-decision-0" label="&#9878;" link="ADRs/ADR-001-DSL-Format.html" tooltip="ADR-001: Use JSONC">
+  <mxCell style="..." vertex="1" parent="webshop.api">
     <mxGeometry ... />
   </mxCell>
 </object>
 
 <!-- View-level icons: parented to "1" (page-absolute) -->
-<object id="doclink-view-overview-0" link="docs/prd.html" tooltip="Product Requirements">
-  <mxCell style="..." value="&#128203;" vertex="1" parent="1">
+<object id="doclink-view-overview-0" label="&#128203;" link="docs/prd.html" tooltip="Product Requirements">
+  <mxCell style="..." vertex="1" parent="1">
     <mxGeometry ... />
   </mxCell>
 </object>
 ----
+
+IMPORTANT: The glyph must be the `<object>`'s own `label` attribute, not a `value` attribute on the inner `<mxCell>`. A `value` set directly on the mxCell still renders visually (confirmed against a real draw.io export: the glyph shows, rasterized to an embedded image) but silently breaks the SVG `<a href>` export — draw.io's exporter only wraps a shape in a clickable anchor when the cell's displayed value resolves through the `<object>` wrapper's own attributes, matching every other `link`-bearing `<object>` in this codebase (the element shape itself, the back-navigation button, the metadata/legend boxes).
+
+CAUTION: A relative `href`/`link` (e.g. `"ADRs/ADR-001-DSL-Format.html"`) resolves differently in SVG export depending on whether it carries a `#fragment`. A fragment-bearing href (e.g. `"architecture.adoc#sec-api"`) exports as just the bare fragment (`#sec-api`), which is portable and resolves correctly when the SVG is embedded in that same HTML/AsciiDoc page. A fragment-*less* relative href exports as a full `file://<local draw.io install path>/<original relative path>` URL — anchored to wherever draw.io itself is installed on the machine that ran the export, **not** to the project or the exported SVG's own location. This is not portable across machines and will not resolve for other readers. Until this is addressed, prefer `#fragment`-only anchors or absolute URLs (`https://...`) for `docLinks`/`decisions[].file`/`link` values that need to survive SVG export unchanged.
 
 Icon cells are identified by the `doclink-` ID prefix and excluded from reverse-sync element/relationship extraction, the same way `nav-back-` buttons are (#205) — model is authoritative, icon state is never read back from draw.io. See ADR-009's "Extension: Doc/ADR Drilldown Icons (#543)" for the full rationale, including why decision badges are clickable now and why PNG export still shows the icon glyph without the click behavior.
 
