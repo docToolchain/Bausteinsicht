@@ -57,7 +57,7 @@ jobs:
             # Best-effort: posting a comment needs write access, which fork PRs
             # lack. Never hard-fail here - the warning above already reports it.
             gh pr comment "$PR_NUMBER" --body "$BODY" \
-              || echo "::notice::Could not post the duplicate-work comment (fork PRs have a read-only token); see the warning above."
+              || echo "::notice::Could not post the duplicate-work comment (e.g. a fork PR's read-only token, rate limit, or API error); the overlap is reported in the warning above."
           else
             echo "✅ No overlapping work detected"
           fi
