@@ -47,8 +47,17 @@ jobs:
             echo -e "$DUPLICATES"
             echo ""
 
+            # Surface the overlap as a soft warning annotation so it is visible
+            # in the Checks UI without failing the job. Fork PRs get a read-only
+            # GITHUB_TOKEN, so the comment below cannot be posted there and the
+            # job must not hard-fail on that.
+            echo "::warning title=Potential duplicate work::This PR overlaps with other open PRs:$(echo -e "$DUPLICATES" | tr '\n' ' ')"
+
             BODY=$(printf '⚠️ **Potential Duplicate Work Detected**\n\nThis PR may overlap with other open PRs:%s\n\nPlease review and coordinate:\n1. Confirm this PR does not duplicate existing work\n2. If duplicate, consider closing this PR\n3. If improvements, consider cherry-picking into existing PR instead' "$(echo -e "$DUPLICATES")")
-            gh pr comment "$PR_NUMBER" --body "$BODY"
+            # Best-effort: posting a comment needs write access, which fork PRs
+            # lack. Never hard-fail here - the warning above already reports it.
+            gh pr comment "$PR_NUMBER" --body "$BODY" \
+              || echo "::notice::Could not post the duplicate-work comment (e.g. a fork PR's read-only token, rate limit, or API error); the overlap is reported in the warning above."
           else
             echo "✅ No overlapping work detected"
           fi

@@ -35,9 +35,13 @@ jobs:
             if [ "$COMMITS_BEHIND" -gt 0 ]; then
               echo "- ⚠️ Branch is behind main" >> "$GITHUB_STEP_SUMMARY"
 
+              echo "::warning title=Branch behind main::This branch is behind main by $COMMITS_BEHIND commit(s); rebase onto origin/main."
               # shellcheck disable=SC2016  # backticks are literal markdown code-fence text in the PR comment body, not command substitution
               BODY=$(printf '⚠️ **Branch is behind main by %s commit(s)**\n\nThis may cause merge conflicts or miss recent bug fixes/improvements.\n\n**Recommended action:**\n```bash\ngit fetch origin\ngit rebase origin/main\ngit push --force-with-lease\n```\n\nThis ensures compatibility with the latest main and prevents conflicts.' "$COMMITS_BEHIND")
-              gh pr comment ${{ github.event.pull_request.number }} --body "$BODY"
+              # Best-effort: posting a comment needs write access, which fork PRs
+              # lack. Never hard-fail here - the warning above already reports it.
+              gh pr comment ${{ github.event.pull_request.number }} --body "$BODY" \
+                || echo "::notice::Could not post the branch-freshness comment (e.g. a fork PR's read-only token, rate limit, or API error); the warning above already reports it."
             fi
           else
             echo "✅ Branch is up-to-date with main" >> "$GITHUB_STEP_SUMMARY"
