@@ -434,6 +434,28 @@ func TestValidate_ViewValidLayouts(t *testing.T) {
 	}
 }
 
+// TestValidate_ViewNestedRequiresScope covers BR-014a: a nested view without a
+// scope is rejected (it must not silently fall back to another layout), while a
+// nested view WITH a scope is accepted.
+func TestValidate_ViewNestedRequiresScope(t *testing.T) {
+	t.Run("no scope → error", func(t *testing.T) {
+		m := buildValidModel()
+		m.Views["rings"] = View{Title: "Rings", Include: []string{"*"}, Layout: "nested"}
+		errs := Validate(m)
+		if !containsMessage(errs, "requires a \"scope\"") {
+			t.Errorf("expected nested-requires-scope error, got: %v", errs)
+		}
+	})
+	t.Run("with scope → no such error", func(t *testing.T) {
+		m := buildValidModel()
+		m.Views["rings"] = View{Title: "Rings", Scope: "shop", Include: []string{"shop.*"}, Layout: "nested"}
+		errs := Validate(m)
+		if containsMessage(errs, "requires a \"scope\"") {
+			t.Errorf("nested view with a scope should not raise the scope error, got: %v", errs)
+		}
+	})
+}
+
 // containsPath checks whether any error has the given path.
 func containsPath(errs []ValidationError, path string) bool {
 	for _, e := range errs {

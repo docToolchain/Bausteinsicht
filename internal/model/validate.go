@@ -226,6 +226,12 @@ func validateViews(m *BausteinsichtModel) []ValidationError {
 				Message: fmt.Sprintf("invalid layout %q (must be \"layered\", \"grid\", \"none\", \"nested\", or empty)", view.Layout),
 			})
 		}
+		if view.Layout == "nested" && view.Scope == "" {
+			errs = append(errs, ValidationError{
+				Path:    path,
+				Message: "layout \"nested\" requires a \"scope\" (it renders the scope's container nesting as concentric containers)",
+			})
+		}
 		if view.Scope != "" {
 			if _, err := lookupElement(m, view.Scope); err != nil {
 				errs = append(errs, ValidationError{

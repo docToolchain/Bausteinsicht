@@ -83,7 +83,9 @@ func computeNestedLayout(
 		ParentOf:       make(map[string]string),
 	}
 	if scopeID == "" {
-		// Nested mode targets scoped views; without a scope, fall back to grid.
+		// Nested mode targets scoped views. Validation (BR-014a) rejects a
+		// scope-less nested view, so this is an unreachable safety net for
+		// direct callers; fall back to grid rather than produce no layout.
 		return computeGridLayout(ids, flat, templates)
 	}
 
