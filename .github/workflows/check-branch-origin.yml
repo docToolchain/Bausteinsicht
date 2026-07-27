@@ -40,9 +40,13 @@ jobs:
             echo "  git push --force-with-lease"
             echo ""
 
+            echo "::warning title=Branch behind main::This branch is behind main by $COMMITS_BEHIND commit(s); rebase onto origin/main."
             # shellcheck disable=SC2016  # backticks are literal markdown code-fence text in the PR comment body, not command substitution
             BODY=$(printf '⚠️ **Branch Behind Main**\n\nThis branch is based on an older commit from main and is behind by **%s commit(s)**.\n\nThis often happens when a feature branch is created from another feature branch instead of from main directly.\n\n**Recommendation:**\n```bash\ngit fetch origin\ngit rebase origin/main\ngit push --force-with-lease\n```\n\nAfter rebasing, this warning will disappear.' "$COMMITS_BEHIND")
-            gh pr comment ${{ github.event.pull_request.number }} --body "$BODY"
+            # Best-effort: posting a comment needs write access, which fork PRs
+            # lack. Never hard-fail here - the warning above already reports it.
+            gh pr comment ${{ github.event.pull_request.number }} --body "$BODY" \
+              || echo "::notice::Could not post the branch-origin comment (e.g. a fork PR's read-only token, rate limit, or API error); the warning above already reports it."
 
             # Don't fail - let it proceed with warning
           fi
