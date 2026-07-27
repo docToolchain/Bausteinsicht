@@ -99,6 +99,42 @@ func TestValidate_ElementDocLinkMissingHref(t *testing.T) {
 	}
 }
 
+func TestValidate_ElementDocLinkBothFieldsMissing(t *testing.T) {
+	m := buildValidModel()
+	elem := m.Model["customer"]
+	elem.DocLinks = []DocLink{{Title: "no type or href"}}
+	m.Model["customer"] = elem
+
+	errs := Validate(m)
+	count := 0
+	for _, e := range errs {
+		if e.Path == "model.customer.docLinks[0]" {
+			count++
+		}
+	}
+	if count != 2 {
+		t.Errorf("expected 2 errors (missing type AND missing href) for model.customer.docLinks[0], got %d: %v", count, errs)
+	}
+}
+
+func TestValidate_ElementDocLinkSecondEntryIndexReported(t *testing.T) {
+	m := buildValidModel()
+	elem := m.Model["customer"]
+	elem.DocLinks = []DocLink{
+		{Type: "persona", Href: "docs/prd.html#felix"}, // valid — index 0
+		{Type: "arc42"}, // missing href — index 1
+	}
+	m.Model["customer"] = elem
+
+	errs := Validate(m)
+	if containsPath(errs, "model.customer.docLinks[0]") {
+		t.Errorf("expected no error for the valid entry at index 0, got %v", errs)
+	}
+	if !containsPath(errs, "model.customer.docLinks[1]") {
+		t.Errorf("expected an error for the invalid entry at index 1, got %v", errs)
+	}
+}
+
 func TestValidate_ElementDocLinkValid(t *testing.T) {
 	m := buildValidModel()
 	elem := m.Model["customer"]
