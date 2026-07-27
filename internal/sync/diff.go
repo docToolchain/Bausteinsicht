@@ -37,6 +37,7 @@ type RelationshipChange struct {
 	OldValue string
 	NewValue string
 	Kind     string // relationship kind key into Specification.Relationships, for style lookup (e.g. dashed)
+	PageID   string // draw.io page name (page.Name()) where this relationship exists (for debugging/warnings)
 }
 
 // ChangeSet contains all detected changes from both sides.
@@ -373,6 +374,7 @@ func extractDrawioRelationships(doc *drawio.Document) map[string]RelationshipSta
 	cellToElem := buildCellIDToElemID(doc)
 	result := make(map[string]RelationshipState)
 	for _, page := range doc.Pages() {
+		pageID := page.Name()
 		for _, cell := range page.FindAllConnectors() {
 			fromCell := cell.SelectAttrValue("source", "")
 			toCell := cell.SelectAttrValue("target", "")
@@ -394,12 +396,18 @@ func extractDrawioRelationships(doc *drawio.Document) map[string]RelationshipSta
 			cellID := cell.SelectAttrValue("id", "")
 			index := parseConnectorIndex(cellID)
 			key := relKey(from, to, index)
-			if _, exists := result[key]; !exists {
+			if existing, exists := result[key]; exists {
+				// If relationship already exists on another page, append this page to the list.
+				// PageIDs is a []string of page names (page.Name()), used later in warnings.
+				existing.PageIDs = append(existing.PageIDs, pageID)
+				result[key] = existing
+			} else {
 				result[key] = RelationshipState{
-					From:  from,
-					To:    to,
-					Index: index,
-					Label: cell.SelectAttrValue("value", ""),
+					From:    from,
+					To:      to,
+					Index:   index,
+					Label:   cell.SelectAttrValue("value", ""),
+					PageIDs: []string{pageID},
 				}
 			}
 		}
@@ -716,8 +724,13 @@ func detectRelationshipChanges(
 			if isLiftedRelationship(from, to, modelRels) {
 				continue
 			}
+			// Collect page IDs where this relationship exists.
+			pageID := ""
+			if len(dr.PageIDs) > 0 {
+				pageID = dr.PageIDs[0]
+			}
 			cs.DrawioRelationshipChanges = append(cs.DrawioRelationshipChanges, RelationshipChange{
-				From: from, To: to, Index: index, Type: Added, NewValue: dr.Label,
+				From: from, To: to, Index: index, Type: Added, NewValue: dr.Label, PageID: pageID,
 			})
 		case !inDrawio && inLast:
 			// Only treat as deleted if the relationship should have a connector

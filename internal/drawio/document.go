@@ -167,6 +167,11 @@ func (p *Page) ID() string {
 	return p.diagram.SelectAttrValue("id", "")
 }
 
+// Name returns the name attribute of the page's diagram element.
+func (p *Page) Name() string {
+	return p.diagram.SelectAttrValue("name", "")
+}
+
 // Root returns the <root> element of the page for direct manipulation.
 func (p *Page) Root() *etree.Element {
 	model := p.diagram.FindElement("mxGraphModel")

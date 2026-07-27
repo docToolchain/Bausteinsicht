@@ -61,7 +61,7 @@ func TestApplyReverse_TitleUpdate(t *testing.T) {
 	m := simpleModel("api", "Old Title", "", "")
 	cs := elemChangeSet("api", Modified, "title", "Old Title", "New Title")
 
-	r := ApplyReverse(cs, m)
+	r := ApplyReverse(cs, m, nil)
 
 	if m.Model["api"].Title != "New Title" {
 		t.Errorf("expected title %q, got %q", "New Title", m.Model["api"].Title)
@@ -78,7 +78,7 @@ func TestApplyReverse_DescriptionUpdate(t *testing.T) {
 	m := simpleModel("api", "Title", "Old Desc", "")
 	cs := elemChangeSet("api", Modified, "description", "Old Desc", "New Desc")
 
-	r := ApplyReverse(cs, m)
+	r := ApplyReverse(cs, m, nil)
 
 	if m.Model["api"].Description != "New Desc" {
 		t.Errorf("expected description %q, got %q", "New Desc", m.Model["api"].Description)
@@ -92,7 +92,7 @@ func TestApplyReverse_TechnologyUpdate(t *testing.T) {
 	m := simpleModel("api", "Title", "", "Go")
 	cs := elemChangeSet("api", Modified, "technology", "Go", "Rust")
 
-	r := ApplyReverse(cs, m)
+	r := ApplyReverse(cs, m, nil)
 
 	if m.Model["api"].Technology != "Rust" {
 		t.Errorf("expected technology %q, got %q", "Rust", m.Model["api"].Technology)
@@ -106,7 +106,7 @@ func TestApplyReverse_NestedElementUpdate(t *testing.T) {
 	m := modelWithChild("webshop", "api")
 	cs := elemChangeSet("webshop.api", Modified, "title", "child-title", "Updated API")
 
-	r := ApplyReverse(cs, m)
+	r := ApplyReverse(cs, m, nil)
 
 	child := m.Model["webshop"].Children["api"]
 	if child.Title != "Updated API" {
@@ -121,7 +121,7 @@ func TestApplyReverse_ElementDeleted(t *testing.T) {
 	m := simpleModel("api", "Title", "", "")
 	cs := elemChangeSet("api", Deleted, "", "", "")
 
-	r := ApplyReverse(cs, m)
+	r := ApplyReverse(cs, m, nil)
 
 	if _, exists := m.Model["api"]; exists {
 		t.Error("expected element to be removed from model")
@@ -138,7 +138,7 @@ func TestApplyReverse_AddedElementWarning(t *testing.T) {
 	m := emptyModel()
 	cs := elemChangeSet("unknown", Added, "", "", "")
 
-	r := ApplyReverse(cs, m)
+	r := ApplyReverse(cs, m, nil)
 
 	if len(r.Warnings) != 1 {
 		t.Fatalf("expected 1 warning, got %d: %v", len(r.Warnings), r.Warnings)
@@ -158,10 +158,11 @@ func TestApplyReverse_AddedNestedElementSkipped(t *testing.T) {
 	// elements appear as "Added" from the draw.io side. Nested elements with
 	// dot-path IDs (e.g. "parent.child") must NOT be created as spurious
 	// top-level entries — they already exist in the model hierarchy. (#307)
+	// On first sync (lastState is nil), skip silently without warning.
 	m := modelWithChild("parent", "child")
 	cs := elemChangeSet("parent.child", Added, "", "", "")
 
-	r := ApplyReverse(cs, m)
+	r := ApplyReverse(cs, m, nil)
 
 	// The nested element must NOT be created as a top-level entry.
 	if _, exists := m.Model["parent.child"]; exists {
@@ -170,8 +171,9 @@ func TestApplyReverse_AddedNestedElementSkipped(t *testing.T) {
 	if r.ElementsCreated != 0 {
 		t.Errorf("expected ElementsCreated=0, got %d", r.ElementsCreated)
 	}
-	if len(r.Warnings) == 0 || !strings.Contains(r.Warnings[0], "already exists") {
-		t.Errorf("expected 'already exists' warning, got %v", r.Warnings)
+	// On first sync, skip silently without warning (elements exist in both places by design).
+	if len(r.Warnings) != 0 {
+		t.Errorf("expected no warnings on first sync, got %v", r.Warnings)
 	}
 }
 
@@ -179,7 +181,7 @@ func TestApplyReverse_ModifyMissingElement(t *testing.T) {
 	m := emptyModel()
 	cs := elemChangeSet("nonexistent", Modified, "title", "", "New")
 
-	r := ApplyReverse(cs, m)
+	r := ApplyReverse(cs, m, nil)
 
 	if r.ElementsUpdated != 0 {
 		t.Errorf("expected no update, got %d", r.ElementsUpdated)
@@ -195,7 +197,7 @@ func TestApplyReverse_RelationshipLabelUpdated(t *testing.T) {
 	m := modelWithRel("a", "b", "old label")
 	cs := relChangeSet("a", "b", Modified, "label", "old label", "new label")
 
-	r := ApplyReverse(cs, m)
+	r := ApplyReverse(cs, m, nil)
 
 	if m.Relationships[0].Label != "new label" {
 		t.Errorf("expected label %q, got %q", "new label", m.Relationships[0].Label)
@@ -209,7 +211,7 @@ func TestApplyReverse_RelationshipDeleted(t *testing.T) {
 	m := modelWithRel("a", "b", "calls")
 	cs := relChangeSet("a", "b", Deleted, "", "", "")
 
-	r := ApplyReverse(cs, m)
+	r := ApplyReverse(cs, m, nil)
 
 	if len(m.Relationships) != 0 {
 		t.Errorf("expected relationship to be removed, got %d remaining", len(m.Relationships))
@@ -236,7 +238,7 @@ func TestApplyReverse_DeleteElementCleansViewIncludes(t *testing.T) {
 	}
 
 	cs := elemChangeSet("api", Deleted, "", "", "")
-	ApplyReverse(cs, m)
+	ApplyReverse(cs, m, nil)
 
 	v := m.Views["overview"]
 	for _, inc := range v.Include {
@@ -265,7 +267,7 @@ func TestApplyReverse_EmptyTitleSkipped(t *testing.T) {
 	m := simpleModel("api", "Original Title", "", "")
 	cs := elemChangeSet("api", Modified, "title", "Original Title", "")
 
-	r := ApplyReverse(cs, m)
+	r := ApplyReverse(cs, m, nil)
 
 	// Title should remain unchanged
 	if m.Model["api"].Title != "Original Title" {
@@ -295,7 +297,7 @@ func TestApplyReverse_RelationshipAdded(t *testing.T) {
 	m.Relationships = []model.Relationship{} // clear the initial relationship for this test
 	cs := relChangeSet("x", "y", Added, "", "", "uses")
 
-	r := ApplyReverse(cs, m)
+	r := ApplyReverse(cs, m, nil)
 
 	if len(m.Relationships) != 1 {
 		t.Fatalf("expected 1 relationship, got %d", len(m.Relationships))
@@ -312,6 +314,193 @@ func TestApplyReverse_RelationshipAdded(t *testing.T) {
 	}
 }
 
+// TestApplyReverse_RelationshipAddedDuplicateSkipped verifies that adding a
+// relationship that already exists in the model is skipped and a warning is
+// issued. This prevents duplicate relationships when sync state is stale or
+// when the same relationship appears in both model and draw.io. Regression
+// test for #547.
+func TestApplyReverse_RelationshipAddedDuplicateSkipped(t *testing.T) {
+	// Build a model with existing elements and a relationship between them.
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"frontend": {Kind: "container", Title: "Frontend"},
+			"backend":  {Kind: "container", Title: "Backend"},
+		},
+		Relationships: []model.Relationship{
+			{From: "frontend", To: "backend", Label: "calls API"},
+		},
+	}
+
+	// Simulate "lost sync state" - previous sync had OTHER relationships,
+	// but not this one. The relationship was manually added to the model
+	// (not synced from draw.io), and now draw.io also has it.
+	// This is a genuine conflict: model has relationship that wasn't synced from draw.io.
+	lastState := &SyncState{
+		Timestamp: "2026-07-26T00:00:00Z", // a prior sync completed
+		Relationships: []RelationshipState{
+			// Some OTHER relationship that was synced before
+			{From: "other", To: "thing"},
+		},
+	}
+
+	cs := relChangeSet("frontend", "backend", Added, "", "", "calls API")
+
+	r := ApplyReverse(cs, m, lastState)
+
+	// Should still have exactly 1 relationship (no duplicate added).
+	if len(m.Relationships) != 1 {
+		t.Fatalf("expected 1 relationship (no duplicate), got %d", len(m.Relationships))
+	}
+
+	// Should NOT count as created.
+	if r.RelationshipsCreated != 0 {
+		t.Errorf("expected RelationshipsCreated=0 (duplicate skipped), got %d", r.RelationshipsCreated)
+	}
+
+	// Should have a warning about the duplicate (because lastState exists but
+	// doesn't include this relationship - it's a genuine conflict).
+	if len(r.Warnings) == 0 {
+		t.Fatal("expected warning about duplicate relationship, got none")
+	}
+	found := false
+	for _, w := range r.Warnings {
+		if strings.Contains(w, "already exists") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected warning mentioning 'already exists', got: %v", r.Warnings)
+	}
+}
+
+// TestApplyReverse_RelationshipAddedSecondBetweenSamePair verifies that a
+// newly-drawn SECOND relationship between the same pair (#142) is imported even
+// when a FIRST relationship between that pair was already synced. Keying the
+// last-sync set by "from->to" (ignoring the per-pair index) previously matched
+// the already-synced first relationship and dropped the new one silently (#548).
+func TestApplyReverse_RelationshipAddedSecondBetweenSamePair(t *testing.T) {
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"a": {Kind: "container", Title: "A"},
+			"b": {Kind: "container", Title: "B"},
+		},
+		Relationships: []model.Relationship{
+			{From: "a", To: "b", Label: "uses"}, // index 0, previously synced
+		},
+	}
+	// Previous sync recorded a->b at index 0 only.
+	lastState := &SyncState{
+		Timestamp: "2026-07-26T00:00:00Z", // a prior sync completed
+		Relationships: []RelationshipState{
+			{From: "a", To: "b", Index: 0, Label: "uses"},
+		},
+	}
+	// draw.io now has a SECOND a->b connector (index 1) - a genuinely new relationship.
+	cs := &ChangeSet{
+		DrawioRelationshipChanges: []RelationshipChange{
+			{From: "a", To: "b", Index: 1, Type: Added, NewValue: "calls"},
+		},
+	}
+
+	r := ApplyReverse(cs, m, lastState)
+
+	if len(m.Relationships) != 2 {
+		t.Fatalf("expected 2 relationships (new one imported), got %d", len(m.Relationships))
+	}
+	if r.RelationshipsCreated != 1 {
+		t.Errorf("expected RelationshipsCreated=1, got %d", r.RelationshipsCreated)
+	}
+	if len(r.Warnings) != 0 {
+		t.Errorf("unexpected warnings: %v", r.Warnings)
+	}
+}
+
+// TestApplyReverse_RelationshipAddedWithUnrelatedAhead exercises the
+// global-index-vs-per-pair-count distinction (#548 review): an unrelated
+// relationship sits AHEAD of the target pair in m.Relationships, so a per-pair
+// count would not equal the global connector index. A genuinely new hand-drawn
+// a->b connector (parseConnectorIndex yields 0 for non-"rel-a-b-N" ids) must
+// still be imported, not dropped.
+func TestApplyReverse_RelationshipAddedWithUnrelatedAhead(t *testing.T) {
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"x": {Kind: "container", Title: "X"},
+			"y": {Kind: "container", Title: "Y"},
+			"a": {Kind: "container", Title: "A"},
+			"b": {Kind: "container", Title: "B"},
+		},
+		Relationships: []model.Relationship{
+			{From: "x", To: "y", Label: "unrelated"}, // global index 0
+			{From: "a", To: "b", Label: "uses"},      // global index 1
+		},
+	}
+	// Prior sync recorded both, a->b at its global index 1.
+	lastState := &SyncState{
+		Timestamp: "2026-07-26T00:00:00Z",
+		Relationships: []RelationshipState{
+			{From: "x", To: "y", Index: 0, Label: "unrelated"},
+			{From: "a", To: "b", Index: 1, Label: "uses"},
+		},
+	}
+	// A genuinely new, hand-drawn second a->b connector: its id is not a
+	// bausteinsicht-generated "rel-a-b-N", so parseConnectorIndex yields 0.
+	cs := &ChangeSet{
+		DrawioRelationshipChanges: []RelationshipChange{
+			{From: "a", To: "b", Index: 0, Type: Added, NewValue: "calls"},
+		},
+	}
+
+	r := ApplyReverse(cs, m, lastState)
+
+	if len(m.Relationships) != 3 {
+		t.Fatalf("expected 3 relationships (new a->b imported), got %d", len(m.Relationships))
+	}
+	if r.RelationshipsCreated != 1 {
+		t.Errorf("expected RelationshipsCreated=1, got %d", r.RelationshipsCreated)
+	}
+	if len(r.Warnings) != 0 {
+		t.Errorf("unexpected warnings: %v", r.Warnings)
+	}
+}
+
+// TestApplyReverse_RelationshipAddedFirstSyncNoWarning verifies the first-sync
+// gate works for real callers (#548 review): production callers pass a non-nil
+// but timestamp-less state on the first sync (LoadState fabricates it), so the
+// "already exists" conflict warning must be suppressed via the timestamp, not
+// via nil-ness. A user who added the same relationship to both the model and
+// draw.io on their very first sync should get no warning.
+func TestApplyReverse_RelationshipAddedFirstSyncNoWarning(t *testing.T) {
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"a": {Kind: "container", Title: "A"},
+			"b": {Kind: "container", Title: "B"},
+		},
+		Relationships: []model.Relationship{
+			{From: "a", To: "b", Label: "uses"}, // global index 0
+		},
+	}
+	// First sync: non-nil state as LoadState fabricates it, but no timestamp.
+	lastState := &SyncState{
+		Elements:      map[string]ElementState{},
+		Relationships: []RelationshipState{},
+		// Timestamp intentionally empty: no prior sync has completed.
+	}
+	cs := relChangeSet("a", "b", Added, "", "", "uses")
+
+	r := ApplyReverse(cs, m, lastState)
+
+	if len(m.Relationships) != 1 {
+		t.Fatalf("expected 1 relationship (no duplicate), got %d", len(m.Relationships))
+	}
+	if r.RelationshipsCreated != 0 {
+		t.Errorf("expected RelationshipsCreated=0, got %d", r.RelationshipsCreated)
+	}
+	if len(r.Warnings) != 0 {
+		t.Errorf("expected no warning on first sync, got %v", r.Warnings)
+	}
+}
+
 // TestApplyReverse_RelationshipAddedStaleElementsRejected verifies that
 // relationships referencing non-existent elements are rejected during reverse sync (#329).
 func TestApplyReverse_RelationshipAddedStaleElementsRejected(t *testing.T) {
@@ -319,7 +508,7 @@ func TestApplyReverse_RelationshipAddedStaleElementsRejected(t *testing.T) {
 	m.Relationships = []model.Relationship{} // clear the initial relationship for this test
 	cs := relChangeSet("nonexistent", "y", Added, "", "", "uses")
 
-	r := ApplyReverse(cs, m)
+	r := ApplyReverse(cs, m, nil)
 
 	if len(m.Relationships) != 0 {
 		t.Fatalf("expected 0 relationships (stale rejected), got %d", len(m.Relationships))
@@ -358,7 +547,7 @@ func TestApplyReverse_SwapConnectorDirectionPreservesMetadata(t *testing.T) {
 		},
 	}
 
-	result := ApplyReverse(cs, m)
+	result := ApplyReverse(cs, m, nil)
 
 	if len(m.Relationships) != 1 {
 		t.Fatalf("expected 1 relationship, got %d", len(m.Relationships))
@@ -468,7 +657,7 @@ func TestApplyReverse_NewElementFromDrawio(t *testing.T) {
 		},
 	}
 
-	result := ApplyReverse(cs, m)
+	result := ApplyReverse(cs, m, nil)
 
 	// The new element should be added to the model.
 	if _, ok := m.Model["newservice"]; !ok {
@@ -493,10 +682,24 @@ func TestApplyReverse_NewElementFromDrawio(t *testing.T) {
 // TestApplyReverse_NewElementCollidingIDSkipped verifies that a new element
 // from draw.io whose auto-generated ID collides with an existing model element
 // is NOT imported and a warning is issued instead of overwriting (#203).
+// On first sync (lastState is nil), skip silently - element exists in both places by design.
+// On subsequent sync, warn about genuine conflicts (element in model wasn't synced from draw.io).
 func TestApplyReverse_NewElementCollidingIDSkipped(t *testing.T) {
 	m := &model.BausteinsichtModel{
 		Model: map[string]model.Element{
 			"api": {Kind: "container", Title: "API Gateway", Description: "Main service", Technology: "Go"},
+		},
+	}
+
+	// Simulate "lost sync state" - previous sync had OTHER elements,
+	// but not this one. The element was manually added to the model
+	// (not synced from draw.io), and now draw.io also has it.
+	// This is a genuine conflict: model has element that wasn't synced from draw.io.
+	lastState := &SyncState{
+		Timestamp: "2026-07-26T00:00:00Z", // a prior sync completed
+		Elements: map[string]ElementState{
+			// Some OTHER element that was synced before
+			"other": {Title: "Other", Kind: "system"},
 		},
 	}
 
@@ -506,7 +709,7 @@ func TestApplyReverse_NewElementCollidingIDSkipped(t *testing.T) {
 		},
 	}
 
-	result := ApplyReverse(cs, m)
+	result := ApplyReverse(cs, m, lastState)
 
 	// Existing element must NOT be overwritten.
 	elem := m.Model["api"]
@@ -523,7 +726,8 @@ func TestApplyReverse_NewElementCollidingIDSkipped(t *testing.T) {
 	if result.ElementsCreated != 0 {
 		t.Errorf("expected ElementsCreated=0, got %d", result.ElementsCreated)
 	}
-	// Should have a warning about the collision.
+	// Should have a warning about the collision (because lastState exists but
+	// doesn't include this element - it's a genuine conflict).
 	var found bool
 	for _, w := range result.Warnings {
 		if strings.Contains(w, "api") && strings.Contains(w, "already exists") {
@@ -556,7 +760,7 @@ func TestApplyReverse_NewElementGetsDefaultKind(t *testing.T) {
 		},
 	}
 
-	ApplyReverse(cs, m)
+	ApplyReverse(cs, m, nil)
 
 	elem, ok := m.Model["newservice"]
 	if !ok {
@@ -589,7 +793,7 @@ func TestApplyReverse_NewElementWarningMentionsKind(t *testing.T) {
 		},
 	}
 
-	result := ApplyReverse(cs, m)
+	result := ApplyReverse(cs, m, nil)
 
 	var found bool
 	for _, w := range result.Warnings {
@@ -623,7 +827,7 @@ func TestApplyReverse_DeletedElementCleansOrphanedRelationships(t *testing.T) {
 	// Delete "payments" element from draw.io (without deleting its connectors).
 	cs := elemChangeSet("payments", Deleted, "", "", "")
 
-	r := ApplyReverse(cs, m)
+	r := ApplyReverse(cs, m, nil)
 
 	// Element should be removed.
 	if _, exists := m.Model["payments"]; exists {
@@ -673,7 +877,7 @@ func TestApplyReverse_DeletedElementCleansNestedRelationships(t *testing.T) {
 
 	cs := elemChangeSet("shop", Deleted, "", "", "")
 
-	r := ApplyReverse(cs, m)
+	r := ApplyReverse(cs, m, nil)
 
 	if _, exists := m.Model["shop"]; exists {
 		t.Error("expected element 'shop' to be removed")

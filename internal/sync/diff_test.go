@@ -1004,7 +1004,7 @@ func TestDetectChanges_DeletedElementConnectorUsesCanonicalIDs(t *testing.T) {
 
 	// Also verify via ApplyReverse: if changes are applied, the model should
 	// not contain relationships with scoped cell IDs.
-	ApplyReverse(cs, m)
+	ApplyReverse(cs, m, nil)
 	for _, rel := range m.Relationships {
 		if strings.Contains(rel.From, "--") {
 			t.Errorf("Model relationship From contains scoped cell ID %q after reverse sync", rel.From)

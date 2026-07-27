@@ -61,7 +61,7 @@ func Run(
 	result.Forward = ApplyForward(changes, doc, templates, m, opts...)
 
 	// Step 5: Reverse sync (draw.io → model).
-	result.Reverse = ApplyReverse(changes, m)
+	result.Reverse = ApplyReverse(changes, m, lastState)
 
 	// Step 6: Warn about model elements not visible in any view (#183).
 	if len(m.Views) > 0 {
