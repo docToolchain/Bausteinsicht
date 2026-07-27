@@ -9,6 +9,8 @@ package e2e
 // back-nav button (#198).
 
 import (
+	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -165,6 +167,42 @@ func TestDocLinkIcons(t *testing.T) {
 	if count != 1 {
 		t.Errorf("expected exactly 1 doclink-%s-link icon after re-sync, got %d", apiCellID, count)
 	}
+
+	// ── SVG export + link validation (requires draw.io CLI) ────────────────────
+	// The .drawio-XML assertions above prove the `link` attributes are written
+	// correctly; this proves they actually survive draw.io's own SVG rendering
+	// and come out as clickable <a href> elements — the claim 03_data_models.adoc
+	// makes for `link` ("Use SVG export ... to preserve links") extended to the
+	// new doc-link icons. Mirrors bigbank_arc42_test.go's SVGExportAndLinks step.
+	drawioCmd := findDrawioCmd()
+	if drawioCmd == "" {
+		t.Log("draw.io CLI not found — skipping SVG export and link validation")
+		t.Log("To run this part: install draw.io CLI and re-run the test")
+		return
+	}
+
+	svgDir := filepath.Join(dir, "svgs")
+	if err := os.MkdirAll(svgDir, 0o755); err != nil {
+		t.Fatalf("mkdir svgs: %v", err)
+	}
+
+	exportCmd := exec.Command(bin,
+		"export",
+		"--model", modelPath,
+		"--image-format", "svg",
+		"--output", svgDir,
+	)
+	if out, err := exportCmd.CombinedOutput(); err != nil {
+		t.Fatalf("bausteinsicht export: %v\n%s", err, out)
+	}
+
+	expectedHrefs := map[string]string{
+		"element link":    "architecture.adoc#sec-api",
+		"decision":        "ADRs/ADR-001-DSL-Format.html",
+		"element docLink": "docs/arc42/05-building-blocks.html#api",
+		"view docLink":    "docs/prd.html",
+	}
+	validateSVGLinks(t, filepath.Join(svgDir, "architecture-overview.svg"), expectedHrefs)
 }
 
 func requirePageE2E(t *testing.T, doc *drawio.Document, pageID string) *drawio.Page {
