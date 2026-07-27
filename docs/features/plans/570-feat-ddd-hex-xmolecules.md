@@ -9,7 +9,7 @@ This is the umbrella plan for how Bausteinsicht supports Hexagonal Architecture 
 ## Scope
 
 - **In scope:** modelling Hexagonal + DDD as architecture-as-code in Bausteinsicht; aligning the vocabulary with xMolecules; generating and synchronising code-level rules (ArchUnit) from the model; validating against a known reference codebase; publishing the story.
-- **Out of scope:** mirroring the code's type graph inside the model; owning a JVM adapter's maintenance; jQAssistant and non-ArchUnit backends (anticipated later, tracked in the ArchUnit ADR — planned ADR-013).
+- **Out of scope:** mirroring the code's type graph inside the model; owning a JVM adapter's maintenance; jQAssistant and non-ArchUnit backends (anticipated later, tracked in the ArchUnit ADR — planned).
 
 ## Vision (one paragraph)
 
@@ -20,7 +20,7 @@ A language-neutral, xMolecules-aligned architecture vocabulary in Bausteinsicht 
 1. **Model** — express the architecture in the JSONC model. `kind` carries the structural role (`drivingAdapter`, `inboundPort`, `applicationService`, `aggregate`, `entity`, `valueObject`, `domainService`, `outboundPort`, `drivenAdapter`, plus `boundedContext`, `datastore`, `externalSystem`). `tags` carry the four zones (adapter / port / application / domain) for colour and view filtering. `metadata` carries machine-readable stereotypes that are not rendered visually. A `template.drawio` renders a real hexagon; `views` give context / ports-and-adapters / domain-model drill-down.
 2. **Enforce** — architecture rules as fitness functions. `constraints` (`no-outgoing-dependency`, `allowed-relationship`, `no-circular-dependency`, …) encode the hexagonal dependency rules, checked by `bausteinsicht lint`, so CI fails when the model is wired against the architecture.
 3. **Standardise** — anchor the vocabulary to xMolecules. xMolecules is the language-neutral umbrella (jMolecules/Java, nMolecules/.NET, phpMolecules/PHP); Bausteinsicht is the *model / diagram* member of that family. **Option A** (chosen — see [Vocabulary alignment](#vocabulary-alignment-option-a-vs-option-b), decision record ADR-012) keeps the didactic terms as `kind` and maps each element 1:1 onto the xMolecules stereotype via `metadata.jmolecules`, defaulting deterministically from `kind`.
-4. **Bridge to code** — the round-trip ([#562](https://github.com/docToolchain/Bausteinsicht/issues/562), ArchUnit ADR — planned ADR-013). The stereotype is the bridge between architecture-as-code (the model) and code-level architecture. A generator turns the model into ArchUnit rules — or verifies code against the model — with the code→role mapping supplied by a `codeMapping` field, not by code annotations.
+4. **Bridge to code** — the round-trip ([#562](https://github.com/docToolchain/Bausteinsicht/issues/562), ArchUnit ADR — planned). The stereotype is the bridge between architecture-as-code (the model) and code-level architecture. A generator turns the model into ArchUnit rules — or verifies code against the model — with the code→role mapping supplied by a `codeMapping` field, not by code annotations.
 5. **Prove and publish** — dogfooding. Validate against Spring RESTBucks (its `hacking/hexagonal` branch uses jMolecules + jmolecules-archunit); publish a two-tier article on the docToolchain blog.
 
 ## Vocabulary alignment: Option A vs. Option B
@@ -47,7 +47,7 @@ The only fact that genuinely overlaps is the *stereotype* (`@AggregateRoot` in c
 
 - **Cross-check:** CI asserts "code annotation ↔ model stereotype agree"; on divergence it fails and one side is fixed. Verified redundancy, like a test — not manual sync.
 - **Generate one side from the other:** generate a jMolecules-annotated skeleton from the model, or derive the model's element list from an annotation scan. Single source plus a generated projection.
-- **Rule of thumb:** double-maintenance pain arises only when *both* sides are hand-authored *and* can silently diverge. The ArchUnit ADR's (planned ADR-013) reverse/drift path plus a stereotype cross-check remove exactly that condition.
+- **Rule of thumb:** double-maintenance pain arises only when *both* sides are hand-authored *and* can silently diverge. The ArchUnit ADR's (planned) reverse/drift path plus a stereotype cross-check remove exactly that condition.
 
 ## Two ArchUnit worlds (comparison)
 
@@ -74,7 +74,7 @@ They are complementary axes, not competitors. Modelling with xMolecules and vali
 **Available today:**
 
 - Model Hexagonal + DDD with custom kinds/tags/metadata; real hexagon rendering via `template.drawio`.
-- **Concentric hexagonal rings** via the `nested` layout mode: nest zone containers (`adapterZone` ⊃ `portZone` ⊃ `domainZone`) and Bausteinsicht renders them as concentric hexagons, sized bottom-up; `metadata.side` (`top`/`bottom`) places driving/inbound on top and driven/outbound below (see the `hexagonal-ddd` Ports & Adapters view). Documented in ADR-005 and `05_sync_specification.adoc`.
+- **Concentric hexagonal rings** via the `nested` layout mode: nest zone containers (`adapterZone` ⊃ `portZone` ⊃ `domainZone`) and Bausteinsicht renders them as concentric hexagons, sized bottom-up; `metadata.side` (`top`/`bottom`) places driving/inbound on top and driven/outbound below (see the `hexagonal-ddd` Ports & Adapters view). Documented in ADR-013 (which extends ADR-005) and `05_sync_specification.adoc`.
 - Enforce hexagonal rules via `constraints` + `bausteinsicht lint`.
 - xMolecules vocabulary alignment via `metadata.jmolecules` (see the `hexagonal-jmolecules` example).
 
@@ -103,7 +103,7 @@ They are complementary axes, not competitors. Modelling with xMolecules and vali
 
 _Some targets currently live on the `feature/archunit` branch and become live links once branches merge to `main`._
 
-- Decision — ArchUnit integration (planned ADR-013; currently drafted as `ADR-XXX-ArchUnit-Rule-Integration.adoc` + `adr-012-integration-variants.adoc` on `feature/archunit`, to be renumbered).
+- Decision — ArchUnit integration (planned; currently drafted as `ADR-XXX-ArchUnit-Rule-Integration.adoc` + `adr-012-integration-variants.adoc` on `feature/archunit`; stays unnumbered until merged — planned ADRs are not pre-assigned numbers).
 - Decision — xMolecules vocabulary alignment (Option A): `src/docs/arc42/ADRs/ADR-012-xMolecules-Vocabulary-Alignment.adoc`.
 - Concept — arc42 §8 Crosscutting Concepts: DDD/Hex/xMolecules modelling approach _(planned)_.
 - Spec — `codeMapping` field + constraint→ArchUnit mapping: `src/docs/spec/02_cli_specification.adoc`, `03_data_models.adoc` _(to extend)_.
