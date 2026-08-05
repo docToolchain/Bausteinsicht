@@ -247,7 +247,7 @@ func (s *replState) addElementInteractive() {
 		fmt.Println("Aborted (empty ID)")
 		return
 	}
-	if !isValidID(id) {
+	if !isValidKey(id) {
 		fmt.Printf("Invalid ID %q: must contain only letters, digits, hyphens, or underscores\n", id)
 		return
 	}

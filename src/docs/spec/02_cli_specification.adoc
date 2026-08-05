@@ -525,6 +525,8 @@ $ bausteinsicht add relationship --from webshop.api --to webshop.db --format jso
 
 Creates a new view or modifies an existing view's include list. Designed for LLM-driven workflows to dynamically filter architecture diagrams.
 
+The `<view-key>` argument must match `[a-zA-Z][a-zA-Z0-9_-]*` (the same identifier form as element IDs and specification keys).
+
 **Flags:**
 
 [cols="2,3,1,1"]
@@ -612,6 +614,9 @@ $ bausteinsicht add view context --title "System Context" --format json
 ==== `bausteinsicht add specification`
 
 Adds new element or relationship types to the model's specification. Enables definition of custom architecture notations.
+
+The `<key>` names the kind and must match `[a-zA-Z][a-zA-Z0-9_-]*` (letters, digits, hyphens, underscores -- the same identifier form as element IDs).
+camelCase kinds such as `boundaryObject` or `applicationService` are supported.
 
 ===== Add Element Type
 

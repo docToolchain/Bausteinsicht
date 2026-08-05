@@ -63,3 +63,40 @@ func TestAuthoringWorkflow(t *testing.T) {
 
 	t.Log("authoring workflow OK: init → validate → lint (pass) → add element → lint (fail) verified")
 }
+
+// TestAuthoringWorkflow_CamelCaseKinds (#582) verifies the CLI can author a
+// model whose specification kinds and view key are camelCase. The model,
+// schema, `validate`, and `add element --kind` already accept camelCase kinds
+// (e.g. the hexagonal/DDD example), so `add specification` and `add view` must
+// be able to create them too.
+func TestAuthoringWorkflow_CamelCaseKinds(t *testing.T) {
+	bin := buildBinary(t)
+	dir := t.TempDir()
+
+	runCLI(t, bin, dir, "init")
+
+	// Define camelCase specification kinds (hexagonal/DDD style).
+	runCLI(t, bin, dir, "add", "specification", "element", "boundaryObject",
+		"--notation", "Boundary Object", "--container")
+	runCLI(t, bin, dir, "add", "specification", "element", "applicationService",
+		"--notation", "Application Service")
+	runCLI(t, bin, dir, "add", "specification", "relationship", "dependsOn",
+		"--notation", "depends on")
+
+	// A camelCase view key.
+	runCLI(t, bin, dir, "add", "view", "systemContext", "--title", "System Context")
+
+	// Use the camelCase kinds when adding elements.
+	runCLI(t, bin, dir, "add", "element",
+		"--id", "orderRecord", "--kind", "boundaryObject", "--title", "Order Record")
+	runCLI(t, bin, dir, "add", "element",
+		"--id", "orderService", "--kind", "applicationService", "--title", "Order Service")
+
+	// The resulting model must still validate.
+	validateOut := runCLI(t, bin, dir, "validate")
+	if !strings.Contains(validateOut, "valid") {
+		t.Errorf("expected model to validate after camelCase authoring, got: %q", validateOut)
+	}
+
+	t.Log("camelCase authoring OK: add specification/view/element with camelCase kinds → validate")
+}
