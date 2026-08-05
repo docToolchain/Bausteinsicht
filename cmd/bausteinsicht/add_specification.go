@@ -3,19 +3,10 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"regexp"
 
 	"github.com/docToolchain/Bausteinsicht/internal/model"
 	"github.com/spf13/cobra"
 )
-
-// validSpecKeyPattern matches specification keys: lowercase letters, digits, underscores, hyphens.
-var validSpecKeyPattern = regexp.MustCompile(`^[a-z][a-z0-9_-]*$`)
-
-// isValidSpecKey checks if the given spec key is valid.
-func isValidSpecKey(key string) bool {
-	return validSpecKeyPattern.MatchString(key)
-}
 
 func newAddSpecificationCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -56,9 +47,9 @@ func runAddSpecificationElement(cmd *cobra.Command, args []string) error {
 	format, _ := cmd.Flags().GetString("format")
 
 	// Validate key format
-	if !isValidSpecKey(key) {
+	if !isValidKey(key) {
 		return exitWithCode(
-			fmt.Errorf("invalid specification key %q: must contain only lowercase letters, digits, hyphens, or underscores", key),
+			fmt.Errorf("invalid specification key %q: must contain only letters, digits, hyphens, or underscores", key),
 			1,
 		)
 	}
@@ -148,9 +139,9 @@ func runAddSpecificationRelationship(cmd *cobra.Command, args []string) error {
 	format, _ := cmd.Flags().GetString("format")
 
 	// Validate key format
-	if !isValidSpecKey(key) {
+	if !isValidKey(key) {
 		return exitWithCode(
-			fmt.Errorf("invalid specification key %q: must contain only lowercase letters, digits, hyphens, or underscores", key),
+			fmt.Errorf("invalid specification key %q: must contain only letters, digits, hyphens, or underscores", key),
 			1,
 		)
 	}

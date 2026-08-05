@@ -3,21 +3,11 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"regexp"
 	"strings"
 
 	"github.com/docToolchain/Bausteinsicht/internal/model"
 	"github.com/spf13/cobra"
 )
-
-// validIDPattern matches element IDs: letters, digits, hyphens, underscores.
-// Dots are NOT allowed since they serve as hierarchy separators.
-var validIDPattern = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_-]*$`)
-
-// isValidID checks if the given ID is a valid element identifier.
-func isValidID(id string) bool {
-	return validIDPattern.MatchString(id)
-}
 
 func newAddElementCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -52,7 +42,7 @@ func runAddElement(cmd *cobra.Command, args []string) error {
 	format, _ := cmd.Flags().GetString("format")
 
 	// Validate ID format. (#123)
-	if !isValidID(id) {
+	if !isValidKey(id) {
 		return exitWithCode(
 			fmt.Errorf("invalid element ID %q: must contain only letters, digits, hyphens, or underscores", id),
 			1,

@@ -3,19 +3,10 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"regexp"
 
 	"github.com/docToolchain/Bausteinsicht/internal/model"
 	"github.com/spf13/cobra"
 )
-
-// validViewKeyPattern matches view keys: lowercase letters, digits, hyphens.
-var validViewKeyPattern = regexp.MustCompile(`^[a-z][a-z0-9_-]*$`)
-
-// isValidViewKey checks if the given view key is valid.
-func isValidViewKey(key string) bool {
-	return validViewKeyPattern.MatchString(key)
-}
 
 func newAddViewCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -44,9 +35,9 @@ func runAddView(cmd *cobra.Command, args []string) error {
 	format, _ := cmd.Flags().GetString("format")
 
 	// Validate view key format
-	if !isValidViewKey(viewKey) {
+	if !isValidKey(viewKey) {
 		return exitWithCode(
-			fmt.Errorf("invalid view key %q: must contain only lowercase letters, digits, hyphens, or underscores", viewKey),
+			fmt.Errorf("invalid view key %q: must contain only letters, digits, hyphens, or underscores", viewKey),
 			1,
 		)
 	}
