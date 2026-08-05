@@ -37,7 +37,7 @@ func runAddView(cmd *cobra.Command, args []string) error {
 	// Validate view key format
 	if !isValidKey(viewKey) {
 		return exitWithCode(
-			fmt.Errorf("invalid view key %q: must contain only letters, digits, hyphens, or underscores", viewKey),
+			fmt.Errorf("invalid view key %q: must start with a letter and contain only letters, digits, hyphens, or underscores", viewKey),
 			1,
 		)
 	}

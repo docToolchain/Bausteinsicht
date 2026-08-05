@@ -49,7 +49,7 @@ func runAddSpecificationElement(cmd *cobra.Command, args []string) error {
 	// Validate key format
 	if !isValidKey(key) {
 		return exitWithCode(
-			fmt.Errorf("invalid specification key %q: must contain only letters, digits, hyphens, or underscores", key),
+			fmt.Errorf("invalid specification key %q: must start with a letter and contain only letters, digits, hyphens, or underscores", key),
 			1,
 		)
 	}
@@ -141,7 +141,7 @@ func runAddSpecificationRelationship(cmd *cobra.Command, args []string) error {
 	// Validate key format
 	if !isValidKey(key) {
 		return exitWithCode(
-			fmt.Errorf("invalid specification key %q: must contain only letters, digits, hyphens, or underscores", key),
+			fmt.Errorf("invalid specification key %q: must start with a letter and contain only letters, digits, hyphens, or underscores", key),
 			1,
 		)
 	}

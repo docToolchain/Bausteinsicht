@@ -44,7 +44,7 @@ func runAddElement(cmd *cobra.Command, args []string) error {
 	// Validate ID format. (#123)
 	if !isValidKey(id) {
 		return exitWithCode(
-			fmt.Errorf("invalid element ID %q: must contain only letters, digits, hyphens, or underscores", id),
+			fmt.Errorf("invalid element ID %q: must start with a letter and contain only letters, digits, hyphens, or underscores", id),
 			1,
 		)
 	}
