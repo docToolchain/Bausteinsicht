@@ -248,7 +248,7 @@ func (s *replState) addElementInteractive() {
 		return
 	}
 	if !isValidKey(id) {
-		fmt.Printf("Invalid ID %q: must contain only letters, digits, hyphens, or underscores\n", id)
+		fmt.Printf("Invalid ID %q: must start with a letter and contain only letters, digits, hyphens, or underscores\n", id)
 		return
 	}
 
