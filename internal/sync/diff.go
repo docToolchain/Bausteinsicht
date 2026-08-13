@@ -207,7 +207,7 @@ func extractDrawioElements(doc *drawio.Document) map[string]drawioElemSnapshot {
 	result := make(map[string]drawioElemSnapshot)
 	for _, page := range doc.Pages() {
 		for _, obj := range page.FindAllElements() {
-			id := obj.SelectAttrValue("bausteinsicht_id", "")
+			id := obj.SelectAttrValue(attrBausteinsichtID, "")
 			if id == "" {
 				continue
 			}
@@ -216,7 +216,7 @@ func extractDrawioElements(doc *drawio.Document) map[string]drawioElemSnapshot {
 			title, technology, labelDesc := page.ReadElementFields(obj)
 			// Fall back to XML attribute if label doesn't contain technology (#186).
 			if technology == "" {
-				technology = obj.SelectAttrValue("technology", "")
+				technology = obj.SelectAttrValue(fieldTechnology, "")
 			}
 			tooltipDesc := obj.SelectAttrValue("tooltip", "")
 			description := tooltipDesc
@@ -267,7 +267,7 @@ func detectUnmanagedDrawioElements(cs *ChangeSet, doc *drawio.Document) {
 // non-model elements forward sync itself creates (back-nav button,
 // metadata/legend boxes, doc-link icons), which are skipped by ID prefix.
 func unmanagedDrawioElementTitle(page *drawio.Page, obj *etree.Element) (title, id string, ok bool) {
-	if obj.SelectAttrValue("bausteinsicht_id", "") != "" {
+	if obj.SelectAttrValue(attrBausteinsichtID, "") != "" {
 		return "", "", false // managed element, already handled
 	}
 	// Skip non-model elements created by forward sync.
@@ -286,7 +286,7 @@ func unmanagedDrawioElementTitle(page *drawio.Page, obj *etree.Element) (title, 
 	// Try sub-cell reading first, then HTML label.
 	title, _, _ = page.ReadElementFields(obj)
 	if title == "" {
-		label := obj.SelectAttrValue("label", "")
+		label := obj.SelectAttrValue(fieldLabel, "")
 		if label == "" {
 			return "", "", false
 		}
@@ -346,7 +346,7 @@ func buildCellIDToElemID(doc *drawio.Document) map[string]string {
 // to its element ID.
 func mapManagedElementsOnPage(page *drawio.Page, m map[string]string) {
 	for _, obj := range page.FindAllElements() {
-		elemID := obj.SelectAttrValue("bausteinsicht_id", "")
+		elemID := obj.SelectAttrValue(attrBausteinsichtID, "")
 		cellID := obj.SelectAttrValue("id", "")
 		if elemID != "" && cellID != "" {
 			m[cellID] = elemID
@@ -374,7 +374,7 @@ func mapUnmanagedElementsOnPage(page *drawio.Page, m map[string]string) {
 // connectors targeting unmanaged elements resolve correctly during reverse
 // sync (#211).
 func unmanagedElementID(obj *etree.Element) (cellID, id string, ok bool) {
-	if obj.SelectAttrValue("bausteinsicht_id", "") != "" {
+	if obj.SelectAttrValue(attrBausteinsichtID, "") != "" {
 		return "", "", false
 	}
 	cellID = obj.SelectAttrValue("id", "")
@@ -388,7 +388,7 @@ func unmanagedElementID(obj *etree.Element) (cellID, id string, ok bool) {
 	if cell == nil || cell.SelectAttrValue("vertex", "") != "1" {
 		return "", "", false
 	}
-	label := obj.SelectAttrValue("label", "")
+	label := obj.SelectAttrValue(fieldLabel, "")
 	if label == "" {
 		return "", "", false
 	}
@@ -534,9 +534,9 @@ func detectElementChangeForID(
 
 	// Conflicts: both sides modified the same field
 	if inModel && inDrawio && inLast {
-		checkElemConflict(cs, id, "title", lastElem.Title, me.Title, de.title)
-		checkElemConflict(cs, id, "description", lastElem.Description, me.Description, de.description)
-		checkElemConflict(cs, id, "technology", lastElem.Technology, me.Technology, de.technology)
+		checkElemConflict(cs, id, fieldTitle, lastElem.Title, me.Title, de.title)
+		checkElemConflict(cs, id, fieldDescription, lastElem.Description, me.Description, de.description)
+		checkElemConflict(cs, id, fieldTechnology, lastElem.Technology, me.Technology, de.technology)
 		// Note: kind conflicts are not checked because kind is
 		// model-authoritative and draw.io boundary kinds are derived.
 	}
@@ -551,9 +551,9 @@ func detectModelElementChange(cs *ChangeSet, id string, me *model.Element, inMod
 	case !inModel && inLast:
 		cs.ModelElementChanges = append(cs.ModelElementChanges, ElementChange{ID: id, Type: Deleted})
 	case inModel && inLast:
-		appendIfChanged(id, "title", lastElem.Title, me.Title, &cs.ModelElementChanges)
-		appendIfChanged(id, "description", lastElem.Description, me.Description, &cs.ModelElementChanges)
-		appendIfChanged(id, "technology", lastElem.Technology, me.Technology, &cs.ModelElementChanges)
+		appendIfChanged(id, fieldTitle, lastElem.Title, me.Title, &cs.ModelElementChanges)
+		appendIfChanged(id, fieldDescription, lastElem.Description, me.Description, &cs.ModelElementChanges)
+		appendIfChanged(id, fieldTechnology, lastElem.Technology, me.Technology, &cs.ModelElementChanges)
 		appendIfChanged(id, "kind", lastElem.Kind, me.Kind, &cs.ModelElementChanges)
 		appendIfChanged(id, "link", lastElem.Link, me.Link, &cs.ModelElementChanges)
 	}
@@ -578,9 +578,9 @@ func detectDrawioElementChange(
 	case !inDrawio && inLast:
 		appendDrawioDeletionIfVisible(cs, id, lastState, visibleElems, newPageOnly)
 	case inDrawio && inLast:
-		appendIfChanged(id, "title", lastElem.Title, de.title, &cs.DrawioElementChanges)
-		appendIfChanged(id, "description", lastElem.Description, de.description, &cs.DrawioElementChanges)
-		appendIfChanged(id, "technology", lastElem.Technology, de.technology, &cs.DrawioElementChanges)
+		appendIfChanged(id, fieldTitle, lastElem.Title, de.title, &cs.DrawioElementChanges)
+		appendIfChanged(id, fieldDescription, lastElem.Description, de.description, &cs.DrawioElementChanges)
+		appendIfChanged(id, fieldTechnology, lastElem.Technology, de.technology, &cs.DrawioElementChanges)
 		// Note: kind is not compared on the draw.io side because scope
 		// boundary elements have a derived kind (e.g. "system_boundary")
 		// that legitimately differs from the model kind ("system").
@@ -691,7 +691,7 @@ func reconcileElementFieldsAcrossViews(
 	lastState *SyncState,
 	emitted map[fieldKey]bool,
 ) {
-	id := obj.SelectAttrValue("bausteinsicht_id", "")
+	id := obj.SelectAttrValue(attrBausteinsichtID, "")
 	if id == "" {
 		return
 	}
@@ -706,7 +706,7 @@ func reconcileElementFieldsAcrossViews(
 
 	title, technology, labelDesc := page.ReadElementFields(obj)
 	if technology == "" {
-		technology = obj.SelectAttrValue("technology", "")
+		technology = obj.SelectAttrValue(fieldTechnology, "")
 	}
 	tooltipDesc := obj.SelectAttrValue("tooltip", "")
 	description := tooltipDesc
@@ -714,9 +714,9 @@ func reconcileElementFieldsAcrossViews(
 		description = labelDesc
 	}
 
-	emitStaleFieldChange(cs, emitted, id, "title", lastElem.Title, me.Title, title)
-	emitStaleFieldChange(cs, emitted, id, "description", lastElem.Description, me.Description, description)
-	emitStaleFieldChange(cs, emitted, id, "technology", lastElem.Technology, me.Technology, technology)
+	emitStaleFieldChange(cs, emitted, id, fieldTitle, lastElem.Title, me.Title, title)
+	emitStaleFieldChange(cs, emitted, id, fieldDescription, lastElem.Description, me.Description, description)
+	emitStaleFieldChange(cs, emitted, id, fieldTechnology, lastElem.Technology, me.Technology, technology)
 }
 
 // emitStaleFieldChange appends a Modified ElementChange for field if the
@@ -830,7 +830,7 @@ func detectModelRelationshipChange(
 		})
 	case inModel && inLast && (mr.Label != lr.Label || mr.Kind != lr.Kind):
 		cs.ModelRelationshipChanges = append(cs.ModelRelationshipChanges, RelationshipChange{
-			From: from, To: to, Index: index, Type: Modified, Field: "label",
+			From: from, To: to, Index: index, Type: Modified, Field: fieldLabel,
 			OldValue: lr.Label, NewValue: mr.Label, Kind: mr.Kind,
 		})
 	}
@@ -858,7 +858,7 @@ func detectDrawioRelationshipChange(
 		appendDeletedDrawioRelationship(cs, k, from, to, index, drawioRels, visibleRels)
 	case inDrawio && inLast && dr.Label != lr.Label:
 		cs.DrawioRelationshipChanges = append(cs.DrawioRelationshipChanges, RelationshipChange{
-			From: from, To: to, Index: index, Type: Modified, Field: "label",
+			From: from, To: to, Index: index, Type: Modified, Field: fieldLabel,
 			OldValue: lr.Label, NewValue: dr.Label,
 		})
 	}

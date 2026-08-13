@@ -43,10 +43,10 @@ func createMetadata(
 	// Update existing metadata cell — only if label actually changed.
 	for _, obj := range root.SelectElements("object") {
 		if obj.SelectAttrValue("id", "") == cellID {
-			if obj.SelectAttrValue("label", "") == label {
+			if obj.SelectAttrValue(fieldLabel, "") == label {
 				return false
 			}
-			obj.CreateAttr("label", label)
+			obj.CreateAttr(fieldLabel, label)
 			return true
 		}
 	}
@@ -84,10 +84,10 @@ func createLegend(
 	// Update existing legend cell — only if label actually changed.
 	for _, obj := range root.SelectElements("object") {
 		if obj.SelectAttrValue("id", "") == cellID {
-			if obj.SelectAttrValue("label", "") == label {
+			if obj.SelectAttrValue(fieldLabel, "") == label {
 				return false
 			}
-			obj.CreateAttr("label", label)
+			obj.CreateAttr(fieldLabel, label)
 			return true
 		}
 	}
@@ -199,7 +199,7 @@ func extractFillColor(allStyles map[string]drawio.TemplateStyle, kind string) st
 // createInfoBox creates a non-model mxCell info box at the given position.
 func createInfoBox(root *etree.Element, id, label string, x, y, width float64) {
 	obj := root.CreateElement("object")
-	obj.CreateAttr("label", label)
+	obj.CreateAttr(fieldLabel, label)
 	obj.CreateAttr("id", id)
 
 	cell := obj.CreateElement("mxCell")

@@ -348,7 +348,7 @@ func collectElementsToPlace(page *drawio.Page, scopeID string, elemSet map[strin
 func isFreshPage(page *drawio.Page, scopeID string) bool {
 	nonBoundaryCount := 0
 	for _, obj := range page.FindAllElements() {
-		if obj.SelectAttrValue("bausteinsicht_id", "") != scopeID || scopeID == "" {
+		if obj.SelectAttrValue(attrBausteinsichtID, "") != scopeID || scopeID == "" {
 			nonBoundaryCount++
 		}
 	}
@@ -1111,7 +1111,7 @@ func clearPageElements(page *drawio.Page) {
 	// Collect elements to remove (cannot modify tree while iterating).
 	var toRemove []*etree.Element
 	for _, obj := range root.SelectElements("object") {
-		if obj.SelectAttrValue("bausteinsicht_id", "") != "" {
+		if obj.SelectAttrValue(attrBausteinsichtID, "") != "" {
 			toRemove = append(toRemove, obj)
 		}
 	}
@@ -1159,11 +1159,11 @@ func resolveElementFields(ch ElementChange, page *drawio.Page, elem *model.Eleme
 	}
 	title, technology, description = curTitle, curTech, curDesc
 	switch ch.Field {
-	case "title":
+	case fieldTitle:
 		title = elem.Title
-	case "technology":
+	case fieldTechnology:
 		technology = elem.Technology
-	case "description":
+	case fieldDescription:
 		description = elem.Description
 	}
 	return
@@ -1327,7 +1327,7 @@ func reconcileViewPage(
 	}
 
 	for _, obj := range page.FindAllElements() {
-		id := obj.SelectAttrValue("bausteinsicht_id", "")
+		id := obj.SelectAttrValue(attrBausteinsichtID, "")
 		if id == "" {
 			continue
 		}
@@ -1370,7 +1370,7 @@ func reconcileOrphanedElements(
 	result *ForwardResult,
 ) {
 	for _, obj := range page.FindAllElements() {
-		id := obj.SelectAttrValue("bausteinsicht_id", "")
+		id := obj.SelectAttrValue(attrBausteinsichtID, "")
 		if id == "" {
 			continue
 		}
@@ -1464,7 +1464,7 @@ func writeUnoverriddenStyleParts(sb *strings.Builder, base string, overlayKeys m
 func applyDrillDownLinks(page *drawio.Page, links map[string]string) []string {
 	var warnings []string
 	for _, obj := range page.FindAllElements() {
-		bid := obj.SelectAttrValue("bausteinsicht_id", "")
+		bid := obj.SelectAttrValue(attrBausteinsichtID, "")
 		drillDown, ok := links[bid]
 		if !ok {
 			continue
@@ -1513,7 +1513,7 @@ func createBackNavButton(
 	}
 
 	obj := root.CreateElement("object")
-	obj.CreateAttr("label", "&larr; "+parentTitle)
+	obj.CreateAttr(fieldLabel, "&larr; "+parentTitle)
 	obj.CreateAttr("id", navCellID)
 	obj.CreateAttr("link", "data:page/id,view-"+parentViewID)
 
