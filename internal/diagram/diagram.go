@@ -279,6 +279,26 @@ func resolveBoundaryMacro(view model.View, flat map[string]*model.Element) (boun
 	return boundaryMacro, scopeTitle
 }
 
+// writeScopeSection writes a view's scope boundary with its internal
+// elements, or — for unscoped views — just the flat "inside" elements.
+// Shared by writePlantUML and writeMermaid, which differ only in
+// indentation convention (PlantUML: no base indent, 2-space nesting;
+// Mermaid: 4-space base indent, 4-space nesting).
+func writeScopeSection(b *strings.Builder, view model.View, flat map[string]*model.Element, inside []elemEntry, outerIndent, innerIndent string) {
+	if view.Scope == "" {
+		for _, e := range inside {
+			writeC4Element(b, e, outerIndent)
+		}
+		return
+	}
+	boundaryMacro, scopeTitle := resolveBoundaryMacro(view, flat)
+	fmt.Fprintf(b, "%s%s(%s, \"%s\") {\n", outerIndent, boundaryMacro, sanitizeID(view.Scope), escapeQuotes(scopeTitle))
+	for _, e := range inside {
+		writeC4Element(b, e, innerIndent)
+	}
+	fmt.Fprintf(b, "%s}\n", outerIndent)
+}
+
 // --- PlantUML ---
 
 func writePlantUML(b *strings.Builder, view model.View, level string, inside, outside []elemEntry, rels []relEntry, flat map[string]*model.Element) {
@@ -291,18 +311,7 @@ func writePlantUML(b *strings.Builder, view model.View, level string, inside, ou
 	}
 
 	// Scope boundary with internal elements.
-	if view.Scope != "" {
-		boundaryMacro, scopeTitle := resolveBoundaryMacro(view, flat)
-		fmt.Fprintf(b, "%s(%s, \"%s\") {\n", boundaryMacro, sanitizeID(view.Scope), escapeQuotes(scopeTitle))
-		for _, e := range inside {
-			writeC4Element(b, e, "  ")
-		}
-		b.WriteString("}\n")
-	} else {
-		for _, e := range inside {
-			writeC4Element(b, e, "")
-		}
-	}
+	writeScopeSection(b, view, flat, inside, "", "  ")
 
 	writePlantUMLRelationships(b, rels)
 
@@ -339,18 +348,7 @@ func writeMermaid(b *strings.Builder, view model.View, level string, inside, out
 		writeC4Element(b, e, "    ")
 	}
 
-	if view.Scope != "" {
-		boundaryMacro, scopeTitle := resolveBoundaryMacro(view, flat)
-		fmt.Fprintf(b, "    %s(%s, \"%s\") {\n", boundaryMacro, sanitizeID(view.Scope), escapeQuotes(scopeTitle))
-		for _, e := range inside {
-			writeC4Element(b, e, "        ")
-		}
-		b.WriteString("    }\n")
-	} else {
-		for _, e := range inside {
-			writeC4Element(b, e, "    ")
-		}
-	}
+	writeScopeSection(b, view, flat, inside, "    ", "        ")
 
 	// Relationships. r.Dashed is intentionally not applied here: Mermaid's
 	// own C4 diagram docs mark UpdateRelStyle's $lineStyle=DashedLine() as
