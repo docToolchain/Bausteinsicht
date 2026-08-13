@@ -46,6 +46,7 @@ func ValidateWithWarnings(m *BausteinsichtModel) ValidationResult {
 	result.Errors = append(result.Errors, validateViews(m)...)
 	result.Errors = append(result.Errors, validateDynamicViews(m)...)
 	result.Errors = append(result.Errors, validatePatterns(m)...)
+	result.Errors = append(result.Errors, validateDuplicateDecisionIDs(m)...)
 	result.Errors = append(result.Errors, validateDecisions(m)...)
 	result.Warnings = append(result.Warnings, validateEmptyModel(m)...)
 	result.Warnings = append(result.Warnings, validateLifecycleStatus(m)...)
@@ -486,6 +487,29 @@ func validatePatterns(m *BausteinsichtModel) []ValidationError {
 				}
 			}
 		}
+	}
+
+	return errs
+}
+
+// validateDuplicateDecisionIDs checks that no two entries in specification.decisions
+// share the same id. A silent collision would make knownDecisions (below) and
+// decisionMap (internal/sync/badge.go) pick whichever entry happens to be last,
+// so linked elements/relationships could display the wrong decision's title/status
+// with no indication anything is wrong.
+func validateDuplicateDecisionIDs(m *BausteinsichtModel) []ValidationError {
+	var errs []ValidationError
+
+	seen := make(map[string]bool)
+	for _, decision := range m.Specification.Decisions {
+		if seen[decision.ID] {
+			errs = append(errs, ValidationError{
+				Path:    "specification.decisions",
+				Message: fmt.Sprintf("duplicate decision id %q", decision.ID),
+			})
+			continue
+		}
+		seen[decision.ID] = true
 	}
 
 	return errs

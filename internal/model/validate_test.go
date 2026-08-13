@@ -518,6 +518,37 @@ func TestValidate_ViewValidLayouts(t *testing.T) {
 	}
 }
 
+// TestValidate_DuplicateDecisionID verifies that two decisions sharing the
+// same ID are flagged. Without this check, knownDecisions in validateDecisions
+// (and decisionMap in internal/sync/badge.go) silently let the last entry win,
+// so a linked element/relationship can end up showing the wrong decision's
+// title/status with no warning at all. Regression test for #557.
+func TestValidate_DuplicateDecisionID(t *testing.T) {
+	m := buildValidModel()
+	m.Specification.Decisions = []DecisionRecord{
+		{ID: "decision_0", Title: "Use PostgreSQL", Status: ADRActive},
+		{ID: "decision_0", Title: "Use REST over gRPC", Status: ADRProposed},
+	}
+
+	errs := Validate(m)
+	if !containsMessage(errs, "decision_0") {
+		t.Errorf("expected error mentioning duplicate decision id %q, got %v", "decision_0", errs)
+	}
+}
+
+func TestValidate_UniqueDecisionIDs(t *testing.T) {
+	m := buildValidModel()
+	m.Specification.Decisions = []DecisionRecord{
+		{ID: "decision_0", Title: "Use PostgreSQL", Status: ADRActive},
+		{ID: "decision_1", Title: "Use REST over gRPC", Status: ADRProposed},
+	}
+
+	errs := Validate(m)
+	if containsMessage(errs, "duplicate") {
+		t.Errorf("expected no duplicate-decision error for unique ids, got %v", errs)
+	}
+}
+
 // containsPath checks whether any error has the given path.
 func containsPath(errs []ValidationError, path string) bool {
 	for _, e := range errs {
