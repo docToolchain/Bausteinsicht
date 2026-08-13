@@ -217,7 +217,8 @@ func testScanIdent(s *Scanner, line int) (Token, error) {
 	start := s.Pos
 	for {
 		c, ok := s.At(0)
-		if !ok || (!testIdentStart(c) && !(c >= '0' && c <= '9')) {
+		isDigit := c >= '0' && c <= '9'
+		if !ok || (!testIdentStart(c) && !isDigit) {
 			break
 		}
 		s.Consume()
