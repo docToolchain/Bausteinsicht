@@ -2,6 +2,7 @@ package diagram
 
 import (
 	"encoding/json"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -422,6 +423,57 @@ func TestHTML_ContextView(t *testing.T) {
 	if !strings.Contains(result, "createElementNS") {
 		t.Error("expected SVG creation via JavaScript")
 	}
+}
+
+// TestHTML_CanvasHasResolvedHeight verifies the generated CSS establishes a
+// resolved height chain from html/body down through .grid to #canvas. Without
+// it, #canvas (flex:1 inside .grid) collapses to ~0 height and the diagram
+// area renders blank even though nodes/edges are embedded correctly.
+// Regression test for #555.
+func TestHTML_CanvasHasResolvedHeight(t *testing.T) {
+	m := testModel()
+	result, err := RenderHTML(m, "context")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	styleStart := strings.Index(result, "<style>")
+	styleEnd := strings.Index(result, "</style>")
+	if styleStart < 0 || styleEnd < 0 {
+		t.Fatal("could not find <style> block")
+	}
+	css := result[styleStart:styleEnd]
+
+	bodyRule := extractCSSRule(css, "body")
+	if !strings.Contains(bodyRule, "height:") {
+		t.Errorf("expected body rule to set an explicit height so descendants can resolve theirs, got body rule:\n%s", bodyRule)
+	}
+	if !strings.Contains(bodyRule, "display: flex") || !strings.Contains(bodyRule, "flex-direction: column") {
+		t.Errorf("expected body to be a column flex container so .grid can flex to fill remaining space, got body rule:\n%s", bodyRule)
+	}
+
+	gridRule := extractCSSRule(css, ".grid")
+	if !strings.Contains(gridRule, "flex:") {
+		t.Errorf("expected .grid to grow to fill the body flex container, got .grid rule:\n%s", gridRule)
+	}
+}
+
+// extractCSSRule returns the declaration block (without braces) for the rule
+// whose selector line is exactly the given selector (ignoring leading
+// whitespace), or "" if not found. Anchoring on the line start avoids
+// matching a combined selector like "html, body {" when looking up "body".
+func extractCSSRule(css, selector string) string {
+	re := regexp.MustCompile(`(?m)^\s*` + regexp.QuoteMeta(selector) + `\s*\{`)
+	loc := re.FindStringIndex(css)
+	if loc == nil {
+		return ""
+	}
+	start := loc[1]
+	end := strings.Index(css[start:], "}")
+	if end < 0 {
+		return ""
+	}
+	return css[start : start+end]
 }
 
 func TestHTML_ValidJSON(t *testing.T) {

@@ -122,9 +122,18 @@ func generateHTMLTemplate(title, dataJSON string) string {
   <title>Architecture — %s</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f5f5; }
+    html, body { height: 100%%; }
+    body {
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f5f5f5;
+    }
 
     #header {
+      flex-shrink: 0;
       background: white;
       padding: 16px;
       border-bottom: 1px solid #ddd;
@@ -185,8 +194,7 @@ func generateHTMLTemplate(title, dataJSON string) string {
     #details p { margin: 8px 0; font-size: 13px; color: #666; word-break: break-word; }
     #details strong { color: #333; }
 
-    .grid { display: flex; }
-    #canvas { flex: 1; }
+    .grid { display: flex; flex: 1; min-height: 0; }
 
     .node { cursor: pointer; transition: opacity 0.2s; }
     .node:hover { opacity: 0.8; }
