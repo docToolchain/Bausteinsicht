@@ -87,23 +87,7 @@ func computeLayeredLayout(
 
 	// Separate scoped children from external elements.
 	// For externals, further split into actors (top) and non-actors (bottom).
-	var scopeChildren []string
-	var actorExternals []string
-	var otherExternals []string
-	for _, id := range ids {
-		if id == scopeID {
-			continue
-		}
-		if scopeID != "" && isChildOf(id, scopeID) {
-			scopeChildren = append(scopeChildren, id)
-		} else {
-			if isActorKind(id, flat) {
-				actorExternals = append(actorExternals, id)
-			} else {
-				otherExternals = append(otherExternals, id)
-			}
-		}
-	}
+	scopeChildren, actorExternals, otherExternals := groupElementsByScope(ids, scopeID, flat)
 
 	// If no scope, treat everything as one group (actors first, then rest).
 	if scopeID == "" {
@@ -115,31 +99,7 @@ func computeLayeredLayout(
 
 	// Compute boundary dimensions first (needed for centering actors/externals).
 	boundaryX := cfg.startX
-	var boundaryContentW, boundaryContentH float64
-	boundaryStartSize := 30.0
-
-	scopeChildPositions := make(map[string]position)
-	if len(scopeChildren) > 0 {
-		innerX := cfg.padding
-		innerY := boundaryStartSize + cfg.padding
-		minContentWidth := minBoundaryContentWidth(scopeChildren, flat, templates, cfg)
-
-		boundaryContentW, boundaryContentH = placeBFS(scopeChildren, flat, templates, cfg, innerX, innerY, minContentWidth, actorExternals, relationships, scopeChildPositions)
-
-		if boundaryContentW < minContentWidth {
-			boundaryContentW = minContentWidth
-		}
-
-		result.BoundaryWidth = boundaryContentW + 2*cfg.padding
-		result.BoundaryHeight = boundaryContentH + boundaryStartSize + 2*cfg.padding
-
-		if result.BoundaryWidth < 400 {
-			result.BoundaryWidth = 400
-		}
-		if result.BoundaryHeight < 300 {
-			result.BoundaryHeight = 300
-		}
-	}
+	scopeChildPositions := computeScopeBoundary(&result, scopeChildren, flat, templates, cfg, actorExternals, relationships)
 
 	// Reference width for centering: the wider of boundary or page content.
 	refWidth := result.BoundaryWidth
@@ -153,16 +113,7 @@ func computeLayeredLayout(
 	// Reserve the first row even when there are no actors so users can add them later.
 	if len(actorExternals) > 0 {
 		actorW, actorH := placeLayered(actorExternals, flat, templates, kindTier, maxTier, cfg, cfg.startX, curY, result.Positions)
-		// Center actor row relative to boundary width.
-		if actorW < refWidth {
-			offset := (refWidth - actorW) / 2
-			for _, id := range actorExternals {
-				if p, ok := result.Positions[id]; ok {
-					p.X += offset
-					result.Positions[id] = p
-				}
-			}
-		}
+		centerRow(actorExternals, actorW, refWidth, result.Positions)
 		curY += actorH + cfg.elementGap
 	} else {
 		// No actors — still reserve space for a potential actor row.
@@ -186,18 +137,84 @@ func computeLayeredLayout(
 	// 3. Place non-actor externals below the boundary, centered.
 	if len(otherExternals) > 0 {
 		extW, _ := placeLayered(otherExternals, flat, templates, kindTier, maxTier, cfg, cfg.startX, curY, result.Positions)
-		if extW < refWidth {
-			offset := (refWidth - extW) / 2
-			for _, id := range otherExternals {
-				if p, ok := result.Positions[id]; ok {
-					p.X += offset
-					result.Positions[id] = p
-				}
-			}
-		}
+		centerRow(otherExternals, extW, refWidth, result.Positions)
 	}
 
 	return result
+}
+
+// groupElementsByScope splits ids into scoped children of scopeID, actor-kind
+// externals, and other externals, preserving the input order within each group.
+func groupElementsByScope(ids []string, scopeID string, flat map[string]*model.Element) (scopeChildren, actorExternals, otherExternals []string) {
+	for _, id := range ids {
+		if id == scopeID {
+			continue
+		}
+		if scopeID != "" && isChildOf(id, scopeID) {
+			scopeChildren = append(scopeChildren, id)
+			continue
+		}
+		if isActorKind(id, flat) {
+			actorExternals = append(actorExternals, id)
+		} else {
+			otherExternals = append(otherExternals, id)
+		}
+	}
+	return scopeChildren, actorExternals, otherExternals
+}
+
+// computeScopeBoundary lays out scopeChildren inside the scope boundary and
+// sets its computed width/height (clamped to a 400x300 minimum) on result.
+// Returns the computed child positions, to be merged into result.Positions
+// once the boundary's Y position is known.
+func computeScopeBoundary(
+	result *layoutResult,
+	scopeChildren []string,
+	flat map[string]*model.Element,
+	templates *drawio.TemplateSet,
+	cfg layoutConfig,
+	actorExternals []string,
+	relationships []model.Relationship,
+) map[string]position {
+	scopeChildPositions := make(map[string]position)
+	if len(scopeChildren) == 0 {
+		return scopeChildPositions
+	}
+
+	boundaryStartSize := 30.0
+	innerX := cfg.padding
+	innerY := boundaryStartSize + cfg.padding
+	minContentWidth := minBoundaryContentWidth(scopeChildren, flat, templates, cfg)
+
+	boundaryContentW, boundaryContentH := placeBFS(scopeChildren, flat, templates, cfg, innerX, innerY, minContentWidth, actorExternals, relationships, scopeChildPositions)
+	if boundaryContentW < minContentWidth {
+		boundaryContentW = minContentWidth
+	}
+
+	result.BoundaryWidth = boundaryContentW + 2*cfg.padding
+	result.BoundaryHeight = boundaryContentH + boundaryStartSize + 2*cfg.padding
+	if result.BoundaryWidth < 400 {
+		result.BoundaryWidth = 400
+	}
+	if result.BoundaryHeight < 300 {
+		result.BoundaryHeight = 300
+	}
+	return scopeChildPositions
+}
+
+// centerRow shifts the X position of each id in ids by the offset needed to
+// center a row of width rowWidth within refWidth. No-op if rowWidth >= refWidth.
+func centerRow(ids []string, rowWidth, refWidth float64, positions map[string]position) {
+	if rowWidth >= refWidth {
+		return
+	}
+	offset := (refWidth - rowWidth) / 2
+	for _, id := range ids {
+		if p, ok := positions[id]; ok {
+			p.X += offset
+			positions[id] = p
+		}
+	}
 }
 
 // isActorKind returns true if the element's kind contains "actor" (case-insensitive).
@@ -244,8 +261,32 @@ func placeLayered(
 	originX, originY float64,
 	positions map[string]position,
 ) (contentWidth, contentHeight float64) {
-	// Group by tier.
-	tiers := make(map[int][]string)
+	tiers, tierKeys := groupIntoTiers(ids, flat, kindTier, maxTier)
+
+	rows, maxRowWidth, endY := placeTierRows(tierKeys, tiers, flat, templates, cfg, originX, originY, positions)
+	centerRows(rows, maxRowWidth, positions)
+
+	contentWidth = maxRowWidth
+	contentHeight = endY - originY - cfg.elementGap // subtract trailing gap
+	if contentHeight < 0 {
+		contentHeight = 0
+	}
+	return contentWidth, contentHeight
+}
+
+// layeredRow tracks one row's placed elements and geometry, computed by
+// placeTierRows and consumed by centerRows.
+type layeredRow struct {
+	ids    []string
+	width  float64
+	height float64
+	y      float64
+}
+
+// groupIntoTiers groups ids by their kind's tier (elements with unknown
+// kinds fall into maxTier) and returns the tiers plus their sorted keys.
+func groupIntoTiers(ids []string, flat map[string]*model.Element, kindTier map[string]int, maxTier int) (tiers map[int][]string, tierKeys []int) {
+	tiers = make(map[int][]string)
 	for _, id := range ids {
 		elem := flat[id]
 		if elem == nil {
@@ -258,68 +299,96 @@ func placeLayered(
 		tiers[tier] = append(tiers[tier], id)
 	}
 
-	// Sort tier keys.
-	tierKeys := make([]int, 0, len(tiers))
+	tierKeys = make([]int, 0, len(tiers))
 	for k := range tiers {
 		tierKeys = append(tierKeys, k)
 	}
 	sort.Ints(tierKeys)
+	return tiers, tierKeys
+}
 
-	// First pass: place left-aligned and track row membership for centering.
-	type rowInfo struct {
-		ids    []string
-		width  float64
-		height float64
-		y      float64
-	}
-	var rows []rowInfo
+// placeTierRows places each tier's elements left-aligned in row order,
+// wrapping to a new row when the page width would be exceeded. Returns the
+// resulting rows (for later centering), the widest row's width, and the Y
+// position immediately after the last row.
+func placeTierRows(
+	tierKeys []int,
+	tiers map[int][]string,
+	flat map[string]*model.Element,
+	templates *drawio.TemplateSet,
+	cfg layoutConfig,
+	originX, originY float64,
+	positions map[string]position,
+) (rows []layeredRow, maxRowWidth float64, endY float64) {
 	curY := originY
-	maxRowWidth := 0.0
 
 	for _, tier := range tierKeys {
 		elems := tiers[tier]
 		sort.Strings(elems)
 
-		curX := originX
-		rowHeight := 0.0
-		var currentRow []string
-
-		for _, id := range elems {
-			w, h := elementSize(id, flat, templates)
-
-			// Row wrapping.
-			if curX > originX && curX+w > cfg.pageWidth-cfg.startX {
-				rowWidth := curX - cfg.elementGap - originX
-				rows = append(rows, rowInfo{ids: currentRow, width: rowWidth, height: rowHeight, y: curY})
-				if rowWidth > maxRowWidth {
-					maxRowWidth = rowWidth
-				}
-				curY += rowHeight + cfg.elementGap
-				curX = originX
-				rowHeight = 0
-				currentRow = nil
-			}
-
-			positions[id] = position{X: curX, Y: curY}
-			currentRow = append(currentRow, id)
-			curX += w + cfg.elementGap
-			if h > rowHeight {
-				rowHeight = h
+		var tierRows []layeredRow
+		tierRows, curY = placeOneTier(elems, flat, templates, cfg, originX, curY, positions)
+		for _, row := range tierRows {
+			rows = append(rows, row)
+			if row.width > maxRowWidth {
+				maxRowWidth = row.width
 			}
 		}
-
-		// Finish last row of this tier.
-		if len(currentRow) > 0 {
-			rowWidth := curX - cfg.elementGap - originX
-			rows = append(rows, rowInfo{ids: currentRow, width: rowWidth, height: rowHeight, y: curY})
-			if rowWidth > maxRowWidth {
-				maxRowWidth = rowWidth
-			}
-		}
-		curY += rowHeight + cfg.elementGap
 	}
 
-	// Second pass: center each row within the max row width.
+	return rows, maxRowWidth, curY
+}
+
+// placeOneTier places a single tier's elements left-aligned starting at
+// (originX, startY), wrapping to a new row when the page width would be
+// exceeded. Returns the resulting rows and the Y position after the last row.
+func placeOneTier(
+	elems []string,
+	flat map[string]*model.Element,
+	templates *drawio.TemplateSet,
+	cfg layoutConfig,
+	originX, startY float64,
+	positions map[string]position,
+) (rows []layeredRow, endY float64) {
+	curY := startY
+	curX := originX
+	rowHeight := 0.0
+	var currentRow []string
+
+	for _, id := range elems {
+		w, h := elementSize(id, flat, templates)
+
+		// Row wrapping.
+		if curX > originX && curX+w > cfg.pageWidth-cfg.startX {
+			rowWidth := curX - cfg.elementGap - originX
+			rows = append(rows, layeredRow{ids: currentRow, width: rowWidth, height: rowHeight, y: curY})
+			curY += rowHeight + cfg.elementGap
+			curX = originX
+			rowHeight = 0
+			currentRow = nil
+		}
+
+		positions[id] = position{X: curX, Y: curY}
+		currentRow = append(currentRow, id)
+		curX += w + cfg.elementGap
+		if h > rowHeight {
+			rowHeight = h
+		}
+	}
+
+	// Finish last row of this tier.
+	if len(currentRow) > 0 {
+		rowWidth := curX - cfg.elementGap - originX
+		rows = append(rows, layeredRow{ids: currentRow, width: rowWidth, height: rowHeight, y: curY})
+	}
+	curY += rowHeight + cfg.elementGap
+
+	return rows, curY
+}
+
+// centerRows shifts each row's elements so the row is horizontally centered
+// within maxRowWidth.
+func centerRows(rows []layeredRow, maxRowWidth float64, positions map[string]position) {
 	for _, row := range rows {
 		if row.width >= maxRowWidth {
 			continue
@@ -331,13 +400,6 @@ func placeLayered(
 			positions[id] = p
 		}
 	}
-
-	contentWidth = maxRowWidth
-	contentHeight = curY - originY - cfg.elementGap // subtract trailing gap
-	if contentHeight < 0 {
-		contentHeight = 0
-	}
-	return contentWidth, contentHeight
 }
 
 // placeBFS places scope children using relationship-based BFS ordering:
@@ -359,15 +421,24 @@ func placeBFS(
 	relationships []model.Relationship,
 	positions map[string]position,
 ) (contentWidth, contentHeight float64) {
-	// Build an adjacency map among the scope children.
+	adj, connectedToActor := buildScopeAdjacency(ids, actorIDs, relationships)
+	rows := assignBFSRows(ids, adj, connectedToActor)
+	return placeBFSRows(rows, flat, templates, cfg, originX, originY, minRowWidth, positions)
+}
+
+// buildScopeAdjacency builds an adjacency map among ids (scope children)
+// from relationships. adj maps each scope child to the other scope children
+// it is (directly or, via lifting, indirectly) connected to.
+// connectedToActor tracks which scope children have a direct or lifted
+// relationship to one of actorIDs — e.g. actor→onlineshop.frontend lifts to
+// the scope child onlineshop.frontend via resolveToScopeChild.
+func buildScopeAdjacency(ids []string, actorIDs []string, relationships []model.Relationship) (adj map[string]map[string]bool, connectedToActor map[string]bool) {
 	idSet := make(map[string]bool, len(ids))
 	for _, id := range ids {
 		idSet[id] = true
 	}
 
-	// adj maps each scope child to its neighbors (other scope children
-	// or external elements it is connected to).
-	adj := make(map[string]map[string]bool)
+	adj = make(map[string]map[string]bool)
 	for _, id := range ids {
 		adj[id] = make(map[string]bool)
 	}
@@ -377,53 +448,90 @@ func placeBFS(
 		actorSet[id] = true
 	}
 
-	// connectedToActor tracks which scope children have a direct or
-	// indirect (via lifted) relationship to an actor.
-	connectedToActor := make(map[string]bool)
-
+	connectedToActor = make(map[string]bool)
 	for _, rel := range relationships {
-		from, to := rel.From, rel.To
+		addRelationshipToAdjacency(rel, idSet, actorSet, adj, connectedToActor)
+	}
 
-		// Check if this relationship connects a scope child to an actor.
-		if idSet[from] && actorSet[to] {
-			connectedToActor[from] = true
-		}
-		if idSet[to] && actorSet[from] {
-			connectedToActor[to] = true
-		}
+	return adj, connectedToActor
+}
 
-		// Also check lifted relationships: if an actor connects to a
-		// parent of a scope child (e.g., actor→onlineshop.frontend where
-		// frontend is a scope child via onlineshop.frontend).
-		fromInScope := idSet[from] || hasChildInSet(from, idSet)
-		toInScope := idSet[to] || hasChildInSet(to, idSet)
-		_ = fromInScope
-		_ = toInScope
+// addRelationshipToAdjacency updates adj and connectedToActor with the
+// contribution of a single relationship: direct and lifted (resolved via
+// resolveToScopeChild) actor connections, and adjacency between scope
+// children.
+func addRelationshipToAdjacency(
+	rel model.Relationship,
+	idSet map[string]bool,
+	actorSet map[string]bool,
+	adj map[string]map[string]bool,
+	connectedToActor map[string]bool,
+) {
+	from, to := rel.From, rel.To
 
-		// Build adjacency between scope children.
-		fromResolved := resolveToScopeChild(from, idSet)
-		toResolved := resolveToScopeChild(to, idSet)
-		if fromResolved != "" && toResolved != "" && fromResolved != toResolved {
-			if adj[fromResolved] != nil && adj[toResolved] != nil {
-				adj[fromResolved][toResolved] = true
-				adj[toResolved][fromResolved] = true
-			}
-		}
+	// Check if this relationship connects a scope child to an actor.
+	if idSet[from] && actorSet[to] {
+		connectedToActor[from] = true
+	}
+	if idSet[to] && actorSet[from] {
+		connectedToActor[to] = true
+	}
 
-		// Track actor connections via resolved scope children.
-		if fromResolved != "" && actorSet[to] {
-			connectedToActor[fromResolved] = true
-		}
-		if toResolved != "" && actorSet[from] {
-			connectedToActor[toResolved] = true
+	// Build adjacency between scope children.
+	fromResolved := resolveToScopeChild(from, idSet)
+	toResolved := resolveToScopeChild(to, idSet)
+	if fromResolved != "" && toResolved != "" && fromResolved != toResolved {
+		if adj[fromResolved] != nil && adj[toResolved] != nil {
+			adj[fromResolved][toResolved] = true
+			adj[toResolved][fromResolved] = true
 		}
 	}
 
-	// BFS: assign elements to rows.
+	// Track actor connections via resolved scope children.
+	if fromResolved != "" && actorSet[to] {
+		connectedToActor[fromResolved] = true
+	}
+	if toResolved != "" && actorSet[from] {
+		connectedToActor[toResolved] = true
+	}
+}
+
+// assignBFSRows assigns ids to rows via relationship-based BFS:
+//  1. Row 1: elements connected to actors (external seeds)
+//  2. Row 2: elements connected to row 1
+//  3. Row N: elements connected to row N-1
+//  4. Remaining: any unconnected elements at the end
+//
+// Within each row, the next element is chosen by adjacency to the last
+// placed element (greedy neighbor selection), with alphabetical fallback.
+func assignBFSRows(ids []string, adj map[string]map[string]bool, connectedToActor map[string]bool) [][]string {
 	placed := make(map[string]bool)
 	var rows [][]string
 
-	// Row 0: elements connected to actors.
+	if row0 := seedActorRow(ids, connectedToActor, placed); len(row0) > 0 {
+		rows = append(rows, orderByAdjacency(row0, adj))
+	}
+
+	// Subsequent rows: BFS from previous row.
+	for len(rows) > 0 && len(placed) < len(ids) {
+		nextRow := nextBFSRow(rows[len(rows)-1], adj, placed)
+		if len(nextRow) == 0 {
+			break
+		}
+		rows = append(rows, orderByAdjacency(nextRow, adj))
+	}
+
+	// Remaining: elements not reached by BFS (no relationships).
+	if remaining := unplacedSorted(ids, placed); len(remaining) > 0 {
+		rows = append(rows, remaining)
+	}
+
+	return rows
+}
+
+// seedActorRow returns, sorted, the ids directly or indirectly connected to
+// an actor (row 0 of the BFS), marking each as placed.
+func seedActorRow(ids []string, connectedToActor map[string]bool, placed map[string]bool) []string {
 	var row0 []string
 	for _, id := range ids {
 		if connectedToActor[id] {
@@ -432,45 +540,49 @@ func placeBFS(
 		}
 	}
 	sort.Strings(row0)
-	if len(row0) > 0 {
-		rows = append(rows, orderByAdjacency(row0, adj))
-	}
+	return row0
+}
 
-	// Subsequent rows: BFS from previous row.
-	for len(rows) > 0 {
-		if len(placed) >= len(ids) {
-			break
-		}
-		prevRow := rows[len(rows)-1]
-		var nextRow []string
-		for _, prev := range prevRow {
-			for neighbor := range adj[prev] {
-				if !placed[neighbor] {
-					nextRow = append(nextRow, neighbor)
-					placed[neighbor] = true
-				}
+// nextBFSRow returns, sorted, the not-yet-placed neighbors of prevRow's
+// elements, marking each as placed.
+func nextBFSRow(prevRow []string, adj map[string]map[string]bool, placed map[string]bool) []string {
+	var nextRow []string
+	for _, prev := range prevRow {
+		for neighbor := range adj[prev] {
+			if !placed[neighbor] {
+				nextRow = append(nextRow, neighbor)
+				placed[neighbor] = true
 			}
 		}
-		if len(nextRow) == 0 {
-			break
-		}
-		sort.Strings(nextRow)
-		rows = append(rows, orderByAdjacency(nextRow, adj))
 	}
+	sort.Strings(nextRow)
+	return nextRow
+}
 
-	// Remaining: elements not reached by BFS (no relationships).
+// unplacedSorted returns, sorted, the ids not yet marked placed.
+func unplacedSorted(ids []string, placed map[string]bool) []string {
 	var remaining []string
 	for _, id := range ids {
 		if !placed[id] {
 			remaining = append(remaining, id)
 		}
 	}
-	if len(remaining) > 0 {
-		sort.Strings(remaining)
-		rows = append(rows, remaining)
-	}
+	sort.Strings(remaining)
+	return remaining
+}
 
-	// Place rows.
+// placeBFSRows places each BFS row left-aligned starting at (originX,
+// originY), wrapping to a new line when minRowWidth would be exceeded, and
+// returns the overall content width/height.
+func placeBFSRows(
+	rows [][]string,
+	flat map[string]*model.Element,
+	templates *drawio.TemplateSet,
+	cfg layoutConfig,
+	originX, originY float64,
+	minRowWidth float64,
+	positions map[string]position,
+) (contentWidth, contentHeight float64) {
 	curY := originY
 	maxWidth := 0.0
 
