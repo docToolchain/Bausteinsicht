@@ -457,6 +457,57 @@ func TestSynchronizeDocLinkIcons_CombinedOrderAndUniqueness(t *testing.T) {
 	}
 }
 
+// TestSynchronizeViewDocLinkIcons_NoOverlapWithMetadataBox is a regression
+// test for the icon row landing on the exact same coordinate as the
+// metadata box (both previously derived their position from computeMaxY
+// independently): with real content on the page, the metadata box gets a
+// non-trivial width and the doc-link row must anchor to *its* geometry
+// instead of duplicating the computation — otherwise both info boxes are
+// created at contentWidth-driven positions, and the icon row (still using
+// the old fixed metadataX/computeMaxY math) would sit on top of the
+// metadata box's title text.
+func TestSynchronizeViewDocLinkIcons_NoOverlapWithMetadataBox(t *testing.T) {
+	ts := minimalTemplates(t)
+	m := viewModelWithDocLinks([]model.DocLink{
+		{Type: "prd", Href: "docs/prd.html", Title: "Product Requirements"},
+	})
+	doc := drawio.NewDocument()
+	doc.AddPage("view-overview", "Overview")
+
+	Run(m, doc, emptyState(), ts, nil)
+	page := requirePage(t, doc, "view-overview")
+	root := page.Root()
+
+	mx, my, mw, mh, found := infoBoxGeometry(root, metadataPrefix+"overview")
+	if !found {
+		t.Fatal("expected a metadata box on the page")
+	}
+
+	icon := findObjectByID(root, "doclink-view-overview-0")
+	if icon == nil {
+		t.Fatal("expected the view-level doc-link icon to exist")
+	}
+	ix := iconX(t, icon)
+	iy := icon.SelectElement("mxCell").SelectElement("mxGeometry").SelectAttrValue("y", "")
+	iyFloat := parseFloat(iy)
+
+	// The icon must not sit at the metadata box's own top-left corner (the
+	// original bug: both computed to the identical (x, y)).
+	if ix == mx && iyFloat == my {
+		t.Errorf("icon at (%v, %v) collides exactly with the metadata box's origin (%v, %v)", ix, iyFloat, mx, my)
+	}
+	// It must stay horizontally within the box (right-anchored row), not
+	// spill past its right edge.
+	if ix < mx || ix+docIconSize > mx+mw {
+		t.Errorf("icon x=%v (width %v) falls outside metadata box bounds [%v, %v]", ix, docIconSize, mx, mx+mw)
+	}
+	// And vertically within the box's own height, near its top edge — it
+	// shares the header row, it doesn't sit below the box entirely.
+	if iyFloat < my || iyFloat+docIconSize > my+mh {
+		t.Errorf("icon y=%v (height %v) falls outside metadata box bounds [%v, %v]", iyFloat, docIconSize, my, my+mh)
+	}
+}
+
 func TestSynchronizeViewDocLinkIcons_MultipleEntries(t *testing.T) {
 	ts := minimalTemplates(t)
 	m := viewModelWithDocLinks([]model.DocLink{
@@ -564,7 +615,7 @@ func TestSynchronizeViewDocLinkIcons_RemovedBetweenSyncs(t *testing.T) {
 	}
 }
 
-func TestSynchronizeViewDocLinkIcons_CountGrowsPositionStable(t *testing.T) {
+func TestSynchronizeViewDocLinkIcons_CountGrowsRightEdgeStable(t *testing.T) {
 	ts := minimalTemplates(t)
 	m := viewModelWithDocLinks([]model.DocLink{{Type: "prd", Href: "docs/prd.html"}})
 	doc := drawio.NewDocument()
@@ -576,7 +627,10 @@ func TestSynchronizeViewDocLinkIcons_CountGrowsPositionStable(t *testing.T) {
 	if icon0Round1 == nil {
 		t.Fatal("round 1: expected icon 0 to exist")
 	}
-	x0Round1 := iconX(t, icon0Round1)
+	// The row is anchored to the metadata box's right edge and grows
+	// leftward (matching placeElementIconRow's element-icon convention), so
+	// with a single icon it sits at that fixed right-edge anchor.
+	rightEdgeX := iconX(t, icon0Round1)
 
 	// Round 2: a second docLinks entry is added.
 	m.Views["overview"] = model.View{
@@ -590,23 +644,29 @@ func TestSynchronizeViewDocLinkIcons_CountGrowsPositionStable(t *testing.T) {
 	state1.Elements["api"] = ElementState{Title: "API", Kind: "container"}
 	Run(m, doc, state1, ts, nil)
 
-	icon0Round2 := findObjectByID(page.Root(), "doclink-view-overview-0")
-	if icon0Round2 == nil {
-		t.Fatal("round 2: expected icon 0 to still exist")
-	}
-	if x0Round2 := iconX(t, icon0Round2); x0Round2 != x0Round1 {
-		t.Errorf("round 2: expected icon 0's position to stay at %v, got %v", x0Round1, x0Round2)
-	}
-
+	// The newly-last icon now occupies the anchor position icon 0 held
+	// alone; icon 0 shifts one slot left to make room.
 	icon1 := findObjectByID(page.Root(), "doclink-view-overview-1")
 	if icon1 == nil {
 		t.Fatal("round 2: expected the newly-added icon 1 to exist")
 	}
+	if x1 := iconX(t, icon1); x1 != rightEdgeX {
+		t.Errorf("round 2: expected the last icon to stay at the right-edge anchor %v, got %v", rightEdgeX, x1)
+	}
+
+	icon0Round2 := findObjectByID(page.Root(), "doclink-view-overview-0")
+	if icon0Round2 == nil {
+		t.Fatal("round 2: expected icon 0 to still exist")
+	}
+	if x0Round2 := iconX(t, icon0Round2); x0Round2 != rightEdgeX-(docIconSize+docIconGap) {
+		t.Errorf("round 2: expected icon 0 to shift left by one slot to %v, got %v", rightEdgeX-(docIconSize+docIconGap), x0Round2)
+	}
 	if got := icon1.SelectAttrValue("link", ""); got != "docs/spec.html" {
 		t.Errorf("round 2: icon 1 expected href %q, got %q", "docs/spec.html", got)
 	}
-	if x1 := iconX(t, icon1); x1 < x0Round1+docIconSize+docIconGap {
-		t.Errorf("round 2: icon 1 (x=%v) overlaps icon 0 (x=%v)", x1, x0Round1)
+	x0Round2 := iconX(t, icon0Round2)
+	if x1 := iconX(t, icon1); x1 < x0Round2+docIconSize+docIconGap {
+		t.Errorf("round 2: icon 1 (x=%v) overlaps icon 0 (x=%v)", x1, x0Round2)
 	}
 }
 
