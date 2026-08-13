@@ -245,6 +245,22 @@ func escapeQuotes(s string) string {
 	return strings.ReplaceAll(s, "\"", "'")
 }
 
+// writeC4Element writes one element as a C4 macro call. PlantUML-C4 and
+// Mermaid's C4 diagram syntax use the same macro-call format, so both
+// writePlantUML and writeMermaid share this.
+func writeC4Element(b *strings.Builder, e elemEntry, indent string) {
+	macro := c4Macro(e.Elem.Kind)
+	if e.Elem.Technology != "" {
+		fmt.Fprintf(b, "%s%s(%s, \"%s\", \"%s\", \"%s\")\n",
+			indent, macro, sanitizeID(e.ID),
+			escapeQuotes(e.Elem.Title), escapeQuotes(e.Elem.Technology), escapeQuotes(e.Elem.Description))
+	} else {
+		fmt.Fprintf(b, "%s%s(%s, \"%s\", \"%s\")\n",
+			indent, macro, sanitizeID(e.ID),
+			escapeQuotes(e.Elem.Title), escapeQuotes(e.Elem.Description))
+	}
+}
+
 // --- PlantUML ---
 
 func writePlantUML(b *strings.Builder, view model.View, level string, inside, outside []elemEntry, rels []relEntry, flat map[string]*model.Element) {
@@ -253,7 +269,7 @@ func writePlantUML(b *strings.Builder, view model.View, level string, inside, ou
 
 	// External elements (outside scope boundary).
 	for _, e := range outside {
-		writePlantUMLElement(b, e, "")
+		writeC4Element(b, e, "")
 	}
 
 	// Scope boundary with internal elements.
@@ -269,12 +285,12 @@ func writePlantUML(b *strings.Builder, view model.View, level string, inside, ou
 		}
 		fmt.Fprintf(b, "%s(%s, \"%s\") {\n", boundaryMacro, sanitizeID(view.Scope), escapeQuotes(scopeTitle))
 		for _, e := range inside {
-			writePlantUMLElement(b, e, "  ")
+			writeC4Element(b, e, "  ")
 		}
 		b.WriteString("}\n")
 	} else {
 		for _, e := range inside {
-			writePlantUMLElement(b, e, "")
+			writeC4Element(b, e, "")
 		}
 	}
 
@@ -303,19 +319,6 @@ func writePlantUMLRelationships(b *strings.Builder, rels []relEntry) {
 	}
 }
 
-func writePlantUMLElement(b *strings.Builder, e elemEntry, indent string) {
-	macro := c4Macro(e.Elem.Kind)
-	if e.Elem.Technology != "" {
-		fmt.Fprintf(b, "%s%s(%s, \"%s\", \"%s\", \"%s\")\n",
-			indent, macro, sanitizeID(e.ID),
-			escapeQuotes(e.Elem.Title), escapeQuotes(e.Elem.Technology), escapeQuotes(e.Elem.Description))
-	} else {
-		fmt.Fprintf(b, "%s%s(%s, \"%s\", \"%s\")\n",
-			indent, macro, sanitizeID(e.ID),
-			escapeQuotes(e.Elem.Title), escapeQuotes(e.Elem.Description))
-	}
-}
-
 // --- Mermaid ---
 
 func writeMermaid(b *strings.Builder, view model.View, level string, inside, outside []elemEntry, rels []relEntry, flat map[string]*model.Element) {
@@ -323,7 +326,7 @@ func writeMermaid(b *strings.Builder, view model.View, level string, inside, out
 	fmt.Fprintf(b, "    title %s\n\n", view.Title)
 
 	for _, e := range outside {
-		writeMermaidElement(b, e, "    ")
+		writeC4Element(b, e, "    ")
 	}
 
 	if view.Scope != "" {
@@ -338,12 +341,12 @@ func writeMermaid(b *strings.Builder, view model.View, level string, inside, out
 		}
 		fmt.Fprintf(b, "    %s(%s, \"%s\") {\n", boundaryMacro, sanitizeID(view.Scope), escapeQuotes(scopeTitle))
 		for _, e := range inside {
-			writeMermaidElement(b, e, "        ")
+			writeC4Element(b, e, "        ")
 		}
 		b.WriteString("    }\n")
 	} else {
 		for _, e := range inside {
-			writeMermaidElement(b, e, "    ")
+			writeC4Element(b, e, "    ")
 		}
 	}
 
@@ -359,19 +362,6 @@ func writeMermaid(b *strings.Builder, view model.View, level string, inside, out
 	}
 	for _, r := range rels {
 		fmt.Fprintf(b, "    Rel(%s, %s, \"%s\")\n", sanitizeID(r.From), sanitizeID(r.To), escapeQuotes(r.Label))
-	}
-}
-
-func writeMermaidElement(b *strings.Builder, e elemEntry, indent string) {
-	macro := c4Macro(e.Elem.Kind)
-	if e.Elem.Technology != "" {
-		fmt.Fprintf(b, "%s%s(%s, \"%s\", \"%s\", \"%s\")\n",
-			indent, macro, sanitizeID(e.ID),
-			escapeQuotes(e.Elem.Title), escapeQuotes(e.Elem.Technology), escapeQuotes(e.Elem.Description))
-	} else {
-		fmt.Fprintf(b, "%s%s(%s, \"%s\", \"%s\")\n",
-			indent, macro, sanitizeID(e.ID),
-			escapeQuotes(e.Elem.Title), escapeQuotes(e.Elem.Description))
 	}
 }
 
