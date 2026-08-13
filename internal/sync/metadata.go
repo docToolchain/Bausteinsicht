@@ -215,6 +215,34 @@ func createInfoBox(root *etree.Element, id, label string, x, y, width float64) {
 	geo.CreateAttr("as", "geometry")
 }
 
+// infoBoxGeometry returns the x/y/width/height of the info box (metadata or
+// legend) with the given id, and whether it was found. Callers that need to
+// anchor to an info box's actual position — e.g. the view-level doc-link
+// icon row — read it back here instead of recomputing it independently,
+// since createMetadata/createLegend size these boxes dynamically
+// (contentWidth-based) and only set geometry once at creation.
+func infoBoxGeometry(root *etree.Element, id string) (x, y, w, h float64, found bool) {
+	for _, obj := range root.SelectElements("object") {
+		if obj.SelectAttrValue("id", "") != id {
+			continue
+		}
+		cell := obj.SelectElement("mxCell")
+		if cell == nil {
+			return 0, 0, 0, 0, false
+		}
+		geo := cell.SelectElement("mxGeometry")
+		if geo == nil {
+			return 0, 0, 0, 0, false
+		}
+		return parseFloat(geo.SelectAttrValue("x", "0")),
+			parseFloat(geo.SelectAttrValue("y", "0")),
+			parseFloat(geo.SelectAttrValue("width", "0")),
+			parseFloat(geo.SelectAttrValue("height", "0")),
+			true
+	}
+	return 0, 0, 0, 0, false
+}
+
 // computeMaxY finds the bottom-most Y coordinate of elements on the page,
 // excluding the specified cell IDs (used to ignore metadata/legend boxes).
 func computeMaxY(page *drawio.Page, excludeIDs ...string) float64 {

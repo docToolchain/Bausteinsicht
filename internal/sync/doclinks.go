@@ -235,12 +235,14 @@ func synchronizeDocLinkIcons(page *drawio.Page, m *model.BausteinsichtModel) {
 }
 
 // synchronizeViewDocLinkIcons updates the clickable icon row for a view's
-// page-level DocLinks (#543). The row is positioned once — below the
-// metadata/legend boxes, mirroring their own placement convention, since
-// this codebase has no notion of a "free diagram corner", only the max
-// Y/X of existing content (see computeMaxY/computeContentWidth) — and its
-// position is then reused on every subsequent sync (read back from an
-// existing icon's geometry) rather than recomputed, so it never drifts.
+// page-level DocLinks (#543). The row is anchored to the metadata box's own
+// top-right corner and grows leftward as more icons are added — the same
+// convention placeElementIconRow uses for element icons — and is recomputed
+// every sync from the metadata box's actual (possibly dynamically-sized)
+// geometry via infoBoxGeometry, so it tracks the box instead of colliding
+// with it. Anchoring to computeMaxY independently, as before, put the row at
+// the exact same coordinate as the metadata box itself, since both derived
+// their position from the same page-content bound.
 func synchronizeViewDocLinkIcons(page *drawio.Page, viewID string, view model.View) {
 	root := page.Root()
 	if root == nil {
@@ -248,41 +250,21 @@ func synchronizeViewDocLinkIcons(page *drawio.Page, viewID string, view model.Vi
 	}
 	prefix := docLinkPrefix + "view-" + viewID + "-"
 
-	var existing []*etree.Element
-	for _, obj := range root.SelectElements("object") {
-		if strings.HasPrefix(obj.SelectAttrValue("id", ""), prefix) {
-			existing = append(existing, obj)
-		}
-	}
+	removeDocIcons(root, prefix)
 
 	if len(view.DocLinks) == 0 {
-		for _, obj := range existing {
-			root.RemoveChild(obj)
-		}
 		return
 	}
 
-	x, y := metadataX, 0.0
-	positionKnown := false
-	if len(existing) > 0 {
-		if cell := existing[0].SelectElement("mxCell"); cell != nil {
-			if geo := cell.SelectElement("mxGeometry"); geo != nil {
-				x = parseFloat(geo.SelectAttrValue("x", "0"))
-				y = parseFloat(geo.SelectAttrValue("y", "0"))
-				positionKnown = true
-			}
-		}
-	}
-	if !positionKnown {
-		metaCellID := metadataPrefix + viewID
-		legendCellID := legendPrefix + viewID
-		y = computeMaxY(page, metaCellID, legendCellID) + infoBoxGap
+	x, y, w, _, found := infoBoxGeometry(root, metadataPrefix+viewID)
+	if !found {
 		x = metadataX
+		y = computeMaxY(page, metadataPrefix+viewID, legendPrefix+viewID) + infoBoxGap
+		w = metadataWidth
 	}
-
-	for _, obj := range existing {
-		root.RemoveChild(obj)
-	}
+	rowWidth := float64(len(view.DocLinks))*(docIconSize+docIconGap) - docIconGap
+	startX := x + w - rowWidth
+	startY := y + docIconGap
 
 	for i, dl := range view.DocLinks {
 		glyph, fill, stroke := docLinkGlyph(dl.Type)
@@ -298,6 +280,6 @@ func synchronizeViewDocLinkIcons(page *drawio.Page, viewID string, view model.Vi
 			href:    dl.Href,
 			tooltip: tooltip,
 		}
-		createDocIcon(root, "1", icon, x+float64(i)*(docIconSize+docIconGap), y)
+		createDocIcon(root, "1", icon, startX+float64(i)*(docIconSize+docIconGap), startY)
 	}
 }
