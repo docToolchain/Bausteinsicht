@@ -64,6 +64,7 @@ func NewRootCmd() *cobra.Command {
 	rootCmd.AddCommand(newExportDiagramCmd())
 	rootCmd.AddCommand(newSchemaCmd())
 	rootCmd.AddCommand(newImportCmd())
+	rootCmd.AddCommand(newImportGraphCmd())
 	rootCmd.AddCommand(newExportSequenceCmd())
 	rootCmd.AddCommand(newFindCmd())
 	rootCmd.AddCommand(newShowCmd())

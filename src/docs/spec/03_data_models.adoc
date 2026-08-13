@@ -98,7 +98,7 @@ The element ID (the key in the `model` map, dot-pathed for nested children) is t
 
 === JSON Model Structure
 
-The model has these top-level sections. `specification`, `model`, `relationships`, and `views` are the core; the rest are optional: `$schema` (points the IDE at the JSON Schema for validation and autocompletion), `config` (project metadata/legend), `meta` (e.g. `staleDetection` settings), `dynamicViews` (sequence diagrams), `constraints` (lint rules), and `asIs`/`toBe` (for the `diff` command).
+The model has these top-level sections. `specification`, `model`, `relationships`, and `views` are the core; the rest are optional: `$schema` (points the IDE at the JSON Schema for validation and autocompletion), `config` (project metadata/legend), `meta` (e.g. `staleDetection` settings), `dynamicViews` (sequence diagrams), `constraints` (lint rules), and `asIs`/`toBe` (for the `diff` command — `asIs` can also be written by `import-graph` from real code, see <<CodeMapping Properties>>).
 
 [source,jsonc]
 ----
@@ -287,7 +287,7 @@ The model has these top-level sections. `specification`, `model`, `relationships
 | `codeMapping`
 | CodeMapping
 | no
-| Anchors this element to real code for the code-governance bridge (ArchUnit first). Consumed by `import-graph`/forward rule generation — not yet by any shipped command, but already validated against a real adapter, see <<CodeMapping Properties>> and ADR-013.
+| Anchors this element to real code for the code-governance bridge (ArchUnit first). Consumed by `bausteinsicht import-graph` (reverse path); forward rule generation is still external (see the validated Variant C prototype). See <<CodeMapping Properties>> and ADR-013.
 |===
 
 The **key** of each element in the model object (e.g., `"customer"`, `"api"`) serves as its unique ID.
@@ -340,9 +340,11 @@ A `DocLink` is a typed link to an external documentation artifact, usable on bot
 }
 ----
 
-This exact shape is validated end-to-end by an external prototype adapter, https://github.com/docToolchain/bausteinsicht-archunit — its `BausteinsichtRules.fromModel()` reads this field to build ArchUnit rules (forward), and its `CodeGraphExporter` dumps the real package graph as a `codegraph` JSON document for Bausteinsicht to ingest as an `asIs` snapshot (reverse). See ADR-013 for the full design and staging of the code-governance bridge this field anchors.
+This exact shape is validated end-to-end by an external prototype adapter, https://github.com/docToolchain/bausteinsicht-archunit — its `BausteinsichtRules.fromModel()` reads this field to build ArchUnit rules (forward, not yet implemented on the Bausteinsicht side), and its `CodeGraphExporter` dumps the real package graph as a `codegraph` JSON document, which `bausteinsicht import-graph` ingests as an `asIs` snapshot (reverse, shipped). See ADR-013 for the full design and staging of the code-governance bridge this field anchors.
 
 NOTE: `codeMapping` is flat — one mapping per element — not keyed per backend. A polyglot element (e.g. a service with both a Java implementation and a generated .NET client) is out of scope until a second backend actually needs it; see ADR-013's "Open Questions".
+
+The `codegraph` document `import-graph` consumes is a *separate* format from the architecture model — it has its own JSON Schema, `schemas/codegraph.schema.json` (generated via `bausteinsicht schema generate --type codegraph`), documenting `schemaVersion`, `kind`, `language`, `nodes[]`, and `edges[]`.
 
 [[element-lifecycle]]
 ==== Element Lifecycle
@@ -932,8 +934,9 @@ type Element struct {
     LastModified string             `json:"lastModified,omitempty"` // RFC3339; overrides git-based staleness
     Children     map[string]Element `json:"children,omitempty"`
     Metadata     map[string]string  `json:"metadata,omitempty"`
-    Link         string             `json:"link,omitempty"`     // hyperlink on the draw.io shape and in SVG export
-    DocLinks     []DocLink          `json:"docLinks,omitempty"` // typed documentation links, rendered as clickable icons (#543)
+    Link         string             `json:"link,omitempty"`        // hyperlink on the draw.io shape and in SVG export
+    DocLinks     []DocLink          `json:"docLinks,omitempty"`    // typed documentation links, rendered as clickable icons (#543)
+    CodeMapping  *CodeMapping       `json:"codeMapping,omitempty"` // real-code anchor for the code-governance bridge (#562)
 }
 
 // DocLink is a typed link to an external documentation artifact (#543)
@@ -941,6 +944,13 @@ type DocLink struct {
     Type  string `json:"type"`  // free string; conventional: arc42|adr|persona|prd|spec
     Href  string `json:"href"`
     Title string `json:"title,omitempty"` // icon tooltip; defaults to Type when omitted
+}
+
+// CodeMapping anchors an element to real code for the code-governance
+// bridge (ArchUnit first, #562, ADR-013). Flat, not keyed per backend —
+// matches the validated Variant C prototype contract.
+type CodeMapping struct {
+    Packages []string `json:"packages,omitempty"` // package prefixes, without ArchUnit's trailing ".."
 }
 
 // Relationship connects two elements

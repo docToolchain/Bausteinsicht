@@ -12,6 +12,11 @@
 | Go / Cobra
 | Command-line interface providing validate, sync, export, and watch commands
 
+| CodeGraph
+| container
+| Go
+| Reverse code-governance-bridge contract: projects a language-neutral package-dependency graph onto model elements via codeMapping to produce an asIs snapshot
+
 | Constraints
 | container
 | Go

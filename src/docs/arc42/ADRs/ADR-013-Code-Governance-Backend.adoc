@@ -8,7 +8,7 @@
 
 == Status
 
-Accepted (staged) — the reverse/drift path and the `codeMapping` field (R5) are decided and land in this ADR's implementation slice, with their shape validated by an external Variant C prototype (see <<variant-c-prototype>>). The forward mechanism (Variant A/B/C) is staged, with two open points gating the target variant (see <<open-questions>>).
+Accepted (staged) — the reverse/drift path and the `codeMapping` field (R5) are decided **and implemented** (`internal/codegraph`, `bausteinsicht import-graph`), with their shape validated by an external Variant C prototype (see <<variant-c-prototype>>). The forward mechanism (Variant A/B/C) is staged, with two open points gating the target variant (see <<open-questions>>).
 
 == Context
 
@@ -128,12 +128,13 @@ The result is **weight-sensitive by design**: C leads only if the JSONC-as-publi
 ----
 +
 `packages` holds bare prefixes without ArchUnit's trailing `..` — the consuming adapter appends that itself (see <<variant-c-prototype>>'s `BausteinsichtRules.matchers()`). This is a **reversal** from this ADR's first draft, which had adopted #572's R6 per-backend-keyed proposal (`{"java": {...}, "go": {...}}`) speculatively. Once the Variant C prototype surfaced, matching its validated, tested contract exactly took priority over a shape nothing had exercised yet — see <<variant-c-prototype>>. Per-backend keying is deferred to <<open-questions>>, to be revisited only when a second backend (#574, Go) actually needs an element to carry more than one language's mapping simultaneously. See `src/docs/spec/03_data_models.adoc`, section "CodeMapping Properties".
-* **Reverse/drift path** (shared by all forward variants): a graph extractor (`jdeps` or a small ArchUnit-based tool — the prototype's `CodeGraphExporter` is exactly this) dumps the real package-dependency graph as a `codegraph` JSON document → Bausteinsicht ingests it as an `asIs` snapshot (projected through `codeMapping`) → the existing `bausteinsicht diff` command compares it against `toBe` → proposes curated model patches. An ArchUnit failure is *ambiguous* (wrong code vs. stale model), so a human decides; edits are proposed, never written back silently. This is the model's first **code-derived** `asIs` snapshot — until now `asIs`/`toBe` were both always model-authored or `snapshot save`-captured.
+* **Reverse/drift path** (shared by all forward variants) — **implemented**: a graph extractor (`jdeps` or a small ArchUnit-based tool — the prototype's `CodeGraphExporter` is exactly this) dumps the real package-dependency graph as a `codegraph` JSON document → `bausteinsicht import-graph` ingests it, projects it through `codeMapping`, and writes it as the model's `asIs` snapshot → the existing `bausteinsicht diff` command compares it against `toBe` and reports the gap. An ArchUnit failure is *ambiguous* (wrong code vs. stale model), so a human decides; `import-graph` writes `asIs` directly (that's what it's for — a fresh capture of reality on each run) but never touches `toBe`, and no patch is ever proposed or written back into the model/`toBe` silently. This is the model's first **code-derived** `asIs` snapshot — until now `asIs`/`toBe` were both always model-authored or `snapshot save`-captured.
 * **Prototype the forward mechanism with Variant B** (fastest proof, zero new parser) for the *diagram-intermediate* path; **Variant A is retained as a fallback** for expressiveness if C stalls; **Variant C is the target** and now has a working reference implementation, conditional on the open points below.
 
-=== Not yet implemented by this ADR
+=== Implementation status
 
-The `codegraph` schema, the `import-graph` command, the Variant B PlantUML emitter, and the `RuleBackend` abstraction (R1/R4) are follow-up work, not part of this ADR's initial code slice (which lands only the `codeMapping` field). Scoping them as separate PRs keeps each one reviewable; see References for the tracking issues.
+* **Landed:** `codeMapping` field (`internal/model`); the `codegraph` package (`internal/codegraph` — types, `Load`, `Project`) implementing the reverse-path projection algorithm above; the `bausteinsicht import-graph <codegraph-file>` command wiring it to `asIs`; the `codegraph.schema.json` JSON Schema (`bausteinsicht schema generate --type codegraph`).
+* **Not yet implemented:** the Variant B PlantUML emitter (forward path) and the `RuleBackend` abstraction (R1/R4) generalizing this design for #572's non-JVM backends. Scoping them as separate PRs keeps each one reviewable; see References for the tracking issues.
 
 [[open-questions]]
 == Open Questions
@@ -178,3 +179,7 @@ Cross-cutting with #572 (tracked there, not here):
 * https://github.com/docToolchain/bausteinsicht-archunit[docToolchain/bausteinsicht-archunit] — the Variant C prototype whose contract this ADR's `codeMapping` shape matches exactly.
 * `src/docs/spec/03_data_models.adoc`, section "CodeMapping Properties".
 * `internal/model/types.go` — `Element.CodeMapping`, `CodeMapping`.
+* `internal/codegraph/` — `CodeGraph`/`Node`/`Edge` types, `Load`, `Project` (the reverse-path projection algorithm), `HasAnyCodeMapping`.
+* `cmd/bausteinsicht/import_graph.go` — the `bausteinsicht import-graph` command.
+* `schemas/codegraph.schema.json` — the `codegraph` document's own JSON Schema.
+* `src/docs/spec/02_cli_specification.adoc`, section "`bausteinsicht import-graph`".

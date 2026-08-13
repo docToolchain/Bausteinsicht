@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/docToolchain/Bausteinsicht/internal/codegraph"
 	"github.com/docToolchain/Bausteinsicht/internal/model"
 	"github.com/docToolchain/Bausteinsicht/internal/schema"
 )
@@ -57,5 +58,35 @@ func TestCommittedSchemaInSync(t *testing.T) {
 	if string(committed) != string(generated) {
 		t.Errorf("committed schema is out of sync with Go types; " +
 			"run `go run ./cmd/bausteinsicht schema generate` and commit the result")
+	}
+}
+
+// TestCommittedCodeGraphSchemaInSync is TestCommittedSchemaInSync's
+// counterpart for the codegraph reverse-contract schema (#562, ADR-013). If
+// this fails, run:
+//
+//	go run ./cmd/bausteinsicht schema generate --type codegraph
+//
+// and commit the regenerated schemas/codegraph.schema.json.
+func TestCommittedCodeGraphSchemaInSync(t *testing.T) {
+	schemaPath := filepath.Join(repoRoot(t), "schemas", "codegraph.schema.json")
+
+	committed, err := os.ReadFile(schemaPath) //nolint:gosec // fixed, repo-relative path
+	if err != nil {
+		t.Fatalf("reading committed schema: %v", err)
+	}
+
+	gen := schema.NewGenerator()
+	generatedSchema := gen.Generate(codegraph.CodeGraph{})
+	generatedSchema.Title = codegraph.SchemaTitle
+	generatedSchema.Description = codegraph.SchemaDescription
+	generated, err := generatedSchema.ToJSON()
+	if err != nil {
+		t.Fatalf("generating schema: %v", err)
+	}
+
+	if string(committed) != string(generated) {
+		t.Errorf("committed codegraph schema is out of sync with Go types; " +
+			"run `go run ./cmd/bausteinsicht schema generate --type codegraph` and commit the result")
 	}
 }
