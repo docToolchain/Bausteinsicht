@@ -49,6 +49,7 @@ class RelationshipKind
 class TagDefinition
 class PatternDefinition
 class DecisionRecord
+class DocLink
 class Element
 class Relationship
 class View
@@ -73,6 +74,7 @@ Specification *-- "0..*" DecisionRecord
 Element *-- "0..*" Element : children
 Element ..> ElementKind : kind
 Element ..> DecisionRecord : decisions
+Element *-- "0..*" DocLink : docLinks
 
 Relationship ..> Element : from / to
 Relationship ..> RelationshipKind : kind
@@ -80,6 +82,7 @@ Relationship ..> DecisionRecord : decisions
 
 View ..> Element : scope / include / exclude
 View ..> TagDefinition : filter-tags / exclude-tags
+View *-- "0..*" DocLink : docLinks
 
 DynamicView *-- "1..*" SequenceStep
 SequenceStep ..> Element : from / to
@@ -273,10 +276,40 @@ The model has these top-level sections. `specification`, `model`, `relationships
 | object
 | no
 | Arbitrary key-value metadata
+
+| `docLinks`
+| DocLink[]
+| no
+| Typed documentation links (arc42 chapter, ADR, PRD/persona, spec, ...), rendered as clickable icons next to the element in HTML/SVG export — independent of `link`/`decisions`, which also get their own icons. See <<DocLink Properties>> and ADR-009's "Extension: Doc/ADR Drilldown Icons (#543)".
 |===
 
 The **key** of each element in the model object (e.g., `"customer"`, `"api"`) serves as its unique ID.
 Nested elements are referenced using dot notation: `"webshop.api.auth"`.
+
+[[DocLink Properties]]
+==== DocLink Properties
+
+A `DocLink` is a typed link to an external documentation artifact, usable on both `Element.docLinks` and `View.docLinks`.
+
+[cols="1,1,1,3"]
+|===
+| Property | Type | Required | Description
+
+| `type`
+| string
+| yes
+| Free string, not a closed schema enum. Conventional values: `arc42`, `adr`, `persona`, `prd`, `spec`. Unknown values still render (a generic link icon), so new documentation kinds don't require a schema change. `persona` pairs naturally with elements of kind `actor`/`person`.
+
+| `href`
+| string
+| yes
+| Target URL or document anchor, same conventions as `link`.
+
+| `title`
+| string
+| no
+| Icon tooltip text. Defaults to `type` when omitted.
+|===
 
 [[element-lifecycle]]
 ==== Element Lifecycle
@@ -395,6 +428,11 @@ The transitions themselves are not enforced — `status` is a plain string — b
 | string
 | no
 | Auto-layout mode for new pages: `"layered"` (default), `"grid"`, or `"none"`. Layered groups elements by kind tier; grid places alphabetically in a grid; none uses a horizontal row.
+
+| `docLinks`
+| DocLink[]
+| no
+| View-level documentation links (e.g. the page's PRD), rendered as a clickable icon row on the page itself. See <<DocLink Properties>>.
 |===
 
 [[Wildcard Patterns]]
@@ -494,9 +532,9 @@ Model files use the JSONC (JSON with Comments) format. Both comment styles are s
 [[validation-rules]]
 === Validation Rules
 
-`bausteinsicht validate` enforces the model's integrity constraints. The complete, code-traceable catalogue — each rule's exact statement, severity, and source function — is in the Business Rules section of link:01_use_cases.html#business-rules[01_use_cases] (BR-001–BR-033). The constraints on the data model group as follows:
+`bausteinsicht validate` enforces the model's integrity constraints. The complete, code-traceable catalogue — each rule's exact statement, severity, and source function — is in the Business Rules section of link:01_use_cases.html#business-rules[01_use_cases] (BR-001–BR-034). The constraints on the data model group as follows:
 
-* **Structural (errors):** required fields — `kind`/`title` on elements, `title` on views, `key`/`title` on dynamic views, and at least one step per dynamic view (BR-001, BR-004, BR-013, BR-018, BR-019, BR-020); known kinds (BR-002, BR-009, BR-024, BR-025); container nesting and depth limit (BR-003, BR-006); non-empty element IDs (BR-005).
+* **Structural (errors):** required fields — `kind`/`title` on elements, `title` on views, `key`/`title` on dynamic views, at least one step per dynamic view, and `type`/`href` on `docLinks` entries (BR-001, BR-004, BR-013, BR-018, BR-019, BR-020, BR-034); known kinds (BR-002, BR-009, BR-024, BR-025); container nesting and depth limit (BR-003, BR-006); non-empty element IDs (BR-005).
 * **Referential integrity (errors):** relationship `from`/`to`, view `scope`, non-wildcard `include`/`exclude`, `filter-tags`/`exclude-tags`, dynamic-view step `from`/`to`, and `decisions` references all resolve into the model or specification (BR-007, BR-008, BR-015, BR-016, BR-017, BR-021, BR-026).
 * **Enumerations (errors):** `cardinality`, `dataFlow`, view `layout`, and step `type` take only their fixed defined values (BR-010, BR-011, BR-014, BR-022).
 * **Uniqueness (errors):** no fully-duplicate relationships; unique step indices (BR-012, BR-023).
@@ -757,6 +795,39 @@ Back-navigation buttons are generated in detail views:
 </object>
 ----
 
+==== Documentation Link Icons (#543)
+
+`link`, `decisions`, and `docLinks` each render as their own small clickable icon — independent `<object>` cells (never a bare `<mxCell>`, which cannot carry a `link` attribute), positioned via mxGraph's `parent` ID attribute rather than XML nesting:
+
+[source,xml]
+----
+<!-- Element-level icons: parented to the element's own on-page cell ID -->
+<object id="doclink-webshop.api-link" label="&#128279;" link="architecture.adoc#sec-api" tooltip="Open linked document">
+  <mxCell style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;..."
+          vertex="1" parent="webshop.api">
+    <mxGeometry x="..." y="2" width="18" height="18" as="geometry" />
+  </mxCell>
+</object>
+<object id="doclink-webshop.api-decision-0" label="&#9878;" link="ADRs/ADR-001-DSL-Format.html" tooltip="ADR-001: Use JSONC">
+  <mxCell style="..." vertex="1" parent="webshop.api">
+    <mxGeometry ... />
+  </mxCell>
+</object>
+
+<!-- View-level icons: parented to "1" (page-absolute) -->
+<object id="doclink-view-overview-0" label="&#128203;" link="docs/prd.html" tooltip="Product Requirements">
+  <mxCell style="..." vertex="1" parent="1">
+    <mxGeometry ... />
+  </mxCell>
+</object>
+----
+
+IMPORTANT: The glyph must be the `<object>`'s own `label` attribute, not a `value` attribute on the inner `<mxCell>`. A `value` set directly on the mxCell still renders visually (confirmed against a real draw.io export: the glyph shows, rasterized to an embedded image) but silently breaks the SVG `<a href>` export — draw.io's exporter only wraps a shape in a clickable anchor when the cell's displayed value resolves through the `<object>` wrapper's own attributes, matching every other `link`-bearing `<object>` in this codebase (the element shape itself, the back-navigation button, the metadata/legend boxes).
+
+CAUTION: A relative `href`/`link` (e.g. `"ADRs/ADR-001-DSL-Format.html"`) resolves differently in SVG export depending on whether it carries a `#fragment`. A fragment-bearing href (e.g. `"architecture.adoc#sec-api"`) exports as just the bare fragment (`#sec-api`), which is portable and resolves correctly when the SVG is embedded in that same HTML/AsciiDoc page. A fragment-*less* relative href exports as a full `file://<local draw.io install path>/<original relative path>` URL — anchored to wherever draw.io itself is installed on the machine that ran the export, **not** to the project or the exported SVG's own location. This is not portable across machines and will not resolve for other readers. Until this is addressed, prefer `#fragment`-only anchors or absolute URLs (`https://...`) for `docLinks`/`decisions[].file`/`link` values that need to survive SVG export unchanged.
+
+Icon cells are identified by the `doclink-` ID prefix and excluded from reverse-sync element/relationship extraction, the same way `nav-back-` buttons are (#205) — model is authoritative, icon state is never read back from draw.io. See ADR-009's "Extension: Doc/ADR Drilldown Icons (#543)" for the full rationale, including why decision badges are clickable now and why PNG export still shows the icon glyph without the click behavior.
+
 ==== Multi-Page Structure
 
 Each view is a separate `<diagram>` element. The `id` attribute uses the format `view-<viewKey>` (e.g., `view-context` for a view with key `"context"`).
@@ -828,6 +899,15 @@ type Element struct {
     LastModified string             `json:"lastModified,omitempty"` // RFC3339; overrides git-based staleness
     Children     map[string]Element `json:"children,omitempty"`
     Metadata     map[string]string  `json:"metadata,omitempty"`
+    Link         string             `json:"link,omitempty"`     // hyperlink on the draw.io shape and in SVG export
+    DocLinks     []DocLink          `json:"docLinks,omitempty"` // typed documentation links, rendered as clickable icons (#543)
+}
+
+// DocLink is a typed link to an external documentation artifact (#543)
+type DocLink struct {
+    Type  string `json:"type"`  // free string; conventional: arc42|adr|persona|prd|spec
+    Href  string `json:"href"`
+    Title string `json:"title,omitempty"` // icon tooltip; defaults to Type when omitted
 }
 
 // Relationship connects two elements
@@ -851,7 +931,8 @@ type View struct {
     FilterTags  []string `json:"filter-tags,omitempty"`  // include only elements with ALL of these tags
     ExcludeTags []string `json:"exclude-tags,omitempty"` // exclude elements with ANY of these tags
     Description string   `json:"description,omitempty"`
-    Layout      string   `json:"layout,omitempty"` // layered (default)|grid|none
+    Layout      string   `json:"layout,omitempty"`   // layered (default)|grid|none
+    DocLinks    []DocLink `json:"docLinks,omitempty"` // view-level documentation links (#543)
 }
 
 // DynamicView describes a sequence diagram scenario

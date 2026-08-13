@@ -119,3 +119,19 @@ Elements may carry an optional `link` field in the JSONC model, pointing to an e
 Rationale: drill-down navigation is the primary navigation mechanism established by this ADR. Overriding it silently via a user-defined link would break diagram navigation without a visible signal.
 
 *Reverse sync:* `link` is never read back from draw.io. It is model-authoritative; draw.io edits to the link attribute are overwritten on the next sync.
+
+=== Extension: Doc/ADR Drilldown Icons (#543)
+
+The element's own shape link (Extension #483, above) can only ever point to one place at a time — and the priority rule means a drill-down link silently wins over a user-defined `link` when both apply to the same element. This extension gives the model↔documentation mapping its own, always-clickable carrier, independent of the shape's own `link` attribute:
+
+* **`link`** (existing field): in addition to (optionally) owning the element's shape link, it now also gets a small dedicated icon of its own, so it stays reachable even when a drill-down link owns the shape.
+* **`decisions`** (existing field, `element.go`/`badge.go` decision badges): each decision badge is now a clickable icon, wrapped in its own `<object link="...">`, resolving to the referenced `specification.decisions[].file` when present. A decision without a `file` still renders its badge, just not clickable.
+* **`docLinks`** (new field, `Element.DocLinks`/`View.DocLinks`, `internal/model/types.go`): a typed array of `{type, href, title}` entries — `type` is a free string (not a closed schema enum) with conventional values `arc42`, `adr`, `persona`, `prd`, `spec`; each renders as its own icon with a type-specific glyph. Elements get a row of icons in their top-right corner; a view's own `docLinks` render as a row on the page itself (positioned below the metadata/legend boxes, mirroring their placement convention — there is no notion of a "free diagram corner" in this codebase, only the max Y/X of existing content).
+
+*Mechanism:* each icon is its own top-level `<object id="doclink-..." link="...">` (never a bare `<mxCell>`, which cannot carry a `link` attribute in this codebase's draw.io dialect), positioned via mxGraph's `parent` ID attribute — either the element's own on-page cell ID (element-level icons) or `"1"` (page-absolute, for view-level icons). Old icons are removed and recreated on every sync for elements (their position is a pure function of element width and icon count, so this is idempotent); the view-level row's position is captured once and reused on subsequent syncs, avoiding drift. Implementation: `internal/sync/doclinks.go`.
+
+*Exclusion from reverse sync:* icon cells are identified by the `doclink-` ID prefix and excluded from unmanaged-element detection and connector/relationship extraction in `internal/sync/diff.go`, the same way `nav-back-` back-navigation buttons are (#205) — otherwise reverse sync would try to import them as new model elements.
+
+*PNG degradation:* PNG export discards `link` attributes entirely (same limitation the element shape's own `link` already has, see Extension #483) — the icon shapes and glyphs still render, just without click behavior, giving a visible, non-interactive hint rather than silently vanishing.
+
+*Reverse sync:* like `link`, none of `link`/`decisions`/`docLinks` icon state is ever read back from draw.io; the model is authoritative and icons are fully regenerated from it each sync.

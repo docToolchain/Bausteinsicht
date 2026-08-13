@@ -254,7 +254,8 @@ func detectUnmanagedDrawioElements(cs *ChangeSet, doc *drawio.Document) {
 			objID := obj.SelectAttrValue("id", "")
 			if strings.HasPrefix(objID, "nav-back-") ||
 				strings.HasPrefix(objID, metadataPrefix) ||
-				strings.HasPrefix(objID, legendPrefix) {
+				strings.HasPrefix(objID, legendPrefix) ||
+				strings.HasPrefix(objID, docLinkPrefix) {
 				continue
 			}
 			// Check that it wraps a vertex cell (not a connector).
@@ -343,7 +344,7 @@ func buildCellIDToElemID(doc *drawio.Document) map[string]string {
 			if cellID == "" {
 				continue
 			}
-			if strings.HasPrefix(cellID, "nav-back-") {
+			if strings.HasPrefix(cellID, "nav-back-") || strings.HasPrefix(cellID, docLinkPrefix) {
 				continue
 			}
 			cell := obj.SelectElement("mxCell")
@@ -389,7 +390,8 @@ func extractDrawioRelationships(doc *drawio.Document) map[string]RelationshipSta
 			from := resolveCellID(fromCell, cellToElem)
 			to := resolveCellID(toCell, cellToElem)
 			// Skip connectors targeting navigation buttons (#205).
-			if strings.HasPrefix(from, "nav-back-") || strings.HasPrefix(to, "nav-back-") {
+			if strings.HasPrefix(from, "nav-back-") || strings.HasPrefix(to, "nav-back-") ||
+				strings.HasPrefix(from, docLinkPrefix) || strings.HasPrefix(to, docLinkPrefix) {
 				continue
 			}
 			// Extract the relationship index from the connector ID.

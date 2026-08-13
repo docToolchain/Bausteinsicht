@@ -269,7 +269,20 @@ type Element struct {
 	LastModified string             `json:"lastModified,omitempty"` // RFC3339 timestamp (optional override for git-based staleness detection)
 	Children     map[string]Element `json:"children,omitempty"`
 	Metadata     map[string]string  `json:"metadata,omitempty"`
-	Link         string             `json:"link,omitempty"` // hyperlink on the draw.io shape and in SVG export
+	Link         string             `json:"link,omitempty"`     // hyperlink on the draw.io shape and in SVG export
+	DocLinks     []DocLink          `json:"docLinks,omitempty"` // typed documentation links, rendered as clickable icons (#543)
+}
+
+// DocLink is a typed link from a diagram element or view to an external
+// documentation artifact (arc42 chapter, ADR, PRD/persona, spec, ...),
+// rendered as a clickable icon in HTML/SVG export (#543). Type is a free
+// string (not a closed enum) so new documentation kinds don't require a
+// schema change; conventional values are "arc42", "adr", "persona", "prd",
+// "spec". Type "persona" pairs naturally with elements of kind "actor"/"person".
+type DocLink struct {
+	Type  string `json:"type"`
+	Href  string `json:"href"`
+	Title string `json:"title,omitempty"`
 }
 
 type Relationship struct {
@@ -284,12 +297,13 @@ type Relationship struct {
 }
 
 type View struct {
-	Title       string   `json:"title"`
-	Scope       string   `json:"scope,omitempty"`
-	Include     []string `json:"include,omitempty"`
-	Exclude     []string `json:"exclude,omitempty"`
-	FilterTags  []string `json:"filter-tags,omitempty"`  // Include only elements with ALL of these tags
-	ExcludeTags []string `json:"exclude-tags,omitempty"` // Exclude elements with ANY of these tags
-	Description string   `json:"description,omitempty"`
-	Layout      string   `json:"layout,omitempty"`
+	Title       string    `json:"title"`
+	Scope       string    `json:"scope,omitempty"`
+	Include     []string  `json:"include,omitempty"`
+	Exclude     []string  `json:"exclude,omitempty"`
+	FilterTags  []string  `json:"filter-tags,omitempty"`  // Include only elements with ALL of these tags
+	ExcludeTags []string  `json:"exclude-tags,omitempty"` // Exclude elements with ANY of these tags
+	Description string    `json:"description,omitempty"`
+	Layout      string    `json:"layout,omitempty"`
+	DocLinks    []DocLink `json:"docLinks,omitempty"` // view-level documentation links, rendered as a clickable icon row on the page (#543)
 }
