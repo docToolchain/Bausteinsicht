@@ -151,6 +151,8 @@ Template resolution follows a clear precedence: an explicit `--template <path>` 
 
 Templates only affect **newly created** shapes. Existing shapes keep their look — restyle them in draw.io directly, or remove them from the diagram and sync again.
 
+See the link:../spec/07_template_guide.html[Template Guide] for the full attribute reference and advanced styling (custom shapes, per-kind fonts and sizing).
+
 == Layout control
 
 Each view can choose its layout in the model:
