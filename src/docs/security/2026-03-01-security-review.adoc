@@ -55,6 +55,9 @@
 
 | 2026-07-14 (history rewrite)
 | Purged the historical `BigData.xmi` Git-LFS pointer object from `main`'s history via `git filter-repo` (object was never reachable by CI anyway; this reclaims it from the object graph). Tags `v1.0.0`–`v1.2.0` preserved bit-identical (verified via hash comparison); `v1.2.1` (the only tag descending from the commit that introduced the fixture) was necessarily rewritten to a new commit hash as a result — `go install ...@v1.2.1` will now fail its `sum.golang.org` checksum. Older tags/releases are unaffected.
+
+| 2026-08-13 (chaos permissions)
+| Fixed SEC-020 (#585): `internal/chaos.TestChaos.MakeReadOnly`/`MakeWritable` chmod'd to `0444`/`0644`, granting group/other read access on test-only files. Tightened to `0400`/`0600` (owner-only). TDD: regression test added first (commit `12c942e`), then the fix.
 |===
 
 === Scope
@@ -407,6 +410,23 @@ Low. Test-fixture integrity only (Blast Radius 0 per the Risk Radar assessment) 
 **Fix:**
 Pinned the known digest (`sha256:7b761872b0f773caac76446b857162986761500d625c9bd3514d55bd1f63f5b0`, the same OID the original LFS pointer carried) in `scripts/fetch-xmi-testdata.sh`. On mismatch, the script discards the download and falls back to its existing "fetch failed" behavior (warn, exit 0, leave fixture absent) — `TestImport_BigData` skips itself and the dedicated `xmi-bigdata-integration` CI job still fails loudly if the test unexpectedly skips. PR #561.
 
+==== SEC-020: World-Accessible File Permissions in Chaos Test Helper (Low) — Fixed
+
+_Added 2026-08-13_
+
+**Affected file:** `internal/chaos/chaos.go` (`MakeReadOnly`, `MakeWritable`)
+
+**Description:**
+The chaos-testing helper's `MakeReadOnly`/`MakeWritable` methods chmod'd files to `0444`/`0644`, granting group and other read access. Flagged by SonarCloud (`go:S2612`). These files only ever live under `t.TempDir()` and are only ever touched by the owning test process, so the group/other bits serve no purpose.
+
+**Risk:**
+Low (Blast Radius 0 per the Risk Radar assessment) — test-only helper, no production code path, files are ephemeral per-test temp files.
+
+**Fix:**
+Tightened to `0400`/`0600` (owner-only). Regression test added first per the TDD workflow rule, confirmed failing against the unfixed `0444`/`0644` modes, then the fix applied (#585).
+
+**Windows CI note:** the regression test's group/other-bits assertions are POSIX-only. `os.Chmod` on Windows only toggles the read-only attribute (via the 0200 bit), and `os.Stat` synthesizes a mirrored FileMode (`0444` read-only / `0666` writable) with no owner/group/other distinction — there is no Windows equivalent of "owner-only" access to assert on. The test skips those assertions on `runtime.GOOS == "windows"`, keeping the write-success/failure behavioral checks (which do exercise the real fix) on all platforms.
+
 === Not Vulnerable
 
 The following attack vectors were explicitly tested and confirmed **not exploitable**:
@@ -504,6 +524,7 @@ All dependencies at latest versions. No known CVEs. `go mod verify` — **PASS**
 SEC-002 (PR #77), SEC-003 (PR #77), SEC-009 (PR #77), SEC-010 (PR #77), SEC-012 (#235).
 SEC-004, SEC-007, SEC-011 verified fixed 2026-03-30 (see individual findings above).
 SEC-019 (PR #561).
+SEC-020 (#585).
 
 ==== Remaining Open
 

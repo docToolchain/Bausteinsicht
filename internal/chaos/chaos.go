@@ -49,16 +49,16 @@ func (tc *TestChaos) CorruptFilePartial(path string, content string) {
 	}
 }
 
-// MakeReadOnly sets file permissions to read-only.
+// MakeReadOnly sets file permissions to read-only for the owner only.
 func (tc *TestChaos) MakeReadOnly(path string) {
-	if err := os.Chmod(path, 0444); err != nil {
+	if err := os.Chmod(path, 0400); err != nil {
 		tc.t.Fatalf("MakeReadOnly: %v", err)
 	}
 }
 
-// MakeWritable sets file permissions to writable.
+// MakeWritable sets file permissions to read-write for the owner only.
 func (tc *TestChaos) MakeWritable(path string) {
-	if err := os.Chmod(path, 0644); err != nil {
+	if err := os.Chmod(path, 0600); err != nil {
 		tc.t.Fatalf("MakeWritable: %v", err)
 	}
 }
