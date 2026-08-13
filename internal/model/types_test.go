@@ -67,18 +67,15 @@ func TestJSONRoundTrip(t *testing.T) {
 	}
 }
 
-// TestElement_CodeMapping_JSONRoundTrip verifies the per-backend keyed shape
-// (element → {backend → packages}) round-trips through JSON, so a polyglot
-// model can carry a Java and a Go code anchor on the same element without
-// collision. See #562 R5, #572 R6.
+// TestElement_CodeMapping_JSONRoundTrip verifies codeMapping round-trips
+// through JSON. Shape is flat (Element -> one CodeMapping), matching the
+// validated Variant C prototype contract, not a per-backend map — see #562,
+// ADR-013, and https://github.com/docToolchain/bausteinsicht-archunit.
 func TestElement_CodeMapping_JSONRoundTrip(t *testing.T) {
 	original := Element{
-		Kind:  "container",
-		Title: "Order API",
-		CodeMapping: map[string]CodeMapping{
-			"java": {Packages: []string{"com.acme.backend.orders.."}},
-			"go":   {Packages: []string{"github.com/acme/orders/..."}},
-		},
+		Kind:        "container",
+		Title:       "Order API",
+		CodeMapping: &CodeMapping{Packages: []string{"com.acme.backend.orders"}},
 	}
 
 	data, err := json.Marshal(original)
@@ -93,6 +90,27 @@ func TestElement_CodeMapping_JSONRoundTrip(t *testing.T) {
 
 	if !reflect.DeepEqual(original, restored) {
 		t.Errorf("round-trip mismatch:\noriginal: %+v\nrestored: %+v", original, restored)
+	}
+}
+
+// TestElement_CodeMapping_MatchesArchUnitPrototypeContract pins the exact
+// JSON shape read by the running bausteinsicht-archunit Variant C prototype
+// (adapter/src/test/resources/architecture.jsonc there), so a future change
+// here doesn't silently break that external, already-validated adapter.
+func TestElement_CodeMapping_MatchesArchUnitPrototypeContract(t *testing.T) {
+	raw := `{"kind":"component","title":"API","codeMapping":{"packages":["com.acme.backend.api"]}}`
+
+	var elem Element
+	if err := json.Unmarshal([]byte(raw), &elem); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+
+	if elem.CodeMapping == nil {
+		t.Fatal("expected CodeMapping to be set")
+	}
+	want := []string{"com.acme.backend.api"}
+	if !reflect.DeepEqual(elem.CodeMapping.Packages, want) {
+		t.Errorf("Packages = %v, want %v", elem.CodeMapping.Packages, want)
 	}
 }
 

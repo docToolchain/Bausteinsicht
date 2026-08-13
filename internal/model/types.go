@@ -259,30 +259,29 @@ func (s *Specification) IsDashed(kind string) bool {
 }
 
 type Element struct {
-	Kind         string                 `json:"kind"`
-	Title        string                 `json:"title"`
-	Description  string                 `json:"description,omitempty"`
-	Technology   string                 `json:"technology,omitempty"`
-	Tags         []string               `json:"tags,omitempty"`
-	Status       string                 `json:"status,omitempty"`       // e.g., "deployed", "deprecated", "archived"
-	Decisions    []string               `json:"decisions,omitempty"`    // ADR IDs linked to this element
-	LastModified string                 `json:"lastModified,omitempty"` // RFC3339 timestamp (optional override for git-based staleness detection)
-	Children     map[string]Element     `json:"children,omitempty"`
-	Metadata     map[string]string      `json:"metadata,omitempty"`
-	Link         string                 `json:"link,omitempty"`        // hyperlink on the draw.io shape and in SVG export
-	DocLinks     []DocLink              `json:"docLinks,omitempty"`    // typed documentation links, rendered as clickable icons (#543)
-	CodeMapping  map[string]CodeMapping `json:"codeMapping,omitempty"` // element → real code locations, keyed per code-governance backend (#562)
+	Kind         string             `json:"kind"`
+	Title        string             `json:"title"`
+	Description  string             `json:"description,omitempty"`
+	Technology   string             `json:"technology,omitempty"`
+	Tags         []string           `json:"tags,omitempty"`
+	Status       string             `json:"status,omitempty"`       // e.g., "deployed", "deprecated", "archived"
+	Decisions    []string           `json:"decisions,omitempty"`    // ADR IDs linked to this element
+	LastModified string             `json:"lastModified,omitempty"` // RFC3339 timestamp (optional override for git-based staleness detection)
+	Children     map[string]Element `json:"children,omitempty"`
+	Metadata     map[string]string  `json:"metadata,omitempty"`
+	Link         string             `json:"link,omitempty"`        // hyperlink on the draw.io shape and in SVG export
+	DocLinks     []DocLink          `json:"docLinks,omitempty"`    // typed documentation links, rendered as clickable icons (#543)
+	CodeMapping  *CodeMapping       `json:"codeMapping,omitempty"` // element → real code locations for the code-governance bridge (#562)
 }
 
-// CodeMapping anchors a model element to real code for one code-governance
-// backend (e.g. "java" for ArchUnit). Keyed per backend on Element.CodeMapping
-// rather than as a flat list so a polyglot model doesn't collide across
-// languages — a Go element and its .NET bindings each get their own entry
-// (see #562 R5, #572 R6).
+// CodeMapping anchors a model element to real code for the code-governance
+// bridge (ArchUnit first, #562). Flat (not keyed per backend) matching the
+// validated Variant C prototype contract — see
+// https://github.com/docToolchain/bausteinsicht-archunit and ADR-013.
 type CodeMapping struct {
 	// Packages are backend-native package/namespace/module prefixes that
 	// belong to this element, prefix-matched the way ArchUnit's package
-	// matcher works (e.g. "com.acme.backend.api..").
+	// matcher works (e.g. "com.acme.backend.api").
 	Packages []string `json:"packages,omitempty"`
 }
 

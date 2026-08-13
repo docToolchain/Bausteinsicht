@@ -240,10 +240,7 @@
           "type": "object"
         },
         "codeMapping": {
-          "additionalProperties": {
-            "$ref": "#/definitions/CodeMapping"
-          },
-          "type": "object"
+          "$ref": "#/definitions/CodeMapping"
         },
         "decisions": {
           "items": {
