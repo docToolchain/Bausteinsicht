@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/beevik/etree"
 	"github.com/docToolchain/Bausteinsicht/internal/drawio"
 	"github.com/docToolchain/Bausteinsicht/internal/model"
 )
@@ -247,33 +248,8 @@ func detectUnmanagedDrawioElements(cs *ChangeSet, doc *drawio.Document) {
 			continue
 		}
 		for _, obj := range root.SelectElements("object") {
-			if obj.SelectAttrValue("bausteinsicht_id", "") != "" {
-				continue // managed element, already handled
-			}
-			// Skip non-model elements created by forward sync.
-			objID := obj.SelectAttrValue("id", "")
-			if strings.HasPrefix(objID, "nav-back-") ||
-				strings.HasPrefix(objID, metadataPrefix) ||
-				strings.HasPrefix(objID, legendPrefix) ||
-				strings.HasPrefix(objID, docLinkPrefix) {
-				continue
-			}
-			// Check that it wraps a vertex cell (not a connector).
-			cell := obj.SelectElement("mxCell")
-			if cell == nil || cell.SelectAttrValue("vertex", "") != "1" {
-				continue
-			}
-			// Try sub-cell reading first, then HTML label.
-			title, _, _ := page.ReadElementFields(obj)
-			if title == "" {
-				label := obj.SelectAttrValue("label", "")
-				if label == "" {
-					continue
-				}
-				title, _, _ = drawio.ParseLabel(label)
-			}
-			id := sanitizeID(title)
-			if id == "" {
+			title, id, ok := unmanagedDrawioElementTitle(page, obj)
+			if !ok {
 				continue
 			}
 			cs.DrawioElementChanges = append(cs.DrawioElementChanges, ElementChange{
@@ -283,6 +259,44 @@ func detectUnmanagedDrawioElements(cs *ChangeSet, doc *drawio.Document) {
 			})
 		}
 	}
+}
+
+// unmanagedDrawioElementTitle returns the title and sanitized ID for obj if
+// it is an unmanaged (no bausteinsicht_id) vertex representing a
+// user-created element forward sync hasn't seen before — as opposed to
+// non-model elements forward sync itself creates (back-nav button,
+// metadata/legend boxes, doc-link icons), which are skipped by ID prefix.
+func unmanagedDrawioElementTitle(page *drawio.Page, obj *etree.Element) (title, id string, ok bool) {
+	if obj.SelectAttrValue("bausteinsicht_id", "") != "" {
+		return "", "", false // managed element, already handled
+	}
+	// Skip non-model elements created by forward sync.
+	objID := obj.SelectAttrValue("id", "")
+	if strings.HasPrefix(objID, "nav-back-") ||
+		strings.HasPrefix(objID, metadataPrefix) ||
+		strings.HasPrefix(objID, legendPrefix) ||
+		strings.HasPrefix(objID, docLinkPrefix) {
+		return "", "", false
+	}
+	// Check that it wraps a vertex cell (not a connector).
+	cell := obj.SelectElement("mxCell")
+	if cell == nil || cell.SelectAttrValue("vertex", "") != "1" {
+		return "", "", false
+	}
+	// Try sub-cell reading first, then HTML label.
+	title, _, _ = page.ReadElementFields(obj)
+	if title == "" {
+		label := obj.SelectAttrValue("label", "")
+		if label == "" {
+			return "", "", false
+		}
+		title, _, _ = drawio.ParseLabel(label)
+	}
+	id = sanitizeID(title)
+	if id == "" {
+		return "", "", false
+	}
+	return title, id, true
 }
 
 // sanitizeID converts a title to a lowercase, hyphen-separated ID suitable
@@ -322,47 +336,68 @@ func resolveCellID(cellID string, cellToElem map[string]string) string {
 func buildCellIDToElemID(doc *drawio.Document) map[string]string {
 	m := make(map[string]string)
 	for _, page := range doc.Pages() {
-		for _, obj := range page.FindAllElements() {
-			elemID := obj.SelectAttrValue("bausteinsicht_id", "")
-			cellID := obj.SelectAttrValue("id", "")
-			if elemID != "" && cellID != "" {
-				m[cellID] = elemID
-			}
-		}
-		// Also map unmanaged elements (no bausteinsicht_id) to their
-		// sanitized label-based IDs so that connectors targeting them
-		// resolve correctly during reverse sync (#211).
-		root := page.Root()
-		if root == nil {
-			continue
-		}
-		for _, obj := range root.SelectElements("object") {
-			if obj.SelectAttrValue("bausteinsicht_id", "") != "" {
-				continue
-			}
-			cellID := obj.SelectAttrValue("id", "")
-			if cellID == "" {
-				continue
-			}
-			if strings.HasPrefix(cellID, "nav-back-") || strings.HasPrefix(cellID, docLinkPrefix) {
-				continue
-			}
-			cell := obj.SelectElement("mxCell")
-			if cell == nil || cell.SelectAttrValue("vertex", "") != "1" {
-				continue
-			}
-			label := obj.SelectAttrValue("label", "")
-			if label == "" {
-				continue
-			}
-			title, _, _ := drawio.ParseLabel(label)
-			id := sanitizeID(title)
-			if id != "" {
-				m[cellID] = id
-			}
-		}
+		mapManagedElementsOnPage(page, m)
+		mapUnmanagedElementsOnPage(page, m)
 	}
 	return m
+}
+
+// mapManagedElementsOnPage maps each bausteinsicht-managed element's cell ID
+// to its element ID.
+func mapManagedElementsOnPage(page *drawio.Page, m map[string]string) {
+	for _, obj := range page.FindAllElements() {
+		elemID := obj.SelectAttrValue("bausteinsicht_id", "")
+		cellID := obj.SelectAttrValue("id", "")
+		if elemID != "" && cellID != "" {
+			m[cellID] = elemID
+		}
+	}
+}
+
+// mapUnmanagedElementsOnPage maps unmanaged elements (no bausteinsicht_id)
+// to their sanitized label-based IDs so that connectors targeting them
+// resolve correctly during reverse sync (#211).
+func mapUnmanagedElementsOnPage(page *drawio.Page, m map[string]string) {
+	root := page.Root()
+	if root == nil {
+		return
+	}
+	for _, obj := range root.SelectElements("object") {
+		if cellID, id, ok := unmanagedElementID(obj); ok {
+			m[cellID] = id
+		}
+	}
+}
+
+// unmanagedElementID returns the sanitized label-based ID for obj if it is
+// an unmanaged (no bausteinsicht_id) vertex with a usable label — used so
+// connectors targeting unmanaged elements resolve correctly during reverse
+// sync (#211).
+func unmanagedElementID(obj *etree.Element) (cellID, id string, ok bool) {
+	if obj.SelectAttrValue("bausteinsicht_id", "") != "" {
+		return "", "", false
+	}
+	cellID = obj.SelectAttrValue("id", "")
+	if cellID == "" {
+		return "", "", false
+	}
+	if strings.HasPrefix(cellID, "nav-back-") || strings.HasPrefix(cellID, docLinkPrefix) {
+		return "", "", false
+	}
+	cell := obj.SelectElement("mxCell")
+	if cell == nil || cell.SelectAttrValue("vertex", "") != "1" {
+		return "", "", false
+	}
+	label := obj.SelectAttrValue("label", "")
+	if label == "" {
+		return "", "", false
+	}
+	title, _, _ := drawio.ParseLabel(label)
+	id = sanitizeID(title)
+	if id == "" {
+		return "", "", false
+	}
+	return cellID, id, true
 }
 
 // extractDrawioRelationships gathers connector data from all pages.
@@ -474,68 +509,109 @@ func detectElementChanges(
 	sort.Strings(allIDs)
 
 	for _, id := range allIDs {
-		me, inModel := flatModel[id]
-		de, inDrawio := drawioElems[id]
-		lastElem, inLast := lastState.Elements[id]
-
-		// Model side changes
-		switch {
-		case inModel && !inLast:
-			cs.ModelElementChanges = append(cs.ModelElementChanges, ElementChange{ID: id, Type: Added})
-		case !inModel && inLast:
-			cs.ModelElementChanges = append(cs.ModelElementChanges, ElementChange{ID: id, Type: Deleted})
-		case inModel && inLast:
-			appendIfChanged(id, "title", lastElem.Title, me.Title, &cs.ModelElementChanges)
-			appendIfChanged(id, "description", lastElem.Description, me.Description, &cs.ModelElementChanges)
-			appendIfChanged(id, "technology", lastElem.Technology, me.Technology, &cs.ModelElementChanges)
-			appendIfChanged(id, "kind", lastElem.Kind, me.Kind, &cs.ModelElementChanges)
-			appendIfChanged(id, "link", lastElem.Link, me.Link, &cs.ModelElementChanges)
-		}
-
-		// Draw.io side changes
-		switch {
-		case inDrawio && !inLast:
-			cs.DrawioElementChanges = append(cs.DrawioElementChanges, ElementChange{ID: id, Type: Added})
-		case !inDrawio && inLast:
-			// Only treat as deleted if the element should be visible on at least one
-			// view page. Elements not in any view's resolved set are simply filtered
-			// out and their absence from draw.io is expected, not a deletion. (#108, #118)
-			// Also skip elements that are only expected on newly created pages — those
-			// pages haven't been populated by forward sync yet (#184, #188, #189).
-			if visibleElems == nil || visibleElems[id] {
-				if newPageOnly != nil && newPageOnly[id] {
-					continue
-				}
-				// Skip elements that were never rendered to a draw.io page.
-				// When RenderedElements is available (state from v2+), an element
-				// absent from draw.io but not in RenderedElements was never on any
-				// page — it was filtered by views. Forward sync will create it now
-				// that views include it. (#240)
-				// When RenderedElements is nil (old state files), fall back to
-				// treating all elements as rendered (preserving old behavior).
-				if lastState.RenderedElements != nil && !lastState.RenderedElements[id] {
-					continue
-				}
-				cs.DrawioElementChanges = append(cs.DrawioElementChanges, ElementChange{ID: id, Type: Deleted})
-			}
-		case inDrawio && inLast:
-			appendIfChanged(id, "title", lastElem.Title, de.title, &cs.DrawioElementChanges)
-			appendIfChanged(id, "description", lastElem.Description, de.description, &cs.DrawioElementChanges)
-			appendIfChanged(id, "technology", lastElem.Technology, de.technology, &cs.DrawioElementChanges)
-			// Note: kind is not compared on the draw.io side because scope
-			// boundary elements have a derived kind (e.g. "system_boundary")
-			// that legitimately differs from the model kind ("system").
-		}
-
-		// Conflicts: both sides modified the same field
-		if inModel && inDrawio && inLast {
-			checkElemConflict(cs, id, "title", lastElem.Title, me.Title, de.title)
-			checkElemConflict(cs, id, "description", lastElem.Description, me.Description, de.description)
-			checkElemConflict(cs, id, "technology", lastElem.Technology, me.Technology, de.technology)
-			// Note: kind conflicts are not checked because kind is
-			// model-authoritative and draw.io boundary kinds are derived.
-		}
+		detectElementChangeForID(cs, id, flatModel, drawioElems, lastState, visibleElems, newPageOnly)
 	}
+}
+
+// detectElementChangeForID performs the three-way comparison (model /
+// draw.io / last-sync state) for a single element ID and appends the
+// resulting changes and conflicts to cs.
+func detectElementChangeForID(
+	cs *ChangeSet,
+	id string,
+	flatModel map[string]*model.Element,
+	drawioElems map[string]drawioElemSnapshot,
+	lastState *SyncState,
+	visibleElems map[string]bool,
+	newPageOnly map[string]bool,
+) {
+	me, inModel := flatModel[id]
+	de, inDrawio := drawioElems[id]
+	lastElem, inLast := lastState.Elements[id]
+
+	detectModelElementChange(cs, id, me, inModel, lastElem, inLast)
+	detectDrawioElementChange(cs, id, de, inDrawio, lastElem, inLast, lastState, visibleElems, newPageOnly)
+
+	// Conflicts: both sides modified the same field
+	if inModel && inDrawio && inLast {
+		checkElemConflict(cs, id, "title", lastElem.Title, me.Title, de.title)
+		checkElemConflict(cs, id, "description", lastElem.Description, me.Description, de.description)
+		checkElemConflict(cs, id, "technology", lastElem.Technology, me.Technology, de.technology)
+		// Note: kind conflicts are not checked because kind is
+		// model-authoritative and draw.io boundary kinds are derived.
+	}
+}
+
+// detectModelElementChange appends the model-side ElementChange for a single
+// element, comparing against last-sync state.
+func detectModelElementChange(cs *ChangeSet, id string, me *model.Element, inModel bool, lastElem ElementState, inLast bool) {
+	switch {
+	case inModel && !inLast:
+		cs.ModelElementChanges = append(cs.ModelElementChanges, ElementChange{ID: id, Type: Added})
+	case !inModel && inLast:
+		cs.ModelElementChanges = append(cs.ModelElementChanges, ElementChange{ID: id, Type: Deleted})
+	case inModel && inLast:
+		appendIfChanged(id, "title", lastElem.Title, me.Title, &cs.ModelElementChanges)
+		appendIfChanged(id, "description", lastElem.Description, me.Description, &cs.ModelElementChanges)
+		appendIfChanged(id, "technology", lastElem.Technology, me.Technology, &cs.ModelElementChanges)
+		appendIfChanged(id, "kind", lastElem.Kind, me.Kind, &cs.ModelElementChanges)
+		appendIfChanged(id, "link", lastElem.Link, me.Link, &cs.ModelElementChanges)
+	}
+}
+
+// detectDrawioElementChange appends the draw.io-side ElementChange for a
+// single element, comparing against last-sync state.
+func detectDrawioElementChange(
+	cs *ChangeSet,
+	id string,
+	de drawioElemSnapshot,
+	inDrawio bool,
+	lastElem ElementState,
+	inLast bool,
+	lastState *SyncState,
+	visibleElems map[string]bool,
+	newPageOnly map[string]bool,
+) {
+	switch {
+	case inDrawio && !inLast:
+		cs.DrawioElementChanges = append(cs.DrawioElementChanges, ElementChange{ID: id, Type: Added})
+	case !inDrawio && inLast:
+		appendDrawioDeletionIfVisible(cs, id, lastState, visibleElems, newPageOnly)
+	case inDrawio && inLast:
+		appendIfChanged(id, "title", lastElem.Title, de.title, &cs.DrawioElementChanges)
+		appendIfChanged(id, "description", lastElem.Description, de.description, &cs.DrawioElementChanges)
+		appendIfChanged(id, "technology", lastElem.Technology, de.technology, &cs.DrawioElementChanges)
+		// Note: kind is not compared on the draw.io side because scope
+		// boundary elements have a derived kind (e.g. "system_boundary")
+		// that legitimately differs from the model kind ("system").
+	}
+}
+
+// appendDrawioDeletionIfVisible appends a Deleted DrawioElementChange for id
+// unless its absence from draw.io is expected rather than a real deletion.
+func appendDrawioDeletionIfVisible(cs *ChangeSet, id string, lastState *SyncState, visibleElems map[string]bool, newPageOnly map[string]bool) {
+	// Only treat as deleted if the element should be visible on at least one
+	// view page. Elements not in any view's resolved set are simply filtered
+	// out and their absence from draw.io is expected, not a deletion. (#108, #118)
+	if visibleElems != nil && !visibleElems[id] {
+		return
+	}
+	// Skip elements that are only expected on newly created pages — those
+	// pages haven't been populated by forward sync yet (#184, #188, #189).
+	if newPageOnly != nil && newPageOnly[id] {
+		return
+	}
+	// Skip elements that were never rendered to a draw.io page.
+	// When RenderedElements is available (state from v2+), an element
+	// absent from draw.io but not in RenderedElements was never on any
+	// page — it was filtered by views. Forward sync will create it now
+	// that views include it. (#240)
+	// When RenderedElements is nil (old state files), fall back to
+	// treating all elements as rendered (preserving old behavior).
+	if lastState.RenderedElements != nil && !lastState.RenderedElements[id] {
+		return
+	}
+	cs.DrawioElementChanges = append(cs.DrawioElementChanges, ElementChange{ID: id, Type: Deleted})
 }
 
 // unionElementIDs returns the union of IDs across all three sources.
@@ -562,90 +638,103 @@ func unionElementIDs(
 // that doesn't match the model, even though model and state agree.
 // This handles the case where reverse sync updated one view but other views
 // still show the old value (#236).
+// fieldKey identifies a single (element, field) combo, used to track which
+// cross-view field changes have already been emitted to avoid duplicates.
+type fieldKey struct {
+	id, field string
+}
+
 func detectCrossViewInconsistencies(
 	cs *ChangeSet,
 	doc *drawio.Document,
 	flatModel map[string]*model.Element,
 	lastState *SyncState,
 ) {
-	// Track which element+field combos we've already emitted to avoid duplicates.
-	type fieldKey struct {
-		id, field string
+	emitted := buildEmittedFieldSet(cs)
+
+	for _, page := range doc.Pages() {
+		for _, obj := range page.FindAllElements() {
+			reconcileElementFieldsAcrossViews(cs, obj, page, flatModel, lastState, emitted)
+		}
 	}
+}
+
+// buildEmittedFieldSet returns the (element, field) pairs already covered by
+// a model-side change (already forward-synced) or a draw.io-side change
+// (a legitimate user edit that should be reverse-synced, not overwritten by
+// forward sync) in cs, so detectCrossViewInconsistencies doesn't also emit a
+// stale-value change for them.
+func buildEmittedFieldSet(cs *ChangeSet) map[fieldKey]bool {
 	emitted := make(map[fieldKey]bool)
-	// Skip fields that detectElementChanges already emitted as model changes.
 	for _, ch := range cs.ModelElementChanges {
 		if ch.Field != "" {
 			emitted[fieldKey{ch.ID, ch.Field}] = true
 		}
 	}
-	// Skip fields that have a legitimate draw.io-side change — those are user
-	// edits that should be reverse-synced, not overwritten by forward sync.
 	for _, ch := range cs.DrawioElementChanges {
 		if ch.Field != "" {
 			emitted[fieldKey{ch.ID, ch.Field}] = true
 		}
 	}
+	return emitted
+}
 
-	for _, page := range doc.Pages() {
-		for _, obj := range page.FindAllElements() {
-			id := obj.SelectAttrValue("bausteinsicht_id", "")
-			if id == "" {
-				continue
-			}
-			me, inModel := flatModel[id]
-			if !inModel {
-				continue
-			}
-			lastElem, inLast := lastState.Elements[id]
-			if !inLast {
-				continue
-			}
-
-			title, technology, labelDesc := page.ReadElementFields(obj)
-			if technology == "" {
-				technology = obj.SelectAttrValue("technology", "")
-			}
-			tooltipDesc := obj.SelectAttrValue("tooltip", "")
-			description := tooltipDesc
-			if description == "" {
-				description = labelDesc
-			}
-
-			// If model and state agree but this page shows a stale value,
-			// emit a forward change so all views are brought up to date.
-			if me.Title == lastElem.Title && title != me.Title {
-				fk := fieldKey{id, "title"}
-				if !emitted[fk] {
-					emitted[fk] = true
-					cs.ModelElementChanges = append(cs.ModelElementChanges, ElementChange{
-						ID: id, Type: Modified, Field: "title",
-						OldValue: title, NewValue: me.Title,
-					})
-				}
-			}
-			if me.Description == lastElem.Description && description != me.Description {
-				fk := fieldKey{id, "description"}
-				if !emitted[fk] {
-					emitted[fk] = true
-					cs.ModelElementChanges = append(cs.ModelElementChanges, ElementChange{
-						ID: id, Type: Modified, Field: "description",
-						OldValue: description, NewValue: me.Description,
-					})
-				}
-			}
-			if me.Technology == lastElem.Technology && technology != me.Technology {
-				fk := fieldKey{id, "technology"}
-				if !emitted[fk] {
-					emitted[fk] = true
-					cs.ModelElementChanges = append(cs.ModelElementChanges, ElementChange{
-						ID: id, Type: Modified, Field: "technology",
-						OldValue: technology, NewValue: me.Technology,
-					})
-				}
-			}
-		}
+// reconcileElementFieldsAcrossViews checks a single page element against the
+// model and last-sync state, emitting a forward change for any field where
+// model and state agree (no real model change) but this page's rendered
+// value is stale — bringing all views up to date with the model.
+func reconcileElementFieldsAcrossViews(
+	cs *ChangeSet,
+	obj *etree.Element,
+	page *drawio.Page,
+	flatModel map[string]*model.Element,
+	lastState *SyncState,
+	emitted map[fieldKey]bool,
+) {
+	id := obj.SelectAttrValue("bausteinsicht_id", "")
+	if id == "" {
+		return
 	}
+	me, inModel := flatModel[id]
+	if !inModel {
+		return
+	}
+	lastElem, inLast := lastState.Elements[id]
+	if !inLast {
+		return
+	}
+
+	title, technology, labelDesc := page.ReadElementFields(obj)
+	if technology == "" {
+		technology = obj.SelectAttrValue("technology", "")
+	}
+	tooltipDesc := obj.SelectAttrValue("tooltip", "")
+	description := tooltipDesc
+	if description == "" {
+		description = labelDesc
+	}
+
+	emitStaleFieldChange(cs, emitted, id, "title", lastElem.Title, me.Title, title)
+	emitStaleFieldChange(cs, emitted, id, "description", lastElem.Description, me.Description, description)
+	emitStaleFieldChange(cs, emitted, id, "technology", lastElem.Technology, me.Technology, technology)
+}
+
+// emitStaleFieldChange appends a Modified ElementChange for field if the
+// model and last-sync state agree (no real model change occurred) but
+// pageValue has drifted from the model, unless already covered by emitted.
+func emitStaleFieldChange(cs *ChangeSet, emitted map[fieldKey]bool, id, field, lastValue, modelValue, pageValue string) {
+	if modelValue != lastValue || pageValue == modelValue {
+		return
+	}
+	fk := fieldKey{id, field}
+	if emitted[fk] {
+		return
+	}
+	emitted[fk] = true
+	cs.ModelElementChanges = append(cs.ModelElementChanges, ElementChange{
+		ID: id, Type: Modified, Field: field,
+		OldValue: pageValue, NewValue: modelValue,
+	})
 }
 
 // appendIfChanged adds a Modified ElementChange if newValue differs from lastValue.
@@ -694,72 +783,127 @@ func detectRelationshipChanges(
 	allKeys := unionRelKeys(modelRels, drawioRels, lastRels)
 
 	for k := range allKeys {
-		mr, inModel := modelRels[k]
-		dr, inDrawio := drawioRels[k]
-		lr, inLast := lastRels[k]
-
-		from, to, index := resolveRelFromTo(mr, lr, dr)
-
-		// Model side
-		switch {
-		case inModel && !inLast:
-			cs.ModelRelationshipChanges = append(cs.ModelRelationshipChanges, RelationshipChange{
-				From: from, To: to, Index: index, Type: Added, NewValue: mr.Label, Kind: mr.Kind,
-			})
-		case !inModel && inLast:
-			cs.ModelRelationshipChanges = append(cs.ModelRelationshipChanges, RelationshipChange{
-				From: from, To: to, Index: index, Type: Deleted,
-			})
-		case inModel && inLast && (mr.Label != lr.Label || mr.Kind != lr.Kind):
-			cs.ModelRelationshipChanges = append(cs.ModelRelationshipChanges, RelationshipChange{
-				From: from, To: to, Index: index, Type: Modified, Field: "label",
-				OldValue: lr.Label, NewValue: mr.Label, Kind: mr.Kind,
-			})
-		}
-
-		// Draw.io side
-		switch {
-		case inDrawio && !inLast:
-			// Skip lifted connectors: when a view lifts a relationship
-			// endpoint to a parent (e.g., A→B.child becomes A→B),
-			// the lifted connector should not be treated as a new relationship.
-			if isLiftedRelationship(from, to, modelRels) {
-				continue
-			}
-			// Collect page IDs where this relationship exists.
-			pageID := ""
-			if len(dr.PageIDs) > 0 {
-				pageID = dr.PageIDs[0]
-			}
-			cs.DrawioRelationshipChanges = append(cs.DrawioRelationshipChanges, RelationshipChange{
-				From: from, To: to, Index: index, Type: Added, NewValue: dr.Label, PageID: pageID,
-			})
-		case !inDrawio && inLast:
-			// Only treat as deleted if the relationship should have a connector
-			// on at least one view page. Relationships whose endpoints are not
-			// visible on any view (due to filter changes) are simply absent from
-			// draw.io — not user deletions. (#167)
-			if visibleRels != nil && !visibleRels[k] {
-				continue
-			}
-			// Skip if a lifted version of this relationship exists in draw.io.
-			// When a view lifts endpoints (e.g., cli→model.loader becomes
-			// cli→model), the connector has different keys but still represents
-			// this relationship. Without this check, the original relationship
-			// would be incorrectly deleted (#223).
-			if hasLiftedConnectorInDrawio(from, to, drawioRels) {
-				continue
-			}
-			cs.DrawioRelationshipChanges = append(cs.DrawioRelationshipChanges, RelationshipChange{
-				From: from, To: to, Index: index, Type: Deleted,
-			})
-		case inDrawio && inLast && dr.Label != lr.Label:
-			cs.DrawioRelationshipChanges = append(cs.DrawioRelationshipChanges, RelationshipChange{
-				From: from, To: to, Index: index, Type: Modified, Field: "label",
-				OldValue: lr.Label, NewValue: dr.Label,
-			})
-		}
+		detectRelationshipChangeForKey(cs, k, modelRels, drawioRels, lastRels, visibleRels)
 	}
+}
+
+// detectRelationshipChangeForKey performs the three-way comparison (model /
+// draw.io / last-sync state) for a single relationship key and appends the
+// resulting changes to cs.
+func detectRelationshipChangeForKey(
+	cs *ChangeSet,
+	k string,
+	modelRels map[string]RelationshipState,
+	drawioRels map[string]RelationshipState,
+	lastRels map[string]RelationshipState,
+	visibleRels map[string]bool,
+) {
+	mr, inModel := modelRels[k]
+	dr, inDrawio := drawioRels[k]
+	lr, inLast := lastRels[k]
+
+	from, to, index := resolveRelFromTo(mr, lr, dr)
+
+	detectModelRelationshipChange(cs, from, to, index, mr, inModel, lr, inLast)
+	detectDrawioRelationshipChange(cs, k, from, to, index, dr, inDrawio, lr, inLast, modelRels, drawioRels, visibleRels)
+}
+
+// detectModelRelationshipChange appends the model-side RelationshipChange
+// for a single relationship, comparing against last-sync state.
+func detectModelRelationshipChange(
+	cs *ChangeSet,
+	from, to string,
+	index int,
+	mr RelationshipState,
+	inModel bool,
+	lr RelationshipState,
+	inLast bool,
+) {
+	switch {
+	case inModel && !inLast:
+		cs.ModelRelationshipChanges = append(cs.ModelRelationshipChanges, RelationshipChange{
+			From: from, To: to, Index: index, Type: Added, NewValue: mr.Label, Kind: mr.Kind,
+		})
+	case !inModel && inLast:
+		cs.ModelRelationshipChanges = append(cs.ModelRelationshipChanges, RelationshipChange{
+			From: from, To: to, Index: index, Type: Deleted,
+		})
+	case inModel && inLast && (mr.Label != lr.Label || mr.Kind != lr.Kind):
+		cs.ModelRelationshipChanges = append(cs.ModelRelationshipChanges, RelationshipChange{
+			From: from, To: to, Index: index, Type: Modified, Field: "label",
+			OldValue: lr.Label, NewValue: mr.Label, Kind: mr.Kind,
+		})
+	}
+}
+
+// detectDrawioRelationshipChange appends the draw.io-side RelationshipChange
+// for a single relationship, comparing against last-sync state.
+func detectDrawioRelationshipChange(
+	cs *ChangeSet,
+	k string,
+	from, to string,
+	index int,
+	dr RelationshipState,
+	inDrawio bool,
+	lr RelationshipState,
+	inLast bool,
+	modelRels map[string]RelationshipState,
+	drawioRels map[string]RelationshipState,
+	visibleRels map[string]bool,
+) {
+	switch {
+	case inDrawio && !inLast:
+		appendAddedDrawioRelationship(cs, from, to, index, dr, modelRels)
+	case !inDrawio && inLast:
+		appendDeletedDrawioRelationship(cs, k, from, to, index, drawioRels, visibleRels)
+	case inDrawio && inLast && dr.Label != lr.Label:
+		cs.DrawioRelationshipChanges = append(cs.DrawioRelationshipChanges, RelationshipChange{
+			From: from, To: to, Index: index, Type: Modified, Field: "label",
+			OldValue: lr.Label, NewValue: dr.Label,
+		})
+	}
+}
+
+// appendAddedDrawioRelationship appends an Added DrawioRelationshipChange
+// unless the connector is a lifted view of an existing model relationship
+// (e.g. A→B.child becomes A→B via view endpoint lifting) — those must not
+// be treated as new relationships.
+func appendAddedDrawioRelationship(cs *ChangeSet, from, to string, index int, dr RelationshipState, modelRels map[string]RelationshipState) {
+	if isLiftedRelationship(from, to, modelRels) {
+		return
+	}
+	// Collect page IDs where this relationship exists.
+	pageID := ""
+	if len(dr.PageIDs) > 0 {
+		pageID = dr.PageIDs[0]
+	}
+	cs.DrawioRelationshipChanges = append(cs.DrawioRelationshipChanges, RelationshipChange{
+		From: from, To: to, Index: index, Type: Added, NewValue: dr.Label, PageID: pageID,
+	})
+}
+
+// appendDeletedDrawioRelationship appends a Deleted DrawioRelationshipChange
+// unless the relationship isn't expected to have a connector on any visible
+// view (#167), or a lifted version of it still exists in draw.io (#223).
+func appendDeletedDrawioRelationship(cs *ChangeSet, k string, from, to string, index int, drawioRels map[string]RelationshipState, visibleRels map[string]bool) {
+	// Only treat as deleted if the relationship should have a connector
+	// on at least one view page. Relationships whose endpoints are not
+	// visible on any view (due to filter changes) are simply absent from
+	// draw.io — not user deletions. (#167)
+	if visibleRels != nil && !visibleRels[k] {
+		return
+	}
+	// Skip if a lifted version of this relationship exists in draw.io.
+	// When a view lifts endpoints (e.g., cli→model.loader becomes
+	// cli→model), the connector has different keys but still represents
+	// this relationship. Without this check, the original relationship
+	// would be incorrectly deleted (#223).
+	if hasLiftedConnectorInDrawio(from, to, drawioRels) {
+		return
+	}
+	cs.DrawioRelationshipChanges = append(cs.DrawioRelationshipChanges, RelationshipChange{
+		From: from, To: to, Index: index, Type: Deleted,
+	})
 }
 
 // unionRelKeys returns the union of relationship keys from all three sources.
