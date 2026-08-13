@@ -184,6 +184,27 @@ func TestDiagnosticSeverityMapping(t *testing.T) {
 	}
 }
 
+func TestValidateDocument_BinaryNotOnPath(t *testing.T) {
+	t.Setenv("PATH", "")
+
+	doc := &Document{
+		Content:  "{}",
+		Filename: "architecture.jsonc",
+	}
+
+	diags := ValidateDocument(doc, t.TempDir())
+
+	if len(diags) != 1 {
+		t.Fatalf("expected 1 diagnostic, got %d", len(diags))
+	}
+	if diags[0].Severity != DiagnosticError {
+		t.Errorf("expected DiagnosticError, got %d", diags[0].Severity)
+	}
+	if diags[0].Message != "bausteinsicht binary not found on PATH" {
+		t.Errorf("expected missing-binary message, got %q", diags[0].Message)
+	}
+}
+
 func TestEmptyValidateOutput(t *testing.T) {
 	doc := &Document{
 		Content:  "{}",

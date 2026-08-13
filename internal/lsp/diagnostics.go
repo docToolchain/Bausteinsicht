@@ -73,7 +73,18 @@ func ValidateDocument(doc *Document, workDir string) []Diagnostic {
 	}
 
 	// Call bausteinsicht validate --format json
-	cmd := exec.Command("bausteinsicht", "validate", "--format", "json", "--model", doc.Filename)
+	binPath, err := exec.LookPath("bausteinsicht")
+	if err != nil {
+		return []Diagnostic{
+			{
+				Range:    Range{Start: Position{Line: 0, Character: 0}, End: Position{Line: 0, Character: 10}},
+				Message:  "bausteinsicht binary not found on PATH",
+				Severity: DiagnosticError,
+				Source:   "bausteinsicht",
+			},
+		}
+	}
+	cmd := exec.Command(binPath, "validate", "--format", "json", "--model", doc.Filename)
 	cmd.Dir = workDir
 
 	var stdout bytes.Buffer
