@@ -156,8 +156,8 @@ This does **not** close out R4/R1 in full: the *constraint→target-rule transla
 Gating the forward mechanism's move from B to C:
 
 * Must the failing gate be a **native JUnit/IDE test** (→ Variant C/A), or is a **separate CI step** running the Bausteinsicht binary against an extracted graph acceptable (→ extractor + BS engine)?
-* Are we willing to treat the **JSONC model as a stable, versioned public API**? Partially answered by <<variant-c-prototype>> — a real adapter already depends on the shape — but not yet a formal commitment (versioning policy, compatibility guarantees).
-* Who **owns** the Java-side adapter (Variant C) long-term? A prototype owner exists (ascheman, `docToolchain/bausteinsicht-archunit`), but its README lists the license as "TBD — to be aligned with the docToolchain organisation's policy," so its path to becoming the *official* adapter (vs. staying a reference prototype) is still open.
+* Are we willing to treat the **JSONC model as a stable, versioned public API**? Partially answered by <<variant-c-prototype>> — a real adapter already depends on the shape — but not yet a formal commitment (versioning policy, compatibility guarantees). Tracked as its own decision: https://github.com/docToolchain/Bausteinsicht/issues/601[Bausteinsicht#601].
+* Who **owns** the Java-side adapter (Variant C) long-term? A prototype owner exists (ascheman, `docToolchain/bausteinsicht-archunit`), but its README lists the license as "TBD — to be aligned with the docToolchain organisation's policy," so its path to becoming the *official* adapter (vs. staying a reference prototype) is still open. Tracked as its own decision, in the adapter's own repo: https://github.com/docToolchain/bausteinsicht-archunit/issues/1[bausteinsicht-archunit#1].
 * Should `codeMapping` become per-backend-keyed (#572 R6) once a second backend (#574, Go) exists, or does the flat shape decided here turn out to generalise (e.g. by adding a sibling field rather than reshaping this one)? Deliberately not decided now — see <<variant-c-prototype>>.
 * Does #574 (Go)'s actual implementation ever need Bausteinsicht's own code to branch on backend/language? If yes, that's the trigger to revisit <<rulebackend-r1>>'s "no interface needed" call — see that section.
 
@@ -195,6 +195,7 @@ Cross-cutting with #572 (tracked there, not here):
 * https://github.com/docToolchain/Bausteinsicht/issues/570[#570] — RFE: Model DDD / Hexagonal Architecture with xMolecules-aligned vocabulary (umbrella; this ADR is a descendant of its layer 4 "Bridge to code").
 * https://github.com/docToolchain/Bausteinsicht/issues/572[#572] — RFE: Multi-language code-governance backends beyond ArchUnit/JVM. Proposes per-backend `codeMapping` keying (R6) and the `RuleBackend` abstraction (R1); this ADR deliberately does *not* adopt the R6 keying yet — see <<variant-c-prototype>> and <<open-questions>>.
 * https://github.com/docToolchain/bausteinsicht-archunit[docToolchain/bausteinsicht-archunit] — the Variant C prototype whose contract this ADR's `codeMapping` shape matches exactly.
+* Governance decisions spun out of <<open-questions>>: https://github.com/docToolchain/Bausteinsicht/issues/601[Bausteinsicht#601] (JSONC as stable public API) and https://github.com/docToolchain/bausteinsicht-archunit/issues/1[bausteinsicht-archunit#1] (adapter ownership/license).
 * `src/docs/spec/03_data_models.adoc`, section "CodeMapping Properties".
 * `internal/model/types.go` — `Element.CodeMapping`, `CodeMapping`.
 * `internal/codegraph/` — `CodeGraph`/`Node`/`Edge` types, `Load`, `Project` (the reverse-path projection algorithm), `HasAnyCodeMapping`.
