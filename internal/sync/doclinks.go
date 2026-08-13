@@ -19,6 +19,11 @@ const docLinkPrefix = "doclink-"
 const (
 	docIconSize = 18.0
 	docIconGap  = 2.0
+
+	// docIconFill/docIconStroke are the standard doc-link icon colors,
+	// shared by every DocLink type (docLinkGlyph).
+	docIconFill   = "#dae8fc"
+	docIconStroke = "#6c8ebf"
 )
 
 // docLinkGlyph returns the icon glyph and fill/stroke colors for a DocLink
@@ -28,17 +33,17 @@ const (
 func docLinkGlyph(linkType string) (glyph, fill, stroke string) {
 	switch linkType {
 	case "arc42":
-		return "\U0001F4D6", "#dae8fc", "#6c8ebf" // 📖
+		return "\U0001F4D6", docIconFill, docIconStroke // 📖
 	case "adr":
-		return "⚖", "#dae8fc", "#6c8ebf" // ⚖
+		return "⚖", docIconFill, docIconStroke // ⚖
 	case "persona":
-		return "\U0001F464", "#dae8fc", "#6c8ebf" // 👤
+		return "\U0001F464", docIconFill, docIconStroke // 👤
 	case "prd":
-		return "\U0001F4CB", "#dae8fc", "#6c8ebf" // 📋
+		return "\U0001F4CB", docIconFill, docIconStroke // 📋
 	case "spec":
-		return "\U0001F4C4", "#dae8fc", "#6c8ebf" // 📄
+		return "\U0001F4C4", docIconFill, docIconStroke // 📄
 	default:
-		return "\U0001F517", "#dae8fc", "#6c8ebf" // 🔗
+		return "\U0001F517", docIconFill, docIconStroke // 🔗
 	}
 }
 
@@ -204,34 +209,50 @@ func synchronizeDocLinkIcons(page *drawio.Page, m *model.BausteinsichtModel) {
 	}
 
 	for _, obj := range root.SelectElements("object") {
-		elemID := obj.SelectAttrValue("bausteinsicht_id", "")
-		if elemID == "" {
-			continue
-		}
-		elem, ok := findElementByID(m, elemID)
-		if !ok || elem == nil {
-			continue
-		}
-		cellID := obj.SelectAttrValue("id", "")
-		if cellID == "" {
-			continue
-		}
-
-		removeDocIcons(root, docLinkPrefix+cellID+"-")
-
-		icons := buildElementDocIcons(cellID, elem, decisionMap)
-		if len(icons) == 0 {
-			continue
-		}
-
-		width := 100.0
-		if cell := obj.SelectElement("mxCell"); cell != nil {
-			if geo := cell.SelectElement("mxGeometry"); geo != nil {
-				width = parseFloat(geo.SelectAttrValue("width", "100"))
-			}
-		}
-		placeElementIconRow(root, cellID, icons, width)
+		syncElementDocIcons(root, obj, m, decisionMap)
 	}
+}
+
+// syncElementDocIcons rebuilds the doc-link icon row for a single element
+// cell, if it maps to a known model element (split out of
+// synchronizeDocLinkIcons to keep cognitive complexity down).
+func syncElementDocIcons(root *etree.Element, obj *etree.Element, m *model.BausteinsichtModel, decisionMap map[string]*model.DecisionRecord) {
+	elemID := obj.SelectAttrValue("bausteinsicht_id", "")
+	if elemID == "" {
+		return
+	}
+	elem, ok := findElementByID(m, elemID)
+	if !ok || elem == nil {
+		return
+	}
+	cellID := obj.SelectAttrValue("id", "")
+	if cellID == "" {
+		return
+	}
+
+	removeDocIcons(root, docLinkPrefix+cellID+"-")
+
+	icons := buildElementDocIcons(cellID, elem, decisionMap)
+	if len(icons) == 0 {
+		return
+	}
+
+	placeElementIconRow(root, cellID, icons, elementWidth(obj))
+}
+
+// elementWidth reads an element cell's on-page width, defaulting to 100 if
+// the cell has no geometry (mirrors the fallback synchronizeDocLinkIcons
+// always used).
+func elementWidth(obj *etree.Element) float64 {
+	cell := obj.SelectElement("mxCell")
+	if cell == nil {
+		return 100.0
+	}
+	geo := cell.SelectElement("mxGeometry")
+	if geo == nil {
+		return 100.0
+	}
+	return parseFloat(geo.SelectAttrValue("width", "100"))
 }
 
 // synchronizeViewDocLinkIcons updates the clickable icon row for a view's
