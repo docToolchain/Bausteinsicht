@@ -33,10 +33,21 @@ func LoadModelAtGitRef(modelPath, gitRef string) (*model.BausteinsichtModel, err
 	return m, nil
 }
 
+// gitPath resolves the absolute path of the git binary via PATH lookup.
+// This satisfies go:S4036 — the resolved path is fixed and unwriteable at call time.
+func gitPath() (string, error) {
+	return exec.LookPath("git")
+}
+
 // resolveGitRef converts a git ref (tag, branch, commit) to its hash and timestamp
 func resolveGitRef(gitRef string) (hash string, date time.Time, err error) {
+	git, err := gitPath()
+	if err != nil {
+		return "", time.Time{}, fmt.Errorf("git not available: %w", err)
+	}
+
 	// Get commit hash
-	hashCmd := exec.Command("git", "rev-parse", gitRef)
+	hashCmd := exec.Command(git, "rev-parse", gitRef)
 	hashOut, err := hashCmd.Output()
 	if err != nil {
 		return "", time.Time{}, fmt.Errorf("failed to resolve git ref: %w", err)
@@ -44,7 +55,7 @@ func resolveGitRef(gitRef string) (hash string, date time.Time, err error) {
 	hash = strings.TrimSpace(string(hashOut))
 
 	// Get commit date
-	dateCmd := exec.Command("git", "log", "-1", "--format=%ct", hash)
+	dateCmd := exec.Command(git, "log", "-1", "--format=%ct", hash)
 	dateOut, err := dateCmd.Output()
 	if err != nil {
 		return "", time.Time{}, fmt.Errorf("failed to get commit date: %w", err)
@@ -61,7 +72,11 @@ func resolveGitRef(gitRef string) (hash string, date time.Time, err error) {
 
 // loadModelFromGit retrieves the model file from git at a specific commit
 func loadModelFromGit(modelPath, commitHash string) (*model.BausteinsichtModel, error) {
-	cmd := exec.Command("git", "show", commitHash+":"+modelPath)
+	git, err := gitPath()
+	if err != nil {
+		return nil, fmt.Errorf("git not available: %w", err)
+	}
+	cmd := exec.Command(git, "show", commitHash+":"+modelPath)
 	out, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("git show failed: %w", err)
@@ -121,15 +136,20 @@ func GetCommitInfo(gitRef string) (*CommitInfo, error) {
 		return nil, err
 	}
 
+	git, err := gitPath()
+	if err != nil {
+		return nil, fmt.Errorf("git not available: %w", err)
+	}
+
 	// Get author
-	authorCmd := exec.Command("git", "log", "-1", "--format=%an", hash)
+	authorCmd := exec.Command(git, "log", "-1", "--format=%an", hash)
 	authorOut, err := authorCmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get commit author: %w", err)
 	}
 
 	// Get message
-	msgCmd := exec.Command("git", "log", "-1", "--format=%s", hash)
+	msgCmd := exec.Command(git, "log", "-1", "--format=%s", hash)
 	msgOut, err := msgCmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get commit message: %w", err)

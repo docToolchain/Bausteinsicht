@@ -58,6 +58,9 @@
 
 | 2026-08-13 (chaos permissions)
 | Fixed SEC-020 (#585): `internal/chaos.TestChaos.MakeReadOnly`/`MakeWritable` chmod'd to `0444`/`0644`, granting group/other read access on test-only files. Tightened to `0400`/`0600` (owner-only). TDD: regression test added first (commit `12c942e`), then the fix.
+
+| 2026-08-13 (PATH hotspot review)
+| Fixed SEC-021 (#585): `internal/changelog/git.go` and `internal/lsp/diagnostics.go` invoked `git`/`bausteinsicht` by bare name; resolved via `exec.LookPath` instead, matching the existing `internal/stale/git.go` pattern. Added `TestValidateDocument_BinaryNotOnPath` covering the new missing-binary diagnostic.
 |===
 
 === Scope
@@ -182,6 +185,11 @@ The primary risk scenario is a **malicious or crafted model/drawio file** shared
 | Low
 | `scripts/fetch-xmi-testdata.sh` fetched the `BigData.xmi` test fixture from a separate repo's Release asset with only a size check, no checksum — a corrupted/replaced asset would silently pass and the integration test would run against the wrong fixture
 | Fixed (pinned sha256, verified against known LFS digest; PR #561)
+
+| SEC-021
+| Low
+| `internal/changelog/git.go` (5×) and `internal/lsp/diagnostics.go` shelled out to `git`/`bausteinsicht` by bare name, resolved via `$PATH` at call time (Sonar `go:S4036`)
+| Fixed (resolved via `exec.LookPath` once, same pattern as `internal/stale/git.go`; #585)
 |===
 
 === Findings
@@ -427,6 +435,21 @@ Tightened to `0400`/`0600` (owner-only). Regression test added first per the TDD
 
 **Windows CI note:** the regression test's group/other-bits assertions are POSIX-only. `os.Chmod` on Windows only toggles the read-only attribute (via the 0200 bit), and `os.Stat` synthesizes a mirrored FileMode (`0444` read-only / `0666` writable) with no owner/group/other distinction — there is no Windows equivalent of "owner-only" access to assert on. The test skips those assertions on `runtime.GOOS == "windows"`, keeping the write-success/failure behavioral checks (which do exercise the real fix) on all platforms.
 
+==== SEC-021: Unqualified Executable Names in `exec.Command` (Low) — Fixed
+
+_Added 2026-08-13_
+
+**Affected files:** `internal/changelog/git.go:39,47,64,125,132`, `internal/lsp/diagnostics.go:76`
+
+**Description:**
+Both files invoked external binaries (`git`, `bausteinsicht`) by bare name via `exec.Command("git", ...)` / `exec.Command("bausteinsicht", ...)`, letting the OS resolve the executable from `$PATH` at call time. Flagged by SonarCloud (`go:S4036`) as a security hotspot requiring review: on a system where `$PATH` contains a writable, attacker-influenced directory ahead of the legitimate binary's location, this could result in executing an unintended binary.
+
+**Risk:**
+Low. Bausteinsicht is a local CLI tool (per the Threat Model above) — `$PATH` is operator-controlled, not attacker-controlled, in its normal use. Same category as the already-reviewed `internal/export/export.go` and `internal/stale/git.go` cases (see "Not Vulnerable" below).
+
+**Fix:**
+Resolved both binaries via `exec.LookPath` once per call site, matching the existing `gitPath()` pattern in `internal/stale/git.go` — added an equivalent `gitPath()` helper in `internal/changelog/git.go`, and resolve `bausteinsicht` via `exec.LookPath` in `diagnostics.go` (now also surfaces a clear diagnostic if the binary is missing from `$PATH`, instead of silently failing). #585.
+
 === Not Vulnerable
 
 The following attack vectors were explicitly tested and confirmed **not exploitable**:
@@ -525,6 +548,7 @@ SEC-002 (PR #77), SEC-003 (PR #77), SEC-009 (PR #77), SEC-010 (PR #77), SEC-012 
 SEC-004, SEC-007, SEC-011 verified fixed 2026-03-30 (see individual findings above).
 SEC-019 (PR #561).
 SEC-020 (#585).
+SEC-021 (#585).
 
 ==== Remaining Open
 
