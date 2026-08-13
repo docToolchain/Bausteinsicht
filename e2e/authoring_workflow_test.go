@@ -94,7 +94,7 @@ func TestAuthoringWorkflow_CamelCaseKinds(t *testing.T) {
 
 	// The resulting model must still validate.
 	validateOut := runCLI(t, bin, dir, "validate")
-	if !strings.Contains(validateOut, "valid") {
+	if !strings.Contains(validateOut, "Model is valid.") {
 		t.Errorf("expected model to validate after camelCase authoring, got: %q", validateOut)
 	}
 
