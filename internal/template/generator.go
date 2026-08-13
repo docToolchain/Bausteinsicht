@@ -152,17 +152,22 @@ func (g *Generator) addElementTemplate(parent *etree.Element, kind string, x, y 
 	kindTitle := strings.ToUpper(kind[:1]) + kind[1:]
 	g.addSubCell(parent, objID, "title", kindTitle,
 		fmt.Sprintf("text;html=1;fontSize=13;fontStyle=1;fontColor=%s;fillColor=none;strokeColor=none;align=center;verticalAlign=middle;", colors.Stroke),
-		0, 0, cfg.Width, titleH)
+		cellGeometry{X: 0, Y: 0, W: cfg.Width, H: titleH})
 	g.addSubCell(parent, objID, "tech", "[Technology]",
 		"text;html=1;fontSize=10;fontStyle=2;fontColor=#666666;fillColor=none;strokeColor=none;align=center;verticalAlign=middle;",
-		0, titleH, cfg.Width, techH)
+		cellGeometry{X: 0, Y: titleH, W: cfg.Width, H: techH})
 	g.addSubCell(parent, objID, "desc", "Description",
 		"text;html=1;whiteSpace=wrap;fontSize=10;fontColor=#555555;fillColor=none;strokeColor=none;align=center;verticalAlign=middle;",
-		0, titleH+techH, cfg.Width, descH)
+		cellGeometry{X: 0, Y: titleH + techH, W: cfg.Width, H: descH})
+}
+
+// cellGeometry holds the x/y/width/height of an mxGeometry element.
+type cellGeometry struct {
+	X, Y, W, H int
 }
 
 // addSubCell writes a "-title"/"-tech"/"-desc" text sub-cell parented to objID.
-func (g *Generator) addSubCell(parent *etree.Element, objID, role, value, style string, x, y, w, h int) {
+func (g *Generator) addSubCell(parent *etree.Element, objID, role, value, style string, geo cellGeometry) {
 	cell := parent.CreateElement("mxCell")
 	cell.CreateAttr("id", objID+"-"+role)
 	cell.CreateAttr("parent", objID)
@@ -170,12 +175,12 @@ func (g *Generator) addSubCell(parent *etree.Element, objID, role, value, style 
 	cell.CreateAttr("value", value)
 	cell.CreateAttr("vertex", "1")
 
-	geo := cell.CreateElement("mxGeometry")
-	geo.CreateAttr("x", fmt.Sprintf("%d", x))
-	geo.CreateAttr("y", fmt.Sprintf("%d", y))
-	geo.CreateAttr("width", fmt.Sprintf("%d", w))
-	geo.CreateAttr("height", fmt.Sprintf("%d", h))
-	geo.CreateAttr("as", "geometry")
+	geoElem := cell.CreateElement("mxGeometry")
+	geoElem.CreateAttr("x", fmt.Sprintf("%d", geo.X))
+	geoElem.CreateAttr("y", fmt.Sprintf("%d", geo.Y))
+	geoElem.CreateAttr("width", fmt.Sprintf("%d", geo.W))
+	geoElem.CreateAttr("height", fmt.Sprintf("%d", geo.H))
+	geoElem.CreateAttr("as", "geometry")
 }
 
 // addBoundaryTemplates writes a "<kind>_boundary" template for every container
