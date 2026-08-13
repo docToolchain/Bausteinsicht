@@ -425,6 +425,8 @@ Low (Blast Radius 0 per the Risk Radar assessment) — test-only helper, no prod
 **Fix:**
 Tightened to `0400`/`0600` (owner-only). Regression test added first per the TDD workflow rule, confirmed failing against the unfixed `0444`/`0644` modes, then the fix applied (#585).
 
+**Windows CI note:** the regression test's group/other-bits assertions are POSIX-only. `os.Chmod` on Windows only toggles the read-only attribute (via the 0200 bit), and `os.Stat` synthesizes a mirrored FileMode (`0444` read-only / `0666` writable) with no owner/group/other distinction — there is no Windows equivalent of "owner-only" access to assert on. The test skips those assertions on `runtime.GOOS == "windows"`, keeping the write-success/failure behavioral checks (which do exercise the real fix) on all platforms.
+
 === Not Vulnerable
 
 The following attack vectors were explicitly tested and confirmed **not exploitable**:
