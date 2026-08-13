@@ -74,47 +74,10 @@ func (s *scanner) consume() rune {
 }
 
 func (s *scanner) next() (token, error) {
-	for {
-		c, ok := s.at(0)
-		if !ok {
-			return token{kind: tokEOF, line: s.line}, nil
-		}
-		if c == ' ' || c == '\t' || c == '\r' {
-			s.consume()
-			continue
-		}
-		if c == '/' {
-			n, _ := s.at(1)
-			if n == '/' {
-				for {
-					ch, ok := s.at(0)
-					if !ok || ch == '\n' {
-						break
-					}
-					s.consume()
-				}
-				continue
-			}
-			if n == '*' {
-				s.consume()
-				s.consume()
-				for {
-					ch, ok := s.at(0)
-					if !ok {
-						return token{}, fmt.Errorf("unterminated block comment")
-					}
-					s.consume()
-					if ch == '*' {
-						if nn, _ := s.at(0); nn == '/' {
-							s.consume()
-							break
-						}
-					}
-				}
-				continue
-			}
-		}
-		break
+	// Skip horizontal whitespace and handle comments.
+	// Newlines are NOT skipped here — they are emitted as tokNewline.
+	if err := s.skipWhitespaceAndComments(); err != nil {
+		return token{}, err
 	}
 
 	c, ok := s.at(0)
@@ -123,17 +86,102 @@ func (s *scanner) next() (token, error) {
 	}
 	line := s.line
 
+	// Collapse consecutive newlines into a single tokNewline.
 	if c == '\n' {
-		for {
-			ch, ok := s.at(0)
-			if !ok || ch != '\n' {
-				break
-			}
-			s.consume()
-		}
+		s.skipNewlines()
 		return token{kind: tokNewline, line: line}, nil
 	}
 
+	return s.nextSymbolOrIdent(c, line)
+}
+
+// skipWhitespaceAndComments advances past horizontal whitespace and // and
+// /* */ comments. Newlines are NOT skipped — next emits them as tokNewline.
+func (s *scanner) skipWhitespaceAndComments() error {
+	for {
+		c, ok := s.at(0)
+		if !ok {
+			return nil
+		}
+		if c == ' ' || c == '\t' || c == '\r' {
+			s.consume()
+			continue
+		}
+		if c == '/' {
+			consumed, err := s.skipComment()
+			if err != nil {
+				return err
+			}
+			if consumed {
+				continue
+			}
+		}
+		return nil
+	}
+}
+
+// skipComment consumes a // or /* */ comment starting at the current
+// position (c == '/'), if any, and reports whether one was consumed.
+func (s *scanner) skipComment() (bool, error) {
+	switch n, _ := s.at(1); n {
+	case '/':
+		s.skipLineComment()
+		return true, nil
+	case '*':
+		if err := s.skipBlockComment(); err != nil {
+			return false, err
+		}
+		return true, nil
+	default:
+		return false, nil
+	}
+}
+
+// skipLineComment consumes to end of line (leaving \n for next call).
+func (s *scanner) skipLineComment() {
+	for {
+		ch, ok := s.at(0)
+		if !ok || ch == '\n' {
+			return
+		}
+		s.consume()
+	}
+}
+
+// skipBlockComment consumes a /* ... */ block comment starting at the
+// current position (the leading "/*").
+func (s *scanner) skipBlockComment() error {
+	s.consume()
+	s.consume()
+	for {
+		ch, ok := s.at(0)
+		if !ok {
+			return fmt.Errorf("unterminated block comment")
+		}
+		s.consume()
+		if ch == '*' {
+			if nn, _ := s.at(0); nn == '/' {
+				s.consume()
+				return nil
+			}
+		}
+	}
+}
+
+// skipNewlines consumes consecutive '\n' characters.
+func (s *scanner) skipNewlines() {
+	for {
+		ch, ok := s.at(0)
+		if !ok || ch != '\n' {
+			return
+		}
+		s.consume()
+	}
+}
+
+// nextSymbolOrIdent scans the next symbol, string, or identifier token,
+// given the already-peeked lookahead character c at line.
+func (s *scanner) nextSymbolOrIdent(c rune, line int) (token, error) {
 	switch {
 	case c == '{':
 		s.consume()
@@ -324,11 +372,7 @@ func (p *dslParser) parseOneStmt() (*stmt, error) {
 	if tok.kind == tokArrow {
 		p.advance()
 		to := p.advance()
-		s := &stmt{line: line, isRel: true, relTo: to.val, args: p.collectArgs()}
-		if err := p.optBlock(s); err != nil {
-			return nil, err
-		}
-		return s, nil
+		return p.finishStmt(&stmt{line: line, isRel: true, relTo: to.val, args: p.collectArgs()})
 	}
 
 	if tok.kind == tokLBrace {
@@ -349,28 +393,25 @@ func (p *dslParser) parseOneStmt() (*stmt, error) {
 	case tokAssign:
 		p.advance()
 		kw := p.advance()
-		s := &stmt{line: line, varName: tok.val, keyword: kw.val, args: p.collectArgs()}
-		if err := p.optBlock(s); err != nil {
-			return nil, err
-		}
-		return s, nil
+		return p.finishStmt(&stmt{line: line, varName: tok.val, keyword: kw.val, args: p.collectArgs()})
 
 	case tokArrow:
 		p.advance()
 		to := p.advance()
-		s := &stmt{line: line, isRel: true, relFrom: tok.val, relTo: to.val, args: p.collectArgs()}
-		if err := p.optBlock(s); err != nil {
-			return nil, err
-		}
-		return s, nil
+		return p.finishStmt(&stmt{line: line, isRel: true, relFrom: tok.val, relTo: to.val, args: p.collectArgs()})
 
 	default:
-		s := &stmt{line: line, keyword: tok.val, args: p.collectArgs()}
-		if err := p.optBlock(s); err != nil {
-			return nil, err
-		}
-		return s, nil
+		return p.finishStmt(&stmt{line: line, keyword: tok.val, args: p.collectArgs()})
 	}
+}
+
+// finishStmt parses s's optional trailing "{ ... }" block, if present, and
+// returns s (or the error from parsing the block).
+func (p *dslParser) finishStmt(s *stmt) (*stmt, error) {
+	if err := p.optBlock(s); err != nil {
+		return nil, err
+	}
+	return s, nil
 }
 
 func (p *dslParser) collectArgs() []string {
@@ -451,15 +492,7 @@ func (ls *lc4State) processModelStmts(stmts []stmt, parentPath, parentVar string
 
 func (ls *lc4State) processModelStmt(s stmt, parentPath, parentVar string, dest map[string]model.Element) {
 	if s.isRel {
-		from := s.relFrom
-		if from == "" {
-			from = parentVar
-		}
-		label := ""
-		if len(s.args) > 0 {
-			label = s.args[0]
-		}
-		ls.pendingRels = append(ls.pendingRels, pendingRel{from: from, to: s.relTo, label: label, line: s.line})
+		ls.addPendingRel(s, parentVar)
 		return
 	}
 
@@ -468,16 +501,7 @@ func (ls *lc4State) processModelStmt(s stmt, parentPath, parentVar string, dest 
 		return
 	}
 
-	key := s.varName
-	if key == "" {
-		if len(s.args) > 0 {
-			key = slugify(s.args[0])
-		} else {
-			key = s.keyword
-		}
-		ls.warnings = append(ls.warnings, fmt.Sprintf("line %d: element has no variable name, using %q", s.line, key))
-	}
-
+	key := ls.resolveElementKey(s)
 	path := key
 	if parentPath != "" {
 		path = parentPath + "." + key
@@ -491,28 +515,7 @@ func (ls *lc4State) processModelStmt(s stmt, parentPath, parentVar string, dest 
 
 	children := make(map[string]model.Element)
 	for _, child := range s.body {
-		switch {
-		case child.isRel:
-			from := child.relFrom
-			if from == "" {
-				from = key
-			}
-			label := ""
-			if len(child.args) > 0 {
-				label = child.args[0]
-			}
-			ls.pendingRels = append(ls.pendingRels, pendingRel{from: from, to: child.relTo, label: label, line: child.line})
-		case ls.kinds[child.keyword]:
-			ls.processModelStmt(child, path, key, children)
-		case child.keyword == "description" && len(child.args) > 0:
-			el.Description = child.args[0]
-		case child.keyword == "technology" && len(child.args) > 0:
-			el.Technology = child.args[0]
-		case child.keyword == "title" && len(child.args) > 0:
-			el.Title = child.args[0]
-		case child.keyword == "tags":
-			el.Tags = child.args
-		}
+		ls.processModelChild(child, path, key, &el, children)
 	}
 
 	if len(children) > 0 {
@@ -523,81 +526,152 @@ func (ls *lc4State) processModelStmt(s stmt, parentPath, parentVar string, dest 
 	dest[key] = el
 }
 
+// addPendingRel records a relationship statement for later resolution once
+// all elements have been discovered, defaulting its source to parentVar
+// when the statement omitted an explicit source (e.g. a nested "-> b" inside
+// element a's body).
+func (ls *lc4State) addPendingRel(s stmt, parentVar string) {
+	from := s.relFrom
+	if from == "" {
+		from = parentVar
+	}
+	label := ""
+	if len(s.args) > 0 {
+		label = s.args[0]
+	}
+	ls.pendingRels = append(ls.pendingRels, pendingRel{from: from, to: s.relTo, label: label, line: s.line})
+}
+
+// resolveElementKey returns s's variable name, or a slugified fallback
+// derived from its title (or keyword if untitled), warning when no variable
+// name was given in the DSL.
+func (ls *lc4State) resolveElementKey(s stmt) string {
+	if s.varName != "" {
+		return s.varName
+	}
+	key := s.keyword
+	if len(s.args) > 0 {
+		key = slugify(s.args[0])
+	}
+	ls.warnings = append(ls.warnings, fmt.Sprintf("line %d: element has no variable name, using %q", s.line, key))
+	return key
+}
+
+// processModelChild applies a single child statement of an element's body:
+// a nested relationship, a nested element, or one of the description/
+// technology/title/tags fields.
+func (ls *lc4State) processModelChild(child stmt, path, key string, el *model.Element, children map[string]model.Element) {
+	switch {
+	case child.isRel:
+		ls.addPendingRel(child, key)
+	case ls.kinds[child.keyword]:
+		ls.processModelStmt(child, path, key, children)
+	case child.keyword == "description" && len(child.args) > 0:
+		el.Description = child.args[0]
+	case child.keyword == "technology" && len(child.args) > 0:
+		el.Technology = child.args[0]
+	case child.keyword == "title" && len(child.args) > 0:
+		el.Title = child.args[0]
+	case child.keyword == "tags":
+		el.Tags = child.args
+	}
+}
+
 func (ls *lc4State) processViews(stmts []stmt) {
 	for _, s := range stmts {
 		if s.keyword != "view" {
 			continue
 		}
 
-		// LikeC4: view <key> [of <element>] { ... }
-		// args can be: ["key"], ["key", "of", "element"], or ["key", "of", "element", "title"]
-		viewKey := ""
-		scope := ""
-		title := ""
-
-		args := s.args
-		if len(args) > 0 {
-			viewKey = args[0]
-			args = args[1:]
-		}
-
-		// Check for "of" keyword
-		if len(args) >= 2 && args[0] == "of" {
-			scope = ls.resolveVar(args[1])
-			args = args[2:]
-		}
-
-		title = strings.Join(args, " ")
-
-		if viewKey == "" {
-			baseKey := "view"
-			if scope != "" {
-				baseKey = scope
-			}
-			viewKey = baseKey
-			if ls.viewKeys[baseKey] > 0 {
-				viewKey = fmt.Sprintf("%s_%d", baseKey, ls.viewKeys[baseKey])
-			}
-		}
-		ls.viewKeys[viewKey]++
-
+		viewKey, scope, title := ls.parseViewHeader(s)
 		if title == "" {
 			title = viewKey
 		}
 
 		v := model.View{Title: title, Scope: scope, Include: []string{"*"}}
-
-		for _, bs := range s.body {
-			switch bs.keyword {
-			case "title":
-				if len(bs.args) > 0 {
-					v.Title = bs.args[0]
-				}
-			case "description":
-				if len(bs.args) > 0 {
-					v.Description = bs.args[0]
-				}
-			case "include":
-				if len(bs.args) == 1 && bs.args[0] == "*" {
-					v.Include = []string{"*"}
-				} else {
-					v.Include = nil
-					for _, arg := range bs.args {
-						if arg == "*" {
-							v.Include = []string{"*"}
-							break
-						}
-						v.Include = append(v.Include, ls.resolveVar(arg))
-					}
-				}
-			case "exclude":
-				for _, arg := range bs.args {
-					v.Exclude = append(v.Exclude, ls.resolveVar(arg))
-				}
-			}
-		}
+		ls.applyViewBody(&v, s.body)
 
 		ls.views[viewKey] = v
+	}
+}
+
+// parseViewHeader parses a "view <key> [of <element>] [title]" statement's
+// header arguments and computes its (deduplicated) view key.
+func (ls *lc4State) parseViewHeader(s stmt) (viewKey, scope, title string) {
+	// LikeC4: view <key> [of <element>] { ... }
+	// args can be: ["key"], ["key", "of", "element"], or ["key", "of", "element", "title"]
+	args := s.args
+	if len(args) > 0 {
+		viewKey = args[0]
+		args = args[1:]
+	}
+
+	// Check for "of" keyword
+	if len(args) >= 2 && args[0] == "of" {
+		scope = ls.resolveVar(args[1])
+		args = args[2:]
+	}
+
+	title = strings.Join(args, " ")
+
+	if viewKey == "" {
+		viewKey = ls.nextAnonymousViewKey(scope)
+	}
+	ls.viewKeys[viewKey]++
+
+	return viewKey, scope, title
+}
+
+// nextAnonymousViewKey computes a deduplicated view key for a view statement
+// with no explicit key, based on its scope (or "view" if unscoped).
+func (ls *lc4State) nextAnonymousViewKey(scope string) string {
+	baseKey := "view"
+	if scope != "" {
+		baseKey = scope
+	}
+	viewKey := baseKey
+	if ls.viewKeys[baseKey] > 0 {
+		viewKey = fmt.Sprintf("%s_%d", baseKey, ls.viewKeys[baseKey])
+	}
+	return viewKey
+}
+
+// applyViewBody applies a view's body statements (title, description,
+// include, exclude) to v.
+func (ls *lc4State) applyViewBody(v *model.View, body []stmt) {
+	for _, bs := range body {
+		switch bs.keyword {
+		case "title":
+			if len(bs.args) > 0 {
+				v.Title = bs.args[0]
+			}
+		case "description":
+			if len(bs.args) > 0 {
+				v.Description = bs.args[0]
+			}
+		case "include":
+			ls.applyViewInclude(v, bs.args)
+		case "exclude":
+			for _, arg := range bs.args {
+				v.Exclude = append(v.Exclude, ls.resolveVar(arg))
+			}
+		}
+	}
+}
+
+// applyViewInclude sets v.Include from an "include" statement's arguments.
+func (ls *lc4State) applyViewInclude(v *model.View, args []string) {
+	if len(args) == 1 && args[0] == "*" {
+		v.Include = []string{"*"}
+		return
+	}
+	v.Include = nil
+	for _, arg := range args {
+		if arg == "*" {
+			v.Include = []string{"*"}
+			return
+		}
+		v.Include = append(v.Include, ls.resolveVar(arg))
 	}
 }
 

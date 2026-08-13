@@ -76,48 +76,8 @@ func (s *scanner) consume() rune {
 func (s *scanner) next() (token, error) {
 	// Skip horizontal whitespace and handle comments.
 	// Newlines are NOT skipped here — they are emitted as tokNewline.
-	for {
-		c, ok := s.at(0)
-		if !ok {
-			return token{kind: tokEOF, line: s.line}, nil
-		}
-		if c == ' ' || c == '\t' || c == '\r' {
-			s.consume()
-			continue
-		}
-		if c == '/' {
-			n, _ := s.at(1)
-			if n == '/' {
-				// Line comment: consume to end of line (leave \n for next call)
-				for {
-					ch, ok := s.at(0)
-					if !ok || ch == '\n' {
-						break
-					}
-					s.consume()
-				}
-				continue
-			}
-			if n == '*' {
-				s.consume()
-				s.consume()
-				for {
-					ch, ok := s.at(0)
-					if !ok {
-						return token{}, fmt.Errorf("unterminated block comment")
-					}
-					s.consume()
-					if ch == '*' {
-						if nn, _ := s.at(0); nn == '/' {
-							s.consume()
-							break
-						}
-					}
-				}
-				continue
-			}
-		}
-		break
+	if err := s.skipWhitespaceAndComments(); err != nil {
+		return token{}, err
 	}
 
 	c, ok := s.at(0)
@@ -128,16 +88,100 @@ func (s *scanner) next() (token, error) {
 
 	// Collapse consecutive newlines into a single tokNewline.
 	if c == '\n' {
-		for {
-			ch, ok := s.at(0)
-			if !ok || ch != '\n' {
-				break
-			}
-			s.consume()
-		}
+		s.skipNewlines()
 		return token{kind: tokNewline, line: line}, nil
 	}
 
+	return s.nextSymbolOrIdent(c, line)
+}
+
+// skipWhitespaceAndComments advances past horizontal whitespace and // and
+// /* */ comments. Newlines are NOT skipped — next emits them as tokNewline.
+func (s *scanner) skipWhitespaceAndComments() error {
+	for {
+		c, ok := s.at(0)
+		if !ok {
+			return nil
+		}
+		if c == ' ' || c == '\t' || c == '\r' {
+			s.consume()
+			continue
+		}
+		if c == '/' {
+			consumed, err := s.skipComment()
+			if err != nil {
+				return err
+			}
+			if consumed {
+				continue
+			}
+		}
+		return nil
+	}
+}
+
+// skipComment consumes a // or /* */ comment starting at the current
+// position (c == '/'), if any, and reports whether one was consumed.
+func (s *scanner) skipComment() (bool, error) {
+	switch n, _ := s.at(1); n {
+	case '/':
+		s.skipLineComment()
+		return true, nil
+	case '*':
+		if err := s.skipBlockComment(); err != nil {
+			return false, err
+		}
+		return true, nil
+	default:
+		return false, nil
+	}
+}
+
+// skipLineComment consumes to end of line (leaving \n for next call).
+func (s *scanner) skipLineComment() {
+	for {
+		ch, ok := s.at(0)
+		if !ok || ch == '\n' {
+			return
+		}
+		s.consume()
+	}
+}
+
+// skipBlockComment consumes a /* ... */ block comment starting at the
+// current position (the leading "/*").
+func (s *scanner) skipBlockComment() error {
+	s.consume()
+	s.consume()
+	for {
+		ch, ok := s.at(0)
+		if !ok {
+			return fmt.Errorf("unterminated block comment")
+		}
+		s.consume()
+		if ch == '*' {
+			if nn, _ := s.at(0); nn == '/' {
+				s.consume()
+				return nil
+			}
+		}
+	}
+}
+
+// skipNewlines consumes consecutive '\n' characters.
+func (s *scanner) skipNewlines() {
+	for {
+		ch, ok := s.at(0)
+		if !ok || ch != '\n' {
+			return
+		}
+		s.consume()
+	}
+}
+
+// nextSymbolOrIdent scans the next symbol, string, or identifier token,
+// given the already-peeked lookahead character c at line.
+func (s *scanner) nextSymbolOrIdent(c rune, line int) (token, error) {
 	switch {
 	case c == '{':
 		s.consume()
@@ -342,11 +386,7 @@ func (p *dslParser) parseOneStmt() (*stmt, error) {
 	if tok.kind == tokArrow {
 		p.advance()
 		to := p.advance()
-		s := &stmt{line: line, isRel: true, relTo: to.val, args: p.collectArgs()}
-		if err := p.optBlock(s); err != nil {
-			return nil, err
-		}
-		return s, nil
+		return p.finishStmt(&stmt{line: line, isRel: true, relTo: to.val, args: p.collectArgs()})
 	}
 
 	if tok.kind == tokLBrace {
@@ -367,28 +407,25 @@ func (p *dslParser) parseOneStmt() (*stmt, error) {
 	case tokAssign:
 		p.advance()
 		kw := p.advance()
-		s := &stmt{line: line, varName: tok.val, keyword: kw.val, args: p.collectArgs()}
-		if err := p.optBlock(s); err != nil {
-			return nil, err
-		}
-		return s, nil
+		return p.finishStmt(&stmt{line: line, varName: tok.val, keyword: kw.val, args: p.collectArgs()})
 
 	case tokArrow:
 		p.advance()
 		to := p.advance()
-		s := &stmt{line: line, isRel: true, relFrom: tok.val, relTo: to.val, args: p.collectArgs()}
-		if err := p.optBlock(s); err != nil {
-			return nil, err
-		}
-		return s, nil
+		return p.finishStmt(&stmt{line: line, isRel: true, relFrom: tok.val, relTo: to.val, args: p.collectArgs()})
 
 	default:
-		s := &stmt{line: line, keyword: tok.val, args: p.collectArgs()}
-		if err := p.optBlock(s); err != nil {
-			return nil, err
-		}
-		return s, nil
+		return p.finishStmt(&stmt{line: line, keyword: tok.val, args: p.collectArgs()})
 	}
+}
+
+// finishStmt parses s's optional trailing "{ ... }" block, if present, and
+// returns s (or the error from parsing the block).
+func (p *dslParser) finishStmt(s *stmt) (*stmt, error) {
+	if err := p.optBlock(s); err != nil {
+		return nil, err
+	}
+	return s, nil
 }
 
 func (p *dslParser) collectArgs() []string {
@@ -482,15 +519,7 @@ func (is *importState) processModelStmts(stmts []stmt, parentPath, parentVar str
 
 func (is *importState) processModelStmt(s stmt, parentPath, parentVar string, dest map[string]model.Element) {
 	if s.isRel {
-		from := s.relFrom
-		if from == "" {
-			from = parentVar
-		}
-		label := ""
-		if len(s.args) > 0 {
-			label = s.args[0]
-		}
-		is.pendingRels = append(is.pendingRels, pendingRel{from: from, to: s.relTo, label: label, line: s.line})
+		is.addPendingRel(s, parentVar)
 		return
 	}
 
@@ -505,22 +534,59 @@ func (is *importState) processModelStmt(s stmt, parentPath, parentVar string, de
 
 	is.registerKind(s.keyword)
 
-	key := s.varName
-	if key == "" {
-		if len(s.args) > 0 {
-			key = slugify(s.args[0])
-		} else {
-			key = kd.kind
-		}
-		is.warnings = append(is.warnings, fmt.Sprintf("line %d: element has no variable name, using %q", s.line, key))
-	}
-
+	key := is.resolveElementKey(s, kd)
 	path := key
 	if parentPath != "" {
 		path = parentPath + "." + key
 	}
 	is.varToPath[key] = path
 
+	el := buildElementFromStmt(s, kd)
+
+	children := make(map[string]model.Element)
+	for _, child := range s.body {
+		is.processModelChild(child, path, key, &el, children)
+	}
+	if len(children) > 0 {
+		el.Children = children
+	}
+	dest[key] = el
+}
+
+// addPendingRel records a relationship statement for later resolution once
+// all elements have been discovered, defaulting its source to parentVar
+// when the statement omitted an explicit source (e.g. a nested "-> b" inside
+// element a's body).
+func (is *importState) addPendingRel(s stmt, parentVar string) {
+	from := s.relFrom
+	if from == "" {
+		from = parentVar
+	}
+	label := ""
+	if len(s.args) > 0 {
+		label = s.args[0]
+	}
+	is.pendingRels = append(is.pendingRels, pendingRel{from: from, to: s.relTo, label: label, line: s.line})
+}
+
+// resolveElementKey returns s's variable name, or a slugified fallback
+// derived from its title (or kind if untitled), warning when no variable
+// name was given in the DSL.
+func (is *importState) resolveElementKey(s stmt, kd kindDef) string {
+	if s.varName != "" {
+		return s.varName
+	}
+	key := kd.kind
+	if len(s.args) > 0 {
+		key = slugify(s.args[0])
+	}
+	is.warnings = append(is.warnings, fmt.Sprintf("line %d: element has no variable name, using %q", s.line, key))
+	return key
+}
+
+// buildElementFromStmt constructs the base model.Element from s's title,
+// description, and (for containers/components) technology arguments.
+func buildElementFromStmt(s stmt, kd kindDef) model.Element {
 	el := model.Element{Kind: kd.kind}
 	if len(s.args) > 0 {
 		el.Title = s.args[0]
@@ -531,47 +597,32 @@ func (is *importState) processModelStmt(s stmt, parentPath, parentVar string, de
 	if (kd.kind == "container" || kd.kind == "component") && len(s.args) > 2 {
 		el.Technology = s.args[2]
 	}
+	return el
+}
 
-	children := make(map[string]model.Element)
-	for _, child := range s.body {
-		switch {
-		case child.isRel:
-			from := child.relFrom
-			if from == "" {
-				from = key
-			}
-			label := ""
-			if len(child.args) > 0 {
-				label = child.args[0]
-			}
-			is.pendingRels = append(is.pendingRels, pendingRel{from: from, to: child.relTo, label: label, line: child.line})
-		case structurizrKindMap[child.keyword].kind != "":
-			is.processModelStmt(child, path, key, children)
-		case child.keyword == "description" && len(child.args) > 0:
-			el.Description = child.args[0]
-		case child.keyword == "technology" && len(child.args) > 0:
-			el.Technology = child.args[0]
-		case child.keyword == "tags":
-			el.Tags = child.args
-		case child.keyword == "properties":
-			el.Metadata = parseProperties(child.body)
-		}
+// processModelChild applies a single child statement of an element's body:
+// a nested relationship, a nested element, or one of the description/
+// technology/tags/properties fields.
+func (is *importState) processModelChild(child stmt, path, key string, el *model.Element, children map[string]model.Element) {
+	switch {
+	case child.isRel:
+		is.addPendingRel(child, key)
+	case structurizrKindMap[child.keyword].kind != "":
+		is.processModelStmt(child, path, key, children)
+	case child.keyword == "description" && len(child.args) > 0:
+		el.Description = child.args[0]
+	case child.keyword == "technology" && len(child.args) > 0:
+		el.Technology = child.args[0]
+	case child.keyword == "tags":
+		el.Tags = child.args
+	case child.keyword == "properties":
+		el.Metadata = parseProperties(child.body)
 	}
-
-	if len(children) > 0 {
-		el.Children = children
-	}
-	dest[key] = el
 }
 
 func (is *importState) processViewsStmts(stmts []stmt) {
 	for _, s := range stmts {
-		switch s.keyword {
-		case "systemContext", "container", "component", "systemLandscape":
-		case "filtered", "dynamic", "deployment":
-			is.warnings = append(is.warnings, fmt.Sprintf("line %d: %s view not supported, skipped", s.line, s.keyword))
-			continue
-		default:
+		if !is.isSupportedViewKeyword(s) {
 			continue
 		}
 
@@ -586,85 +637,125 @@ func (is *importState) processViewsStmts(stmts []stmt) {
 		}
 		title := strings.Join(titleArgs, " ")
 
-		baseKey := s.keyword
-		if scope != "" {
-			baseKey = scope
-		}
-		viewKey := baseKey
-		if is.viewKeys[baseKey] > 0 {
-			viewKey = fmt.Sprintf("%s_%d", baseKey, is.viewKeys[baseKey])
-		}
-		is.viewKeys[baseKey]++
-
+		viewKey := is.nextViewKey(s.keyword, scope)
 		if title == "" {
 			title = viewKey
 		}
 
 		v := model.View{Title: title, Scope: scope, Include: []string{"*"}}
-
-		for _, bs := range s.body {
-			switch bs.keyword {
-			case "include":
-				if len(bs.args) == 1 && bs.args[0] == "*" {
-					v.Include = []string{"*"}
-				} else {
-					v.Include = nil
-					for _, arg := range bs.args {
-						if arg != "*" {
-							v.Include = append(v.Include, is.resolveVar(arg))
-						} else {
-							v.Include = []string{"*"}
-							break
-						}
-					}
-				}
-			case "exclude":
-				for _, arg := range bs.args {
-					v.Exclude = append(v.Exclude, is.resolveVar(arg))
-				}
-			case "title":
-				if len(bs.args) > 0 {
-					v.Title = bs.args[0]
-				}
-			case "description":
-				if len(bs.args) > 0 {
-					v.Description = bs.args[0]
-				}
-			case "autoLayout":
-				// Structurizr's autoLayout has no direct Bausteinsicht equivalent
-				// (no direction-aware layout engine); map it to "layered", the
-				// closest match and Bausteinsicht's own default. "auto" is not
-				// a valid Layout value (see model.validate) and would fail
-				// validation on the very model this importer just wrote.
-				v.Layout = "layered"
-				if len(bs.args) > 0 {
-					is.warnings = append(is.warnings, fmt.Sprintf(
-						"line %d: view %q: autoLayout direction %q not preserved, mapped to layout: \"layered\"",
-						bs.line, viewKey, strings.Join(bs.args, " ")))
-				}
-			}
-		}
-
-		// Structurizr's "include *" on a scoped view means all elements visible
-		// in that scope, but Bausteinsicht's "*" pattern only matches top-level
-		// IDs (no dots). Expand the pattern to explicitly include scope children
-		// so containers/components are placed inside their boundary.
-		if scope != "" && len(v.Include) == 1 && v.Include[0] == "*" {
-			switch s.keyword {
-			case "container":
-				v.Include = []string{"*", scope + ".*"}
-			case "component":
-				parts := strings.Split(scope, ".")
-				if len(parts) > 1 {
-					parentScope := strings.Join(parts[:len(parts)-1], ".")
-					v.Include = []string{"*", parentScope + ".*", scope + ".*"}
-				} else {
-					v.Include = []string{"*", scope + ".*"}
-				}
-			}
-		}
+		is.applyViewBodyStmts(&v, s.body, viewKey)
+		expandScopeWildcardInclude(&v, s.keyword, scope)
 
 		is.views[viewKey] = v
+	}
+}
+
+// isSupportedViewKeyword reports whether s is a supported view statement,
+// warning and returning false for recognized-but-unsupported view types.
+func (is *importState) isSupportedViewKeyword(s stmt) bool {
+	switch s.keyword {
+	case "systemContext", "container", "component", "systemLandscape":
+		return true
+	case "filtered", "dynamic", "deployment":
+		is.warnings = append(is.warnings, fmt.Sprintf("line %d: %s view not supported, skipped", s.line, s.keyword))
+		return false
+	default:
+		return false
+	}
+}
+
+// nextViewKey computes a view's map key from its keyword/scope, deduplicating
+// repeated combinations with a numeric suffix.
+func (is *importState) nextViewKey(keyword, scope string) string {
+	baseKey := keyword
+	if scope != "" {
+		baseKey = scope
+	}
+	viewKey := baseKey
+	if is.viewKeys[baseKey] > 0 {
+		viewKey = fmt.Sprintf("%s_%d", baseKey, is.viewKeys[baseKey])
+	}
+	is.viewKeys[baseKey]++
+	return viewKey
+}
+
+// applyViewBodyStmts applies a view's body statements (include, exclude,
+// title, description, autoLayout) to v.
+func (is *importState) applyViewBodyStmts(v *model.View, body []stmt, viewKey string) {
+	for _, bs := range body {
+		switch bs.keyword {
+		case "include":
+			is.applyViewInclude(v, bs.args)
+		case "exclude":
+			for _, arg := range bs.args {
+				v.Exclude = append(v.Exclude, is.resolveVar(arg))
+			}
+		case "title":
+			if len(bs.args) > 0 {
+				v.Title = bs.args[0]
+			}
+		case "description":
+			if len(bs.args) > 0 {
+				v.Description = bs.args[0]
+			}
+		case "autoLayout":
+			is.applyAutoLayout(v, bs, viewKey)
+		}
+	}
+}
+
+// applyViewInclude sets v.Include from an "include" statement's arguments,
+// resolving variables and treating "*" as a wildcard that overrides any
+// prior explicit includes.
+func (is *importState) applyViewInclude(v *model.View, args []string) {
+	if len(args) == 1 && args[0] == "*" {
+		v.Include = []string{"*"}
+		return
+	}
+	v.Include = nil
+	for _, arg := range args {
+		if arg != "*" {
+			v.Include = append(v.Include, is.resolveVar(arg))
+			continue
+		}
+		v.Include = []string{"*"}
+		return
+	}
+}
+
+// applyAutoLayout maps Structurizr's autoLayout to Bausteinsicht's "layered"
+// layout, since there is no direct equivalent (no direction-aware layout
+// engine); "layered" is the closest match and Bausteinsicht's own default.
+// "auto" is not a valid Layout value (see model.validate) and would fail
+// validation on the very model this importer just wrote.
+func (is *importState) applyAutoLayout(v *model.View, bs stmt, viewKey string) {
+	v.Layout = "layered"
+	if len(bs.args) > 0 {
+		is.warnings = append(is.warnings, fmt.Sprintf(
+			"line %d: view %q: autoLayout direction %q not preserved, mapped to layout: \"layered\"",
+			bs.line, viewKey, strings.Join(bs.args, " ")))
+	}
+}
+
+// expandScopeWildcardInclude expands a scoped view's "include *" pattern to
+// explicitly include scope children, since Bausteinsicht's "*" only matches
+// top-level IDs (no dots) while Structurizr's "include *" on a scoped view
+// means all elements visible in that scope.
+func expandScopeWildcardInclude(v *model.View, keyword, scope string) {
+	if scope == "" || len(v.Include) != 1 || v.Include[0] != "*" {
+		return
+	}
+	switch keyword {
+	case "container":
+		v.Include = []string{"*", scope + ".*"}
+	case "component":
+		parts := strings.Split(scope, ".")
+		if len(parts) > 1 {
+			parentScope := strings.Join(parts[:len(parts)-1], ".")
+			v.Include = []string{"*", parentScope + ".*", scope + ".*"}
+		} else {
+			v.Include = []string{"*", scope + ".*"}
+		}
 	}
 }
 
@@ -743,52 +834,56 @@ func resolveIncludes(src, baseDir string, visited map[string]bool) (string, []st
 	absDirBase, _ := filepath.Abs(baseDir)
 	for _, line := range strings.Split(src, "\n") {
 		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "!include ") {
-			includePath := strings.TrimSpace(trimmed[len("!include "):])
-			if strings.HasPrefix(includePath, "http://") || strings.HasPrefix(includePath, "https://") {
-				warnings = append(warnings, "!include: HTTP includes not supported, skipped: "+includePath)
-				out.WriteByte('\n')
-				continue
-			}
-			cleanedPath := filepath.Clean(includePath)
-			fullPath := filepath.Join(baseDir, cleanedPath)
-			absFullPath, _ := filepath.Abs(fullPath)
-
-			// Verify that the resolved path is within baseDir (prevent path traversal).
-			// Use filepath.Rel to check if the path escapes the base directory via .. sequences.
-			relPath, err := filepath.Rel(absDirBase, absFullPath)
-			if err != nil || strings.HasPrefix(relPath, "..") {
-				warnings = append(warnings, "!include: path traversal rejected: "+includePath)
-				out.WriteByte('\n')
-				continue
-			}
-
-			if visited[absFullPath] {
-				warnings = append(warnings, "!include: circular include ignored: "+includePath)
-				out.WriteByte('\n')
-				continue
-			}
-			data, err := os.ReadFile(absFullPath)
-			if err != nil {
-				warnings = append(warnings, fmt.Sprintf("!include: cannot read %s: %v", includePath, err))
-				out.WriteByte('\n')
-				continue
-			}
-			newVisited := make(map[string]bool, len(visited)+1)
-			for k, v := range visited {
-				newVisited[k] = v
-			}
-			newVisited[absFullPath] = true
-			included, w := resolveIncludes(string(data), filepath.Dir(absFullPath), newVisited)
-			warnings = append(warnings, w...)
-			out.WriteString(included)
+		if !strings.HasPrefix(trimmed, "!include ") {
+			out.WriteString(line)
 			out.WriteByte('\n')
 			continue
 		}
-		out.WriteString(line)
+		includePath := strings.TrimSpace(trimmed[len("!include "):])
+		content, w := resolveOneInclude(includePath, baseDir, absDirBase, visited)
+		warnings = append(warnings, w...)
+		out.WriteString(content)
 		out.WriteByte('\n')
 	}
 	return out.String(), warnings
+}
+
+// resolveOneInclude resolves a single "!include <path>" directive, returning
+// its expanded content (recursively resolving nested includes) — or an
+// empty string plus a single warning if the include could not be honored
+// (HTTP URL, path traversal, circular include, or unreadable file).
+func resolveOneInclude(includePath, baseDir, absDirBase string, visited map[string]bool) (content string, warnings []string) {
+	if strings.HasPrefix(includePath, "http://") || strings.HasPrefix(includePath, "https://") {
+		return "", []string{"!include: HTTP includes not supported, skipped: " + includePath}
+	}
+
+	cleanedPath := filepath.Clean(includePath)
+	fullPath := filepath.Join(baseDir, cleanedPath)
+	absFullPath, _ := filepath.Abs(fullPath)
+
+	// Verify that the resolved path is within baseDir (prevent path traversal).
+	// Use filepath.Rel to check if the path escapes the base directory via .. sequences.
+	relPath, err := filepath.Rel(absDirBase, absFullPath)
+	if err != nil || strings.HasPrefix(relPath, "..") {
+		return "", []string{"!include: path traversal rejected: " + includePath}
+	}
+
+	if visited[absFullPath] {
+		return "", []string{"!include: circular include ignored: " + includePath}
+	}
+
+	data, err := os.ReadFile(absFullPath)
+	if err != nil {
+		return "", []string{fmt.Sprintf("!include: cannot read %s: %v", includePath, err)}
+	}
+
+	newVisited := make(map[string]bool, len(visited)+1)
+	for k, v := range visited {
+		newVisited[k] = v
+	}
+	newVisited[absFullPath] = true
+
+	return resolveIncludes(string(data), filepath.Dir(absFullPath), newVisited)
 }
 
 func importSource(src string) (*importer.ImportResult, error) {
@@ -805,7 +900,22 @@ func importSource(src string) (*importer.ImportResult, error) {
 
 	is := newImportState()
 
-	var modelStmts, viewsStmts []stmt
+	modelStmts, viewsStmts := extractModelAndViewsStmts(stmts)
+	is.processModelStmts(modelStmts, "", "", is.elements)
+	if len(viewsStmts) > 0 {
+		is.processViewsStmts(viewsStmts)
+	}
+
+	rels := is.buildRelationships()
+	m := is.buildResultModel(rels)
+
+	return &importer.ImportResult{Model: m, Warnings: is.warnings}, nil
+}
+
+// extractModelAndViewsStmts finds the top-level "model" and "views" blocks
+// among stmts, which may either be nested inside a "workspace" block or
+// appear directly at the top level.
+func extractModelAndViewsStmts(stmts []stmt) (modelStmts, viewsStmts []stmt) {
 	for _, s := range stmts {
 		switch s.keyword {
 		case "workspace":
@@ -823,14 +933,12 @@ func importSource(src string) (*importer.ImportResult, error) {
 			viewsStmts = s.body
 		}
 	}
+	return modelStmts, viewsStmts
+}
 
-	is.processModelStmts(modelStmts, "", "", is.elements)
-	if len(viewsStmts) > 0 {
-		is.processViewsStmts(viewsStmts)
-	}
-
-	rels := is.buildRelationships()
-
+// buildResultModel assembles the final BausteinsichtModel from accumulated
+// import state and resolved relationships.
+func (is *importState) buildResultModel(rels []model.Relationship) *model.BausteinsichtModel {
 	spec := model.Specification{Elements: make(map[string]model.ElementKind)}
 	for _, kd := range elementKindOrder {
 		if ek, ok := is.spec[kd.kind]; ok {
@@ -851,6 +959,5 @@ func importSource(src string) (*importer.ImportResult, error) {
 	if m.Views == nil {
 		m.Views = make(map[string]model.View)
 	}
-
-	return &importer.ImportResult{Model: m, Warnings: is.warnings}, nil
+	return m
 }
