@@ -10,435 +10,191 @@ import (
 	"unicode"
 
 	"github.com/docToolchain/Bausteinsicht/internal/importer"
+	"github.com/docToolchain/Bausteinsicht/internal/importer/dsl"
 	"github.com/docToolchain/Bausteinsicht/internal/model"
 )
 
 // ─── Tokenizer ───────────────────────────────────────────────────────────────
+//
+// The scanner/parser primitives shared with LikeC4's near-identical DSL
+// grammar live in internal/importer/dsl; only the language-specific token
+// and statement dispatch stay here.
 
-type tokKind int
-
-const (
-	tokEOF     tokKind = iota
-	tokNewline         // statement separator — emitted for each (group of) newline(s)
-	tokString
-	tokIdent
-	tokLBrace
-	tokRBrace
-	tokAssign
-	tokArrow
+type (
+	tokKind   = dsl.TokKind
+	token     = dsl.Token
+	stmt      = dsl.Stmt
+	scanner   = dsl.Scanner
+	dslParser = dsl.Parser
 )
 
-type token struct {
-	kind tokKind
-	val  string
-	line int
-}
-
-type scanner struct {
-	src  []rune
-	pos  int
-	line int
-}
+const (
+	tokEOF     = dsl.EOF
+	tokNewline = dsl.Newline
+	tokString  = dsl.String
+	tokIdent   = dsl.Ident
+	tokLBrace  = dsl.LBrace
+	tokRBrace  = dsl.RBrace
+	tokAssign  = dsl.Assign
+	tokArrow   = dsl.Arrow
+)
 
 func tokenize(src string) ([]token, error) {
-	s := &scanner{src: []rune(src), line: 1}
+	s := dsl.NewScanner(src)
 	var toks []token
 	for {
-		tok, err := s.next()
+		tok, err := next(s)
 		if err != nil {
 			return nil, err
 		}
 		toks = append(toks, tok)
-		if tok.kind == tokEOF {
+		if tok.Kind == tokEOF {
 			break
 		}
 	}
 	return toks, nil
 }
 
-func (s *scanner) at(offset int) (rune, bool) {
-	i := s.pos + offset
-	if i >= len(s.src) {
-		return 0, false
-	}
-	return s.src[i], true
-}
-
-func (s *scanner) consume() rune {
-	r := s.src[s.pos]
-	s.pos++
-	if r == '\n' {
-		s.line++
-	}
-	return r
-}
-
-func (s *scanner) next() (token, error) {
+// next scans the next token, handling Structurizr-specific dispatch (the
+// "*"/"**" wildcard identifiers used by "include *", and the "!" prefix on
+// identifiers) on top of the shared whitespace/comment/newline/string
+// scanning in the dsl package.
+func next(s *scanner) (token, error) {
 	// Skip horizontal whitespace and handle comments.
 	// Newlines are NOT skipped here — they are emitted as tokNewline.
-	if err := s.skipWhitespaceAndComments(); err != nil {
+	if err := s.SkipWhitespaceAndComments(); err != nil {
 		return token{}, err
 	}
 
-	c, ok := s.at(0)
+	c, ok := s.At(0)
 	if !ok {
-		return token{kind: tokEOF, line: s.line}, nil
+		return token{Kind: tokEOF, Line: s.Line}, nil
 	}
-	line := s.line
+	line := s.Line
 
 	// Collapse consecutive newlines into a single tokNewline.
 	if c == '\n' {
-		s.skipNewlines()
-		return token{kind: tokNewline, line: line}, nil
+		s.SkipNewlines()
+		return token{Kind: tokNewline, Line: line}, nil
 	}
 
-	return s.nextSymbolOrIdent(c, line)
-}
-
-// skipWhitespaceAndComments advances past horizontal whitespace and // and
-// /* */ comments. Newlines are NOT skipped — next emits them as tokNewline.
-func (s *scanner) skipWhitespaceAndComments() error {
-	for {
-		c, ok := s.at(0)
-		if !ok {
-			return nil
-		}
-		if c == ' ' || c == '\t' || c == '\r' {
-			s.consume()
-			continue
-		}
-		if c == '/' {
-			consumed, err := s.skipComment()
-			if err != nil {
-				return err
-			}
-			if consumed {
-				continue
-			}
-		}
-		return nil
-	}
-}
-
-// skipComment consumes a // or /* */ comment starting at the current
-// position (c == '/'), if any, and reports whether one was consumed.
-func (s *scanner) skipComment() (bool, error) {
-	switch n, _ := s.at(1); n {
-	case '/':
-		s.skipLineComment()
-		return true, nil
-	case '*':
-		if err := s.skipBlockComment(); err != nil {
-			return false, err
-		}
-		return true, nil
-	default:
-		return false, nil
-	}
-}
-
-// skipLineComment consumes to end of line (leaving \n for next call).
-func (s *scanner) skipLineComment() {
-	for {
-		ch, ok := s.at(0)
-		if !ok || ch == '\n' {
-			return
-		}
-		s.consume()
-	}
-}
-
-// skipBlockComment consumes a /* ... */ block comment starting at the
-// current position (the leading "/*").
-func (s *scanner) skipBlockComment() error {
-	s.consume()
-	s.consume()
-	for {
-		ch, ok := s.at(0)
-		if !ok {
-			return fmt.Errorf("unterminated block comment")
-		}
-		s.consume()
-		if ch == '*' {
-			if nn, _ := s.at(0); nn == '/' {
-				s.consume()
-				return nil
-			}
-		}
-	}
-}
-
-// skipNewlines consumes consecutive '\n' characters.
-func (s *scanner) skipNewlines() {
-	for {
-		ch, ok := s.at(0)
-		if !ok || ch != '\n' {
-			return
-		}
-		s.consume()
-	}
+	return nextSymbolOrIdent(s, c, line)
 }
 
 // nextSymbolOrIdent scans the next symbol, string, or identifier token,
 // given the already-peeked lookahead character c at line.
-func (s *scanner) nextSymbolOrIdent(c rune, line int) (token, error) {
+func nextSymbolOrIdent(s *scanner, c rune, line int) (token, error) {
 	switch {
 	case c == '{':
-		s.consume()
-		return token{kind: tokLBrace, val: "{", line: line}, nil
+		s.Consume()
+		return token{Kind: tokLBrace, Val: "{", Line: line}, nil
 	case c == '}':
-		s.consume()
-		return token{kind: tokRBrace, val: "}", line: line}, nil
+		s.Consume()
+		return token{Kind: tokRBrace, Val: "}", Line: line}, nil
 	case c == '=':
-		s.consume()
-		return token{kind: tokAssign, val: "=", line: line}, nil
+		s.Consume()
+		return token{Kind: tokAssign, Val: "=", Line: line}, nil
 	case c == '-':
-		if n, _ := s.at(1); n == '>' {
-			s.consume()
-			s.consume()
-			return token{kind: tokArrow, val: "->", line: line}, nil
+		if n, _ := s.At(1); n == '>' {
+			s.Consume()
+			s.Consume()
+			return token{Kind: tokArrow, Val: "->", Line: line}, nil
 		}
-		s.consume()
-		return s.next()
+		s.Consume()
+		return next(s)
 	case c == '"':
-		return s.scanString(line)
+		return s.ScanString(line)
 	case c == '*':
 		// Consume one or two '*' and return as a single identifier token
 		// so that "include *" and "include **" are parsed correctly.
-		s.consume()
-		if n, _ := s.at(0); n == '*' {
-			s.consume()
-			return token{kind: tokIdent, val: "**", line: line}, nil
+		s.Consume()
+		if n, _ := s.At(0); n == '*' {
+			s.Consume()
+			return token{Kind: tokIdent, Val: "**", Line: line}, nil
 		}
-		return token{kind: tokIdent, val: "*", line: line}, nil
+		return token{Kind: tokIdent, Val: "*", Line: line}, nil
 	case c == '!' || unicode.IsLetter(c) || c == '_':
-		return s.scanIdent(line)
+		return scanIdent(s, line)
 	default:
-		s.consume()
-		return s.next()
+		s.Consume()
+		return next(s)
 	}
 }
 
-func (s *scanner) scanString(line int) (token, error) {
-	s.consume()
+func scanIdent(s *scanner, line int) (token, error) {
 	var sb strings.Builder
-	for {
-		c, ok := s.at(0)
-		if !ok {
-			return token{}, fmt.Errorf("line %d: unterminated string", line)
-		}
-		if c == '"' {
-			s.consume()
-			break
-		}
-		if c == '\\' {
-			s.consume()
-			esc, ok := s.at(0)
-			if !ok {
-				return token{}, fmt.Errorf("line %d: EOF in string escape", line)
-			}
-			s.consume()
-			switch esc {
-			case '"', '\\':
-				sb.WriteRune(esc)
-			case 'n':
-				sb.WriteRune('\n')
-			default:
-				sb.WriteRune('\\')
-				sb.WriteRune(esc)
-			}
-			continue
-		}
-		sb.WriteRune(s.consume())
-	}
-	return token{kind: tokString, val: sb.String(), line: line}, nil
-}
-
-func (s *scanner) scanIdent(line int) (token, error) {
-	var sb strings.Builder
-	if c, _ := s.at(0); c == '!' {
-		sb.WriteRune(s.consume())
+	if c, _ := s.At(0); c == '!' {
+		sb.WriteRune(s.Consume())
 	}
 	for {
-		c, ok := s.at(0)
+		c, ok := s.At(0)
 		if !ok {
 			break
 		}
 		if c == '-' {
-			if n, _ := s.at(1); n == '>' {
+			if n, _ := s.At(1); n == '>' {
 				break
 			}
-			sb.WriteRune(s.consume())
+			sb.WriteRune(s.Consume())
 			continue
 		}
 		if unicode.IsLetter(c) || unicode.IsDigit(c) || c == '_' || c == '.' || c == '/' || c == ':' {
-			sb.WriteRune(s.consume())
+			sb.WriteRune(s.Consume())
 			continue
 		}
 		break
 	}
-	return token{kind: tokIdent, val: sb.String(), line: line}, nil
+	return token{Kind: tokIdent, Val: sb.String(), Line: line}, nil
 }
 
 // ─── Parser ──────────────────────────────────────────────────────────────────
 
-// stmt represents one parsed statement in the DSL.
-type stmt struct {
-	line    int
-	varName string
-	keyword string
-	args    []string
-	isRel   bool
-	relFrom string
-	relTo   string
-	body    []stmt
+func parseAll(p *dslParser) ([]stmt, error) {
+	return p.ParseAll(parseOneStmt)
 }
 
-type dslParser struct {
-	toks []token
-	pos  int
-}
-
-func (p *dslParser) peek() token {
-	if p.pos >= len(p.toks) {
-		return token{kind: tokEOF}
-	}
-	return p.toks[p.pos]
-}
-
-func (p *dslParser) advance() token {
-	t := p.peek()
-	if t.kind != tokEOF {
-		p.pos++
-	}
-	return t
-}
-
-func (p *dslParser) skipNewlines() {
-	for p.peek().kind == tokNewline {
-		p.advance()
-	}
-}
-
-func (p *dslParser) parseAll() ([]stmt, error) {
-	return p.parseStmts(false)
-}
-
-func (p *dslParser) parseStmts(inBlock bool) ([]stmt, error) {
-	var stmts []stmt
-	for {
-		p.skipNewlines()
-		tok := p.peek()
-		if tok.kind == tokEOF {
-			break
-		}
-		if inBlock && tok.kind == tokRBrace {
-			break
-		}
-		s, err := p.parseOneStmt()
-		if err != nil {
-			return nil, err
-		}
-		if s != nil {
-			stmts = append(stmts, *s)
-		}
-	}
-	return stmts, nil
-}
-
-func (p *dslParser) parseBlock() ([]stmt, error) {
-	if p.peek().kind != tokLBrace {
-		return nil, nil
-	}
-	p.advance() // {
-	p.skipNewlines()
-	stmts, err := p.parseStmts(true)
-	if err != nil {
-		return nil, err
-	}
-	if p.peek().kind == tokRBrace {
-		p.advance()
-	}
-	return stmts, nil
-}
-
-// optBlock skips newlines then reads a block if the next token is {.
-func (p *dslParser) optBlock(s *stmt) error {
-	p.skipNewlines()
-	if p.peek().kind == tokLBrace {
-		body, err := p.parseBlock()
-		if err != nil {
-			return err
-		}
-		s.body = body
-	}
-	return nil
-}
-
-func (p *dslParser) parseOneStmt() (*stmt, error) {
-	tok := p.peek()
-	if tok.kind == tokEOF || tok.kind == tokRBrace {
+func parseOneStmt(p *dslParser) (*stmt, error) {
+	tok := p.Peek()
+	if tok.Kind == tokEOF || tok.Kind == tokRBrace {
 		return nil, nil
 	}
 
-	line := tok.line
+	line := tok.Line
 
-	if tok.kind == tokArrow {
-		p.advance()
-		to := p.advance()
-		return p.finishStmt(&stmt{line: line, isRel: true, relTo: to.val, args: p.collectArgs()})
+	if tok.Kind == tokArrow {
+		p.Advance()
+		to := p.Advance()
+		return p.FinishStmt(&stmt{Line: line, IsRel: true, RelTo: to.Val, Args: p.CollectArgs()}, parseOneStmt)
 	}
 
-	if tok.kind == tokLBrace {
-		if _, err := p.parseBlock(); err != nil {
+	if tok.Kind == tokLBrace {
+		if _, err := p.ParseBlock(parseOneStmt); err != nil {
 			return nil, err
 		}
 		return nil, nil
 	}
 
-	if tok.kind != tokIdent && tok.kind != tokString {
-		p.advance()
+	if tok.Kind != tokIdent && tok.Kind != tokString {
+		p.Advance()
 		return nil, nil
 	}
 
-	p.advance()
+	p.Advance()
 
-	switch p.peek().kind {
+	switch p.Peek().Kind {
 	case tokAssign:
-		p.advance()
-		kw := p.advance()
-		return p.finishStmt(&stmt{line: line, varName: tok.val, keyword: kw.val, args: p.collectArgs()})
+		p.Advance()
+		kw := p.Advance()
+		return p.FinishStmt(&stmt{Line: line, VarName: tok.Val, Keyword: kw.Val, Args: p.CollectArgs()}, parseOneStmt)
 
 	case tokArrow:
-		p.advance()
-		to := p.advance()
-		return p.finishStmt(&stmt{line: line, isRel: true, relFrom: tok.val, relTo: to.val, args: p.collectArgs()})
+		p.Advance()
+		to := p.Advance()
+		return p.FinishStmt(&stmt{Line: line, IsRel: true, RelFrom: tok.Val, RelTo: to.Val, Args: p.CollectArgs()}, parseOneStmt)
 
 	default:
-		return p.finishStmt(&stmt{line: line, keyword: tok.val, args: p.collectArgs()})
+		return p.FinishStmt(&stmt{Line: line, Keyword: tok.Val, Args: p.CollectArgs()}, parseOneStmt)
 	}
-}
-
-// finishStmt parses s's optional trailing "{ ... }" block, if present, and
-// returns s (or the error from parsing the block).
-func (p *dslParser) finishStmt(s *stmt) (*stmt, error) {
-	if err := p.optBlock(s); err != nil {
-		return nil, err
-	}
-	return s, nil
-}
-
-func (p *dslParser) collectArgs() []string {
-	var args []string
-	for {
-		k := p.peek().kind
-		if k == tokString || k == tokIdent {
-			args = append(args, p.advance().val)
-		} else {
-			break
-		}
-	}
-	return args
 }
 
 // ─── Mapper ──────────────────────────────────────────────────────────────────
@@ -518,21 +274,21 @@ func (is *importState) processModelStmts(stmts []stmt, parentPath, parentVar str
 }
 
 func (is *importState) processModelStmt(s stmt, parentPath, parentVar string, dest map[string]model.Element) {
-	if s.isRel {
+	if s.IsRel {
 		is.addPendingRel(s, parentVar)
 		return
 	}
 
-	kd, isElement := structurizrKindMap[s.keyword]
+	kd, isElement := structurizrKindMap[s.Keyword]
 	if !isElement {
-		switch s.keyword {
+		switch s.Keyword {
 		case "enterprise", "group":
-			is.processModelStmts(s.body, parentPath, parentVar, dest)
+			is.processModelStmts(s.Body, parentPath, parentVar, dest)
 		}
 		return
 	}
 
-	is.registerKind(s.keyword)
+	is.registerKind(s.Keyword)
 
 	key := is.resolveElementKey(s, kd)
 	path := key
@@ -544,7 +300,7 @@ func (is *importState) processModelStmt(s stmt, parentPath, parentVar string, de
 	el := buildElementFromStmt(s, kd)
 
 	children := make(map[string]model.Element)
-	for _, child := range s.body {
+	for _, child := range s.Body {
 		is.processModelChild(child, path, key, &el, children)
 	}
 	if len(children) > 0 {
@@ -558,29 +314,29 @@ func (is *importState) processModelStmt(s stmt, parentPath, parentVar string, de
 // when the statement omitted an explicit source (e.g. a nested "-> b" inside
 // element a's body).
 func (is *importState) addPendingRel(s stmt, parentVar string) {
-	from := s.relFrom
+	from := s.RelFrom
 	if from == "" {
 		from = parentVar
 	}
 	label := ""
-	if len(s.args) > 0 {
-		label = s.args[0]
+	if len(s.Args) > 0 {
+		label = s.Args[0]
 	}
-	is.pendingRels = append(is.pendingRels, pendingRel{from: from, to: s.relTo, label: label, line: s.line})
+	is.pendingRels = append(is.pendingRels, pendingRel{from: from, to: s.RelTo, label: label, line: s.Line})
 }
 
 // resolveElementKey returns s's variable name, or a slugified fallback
 // derived from its title (or kind if untitled), warning when no variable
 // name was given in the DSL.
 func (is *importState) resolveElementKey(s stmt, kd kindDef) string {
-	if s.varName != "" {
-		return s.varName
+	if s.VarName != "" {
+		return s.VarName
 	}
 	key := kd.kind
-	if len(s.args) > 0 {
-		key = slugify(s.args[0])
+	if len(s.Args) > 0 {
+		key = slugify(s.Args[0])
 	}
-	is.warnings = append(is.warnings, fmt.Sprintf("line %d: element has no variable name, using %q", s.line, key))
+	is.warnings = append(is.warnings, fmt.Sprintf("line %d: element has no variable name, using %q", s.Line, key))
 	return key
 }
 
@@ -588,14 +344,14 @@ func (is *importState) resolveElementKey(s stmt, kd kindDef) string {
 // description, and (for containers/components) technology arguments.
 func buildElementFromStmt(s stmt, kd kindDef) model.Element {
 	el := model.Element{Kind: kd.kind}
-	if len(s.args) > 0 {
-		el.Title = s.args[0]
+	if len(s.Args) > 0 {
+		el.Title = s.Args[0]
 	}
-	if len(s.args) > 1 {
-		el.Description = s.args[1]
+	if len(s.Args) > 1 {
+		el.Description = s.Args[1]
 	}
-	if (kd.kind == "container" || kd.kind == "component") && len(s.args) > 2 {
-		el.Technology = s.args[2]
+	if (kd.kind == "container" || kd.kind == "component") && len(s.Args) > 2 {
+		el.Technology = s.Args[2]
 	}
 	return el
 }
@@ -605,18 +361,18 @@ func buildElementFromStmt(s stmt, kd kindDef) model.Element {
 // technology/tags/properties fields.
 func (is *importState) processModelChild(child stmt, path, key string, el *model.Element, children map[string]model.Element) {
 	switch {
-	case child.isRel:
+	case child.IsRel:
 		is.addPendingRel(child, key)
-	case structurizrKindMap[child.keyword].kind != "":
+	case structurizrKindMap[child.Keyword].kind != "":
 		is.processModelStmt(child, path, key, children)
-	case child.keyword == "description" && len(child.args) > 0:
-		el.Description = child.args[0]
-	case child.keyword == "technology" && len(child.args) > 0:
-		el.Technology = child.args[0]
-	case child.keyword == "tags":
-		el.Tags = child.args
-	case child.keyword == "properties":
-		el.Metadata = parseProperties(child.body)
+	case child.Keyword == "description" && len(child.Args) > 0:
+		el.Description = child.Args[0]
+	case child.Keyword == "technology" && len(child.Args) > 0:
+		el.Technology = child.Args[0]
+	case child.Keyword == "tags":
+		el.Tags = child.Args
+	case child.Keyword == "properties":
+		el.Metadata = parseProperties(child.Body)
 	}
 }
 
@@ -627,24 +383,24 @@ func (is *importState) processViewsStmts(stmts []stmt) {
 		}
 
 		scope := ""
-		if s.keyword != "systemLandscape" && len(s.args) > 0 {
-			scope = is.resolveVar(s.args[0])
+		if s.Keyword != "systemLandscape" && len(s.Args) > 0 {
+			scope = is.resolveVar(s.Args[0])
 		}
 
-		titleArgs := s.args
+		titleArgs := s.Args
 		if scope != "" {
-			titleArgs = s.args[1:]
+			titleArgs = s.Args[1:]
 		}
 		title := strings.Join(titleArgs, " ")
 
-		viewKey := is.nextViewKey(s.keyword, scope)
+		viewKey := is.nextViewKey(s.Keyword, scope)
 		if title == "" {
 			title = viewKey
 		}
 
 		v := model.View{Title: title, Scope: scope, Include: []string{"*"}}
-		is.applyViewBodyStmts(&v, s.body, viewKey)
-		expandScopeWildcardInclude(&v, s.keyword, scope)
+		is.applyViewBodyStmts(&v, s.Body, viewKey)
+		expandScopeWildcardInclude(&v, s.Keyword, scope)
 
 		is.views[viewKey] = v
 	}
@@ -653,11 +409,11 @@ func (is *importState) processViewsStmts(stmts []stmt) {
 // isSupportedViewKeyword reports whether s is a supported view statement,
 // warning and returning false for recognized-but-unsupported view types.
 func (is *importState) isSupportedViewKeyword(s stmt) bool {
-	switch s.keyword {
+	switch s.Keyword {
 	case "systemContext", "container", "component", "systemLandscape":
 		return true
 	case "filtered", "dynamic", "deployment":
-		is.warnings = append(is.warnings, fmt.Sprintf("line %d: %s view not supported, skipped", s.line, s.keyword))
+		is.warnings = append(is.warnings, fmt.Sprintf("line %d: %s view not supported, skipped", s.Line, s.Keyword))
 		return false
 	default:
 		return false
@@ -683,20 +439,20 @@ func (is *importState) nextViewKey(keyword, scope string) string {
 // title, description, autoLayout) to v.
 func (is *importState) applyViewBodyStmts(v *model.View, body []stmt, viewKey string) {
 	for _, bs := range body {
-		switch bs.keyword {
+		switch bs.Keyword {
 		case "include":
-			is.applyViewInclude(v, bs.args)
+			is.applyViewInclude(v, bs.Args)
 		case "exclude":
-			for _, arg := range bs.args {
+			for _, arg := range bs.Args {
 				v.Exclude = append(v.Exclude, is.resolveVar(arg))
 			}
 		case "title":
-			if len(bs.args) > 0 {
-				v.Title = bs.args[0]
+			if len(bs.Args) > 0 {
+				v.Title = bs.Args[0]
 			}
 		case "description":
-			if len(bs.args) > 0 {
-				v.Description = bs.args[0]
+			if len(bs.Args) > 0 {
+				v.Description = bs.Args[0]
 			}
 		case "autoLayout":
 			is.applyAutoLayout(v, bs, viewKey)
@@ -730,10 +486,10 @@ func (is *importState) applyViewInclude(v *model.View, args []string) {
 // validation on the very model this importer just wrote.
 func (is *importState) applyAutoLayout(v *model.View, bs stmt, viewKey string) {
 	v.Layout = "layered"
-	if len(bs.args) > 0 {
+	if len(bs.Args) > 0 {
 		is.warnings = append(is.warnings, fmt.Sprintf(
 			"line %d: view %q: autoLayout direction %q not preserved, mapped to layout: \"layered\"",
-			bs.line, viewKey, strings.Join(bs.args, " ")))
+			bs.Line, viewKey, strings.Join(bs.Args, " ")))
 	}
 }
 
@@ -776,8 +532,8 @@ func (is *importState) buildRelationships() []model.Relationship {
 func parseProperties(body []stmt) map[string]string {
 	m := make(map[string]string)
 	for _, s := range body {
-		if s.keyword != "" && len(s.args) > 0 {
-			m[s.keyword] = s.args[0]
+		if s.Keyword != "" && len(s.Args) > 0 {
+			m[s.Keyword] = s.Args[0]
 		}
 	}
 	return m
@@ -892,8 +648,8 @@ func importSource(src string) (*importer.ImportResult, error) {
 		return nil, fmt.Errorf("tokenize: %w", err)
 	}
 
-	p := &dslParser{toks: toks}
-	stmts, err := p.parseAll()
+	p := &dslParser{Toks: toks}
+	stmts, err := parseAll(p)
 	if err != nil {
 		return nil, fmt.Errorf("parse: %w", err)
 	}
@@ -917,20 +673,20 @@ func importSource(src string) (*importer.ImportResult, error) {
 // appear directly at the top level.
 func extractModelAndViewsStmts(stmts []stmt) (modelStmts, viewsStmts []stmt) {
 	for _, s := range stmts {
-		switch s.keyword {
+		switch s.Keyword {
 		case "workspace":
-			for _, ws := range s.body {
-				switch ws.keyword {
+			for _, ws := range s.Body {
+				switch ws.Keyword {
 				case "model":
-					modelStmts = ws.body
+					modelStmts = ws.Body
 				case "views":
-					viewsStmts = ws.body
+					viewsStmts = ws.Body
 				}
 			}
 		case "model":
-			modelStmts = s.body
+			modelStmts = s.Body
 		case "views":
-			viewsStmts = s.body
+			viewsStmts = s.Body
 		}
 	}
 	return modelStmts, viewsStmts
