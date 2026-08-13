@@ -261,6 +261,24 @@ func writeC4Element(b *strings.Builder, e elemEntry, indent string) {
 	}
 }
 
+// resolveBoundaryMacro determines the C4 boundary macro and display title
+// for a scoped view's boundary box, shared by PlantUML and Mermaid output:
+// System_Boundary by default, Container_Boundary when the scope element's
+// kind is "container". Falls back to the scope's raw ID as the title if the
+// scope element isn't found in flat.
+func resolveBoundaryMacro(view model.View, flat map[string]*model.Element) (boundaryMacro, scopeTitle string) {
+	scopeElem := flat[view.Scope]
+	scopeTitle = view.Scope
+	if scopeElem != nil {
+		scopeTitle = scopeElem.Title
+	}
+	boundaryMacro = "System_Boundary"
+	if scopeElem != nil && scopeElem.Kind == "container" {
+		boundaryMacro = "Container_Boundary"
+	}
+	return boundaryMacro, scopeTitle
+}
+
 // --- PlantUML ---
 
 func writePlantUML(b *strings.Builder, view model.View, level string, inside, outside []elemEntry, rels []relEntry, flat map[string]*model.Element) {
@@ -274,15 +292,7 @@ func writePlantUML(b *strings.Builder, view model.View, level string, inside, ou
 
 	// Scope boundary with internal elements.
 	if view.Scope != "" {
-		scopeElem := flat[view.Scope]
-		scopeTitle := view.Scope
-		if scopeElem != nil {
-			scopeTitle = scopeElem.Title
-		}
-		boundaryMacro := "System_Boundary"
-		if scopeElem != nil && scopeElem.Kind == "container" {
-			boundaryMacro = "Container_Boundary"
-		}
+		boundaryMacro, scopeTitle := resolveBoundaryMacro(view, flat)
 		fmt.Fprintf(b, "%s(%s, \"%s\") {\n", boundaryMacro, sanitizeID(view.Scope), escapeQuotes(scopeTitle))
 		for _, e := range inside {
 			writeC4Element(b, e, "  ")
@@ -330,15 +340,7 @@ func writeMermaid(b *strings.Builder, view model.View, level string, inside, out
 	}
 
 	if view.Scope != "" {
-		scopeElem := flat[view.Scope]
-		scopeTitle := view.Scope
-		if scopeElem != nil {
-			scopeTitle = scopeElem.Title
-		}
-		boundaryMacro := "System_Boundary"
-		if scopeElem != nil && scopeElem.Kind == "container" {
-			boundaryMacro = "Container_Boundary"
-		}
+		boundaryMacro, scopeTitle := resolveBoundaryMacro(view, flat)
 		fmt.Fprintf(b, "    %s(%s, \"%s\") {\n", boundaryMacro, sanitizeID(view.Scope), escapeQuotes(scopeTitle))
 		for _, e := range inside {
 			writeC4Element(b, e, "        ")
