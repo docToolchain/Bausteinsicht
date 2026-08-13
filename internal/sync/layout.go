@@ -692,17 +692,6 @@ func resolveToScopeChild(id string, scopeChildren map[string]bool) string {
 	}
 }
 
-// hasChildInSet returns true if any key in the set is a child of id.
-func hasChildInSet(id string, set map[string]bool) bool {
-	prefix := id + "."
-	for k := range set {
-		if strings.HasPrefix(k, prefix) {
-			return true
-		}
-	}
-	return false
-}
-
 // computeGridLayout arranges all elements in a simple grid.
 func computeGridLayout(
 	ids []string,
