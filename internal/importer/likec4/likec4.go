@@ -20,25 +20,7 @@ import (
 // grammar live in internal/importer/dsl; only the language-specific token
 // and statement dispatch stay here.
 
-type (
-	token     = dsl.Token
-	stmt      = dsl.Stmt
-	scanner   = dsl.Scanner
-	dslParser = dsl.Parser
-)
-
-const (
-	tokEOF     = dsl.EOF
-	tokNewline = dsl.Newline
-	tokString  = dsl.String
-	tokIdent   = dsl.Ident
-	tokLBrace  = dsl.LBrace
-	tokRBrace  = dsl.RBrace
-	tokAssign  = dsl.Assign
-	tokArrow   = dsl.Arrow
-)
-
-func tokenize(src string) ([]token, error) {
+func tokenize(src string) ([]dsl.Token, error) {
 	return dsl.Tokenize(src, identStart, scanIdent)
 }
 
@@ -48,10 +30,10 @@ func identStart(c rune) bool {
 	return unicode.IsLetter(c) || c == '_'
 }
 
-func scanIdent(s *scanner, line int) (token, error) {
+func scanIdent(s *dsl.Scanner, line int) (dsl.Token, error) {
 	var sb strings.Builder
 	dsl.ScanIdentBody(s, &sb)
-	return token{Kind: tokIdent, Val: sb.String(), Line: line}, nil
+	return dsl.Token{Kind: dsl.Ident, Val: sb.String(), Line: line}, nil
 }
 
 // ─── Parser ──────────────────────────────────────────────────────────────────
@@ -93,7 +75,7 @@ func newLC4State() *lc4State {
 	}
 }
 
-func (ls *lc4State) processSpecification(stmts []stmt) {
+func (ls *lc4State) processSpecification(stmts []dsl.Stmt) {
 	for _, s := range stmts {
 		switch s.Keyword {
 		case "element":
@@ -117,13 +99,13 @@ func (ls *lc4State) resolveVar(v string) string {
 	return v
 }
 
-func (ls *lc4State) processModelStmts(stmts []stmt, parentPath, parentVar string, dest map[string]model.Element) {
+func (ls *lc4State) processModelStmts(stmts []dsl.Stmt, parentPath, parentVar string, dest map[string]model.Element) {
 	for _, s := range stmts {
 		ls.processModelStmt(s, parentPath, parentVar, dest)
 	}
 }
 
-func (ls *lc4State) processModelStmt(s stmt, parentPath, parentVar string, dest map[string]model.Element) {
+func (ls *lc4State) processModelStmt(s dsl.Stmt, parentPath, parentVar string, dest map[string]model.Element) {
 	if s.IsRel {
 		ls.addPendingRel(s, parentVar)
 		return
@@ -163,7 +145,7 @@ func (ls *lc4State) processModelStmt(s stmt, parentPath, parentVar string, dest 
 // all elements have been discovered, defaulting its source to parentVar
 // when the statement omitted an explicit source (e.g. a nested "-> b" inside
 // element a's body).
-func (ls *lc4State) addPendingRel(s stmt, parentVar string) {
+func (ls *lc4State) addPendingRel(s dsl.Stmt, parentVar string) {
 	from := s.RelFrom
 	if from == "" {
 		from = parentVar
@@ -178,7 +160,7 @@ func (ls *lc4State) addPendingRel(s stmt, parentVar string) {
 // resolveElementKey returns s's variable name, or a slugified fallback
 // derived from its title (or keyword if untitled), warning when no variable
 // name was given in the DSL.
-func (ls *lc4State) resolveElementKey(s stmt) string {
+func (ls *lc4State) resolveElementKey(s dsl.Stmt) string {
 	if s.VarName != "" {
 		return s.VarName
 	}
@@ -193,7 +175,7 @@ func (ls *lc4State) resolveElementKey(s stmt) string {
 // processModelChild applies a single child statement of an element's body:
 // a nested relationship, a nested element, or one of the description/
 // technology/title/tags fields.
-func (ls *lc4State) processModelChild(child stmt, path, key string, el *model.Element, children map[string]model.Element) {
+func (ls *lc4State) processModelChild(child dsl.Stmt, path, key string, el *model.Element, children map[string]model.Element) {
 	switch {
 	case child.IsRel:
 		ls.addPendingRel(child, key)
@@ -210,7 +192,7 @@ func (ls *lc4State) processModelChild(child stmt, path, key string, el *model.El
 	}
 }
 
-func (ls *lc4State) processViews(stmts []stmt) {
+func (ls *lc4State) processViews(stmts []dsl.Stmt) {
 	for _, s := range stmts {
 		if s.Keyword != "view" {
 			continue
@@ -230,7 +212,7 @@ func (ls *lc4State) processViews(stmts []stmt) {
 
 // parseViewHeader parses a "view <key> [of <element>] [title]" statement's
 // header arguments and computes its (deduplicated) view key.
-func (ls *lc4State) parseViewHeader(s stmt) (viewKey, scope, title string) {
+func (ls *lc4State) parseViewHeader(s dsl.Stmt) (viewKey, scope, title string) {
 	// LikeC4: view <key> [of <element>] { ... }
 	// args can be: ["key"], ["key", "of", "element"], or ["key", "of", "element", "title"]
 	args := s.Args
@@ -271,7 +253,7 @@ func (ls *lc4State) nextAnonymousViewKey(scope string) string {
 
 // applyViewBody applies a view's body statements (title, description,
 // include, exclude) to v.
-func (ls *lc4State) applyViewBody(v *model.View, body []stmt) {
+func (ls *lc4State) applyViewBody(v *model.View, body []dsl.Stmt) {
 	for _, bs := range body {
 		switch bs.Keyword {
 		case "title":
@@ -356,7 +338,7 @@ func importSource(src string) (*importer.ImportResult, error) {
 		return nil, fmt.Errorf("tokenize: %w", err)
 	}
 
-	p := &dslParser{Toks: toks}
+	p := &dsl.Parser{Toks: toks}
 	stmts, err := dsl.ParseAllStmts(p)
 	if err != nil {
 		return nil, fmt.Errorf("parse: %w", err)

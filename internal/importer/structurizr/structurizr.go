@@ -20,25 +20,7 @@ import (
 // grammar live in internal/importer/dsl; only the language-specific token
 // and statement dispatch stay here.
 
-type (
-	token     = dsl.Token
-	stmt      = dsl.Stmt
-	scanner   = dsl.Scanner
-	dslParser = dsl.Parser
-)
-
-const (
-	tokEOF     = dsl.EOF
-	tokNewline = dsl.Newline
-	tokString  = dsl.String
-	tokIdent   = dsl.Ident
-	tokLBrace  = dsl.LBrace
-	tokRBrace  = dsl.RBrace
-	tokAssign  = dsl.Assign
-	tokArrow   = dsl.Arrow
-)
-
-func tokenize(src string) ([]token, error) {
+func tokenize(src string) ([]dsl.Token, error) {
 	return dsl.Tokenize(src, identStart, scanIdent)
 }
 
@@ -49,16 +31,16 @@ func identStart(c rune) bool {
 	return c == '*' || c == '!' || unicode.IsLetter(c) || c == '_'
 }
 
-func scanIdent(s *scanner, line int) (token, error) {
+func scanIdent(s *dsl.Scanner, line int) (dsl.Token, error) {
 	if c, _ := s.At(0); c == '*' {
 		// Consume one or two '*' and return as a single identifier token
 		// so that "include *" and "include **" are parsed correctly.
 		s.Consume()
 		if n, _ := s.At(0); n == '*' {
 			s.Consume()
-			return token{Kind: tokIdent, Val: "**", Line: line}, nil
+			return dsl.Token{Kind: dsl.Ident, Val: "**", Line: line}, nil
 		}
-		return token{Kind: tokIdent, Val: "*", Line: line}, nil
+		return dsl.Token{Kind: dsl.Ident, Val: "*", Line: line}, nil
 	}
 
 	var sb strings.Builder
@@ -66,7 +48,7 @@ func scanIdent(s *scanner, line int) (token, error) {
 		sb.WriteRune(s.Consume())
 	}
 	dsl.ScanIdentBody(s, &sb)
-	return token{Kind: tokIdent, Val: sb.String(), Line: line}, nil
+	return dsl.Token{Kind: dsl.Ident, Val: sb.String(), Line: line}, nil
 }
 
 // ─── Parser ──────────────────────────────────────────────────────────────────
@@ -145,13 +127,13 @@ func (is *importState) resolveVar(v string) string {
 	return v
 }
 
-func (is *importState) processModelStmts(stmts []stmt, parentPath, parentVar string, dest map[string]model.Element) {
+func (is *importState) processModelStmts(stmts []dsl.Stmt, parentPath, parentVar string, dest map[string]model.Element) {
 	for _, s := range stmts {
 		is.processModelStmt(s, parentPath, parentVar, dest)
 	}
 }
 
-func (is *importState) processModelStmt(s stmt, parentPath, parentVar string, dest map[string]model.Element) {
+func (is *importState) processModelStmt(s dsl.Stmt, parentPath, parentVar string, dest map[string]model.Element) {
 	if s.IsRel {
 		is.addPendingRel(s, parentVar)
 		return
@@ -191,7 +173,7 @@ func (is *importState) processModelStmt(s stmt, parentPath, parentVar string, de
 // all elements have been discovered, defaulting its source to parentVar
 // when the statement omitted an explicit source (e.g. a nested "-> b" inside
 // element a's body).
-func (is *importState) addPendingRel(s stmt, parentVar string) {
+func (is *importState) addPendingRel(s dsl.Stmt, parentVar string) {
 	from := s.RelFrom
 	if from == "" {
 		from = parentVar
@@ -206,7 +188,7 @@ func (is *importState) addPendingRel(s stmt, parentVar string) {
 // resolveElementKey returns s's variable name, or a slugified fallback
 // derived from its title (or kind if untitled), warning when no variable
 // name was given in the DSL.
-func (is *importState) resolveElementKey(s stmt, kd kindDef) string {
+func (is *importState) resolveElementKey(s dsl.Stmt, kd kindDef) string {
 	if s.VarName != "" {
 		return s.VarName
 	}
@@ -220,7 +202,7 @@ func (is *importState) resolveElementKey(s stmt, kd kindDef) string {
 
 // buildElementFromStmt constructs the base model.Element from s's title,
 // description, and (for containers/components) technology arguments.
-func buildElementFromStmt(s stmt, kd kindDef) model.Element {
+func buildElementFromStmt(s dsl.Stmt, kd kindDef) model.Element {
 	el := model.Element{Kind: kd.kind}
 	if len(s.Args) > 0 {
 		el.Title = s.Args[0]
@@ -237,7 +219,7 @@ func buildElementFromStmt(s stmt, kd kindDef) model.Element {
 // processModelChild applies a single child statement of an element's body:
 // a nested relationship, a nested element, or one of the description/
 // technology/tags/properties fields.
-func (is *importState) processModelChild(child stmt, path, key string, el *model.Element, children map[string]model.Element) {
+func (is *importState) processModelChild(child dsl.Stmt, path, key string, el *model.Element, children map[string]model.Element) {
 	switch {
 	case child.IsRel:
 		is.addPendingRel(child, key)
@@ -254,7 +236,7 @@ func (is *importState) processModelChild(child stmt, path, key string, el *model
 	}
 }
 
-func (is *importState) processViewsStmts(stmts []stmt) {
+func (is *importState) processViewsStmts(stmts []dsl.Stmt) {
 	for _, s := range stmts {
 		if !is.isSupportedViewKeyword(s) {
 			continue
@@ -286,7 +268,7 @@ func (is *importState) processViewsStmts(stmts []stmt) {
 
 // isSupportedViewKeyword reports whether s is a supported view statement,
 // warning and returning false for recognized-but-unsupported view types.
-func (is *importState) isSupportedViewKeyword(s stmt) bool {
+func (is *importState) isSupportedViewKeyword(s dsl.Stmt) bool {
 	switch s.Keyword {
 	case "systemContext", "container", "component", "systemLandscape":
 		return true
@@ -315,7 +297,7 @@ func (is *importState) nextViewKey(keyword, scope string) string {
 
 // applyViewBodyStmts applies a view's body statements (include, exclude,
 // title, description, autoLayout) to v.
-func (is *importState) applyViewBodyStmts(v *model.View, body []stmt, viewKey string) {
+func (is *importState) applyViewBodyStmts(v *model.View, body []dsl.Stmt, viewKey string) {
 	for _, bs := range body {
 		switch bs.Keyword {
 		case "include":
@@ -362,7 +344,7 @@ func (is *importState) applyViewInclude(v *model.View, args []string) {
 // engine); "layered" is the closest match and Bausteinsicht's own default.
 // "auto" is not a valid Layout value (see model.validate) and would fail
 // validation on the very model this importer just wrote.
-func (is *importState) applyAutoLayout(v *model.View, bs stmt, viewKey string) {
+func (is *importState) applyAutoLayout(v *model.View, bs dsl.Stmt, viewKey string) {
 	v.Layout = "layered"
 	if len(bs.Args) > 0 {
 		is.warnings = append(is.warnings, fmt.Sprintf(
@@ -407,7 +389,7 @@ func (is *importState) buildRelationships() []model.Relationship {
 	return rels
 }
 
-func parseProperties(body []stmt) map[string]string {
+func parseProperties(body []dsl.Stmt) map[string]string {
 	m := make(map[string]string)
 	for _, s := range body {
 		if s.Keyword != "" && len(s.Args) > 0 {
@@ -506,7 +488,7 @@ func importSource(src string) (*importer.ImportResult, error) {
 		return nil, fmt.Errorf("tokenize: %w", err)
 	}
 
-	p := &dslParser{Toks: toks}
+	p := &dsl.Parser{Toks: toks}
 	stmts, err := dsl.ParseAllStmts(p)
 	if err != nil {
 		return nil, fmt.Errorf("parse: %w", err)
@@ -529,7 +511,7 @@ func importSource(src string) (*importer.ImportResult, error) {
 // extractModelAndViewsStmts finds the top-level "model" and "views" blocks
 // among stmts, which may either be nested inside a "workspace" block or
 // appear directly at the top level.
-func extractModelAndViewsStmts(stmts []stmt) (modelStmts, viewsStmts []stmt) {
+func extractModelAndViewsStmts(stmts []dsl.Stmt) (modelStmts, viewsStmts []dsl.Stmt) {
 	for _, s := range stmts {
 		switch s.Keyword {
 		case "workspace":
