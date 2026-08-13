@@ -125,6 +125,9 @@ e2e/                   # Automated end-to-end pipeline tests (Go); testdata/ hol
 
 ## Workflow Rules
 
+### Bug Fixes (TDD)
+When fixing a bug, write a test that reproduces it first — confirm it actually fails against the unfixed code — before writing the fix. Only then implement the change to make it pass. Don't implement the fix and backfill the test afterward. This applies specifically to bug fixes, not necessarily to every feature addition or refactor.
+
 ### Ticket Start
 When starting work on a ticket:
 1. Run `/doc-check start #<issue>` — identifies which spec/architecture docs need updating and applies them before implementation begins (docs-first approach)
