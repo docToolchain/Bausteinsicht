@@ -43,7 +43,7 @@ func tokenize(src string) ([]token, error) {
 	s := dsl.NewScanner(src)
 	var toks []token
 	for {
-		tok, err := next(s)
+		tok, err := dsl.Next(s, identStart, scanIdent)
 		if err != nil {
 			return nil, err
 		}
@@ -55,60 +55,10 @@ func tokenize(src string) ([]token, error) {
 	return toks, nil
 }
 
-// next scans the next token on top of the shared whitespace/comment/
-// newline/string scanning in the dsl package. Unlike Structurizr, LikeC4
-// has no "*" wildcard or "!" prefix identifiers.
-func next(s *scanner) (token, error) {
-	// Skip horizontal whitespace and handle comments.
-	// Newlines are NOT skipped here — they are emitted as tokNewline.
-	if err := s.SkipWhitespaceAndComments(); err != nil {
-		return token{}, err
-	}
-
-	c, ok := s.At(0)
-	if !ok {
-		return token{Kind: tokEOF, Line: s.Line}, nil
-	}
-	line := s.Line
-
-	// Collapse consecutive newlines into a single tokNewline.
-	if c == '\n' {
-		s.SkipNewlines()
-		return token{Kind: tokNewline, Line: line}, nil
-	}
-
-	return nextSymbolOrIdent(s, c, line)
-}
-
-// nextSymbolOrIdent scans the next symbol, string, or identifier token,
-// given the already-peeked lookahead character c at line.
-func nextSymbolOrIdent(s *scanner, c rune, line int) (token, error) {
-	switch {
-	case c == '{':
-		s.Consume()
-		return token{Kind: tokLBrace, Val: "{", Line: line}, nil
-	case c == '}':
-		s.Consume()
-		return token{Kind: tokRBrace, Val: "}", Line: line}, nil
-	case c == '=':
-		s.Consume()
-		return token{Kind: tokAssign, Val: "=", Line: line}, nil
-	case c == '-':
-		if n, _ := s.At(1); n == '>' {
-			s.Consume()
-			s.Consume()
-			return token{Kind: tokArrow, Val: "->", Line: line}, nil
-		}
-		s.Consume()
-		return next(s)
-	case c == '"':
-		return s.ScanString(line)
-	case unicode.IsLetter(c) || c == '_':
-		return scanIdent(s, line)
-	default:
-		s.Consume()
-		return next(s)
-	}
+// identStart reports whether c can start a LikeC4 identifier. Unlike
+// Structurizr, LikeC4 has no "*" wildcard or "!" prefix identifiers.
+func identStart(c rune) bool {
+	return unicode.IsLetter(c) || c == '_'
 }
 
 func scanIdent(s *scanner, line int) (token, error) {
@@ -135,54 +85,10 @@ func scanIdent(s *scanner, line int) (token, error) {
 }
 
 // ─── Parser ──────────────────────────────────────────────────────────────────
-
-func parseAll(p *dslParser) ([]stmt, error) {
-	return p.ParseAll(parseOneStmt)
-}
-
-func parseOneStmt(p *dslParser) (*stmt, error) {
-	tok := p.Peek()
-	if tok.Kind == tokEOF || tok.Kind == tokRBrace {
-		return nil, nil
-	}
-
-	line := tok.Line
-
-	if tok.Kind == tokArrow {
-		p.Advance()
-		to := p.Advance()
-		return p.FinishStmt(&stmt{Line: line, IsRel: true, RelTo: to.Val, Args: p.CollectArgs()}, parseOneStmt)
-	}
-
-	if tok.Kind == tokLBrace {
-		if _, err := p.ParseBlock(parseOneStmt); err != nil {
-			return nil, err
-		}
-		return nil, nil
-	}
-
-	if tok.Kind != tokIdent && tok.Kind != tokString {
-		p.Advance()
-		return nil, nil
-	}
-
-	p.Advance()
-
-	switch p.Peek().Kind {
-	case tokAssign:
-		p.Advance()
-		kw := p.Advance()
-		return p.FinishStmt(&stmt{Line: line, VarName: tok.Val, Keyword: kw.Val, Args: p.CollectArgs()}, parseOneStmt)
-
-	case tokArrow:
-		p.Advance()
-		to := p.Advance()
-		return p.FinishStmt(&stmt{Line: line, IsRel: true, RelFrom: tok.Val, RelTo: to.Val, Args: p.CollectArgs()}, parseOneStmt)
-
-	default:
-		return p.FinishStmt(&stmt{Line: line, Keyword: tok.Val, Args: p.CollectArgs()}, parseOneStmt)
-	}
-}
+//
+// LikeC4's statement grammar is identical to Structurizr's — both are
+// "[var =] keyword args {body}" / "[from] -> to args {body}" — so parsing
+// itself lives entirely in the dsl package (dsl.ParseAllStmts).
 
 // ─── Mapper ──────────────────────────────────────────────────────────────────
 
@@ -501,7 +407,7 @@ func importSource(src string) (*importer.ImportResult, error) {
 	}
 
 	p := &dslParser{Toks: toks}
-	stmts, err := parseAll(p)
+	stmts, err := dsl.ParseAllStmts(p)
 	if err != nil {
 		return nil, fmt.Errorf("parse: %w", err)
 	}

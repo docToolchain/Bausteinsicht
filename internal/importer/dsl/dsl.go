@@ -169,6 +169,70 @@ func (s *Scanner) SkipNewlines() {
 	}
 }
 
+// IdentStartFunc reports whether c can start an identifier-like token in a
+// caller's language — this is where callers hook in language-specific
+// dispatch (e.g. Structurizr's "*"/"**" wildcard or "!"-prefixed
+// identifiers) without Next needing to know about it.
+type IdentStartFunc func(c rune) bool
+
+// ScanIdentFunc scans an identifier-like token starting at the scanner's
+// current position (the character identStart matched on is not yet
+// consumed).
+type ScanIdentFunc func(*Scanner, int) (Token, error)
+
+// Next scans the next token using the shared grammar common to Structurizr-
+// and LikeC4-style DSLs: {}/=/-> punctuation, "quoted strings", C-style
+// comments, and newline-as-statement-separator. Any character for which
+// identStart reports true is delegated to scanIdent, letting callers
+// implement their own identifier/wildcard/prefix handling on top of this
+// shared dispatch.
+func Next(s *Scanner, identStart IdentStartFunc, scanIdent ScanIdentFunc) (Token, error) {
+	// Skip horizontal whitespace and handle comments.
+	// Newlines are NOT skipped here — they are emitted as a Newline token.
+	if err := s.SkipWhitespaceAndComments(); err != nil {
+		return Token{}, err
+	}
+
+	c, ok := s.At(0)
+	if !ok {
+		return Token{Kind: EOF, Line: s.Line}, nil
+	}
+	line := s.Line
+
+	// Collapse consecutive newlines into a single Newline token.
+	if c == '\n' {
+		s.SkipNewlines()
+		return Token{Kind: Newline, Line: line}, nil
+	}
+
+	switch {
+	case c == '{':
+		s.Consume()
+		return Token{Kind: LBrace, Val: "{", Line: line}, nil
+	case c == '}':
+		s.Consume()
+		return Token{Kind: RBrace, Val: "}", Line: line}, nil
+	case c == '=':
+		s.Consume()
+		return Token{Kind: Assign, Val: "=", Line: line}, nil
+	case c == '-':
+		if n, _ := s.At(1); n == '>' {
+			s.Consume()
+			s.Consume()
+			return Token{Kind: Arrow, Val: "->", Line: line}, nil
+		}
+		s.Consume()
+		return Next(s, identStart, scanIdent)
+	case c == '"':
+		return s.ScanString(line)
+	case identStart(c):
+		return scanIdent(s, line)
+	default:
+		s.Consume()
+		return Next(s, identStart, scanIdent)
+	}
+}
+
 // ScanString scans a double-quoted string starting at the current position
 // (the opening quote), handling \", \\, and \n escapes; any other escaped
 // character is passed through literally including its backslash.
@@ -328,4 +392,61 @@ func (p *Parser) CollectArgs() []string {
 		}
 	}
 	return args
+}
+
+// ParseAllStmts parses a full top-level statement list using the shared
+// "[var =] keyword args {body}" / "[from] -> to args {body}" statement
+// grammar common to Structurizr- and LikeC4-style DSLs.
+func ParseAllStmts(p *Parser) ([]Stmt, error) {
+	return p.ParseAll(ParseOneStmt)
+}
+
+// ParseOneStmt parses a single statement using the shared
+// "[var =] keyword args {body}" / "[from] -> to args {body}" grammar common
+// to Structurizr- and LikeC4-style DSLs. Both languages' tokenizers only
+// ever differ in how they produce Ident/String tokens (see Next), not in
+// how those tokens combine into statements, so this needs no per-language
+// hook.
+func ParseOneStmt(p *Parser) (*Stmt, error) {
+	tok := p.Peek()
+	if tok.Kind == EOF || tok.Kind == RBrace {
+		return nil, nil
+	}
+
+	line := tok.Line
+
+	if tok.Kind == Arrow {
+		p.Advance()
+		to := p.Advance()
+		return p.FinishStmt(&Stmt{Line: line, IsRel: true, RelTo: to.Val, Args: p.CollectArgs()}, ParseOneStmt)
+	}
+
+	if tok.Kind == LBrace {
+		if _, err := p.ParseBlock(ParseOneStmt); err != nil {
+			return nil, err
+		}
+		return nil, nil
+	}
+
+	if tok.Kind != Ident && tok.Kind != String {
+		p.Advance()
+		return nil, nil
+	}
+
+	p.Advance()
+
+	switch p.Peek().Kind {
+	case Assign:
+		p.Advance()
+		kw := p.Advance()
+		return p.FinishStmt(&Stmt{Line: line, VarName: tok.Val, Keyword: kw.Val, Args: p.CollectArgs()}, ParseOneStmt)
+
+	case Arrow:
+		p.Advance()
+		to := p.Advance()
+		return p.FinishStmt(&Stmt{Line: line, IsRel: true, RelFrom: tok.Val, RelTo: to.Val, Args: p.CollectArgs()}, ParseOneStmt)
+
+	default:
+		return p.FinishStmt(&Stmt{Line: line, Keyword: tok.Val, Args: p.CollectArgs()}, ParseOneStmt)
+	}
 }

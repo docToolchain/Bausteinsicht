@@ -203,6 +203,156 @@ func TestParser_PeekAdvance_EOF(t *testing.T) {
 	}
 }
 
+// testIdentStart/testScanIdent form a minimal identifier grammar (bare
+// letters/digits/underscore) used to exercise Next and ParseOneStmt/
+// ParseAllStmts without depending on either real DSL importer.
+func testIdentStart(c rune) bool {
+	return c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+}
+
+func testScanIdent(s *Scanner, line int) (Token, error) {
+	start := s.Pos
+	for {
+		c, ok := s.At(0)
+		if !ok || !(testIdentStart(c) || (c >= '0' && c <= '9')) {
+			break
+		}
+		s.Consume()
+	}
+	return Token{Kind: Ident, Val: string(s.Src[start:s.Pos]), Line: line}, nil
+}
+
+func testTokenize(t *testing.T, src string) []Token {
+	t.Helper()
+	s := NewScanner(src)
+	var toks []Token
+	for {
+		tok, err := Next(s, testIdentStart, testScanIdent)
+		if err != nil {
+			t.Fatalf("Next: %v", err)
+		}
+		toks = append(toks, tok)
+		if tok.Kind == EOF {
+			return toks
+		}
+	}
+}
+
+func TestNext_Symbols(t *testing.T) {
+	toks := testTokenize(t, `a = b { c -> d "e" }`)
+	var kinds []TokKind
+	for _, tok := range toks {
+		kinds = append(kinds, tok.Kind)
+	}
+	want := []TokKind{Ident, Assign, Ident, LBrace, Ident, Arrow, Ident, String, RBrace, EOF}
+	if len(kinds) != len(want) {
+		t.Fatalf("got %d tokens %v, want %d %v", len(kinds), kinds, len(want), want)
+	}
+	for i, k := range want {
+		if kinds[i] != k {
+			t.Errorf("token %d: kind = %v, want %v", i, kinds[i], k)
+		}
+	}
+}
+
+func TestNext_CommentsAndNewlines(t *testing.T) {
+	toks := testTokenize(t, "a // comment\n\n\nb")
+	var vals []string
+	for _, tok := range toks {
+		if tok.Kind == Ident {
+			vals = append(vals, tok.Val)
+		}
+	}
+	if len(vals) != 2 || vals[0] != "a" || vals[1] != "b" {
+		t.Errorf("got idents %v, want [a b]", vals)
+	}
+	if toks[1].Kind != Newline {
+		t.Errorf("expected a single collapsed Newline token between idents, got %v", toks[1].Kind)
+	}
+}
+
+func TestNext_UnterminatedBlockComment(t *testing.T) {
+	s := NewScanner("/* oops")
+	if _, err := Next(s, testIdentStart, testScanIdent); err == nil {
+		t.Error("expected error for unterminated block comment")
+	}
+}
+
+func TestNext_DashNotArrow_SkipsSingleDash(t *testing.T) {
+	// A lone '-' (not followed by '>') isn't a token in this shared grammar
+	// and is silently skipped, same as any other unrecognized character.
+	toks := testTokenize(t, "a - b")
+	var vals []string
+	for _, tok := range toks {
+		if tok.Kind == Ident {
+			vals = append(vals, tok.Val)
+		}
+	}
+	if len(vals) != 2 || vals[0] != "a" || vals[1] != "b" {
+		t.Errorf("got idents %v, want [a b]", vals)
+	}
+}
+
+func TestParseAllStmts_VarAssignAndRelationship(t *testing.T) {
+	toks := testTokenize(t, `x = person "Alice"
+x -> y "uses"
+`)
+	p := &Parser{Toks: toks}
+	stmts, err := ParseAllStmts(p)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(stmts) != 2 {
+		t.Fatalf("expected 2 statements, got %d: %+v", len(stmts), stmts)
+	}
+
+	elem := stmts[0]
+	if elem.VarName != "x" || elem.Keyword != "person" || len(elem.Args) != 1 || elem.Args[0] != "Alice" {
+		t.Errorf("element stmt = %+v, want VarName=x Keyword=person Args=[Alice]", elem)
+	}
+
+	rel := stmts[1]
+	if !rel.IsRel || rel.RelFrom != "x" || rel.RelTo != "y" || len(rel.Args) != 1 || rel.Args[0] != "uses" {
+		t.Errorf("relationship stmt = %+v, want IsRel RelFrom=x RelTo=y Args=[uses]", rel)
+	}
+}
+
+func TestParseAllStmts_NestedBlockAndBareRelationship(t *testing.T) {
+	// group { a -> b } — a relationship with no explicit source nested
+	// inside a block; the grammar itself doesn't fill in the source (that's
+	// each importer's own responsibility), so RelFrom is empty here.
+	toks := testTokenize(t, "group {\na -> b\n}")
+	p := &Parser{Toks: toks}
+	stmts, err := ParseAllStmts(p)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(stmts) != 1 || stmts[0].Keyword != "group" {
+		t.Fatalf("expected 1 top-level 'group' statement, got %+v", stmts)
+	}
+	body := stmts[0].Body
+	if len(body) != 1 || !body[0].IsRel || body[0].RelFrom != "a" || body[0].RelTo != "b" {
+		t.Errorf("nested body = %+v, want a single a->b relationship", body)
+	}
+}
+
+func TestParseOneStmt_SkipsUnrecognizedToken(t *testing.T) {
+	// A token that's neither Ident/String nor Arrow (here: a bare RBrace at
+	// the top level, which ParseOneStmt doesn't otherwise special-case) is
+	// consumed and produces no statement.
+	p := &Parser{Toks: []Token{{Kind: Assign}, {Kind: EOF}}}
+	stmts, err := ParseAllStmts(p)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(stmts) != 0 {
+		t.Errorf("expected no statements, got %+v", stmts)
+	}
+	if p.Pos != 1 {
+		t.Errorf("expected the unrecognized token to be consumed, Pos = %d, want 1", p.Pos)
+	}
+}
+
 func TestParser_CollectArgs(t *testing.T) {
 	p := &Parser{Toks: []Token{
 		{Kind: String, Val: "a"},
