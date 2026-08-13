@@ -21,7 +21,6 @@ import (
 // and statement dispatch stay here.
 
 type (
-	tokKind   = dsl.TokKind
 	token     = dsl.Token
 	stmt      = dsl.Stmt
 	scanner   = dsl.Scanner
@@ -40,19 +39,7 @@ const (
 )
 
 func tokenize(src string) ([]token, error) {
-	s := dsl.NewScanner(src)
-	var toks []token
-	for {
-		tok, err := dsl.Next(s, identStart, scanIdent)
-		if err != nil {
-			return nil, err
-		}
-		toks = append(toks, tok)
-		if tok.Kind == tokEOF {
-			break
-		}
-	}
-	return toks, nil
+	return dsl.Tokenize(src, identStart, scanIdent)
 }
 
 // identStart reports whether c can start a LikeC4 identifier. Unlike
@@ -63,24 +50,7 @@ func identStart(c rune) bool {
 
 func scanIdent(s *scanner, line int) (token, error) {
 	var sb strings.Builder
-	for {
-		c, ok := s.At(0)
-		if !ok {
-			break
-		}
-		if c == '-' {
-			if n, _ := s.At(1); n == '>' {
-				break
-			}
-			sb.WriteRune(s.Consume())
-			continue
-		}
-		if unicode.IsLetter(c) || unicode.IsDigit(c) || c == '_' || c == '.' || c == '/' || c == ':' {
-			sb.WriteRune(s.Consume())
-			continue
-		}
-		break
-	}
+	dsl.ScanIdentBody(s, &sb)
 	return token{Kind: tokIdent, Val: sb.String(), Line: line}, nil
 }
 
@@ -214,7 +184,7 @@ func (ls *lc4State) resolveElementKey(s stmt) string {
 	}
 	key := s.Keyword
 	if len(s.Args) > 0 {
-		key = slugify(s.Args[0])
+		key = dsl.Slugify(s.Args[0])
 	}
 	ls.warnings = append(ls.warnings, fmt.Sprintf("line %d: element has no variable name, using %q", s.Line, key))
 	return key
@@ -359,26 +329,6 @@ func (ls *lc4State) updateSpecWithContainers() {
 			ls.spec[kind] = ek
 		}
 	}
-}
-
-func slugify(s string) string {
-	s = strings.ToLower(s)
-	var sb strings.Builder
-	prevUnderscore := false
-	for _, r := range s {
-		if unicode.IsLetter(r) || unicode.IsDigit(r) {
-			sb.WriteRune(r)
-			prevUnderscore = false
-		} else if !prevUnderscore && sb.Len() > 0 {
-			sb.WriteRune('_')
-			prevUnderscore = true
-		}
-	}
-	result := strings.TrimRight(sb.String(), "_")
-	if result == "" {
-		return "element"
-	}
-	return result
 }
 
 // ─── Public API ──────────────────────────────────────────────────────────────

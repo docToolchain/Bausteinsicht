@@ -10,6 +10,7 @@ package dsl
 import (
 	"fmt"
 	"strings"
+	"unicode"
 )
 
 // TokKind classifies a Token.
@@ -179,6 +180,74 @@ type IdentStartFunc func(c rune) bool
 // current position (the character identStart matched on is not yet
 // consumed).
 type ScanIdentFunc func(*Scanner, int) (Token, error)
+
+// Tokenize scans src into a full token stream (ending in an EOF token),
+// using identStart/scanIdent for language-specific identifier handling.
+func Tokenize(src string, identStart IdentStartFunc, scanIdent ScanIdentFunc) ([]Token, error) {
+	s := NewScanner(src)
+	var toks []Token
+	for {
+		tok, err := Next(s, identStart, scanIdent)
+		if err != nil {
+			return nil, err
+		}
+		toks = append(toks, tok)
+		if tok.Kind == EOF {
+			break
+		}
+	}
+	return toks, nil
+}
+
+// ScanIdentBody consumes the shared identifier continuation grammar —
+// letters, digits, '_', '.', '/', ':', stopping before "->" — common to
+// Structurizr- and LikeC4-style DSL identifiers, appending consumed runes to
+// sb. Callers handle their own identifier-start logic (prefixes, wildcards)
+// before calling this for the rest of the token.
+func ScanIdentBody(s *Scanner, sb *strings.Builder) {
+	for {
+		c, ok := s.At(0)
+		if !ok {
+			return
+		}
+		if c == '-' {
+			if n, _ := s.At(1); n == '>' {
+				return
+			}
+			sb.WriteRune(s.Consume())
+			continue
+		}
+		if unicode.IsLetter(c) || unicode.IsDigit(c) || c == '_' || c == '.' || c == '/' || c == ':' {
+			sb.WriteRune(s.Consume())
+			continue
+		}
+		return
+	}
+}
+
+// Slugify converts a title to a lowercase, underscore-separated identifier
+// fallback (used when a DSL element has no explicit variable name), common
+// to Structurizr- and LikeC4-style DSL importers. Returns "element" if the
+// result would otherwise be empty.
+func Slugify(s string) string {
+	s = strings.ToLower(s)
+	var sb strings.Builder
+	prevUnderscore := false
+	for _, r := range s {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			sb.WriteRune(r)
+			prevUnderscore = false
+		} else if !prevUnderscore && sb.Len() > 0 {
+			sb.WriteRune('_')
+			prevUnderscore = true
+		}
+	}
+	result := strings.TrimRight(sb.String(), "_")
+	if result == "" {
+		return "element"
+	}
+	return result
+}
 
 // Next scans the next token using the shared grammar common to Structurizr-
 // and LikeC4-style DSLs: {}/=/-> punctuation, "quoted strings", C-style

@@ -1,6 +1,9 @@
 package dsl
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestScanner_SkipWhitespaceAndComments(t *testing.T) {
 	tests := []struct {
@@ -214,7 +217,7 @@ func testScanIdent(s *Scanner, line int) (Token, error) {
 	start := s.Pos
 	for {
 		c, ok := s.At(0)
-		if !ok || !(testIdentStart(c) || (c >= '0' && c <= '9')) {
+		if !ok || (!testIdentStart(c) && !(c >= '0' && c <= '9')) {
 			break
 		}
 		s.Consume()
@@ -350,6 +353,74 @@ func TestParseOneStmt_SkipsUnrecognizedToken(t *testing.T) {
 	}
 	if p.Pos != 1 {
 		t.Errorf("expected the unrecognized token to be consumed, Pos = %d, want 1", p.Pos)
+	}
+}
+
+func TestTokenize(t *testing.T) {
+	toks, err := Tokenize(`a = b "c"`, testIdentStart, testScanIdent)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := []TokKind{Ident, Assign, Ident, String, EOF}
+	if len(toks) != len(want) {
+		t.Fatalf("got %d tokens, want %d: %+v", len(toks), len(want), toks)
+	}
+	for i, k := range want {
+		if toks[i].Kind != k {
+			t.Errorf("token %d: kind = %v, want %v", i, toks[i].Kind, k)
+		}
+	}
+}
+
+func TestTokenize_Error(t *testing.T) {
+	if _, err := Tokenize("/* unterminated", testIdentStart, testScanIdent); err == nil {
+		t.Error("expected error for unterminated block comment")
+	}
+}
+
+func TestScanIdentBody(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{"plain", "abc123 rest", "abc123"},
+		{"dotted path with dash", "a.b.c-x", "a.b.c-x"}, // '-' only stops before "->"
+		{"stops before arrow", "a->b", "a"},
+		{"slash and colon", "a/b:c d", "a/b:c"},
+		{"empty at eof", "", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := NewScanner(tt.src)
+			var sb strings.Builder
+			ScanIdentBody(s, &sb)
+			if sb.String() != tt.want {
+				t.Errorf("got %q, want %q", sb.String(), tt.want)
+			}
+		})
+	}
+}
+
+func TestSlugify(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"simple", "Hello World", "hello_world"},
+		{"already lower", "already_ok", "already_ok"},
+		{"punctuation collapsed", "A!!!B", "a_b"},
+		{"trailing punctuation trimmed", "Trailing!!!", "trailing"},
+		{"empty falls back", "!!!", "element"},
+		{"fully empty falls back", "", "element"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := Slugify(tt.in); got != tt.want {
+				t.Errorf("Slugify(%q) = %q, want %q", tt.in, got, tt.want)
+			}
+		})
 	}
 }
 
