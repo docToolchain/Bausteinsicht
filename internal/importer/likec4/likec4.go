@@ -10,381 +10,37 @@ import (
 	"unicode"
 
 	"github.com/docToolchain/Bausteinsicht/internal/importer"
+	"github.com/docToolchain/Bausteinsicht/internal/importer/dsl"
 	"github.com/docToolchain/Bausteinsicht/internal/model"
 )
 
 // ─── Tokenizer (identical grammar to Structurizr) ────────────────────────────
+//
+// The scanner/parser primitives shared with Structurizr's near-identical DSL
+// grammar live in internal/importer/dsl; only the language-specific token
+// and statement dispatch stay here.
 
-type tokKind int
-
-const (
-	tokEOF tokKind = iota
-	tokNewline
-	tokString
-	tokIdent
-	tokLBrace
-	tokRBrace
-	tokAssign
-	tokArrow
-)
-
-type token struct {
-	kind tokKind
-	val  string
-	line int
+func tokenize(src string) ([]dsl.Token, error) {
+	return dsl.Tokenize(src, identStart, scanIdent)
 }
 
-type scanner struct {
-	src  []rune
-	pos  int
-	line int
+// identStart reports whether c can start a LikeC4 identifier. Unlike
+// Structurizr, LikeC4 has no "*" wildcard or "!" prefix identifiers.
+func identStart(c rune) bool {
+	return unicode.IsLetter(c) || c == '_'
 }
 
-func tokenize(src string) ([]token, error) {
-	s := &scanner{src: []rune(src), line: 1}
-	var toks []token
-	for {
-		tok, err := s.next()
-		if err != nil {
-			return nil, err
-		}
-		toks = append(toks, tok)
-		if tok.kind == tokEOF {
-			break
-		}
-	}
-	return toks, nil
-}
-
-func (s *scanner) at(offset int) (rune, bool) {
-	i := s.pos + offset
-	if i >= len(s.src) {
-		return 0, false
-	}
-	return s.src[i], true
-}
-
-func (s *scanner) consume() rune {
-	r := s.src[s.pos]
-	s.pos++
-	if r == '\n' {
-		s.line++
-	}
-	return r
-}
-
-func (s *scanner) next() (token, error) {
-	for {
-		c, ok := s.at(0)
-		if !ok {
-			return token{kind: tokEOF, line: s.line}, nil
-		}
-		if c == ' ' || c == '\t' || c == '\r' {
-			s.consume()
-			continue
-		}
-		if c == '/' {
-			n, _ := s.at(1)
-			if n == '/' {
-				for {
-					ch, ok := s.at(0)
-					if !ok || ch == '\n' {
-						break
-					}
-					s.consume()
-				}
-				continue
-			}
-			if n == '*' {
-				s.consume()
-				s.consume()
-				for {
-					ch, ok := s.at(0)
-					if !ok {
-						return token{}, fmt.Errorf("unterminated block comment")
-					}
-					s.consume()
-					if ch == '*' {
-						if nn, _ := s.at(0); nn == '/' {
-							s.consume()
-							break
-						}
-					}
-				}
-				continue
-			}
-		}
-		break
-	}
-
-	c, ok := s.at(0)
-	if !ok {
-		return token{kind: tokEOF, line: s.line}, nil
-	}
-	line := s.line
-
-	if c == '\n' {
-		for {
-			ch, ok := s.at(0)
-			if !ok || ch != '\n' {
-				break
-			}
-			s.consume()
-		}
-		return token{kind: tokNewline, line: line}, nil
-	}
-
-	switch {
-	case c == '{':
-		s.consume()
-		return token{kind: tokLBrace, val: "{", line: line}, nil
-	case c == '}':
-		s.consume()
-		return token{kind: tokRBrace, val: "}", line: line}, nil
-	case c == '=':
-		s.consume()
-		return token{kind: tokAssign, val: "=", line: line}, nil
-	case c == '-':
-		if n, _ := s.at(1); n == '>' {
-			s.consume()
-			s.consume()
-			return token{kind: tokArrow, val: "->", line: line}, nil
-		}
-		s.consume()
-		return s.next()
-	case c == '"':
-		return s.scanString(line)
-	case unicode.IsLetter(c) || c == '_':
-		return s.scanIdent(line)
-	default:
-		s.consume()
-		return s.next()
-	}
-}
-
-func (s *scanner) scanString(line int) (token, error) {
-	s.consume()
+func scanIdent(s *dsl.Scanner, line int) (dsl.Token, error) {
 	var sb strings.Builder
-	for {
-		c, ok := s.at(0)
-		if !ok {
-			return token{}, fmt.Errorf("line %d: unterminated string", line)
-		}
-		if c == '"' {
-			s.consume()
-			break
-		}
-		if c == '\\' {
-			s.consume()
-			esc, ok := s.at(0)
-			if !ok {
-				return token{}, fmt.Errorf("line %d: EOF in string escape", line)
-			}
-			s.consume()
-			switch esc {
-			case '"', '\\':
-				sb.WriteRune(esc)
-			case 'n':
-				sb.WriteRune('\n')
-			default:
-				sb.WriteRune('\\')
-				sb.WriteRune(esc)
-			}
-			continue
-		}
-		sb.WriteRune(s.consume())
-	}
-	return token{kind: tokString, val: sb.String(), line: line}, nil
-}
-
-func (s *scanner) scanIdent(line int) (token, error) {
-	var sb strings.Builder
-	for {
-		c, ok := s.at(0)
-		if !ok {
-			break
-		}
-		if c == '-' {
-			if n, _ := s.at(1); n == '>' {
-				break
-			}
-			sb.WriteRune(s.consume())
-			continue
-		}
-		if unicode.IsLetter(c) || unicode.IsDigit(c) || c == '_' || c == '.' || c == '/' || c == ':' {
-			sb.WriteRune(s.consume())
-			continue
-		}
-		break
-	}
-	return token{kind: tokIdent, val: sb.String(), line: line}, nil
+	dsl.ScanIdentBody(s, &sb)
+	return dsl.Token{Kind: dsl.Ident, Val: sb.String(), Line: line}, nil
 }
 
 // ─── Parser ──────────────────────────────────────────────────────────────────
-
-type stmt struct {
-	line    int
-	varName string
-	keyword string
-	args    []string
-	isRel   bool
-	relFrom string
-	relTo   string
-	body    []stmt
-}
-
-type dslParser struct {
-	toks []token
-	pos  int
-}
-
-func (p *dslParser) peek() token {
-	if p.pos >= len(p.toks) {
-		return token{kind: tokEOF}
-	}
-	return p.toks[p.pos]
-}
-
-func (p *dslParser) advance() token {
-	t := p.peek()
-	if t.kind != tokEOF {
-		p.pos++
-	}
-	return t
-}
-
-func (p *dslParser) skipNewlines() {
-	for p.peek().kind == tokNewline {
-		p.advance()
-	}
-}
-
-func (p *dslParser) parseAll() ([]stmt, error) {
-	return p.parseStmts(false)
-}
-
-func (p *dslParser) parseStmts(inBlock bool) ([]stmt, error) {
-	var stmts []stmt
-	for {
-		p.skipNewlines()
-		tok := p.peek()
-		if tok.kind == tokEOF {
-			break
-		}
-		if inBlock && tok.kind == tokRBrace {
-			break
-		}
-		s, err := p.parseOneStmt()
-		if err != nil {
-			return nil, err
-		}
-		if s != nil {
-			stmts = append(stmts, *s)
-		}
-	}
-	return stmts, nil
-}
-
-func (p *dslParser) parseBlock() ([]stmt, error) {
-	if p.peek().kind != tokLBrace {
-		return nil, nil
-	}
-	p.advance()
-	p.skipNewlines()
-	stmts, err := p.parseStmts(true)
-	if err != nil {
-		return nil, err
-	}
-	if p.peek().kind == tokRBrace {
-		p.advance()
-	}
-	return stmts, nil
-}
-
-func (p *dslParser) optBlock(s *stmt) error {
-	p.skipNewlines()
-	if p.peek().kind == tokLBrace {
-		body, err := p.parseBlock()
-		if err != nil {
-			return err
-		}
-		s.body = body
-	}
-	return nil
-}
-
-func (p *dslParser) parseOneStmt() (*stmt, error) {
-	tok := p.peek()
-	if tok.kind == tokEOF || tok.kind == tokRBrace {
-		return nil, nil
-	}
-
-	line := tok.line
-
-	if tok.kind == tokArrow {
-		p.advance()
-		to := p.advance()
-		s := &stmt{line: line, isRel: true, relTo: to.val, args: p.collectArgs()}
-		if err := p.optBlock(s); err != nil {
-			return nil, err
-		}
-		return s, nil
-	}
-
-	if tok.kind == tokLBrace {
-		if _, err := p.parseBlock(); err != nil {
-			return nil, err
-		}
-		return nil, nil
-	}
-
-	if tok.kind != tokIdent && tok.kind != tokString {
-		p.advance()
-		return nil, nil
-	}
-
-	p.advance()
-
-	switch p.peek().kind {
-	case tokAssign:
-		p.advance()
-		kw := p.advance()
-		s := &stmt{line: line, varName: tok.val, keyword: kw.val, args: p.collectArgs()}
-		if err := p.optBlock(s); err != nil {
-			return nil, err
-		}
-		return s, nil
-
-	case tokArrow:
-		p.advance()
-		to := p.advance()
-		s := &stmt{line: line, isRel: true, relFrom: tok.val, relTo: to.val, args: p.collectArgs()}
-		if err := p.optBlock(s); err != nil {
-			return nil, err
-		}
-		return s, nil
-
-	default:
-		s := &stmt{line: line, keyword: tok.val, args: p.collectArgs()}
-		if err := p.optBlock(s); err != nil {
-			return nil, err
-		}
-		return s, nil
-	}
-}
-
-func (p *dslParser) collectArgs() []string {
-	var args []string
-	for {
-		k := p.peek().kind
-		if k == tokString || k == tokIdent {
-			args = append(args, p.advance().val)
-		} else {
-			break
-		}
-	}
-	return args
-}
+//
+// LikeC4's statement grammar is identical to Structurizr's — both are
+// "[var =] keyword args {body}" / "[from] -> to args {body}" — so parsing
+// itself lives entirely in the dsl package (dsl.ParseAllStmts).
 
 // ─── Mapper ──────────────────────────────────────────────────────────────────
 
@@ -419,14 +75,14 @@ func newLC4State() *lc4State {
 	}
 }
 
-func (ls *lc4State) processSpecification(stmts []stmt) {
+func (ls *lc4State) processSpecification(stmts []dsl.Stmt) {
 	for _, s := range stmts {
-		switch s.keyword {
+		switch s.Keyword {
 		case "element":
-			if len(s.args) == 0 {
+			if len(s.Args) == 0 {
 				continue
 			}
-			kindName := s.args[0]
+			kindName := s.Args[0]
 			ls.kinds[kindName] = true
 			notation := strings.ToUpper(kindName[:1]) + kindName[1:]
 			ls.spec[kindName] = model.ElementKind{Notation: notation}
@@ -443,161 +99,194 @@ func (ls *lc4State) resolveVar(v string) string {
 	return v
 }
 
-func (ls *lc4State) processModelStmts(stmts []stmt, parentPath, parentVar string, dest map[string]model.Element) {
+func (ls *lc4State) processModelStmts(stmts []dsl.Stmt, parentPath, parentVar string, dest map[string]model.Element) {
 	for _, s := range stmts {
 		ls.processModelStmt(s, parentPath, parentVar, dest)
 	}
 }
 
-func (ls *lc4State) processModelStmt(s stmt, parentPath, parentVar string, dest map[string]model.Element) {
-	if s.isRel {
-		from := s.relFrom
-		if from == "" {
-			from = parentVar
-		}
-		label := ""
-		if len(s.args) > 0 {
-			label = s.args[0]
-		}
-		ls.pendingRels = append(ls.pendingRels, pendingRel{from: from, to: s.relTo, label: label, line: s.line})
+func (ls *lc4State) processModelStmt(s dsl.Stmt, parentPath, parentVar string, dest map[string]model.Element) {
+	if s.IsRel {
+		ls.addPendingRel(s, parentVar)
 		return
 	}
 
-	if !ls.kinds[s.keyword] {
+	if !ls.kinds[s.Keyword] {
 		// Not a known kind — treat as property inside element body
 		return
 	}
 
-	key := s.varName
-	if key == "" {
-		if len(s.args) > 0 {
-			key = slugify(s.args[0])
-		} else {
-			key = s.keyword
-		}
-		ls.warnings = append(ls.warnings, fmt.Sprintf("line %d: element has no variable name, using %q", s.line, key))
-	}
-
+	key := ls.resolveElementKey(s)
 	path := key
 	if parentPath != "" {
 		path = parentPath + "." + key
 	}
 	ls.varToPath[key] = path
 
-	el := model.Element{Kind: s.keyword}
-	if len(s.args) > 0 {
-		el.Title = s.args[0]
+	el := model.Element{Kind: s.Keyword}
+	if len(s.Args) > 0 {
+		el.Title = s.Args[0]
 	}
 
 	children := make(map[string]model.Element)
-	for _, child := range s.body {
-		switch {
-		case child.isRel:
-			from := child.relFrom
-			if from == "" {
-				from = key
-			}
-			label := ""
-			if len(child.args) > 0 {
-				label = child.args[0]
-			}
-			ls.pendingRels = append(ls.pendingRels, pendingRel{from: from, to: child.relTo, label: label, line: child.line})
-		case ls.kinds[child.keyword]:
-			ls.processModelStmt(child, path, key, children)
-		case child.keyword == "description" && len(child.args) > 0:
-			el.Description = child.args[0]
-		case child.keyword == "technology" && len(child.args) > 0:
-			el.Technology = child.args[0]
-		case child.keyword == "title" && len(child.args) > 0:
-			el.Title = child.args[0]
-		case child.keyword == "tags":
-			el.Tags = child.args
-		}
+	for _, child := range s.Body {
+		ls.processModelChild(child, path, key, &el, children)
 	}
 
 	if len(children) > 0 {
 		el.Children = children
-		ls.kindsContainer[s.keyword] = true
+		ls.kindsContainer[s.Keyword] = true
 	}
 
 	dest[key] = el
 }
 
-func (ls *lc4State) processViews(stmts []stmt) {
+// addPendingRel records a relationship statement for later resolution once
+// all elements have been discovered, defaulting its source to parentVar
+// when the statement omitted an explicit source (e.g. a nested "-> b" inside
+// element a's body).
+func (ls *lc4State) addPendingRel(s dsl.Stmt, parentVar string) {
+	from := s.RelFrom
+	if from == "" {
+		from = parentVar
+	}
+	label := ""
+	if len(s.Args) > 0 {
+		label = s.Args[0]
+	}
+	ls.pendingRels = append(ls.pendingRels, pendingRel{from: from, to: s.RelTo, label: label, line: s.Line})
+}
+
+// resolveElementKey returns s's variable name, or a slugified fallback
+// derived from its title (or keyword if untitled), warning when no variable
+// name was given in the DSL.
+func (ls *lc4State) resolveElementKey(s dsl.Stmt) string {
+	if s.VarName != "" {
+		return s.VarName
+	}
+	key := s.Keyword
+	if len(s.Args) > 0 {
+		key = dsl.Slugify(s.Args[0])
+	}
+	ls.warnings = append(ls.warnings, fmt.Sprintf("line %d: element has no variable name, using %q", s.Line, key))
+	return key
+}
+
+// processModelChild applies a single child statement of an element's body:
+// a nested relationship, a nested element, or one of the description/
+// technology/title/tags fields.
+func (ls *lc4State) processModelChild(child dsl.Stmt, path, key string, el *model.Element, children map[string]model.Element) {
+	switch {
+	case child.IsRel:
+		ls.addPendingRel(child, key)
+	case ls.kinds[child.Keyword]:
+		ls.processModelStmt(child, path, key, children)
+	case child.Keyword == "description" && len(child.Args) > 0:
+		el.Description = child.Args[0]
+	case child.Keyword == "technology" && len(child.Args) > 0:
+		el.Technology = child.Args[0]
+	case child.Keyword == "title" && len(child.Args) > 0:
+		el.Title = child.Args[0]
+	case child.Keyword == "tags":
+		el.Tags = child.Args
+	}
+}
+
+func (ls *lc4State) processViews(stmts []dsl.Stmt) {
 	for _, s := range stmts {
-		if s.keyword != "view" {
+		if s.Keyword != "view" {
 			continue
 		}
 
-		// LikeC4: view <key> [of <element>] { ... }
-		// args can be: ["key"], ["key", "of", "element"], or ["key", "of", "element", "title"]
-		viewKey := ""
-		scope := ""
-		title := ""
-
-		args := s.args
-		if len(args) > 0 {
-			viewKey = args[0]
-			args = args[1:]
-		}
-
-		// Check for "of" keyword
-		if len(args) >= 2 && args[0] == "of" {
-			scope = ls.resolveVar(args[1])
-			args = args[2:]
-		}
-
-		title = strings.Join(args, " ")
-
-		if viewKey == "" {
-			baseKey := "view"
-			if scope != "" {
-				baseKey = scope
-			}
-			viewKey = baseKey
-			if ls.viewKeys[baseKey] > 0 {
-				viewKey = fmt.Sprintf("%s_%d", baseKey, ls.viewKeys[baseKey])
-			}
-		}
-		ls.viewKeys[viewKey]++
-
+		viewKey, scope, title := ls.parseViewHeader(s)
 		if title == "" {
 			title = viewKey
 		}
 
 		v := model.View{Title: title, Scope: scope, Include: []string{"*"}}
-
-		for _, bs := range s.body {
-			switch bs.keyword {
-			case "title":
-				if len(bs.args) > 0 {
-					v.Title = bs.args[0]
-				}
-			case "description":
-				if len(bs.args) > 0 {
-					v.Description = bs.args[0]
-				}
-			case "include":
-				if len(bs.args) == 1 && bs.args[0] == "*" {
-					v.Include = []string{"*"}
-				} else {
-					v.Include = nil
-					for _, arg := range bs.args {
-						if arg == "*" {
-							v.Include = []string{"*"}
-							break
-						}
-						v.Include = append(v.Include, ls.resolveVar(arg))
-					}
-				}
-			case "exclude":
-				for _, arg := range bs.args {
-					v.Exclude = append(v.Exclude, ls.resolveVar(arg))
-				}
-			}
-		}
+		ls.applyViewBody(&v, s.Body)
 
 		ls.views[viewKey] = v
+	}
+}
+
+// parseViewHeader parses a "view <key> [of <element>] [title]" statement's
+// header arguments and computes its (deduplicated) view key.
+func (ls *lc4State) parseViewHeader(s dsl.Stmt) (viewKey, scope, title string) {
+	// LikeC4: view <key> [of <element>] { ... }
+	// args can be: ["key"], ["key", "of", "element"], or ["key", "of", "element", "title"]
+	args := s.Args
+	if len(args) > 0 {
+		viewKey = args[0]
+		args = args[1:]
+	}
+
+	// Check for "of" keyword
+	if len(args) >= 2 && args[0] == "of" {
+		scope = ls.resolveVar(args[1])
+		args = args[2:]
+	}
+
+	title = strings.Join(args, " ")
+
+	if viewKey == "" {
+		viewKey = ls.nextAnonymousViewKey(scope)
+	}
+	ls.viewKeys[viewKey]++
+
+	return viewKey, scope, title
+}
+
+// nextAnonymousViewKey computes a deduplicated view key for a view statement
+// with no explicit key, based on its scope (or "view" if unscoped).
+func (ls *lc4State) nextAnonymousViewKey(scope string) string {
+	baseKey := "view"
+	if scope != "" {
+		baseKey = scope
+	}
+	viewKey := baseKey
+	if ls.viewKeys[baseKey] > 0 {
+		viewKey = fmt.Sprintf("%s_%d", baseKey, ls.viewKeys[baseKey])
+	}
+	return viewKey
+}
+
+// applyViewBody applies a view's body statements (title, description,
+// include, exclude) to v.
+func (ls *lc4State) applyViewBody(v *model.View, body []dsl.Stmt) {
+	for _, bs := range body {
+		switch bs.Keyword {
+		case "title":
+			if len(bs.Args) > 0 {
+				v.Title = bs.Args[0]
+			}
+		case "description":
+			if len(bs.Args) > 0 {
+				v.Description = bs.Args[0]
+			}
+		case "include":
+			ls.applyViewInclude(v, bs.Args)
+		case "exclude":
+			for _, arg := range bs.Args {
+				v.Exclude = append(v.Exclude, ls.resolveVar(arg))
+			}
+		}
+	}
+}
+
+// applyViewInclude sets v.Include from an "include" statement's arguments.
+func (ls *lc4State) applyViewInclude(v *model.View, args []string) {
+	if len(args) == 1 && args[0] == "*" {
+		v.Include = []string{"*"}
+		return
+	}
+	v.Include = nil
+	for _, arg := range args {
+		if arg == "*" {
+			v.Include = []string{"*"}
+			return
+		}
+		v.Include = append(v.Include, ls.resolveVar(arg))
 	}
 }
 
@@ -622,26 +311,6 @@ func (ls *lc4State) updateSpecWithContainers() {
 			ls.spec[kind] = ek
 		}
 	}
-}
-
-func slugify(s string) string {
-	s = strings.ToLower(s)
-	var sb strings.Builder
-	prevUnderscore := false
-	for _, r := range s {
-		if unicode.IsLetter(r) || unicode.IsDigit(r) {
-			sb.WriteRune(r)
-			prevUnderscore = false
-		} else if !prevUnderscore && sb.Len() > 0 {
-			sb.WriteRune('_')
-			prevUnderscore = true
-		}
-	}
-	result := strings.TrimRight(sb.String(), "_")
-	if result == "" {
-		return "element"
-	}
-	return result
 }
 
 // ─── Public API ──────────────────────────────────────────────────────────────
@@ -669,8 +338,8 @@ func importSource(src string) (*importer.ImportResult, error) {
 		return nil, fmt.Errorf("tokenize: %w", err)
 	}
 
-	p := &dslParser{toks: toks}
-	stmts, err := p.parseAll()
+	p := &dsl.Parser{Toks: toks}
+	stmts, err := dsl.ParseAllStmts(p)
 	if err != nil {
 		return nil, fmt.Errorf("parse: %w", err)
 	}
@@ -678,13 +347,13 @@ func importSource(src string) (*importer.ImportResult, error) {
 	ls := newLC4State()
 
 	for _, s := range stmts {
-		switch s.keyword {
+		switch s.Keyword {
 		case "specification":
-			ls.processSpecification(s.body)
+			ls.processSpecification(s.Body)
 		case "model":
-			ls.processModelStmts(s.body, "", "", ls.elements)
+			ls.processModelStmts(s.Body, "", "", ls.elements)
 		case "views":
-			ls.processViews(s.body)
+			ls.processViews(s.Body)
 		}
 	}
 

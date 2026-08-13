@@ -204,41 +204,49 @@ func parseElem(dec *xml.Decoder, se xml.StartElement, depth int) (*xmiElem, erro
 		}
 		switch t := tok.(type) {
 		case xml.StartElement:
-			// xmi:Extension wraps EA-specific data; extract stereotype, then skip the block
-			if t.Name.Local == "Extension" {
-				stereo, err := extractStereotype(dec)
-				if err != nil {
-					return nil, err
-				}
-				if stereo != "" && e.Stereotype == "" {
-					e.Stereotype = stereo
-				}
-				continue
-			}
-			// Direct stereotype element (outside Extension, less common)
-			if t.Name.Local == "stereotype" {
-				// EA XMI 2.1 uses stereotype="…"; other tools use name="…"
-				name := attrVal(t.Attr, "name")
-				if name == "" {
-					name = attrVal(t.Attr, "stereotype")
-				}
-				if name != "" && e.Stereotype == "" {
-					e.Stereotype = name
-				}
-				if err := dec.Skip(); err != nil {
-					return nil, err
-				}
-				continue
-			}
-			child, err := parseElem(dec, t, depth+1)
-			if err != nil {
+			if err := handleElemStartElement(dec, e, t, depth); err != nil {
 				return nil, err
 			}
-			e.Children = append(e.Children, child)
 		case xml.EndElement:
 			return e, nil
 		}
 	}
+}
+
+// handleElemStartElement processes a single child StartElement token within
+// parseElem's loop: an Extension or stereotype tag sets e.Stereotype and is
+// otherwise skipped; anything else is recursively parsed as a child element
+// and appended to e.Children.
+func handleElemStartElement(dec *xml.Decoder, e *xmiElem, t xml.StartElement, depth int) error {
+	// xmi:Extension wraps EA-specific data; extract stereotype, then skip the block
+	if t.Name.Local == "Extension" {
+		stereo, err := extractStereotype(dec)
+		if err != nil {
+			return err
+		}
+		if stereo != "" && e.Stereotype == "" {
+			e.Stereotype = stereo
+		}
+		return nil
+	}
+	// Direct stereotype element (outside Extension, less common)
+	if t.Name.Local == "stereotype" {
+		// EA XMI 2.1 uses stereotype="…"; other tools use name="…"
+		name := attrVal(t.Attr, "name")
+		if name == "" {
+			name = attrVal(t.Attr, "stereotype")
+		}
+		if name != "" && e.Stereotype == "" {
+			e.Stereotype = name
+		}
+		return dec.Skip()
+	}
+	child, err := parseElem(dec, t, depth+1)
+	if err != nil {
+		return err
+	}
+	e.Children = append(e.Children, child)
+	return nil
 }
 
 // extractStereotype reads the content of an already-opened xmi:Extension element
@@ -254,11 +262,8 @@ func extractStereotype(dec *xml.Decoder) (string, error) {
 		switch t := tok.(type) {
 		case xml.StartElement:
 			depth++
-			if t.Name.Local == "stereotype" && stereo == "" {
-				stereo = attrVal(t.Attr, "name")
-				if stereo == "" {
-					stereo = attrVal(t.Attr, "stereotype") // EA XMI 2.1 variant
-				}
+			if stereo == "" {
+				stereo = stereotypeAttr(t)
 			}
 		case xml.EndElement:
 			if depth == 0 {
@@ -267,6 +272,19 @@ func extractStereotype(dec *xml.Decoder) (string, error) {
 			depth--
 		}
 	}
+}
+
+// stereotypeAttr returns t's stereotype name if t is a "stereotype" element,
+// checking both the "name" attribute and the EA XMI 2.1 "stereotype" variant.
+// Returns "" if t is not a stereotype element or has neither attribute.
+func stereotypeAttr(t xml.StartElement) string {
+	if t.Name.Local != "stereotype" {
+		return ""
+	}
+	if name := attrVal(t.Attr, "name"); name != "" {
+		return name
+	}
+	return attrVal(t.Attr, "stereotype")
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
@@ -421,11 +439,7 @@ func (s *convState) collectElem(
 	}
 
 	// Add kind to specification if new
-	if _, exists := bsModel.Specification.Elements[kind]; !exists {
-		bsModel.Specification.Elements[kind] = model.ElementKind{
-			Notation: titleCase(kind),
-		}
-	}
+	s.registerSpecKind(bsModel, kind)
 
 	// Build element
 	elem := model.Element{
@@ -440,11 +454,7 @@ func (s *convState) collectElem(
 	}
 	if len(childMap) > 0 {
 		elem.Children = childMap
-		// Mark this kind as a container in the specification — derived from the XMI hierarchy.
-		if ks, ok := bsModel.Specification.Elements[kind]; ok && !ks.Container {
-			ks.Container = true
-			bsModel.Specification.Elements[kind] = ks
-		}
+		markSpecKindAsContainer(bsModel, kind)
 	}
 
 	// Store in target map with local key only
@@ -453,6 +463,25 @@ func (s *convState) collectElem(
 		mapKey = bsPath[len(parentPath)+1:]
 	}
 	target[mapKey] = elem
+}
+
+// registerSpecKind adds kind to the specification if it hasn't been seen yet.
+func (s *convState) registerSpecKind(bsModel *model.BausteinsichtModel, kind string) {
+	if _, exists := bsModel.Specification.Elements[kind]; !exists {
+		bsModel.Specification.Elements[kind] = model.ElementKind{
+			Notation: titleCase(kind),
+		}
+	}
+}
+
+// markSpecKindAsContainer marks kind as a container in the specification —
+// derived from the XMI hierarchy (an element of this kind was found to have
+// children).
+func markSpecKindAsContainer(bsModel *model.BausteinsichtModel, kind string) {
+	if ks, ok := bsModel.Specification.Elements[kind]; ok && !ks.Container {
+		ks.Container = true
+		bsModel.Specification.Elements[kind] = ks
+	}
 }
 
 // collectRel converts one XMI relationship to a Bausteinsicht Relationship.
