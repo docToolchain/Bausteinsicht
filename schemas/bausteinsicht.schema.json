@@ -61,6 +61,18 @@
   ],
   "additionalProperties": false,
   "definitions": {
+    "CodeMapping": {
+      "additionalProperties": false,
+      "properties": {
+        "packages": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
     "Config": {
       "additionalProperties": false,
       "properties": {
@@ -224,6 +236,12 @@
         "children": {
           "additionalProperties": {
             "$ref": "#/definitions/Element"
+          },
+          "type": "object"
+        },
+        "codeMapping": {
+          "additionalProperties": {
+            "$ref": "#/definitions/CodeMapping"
           },
           "type": "object"
         },

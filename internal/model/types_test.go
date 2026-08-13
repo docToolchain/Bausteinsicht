@@ -67,6 +67,48 @@ func TestJSONRoundTrip(t *testing.T) {
 	}
 }
 
+// TestElement_CodeMapping_JSONRoundTrip verifies the per-backend keyed shape
+// (element → {backend → packages}) round-trips through JSON, so a polyglot
+// model can carry a Java and a Go code anchor on the same element without
+// collision. See #562 R5, #572 R6.
+func TestElement_CodeMapping_JSONRoundTrip(t *testing.T) {
+	original := Element{
+		Kind:  "container",
+		Title: "Order API",
+		CodeMapping: map[string]CodeMapping{
+			"java": {Packages: []string{"com.acme.backend.orders.."}},
+			"go":   {Packages: []string{"github.com/acme/orders/..."}},
+		},
+	}
+
+	data, err := json.Marshal(original)
+	if err != nil {
+		t.Fatalf("marshal failed: %v", err)
+	}
+
+	var restored Element
+	if err := json.Unmarshal(data, &restored); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+
+	if !reflect.DeepEqual(original, restored) {
+		t.Errorf("round-trip mismatch:\noriginal: %+v\nrestored: %+v", original, restored)
+	}
+}
+
+// TestElement_CodeMapping_OmittedWhenAbsent ensures elements without a
+// codeMapping don't grow a stray "codeMapping": null/{} in the serialized
+// JSONC, keeping existing models byte-for-byte unaffected by this addition.
+func TestElement_CodeMapping_OmittedWhenAbsent(t *testing.T) {
+	data, err := json.Marshal(Element{Kind: "actor", Title: "Customer"})
+	if err != nil {
+		t.Fatalf("marshal failed: %v", err)
+	}
+	if strings.Contains(string(data), "codeMapping") {
+		t.Errorf("expected no codeMapping key when unset, got: %s", data)
+	}
+}
+
 func TestDeserializeSampleModel(t *testing.T) {
 	raw, err := os.ReadFile("../../templates/sample-model.jsonc")
 	if err != nil {

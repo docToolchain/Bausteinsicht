@@ -50,6 +50,7 @@ class TagDefinition
 class PatternDefinition
 class DecisionRecord
 class DocLink
+class CodeMapping
 class Element
 class Relationship
 class View
@@ -75,6 +76,7 @@ Element *-- "0..*" Element : children
 Element ..> ElementKind : kind
 Element ..> DecisionRecord : decisions
 Element *-- "0..*" DocLink : docLinks
+Element *-- "0..*" CodeMapping : codeMapping
 
 Relationship ..> Element : from / to
 Relationship ..> RelationshipKind : kind
@@ -281,6 +283,11 @@ The model has these top-level sections. `specification`, `model`, `relationships
 | DocLink[]
 | no
 | Typed documentation links (arc42 chapter, ADR, PRD/persona, spec, ...), rendered as clickable icons next to the element in HTML/SVG export — independent of `link`/`decisions`, which also get their own icons. See <<DocLink Properties>> and ADR-009's "Extension: Doc/ADR Drilldown Icons (#543)".
+
+| `codeMapping`
+| object (backend → CodeMapping)
+| no
+| Anchors this element to real code, keyed per code-governance backend (e.g. `"java"`) so a polyglot element doesn't collide across languages. Consumed by the code-governance bridge (`import-graph`, forward rule generation) — not yet by any shipped command. See <<CodeMapping Properties>> and ADR-013.
 |===
 
 The **key** of each element in the model object (e.g., `"customer"`, `"api"`) serves as its unique ID.
@@ -310,6 +317,34 @@ A `DocLink` is a typed link to an external documentation artifact, usable on bot
 | no
 | Icon tooltip text. Defaults to `type` when omitted.
 |===
+
+[[CodeMapping Properties]]
+==== CodeMapping Properties
+
+`Element.codeMapping` is an object keyed by backend name (e.g. `"java"`, `"go"`), each value a `CodeMapping`:
+
+[cols="1,1,1,3"]
+|===
+| Property | Type | Required | Description
+
+| `packages`
+| string[]
+| no
+| Backend-native package/namespace/module prefixes belonging to this element, prefix-matched the way ArchUnit's package matcher works (e.g. `"com.acme.backend.orders.."`).
+|===
+
+[source,jsonc]
+----
+"orders": {
+  "kind": "container",
+  "title": "Order API",
+  "codeMapping": {
+    "java": { "packages": ["com.acme.backend.orders.."] }
+  }
+}
+----
+
+Keying per backend (rather than a flat `packages` list) lets one element carry mappings for more than one language without collision — e.g. a service with both a Java implementation and a generated .NET client. See ADR-013 for the design and staging of the code-governance bridge this field anchors.
 
 [[element-lifecycle]]
 ==== Element Lifecycle
