@@ -22,20 +22,15 @@
 # Requirements:
 #   - `bausteinsicht` binary on PATH, or built via `make build` first
 #   - `plantuml` CLI (already required elsewhere in this repo, e.g. for
-#     PDF/HTML builds via asciidoctor-diagram) for the optional PNG step
+#     PDF/HTML builds via asciidoctor-diagram) for the optional SVG step
 #
 # What it does:
 #   1. `export-sequence --diagram-format plantuml --output <dir>` ->
 #      src/docs/arc42/sequence-<key>.puml, one per `dynamicViews` entry
 #   2. If `plantuml` is on PATH: renders each .puml to
-#      src/docs/images/arc42/architecture-sequence-<key>.png
-#
-# NOTE: as of #535, architecture.jsonc has zero `dynamicViews` defined —
-# chapter 6's scenarios are still hand-written. This script is the
-# generation mechanism; migrating each existing/missing scenario into
-# `dynamicViews` (so it actually produces output, and so 06_runtime_view.adoc
-# can include:: the generated .puml instead of embedding PlantUML source) is
-# separate content-authoring work tracked in #535.
+#      src/docs/images/arc42/architecture-sequence-<key>.svg (#560: SVG over
+#      PNG — scales without quality loss, keeps text selectable, GitHub's
+#      AsciiDoc blob preview renders committed SVGs referenced via image::)
 
 set -euo pipefail
 
@@ -82,25 +77,25 @@ fi
 echo "==> Regenerating sequence-*.puml files ($view_count view(s))..." >&2
 "$BIN" export-sequence --model "$MODEL" --diagram-format plantuml --output "$PUML_DIR" >&2
 
-# ── 2. PNG diagrams (local plantuml CLI, no draw.io/xvfb needed) ───────────
+# ── 2. SVG diagrams (local plantuml CLI, no draw.io/xvfb needed) ───────────
 if ! command -v plantuml >/dev/null 2>&1; then
-  echo "==> WARNING: no 'plantuml' CLI found — skipping PNG export." >&2
+  echo "==> WARNING: no 'plantuml' CLI found — skipping SVG export." >&2
   echo "    .puml sources were still regenerated." >&2
 else
-  echo "==> Regenerating PNG diagrams..." >&2
+  echo "==> Regenerating SVG diagrams..." >&2
   mkdir -p "$IMAGES_DIR"
   for puml in "$PUML_DIR"/sequence-*.puml; do
     [ -f "$puml" ] || continue
-    plantuml -tpng -o "$ROOT/$IMAGES_DIR" "$puml"
+    plantuml -tsvg -o "$ROOT/$IMAGES_DIR" "$puml"
     base="$(basename "$puml" .puml)"
     # plantuml names its output after the `@startuml <name>` directive
     # inside the file, not the source filename — and that name has
     # dashes/dots replaced with underscores (sanitizeID in
     # internal/diagram), so a view key like "as-is-vs-to-be" produces
-    # `as_is_vs_to_be.png`, not `sequence-as-is-vs-to-be.png`.
+    # `as_is_vs_to_be.svg`, not `sequence-as-is-vs-to-be.svg`.
     startuml_name="$(grep -m1 -oP '^@startuml \K\S+' "$puml")"
-    src="$IMAGES_DIR/$startuml_name.png"
-    dst="$IMAGES_DIR/architecture-$base.png"
+    src="$IMAGES_DIR/$startuml_name.svg"
+    dst="$IMAGES_DIR/architecture-$base.svg"
     if [ -f "$src" ]; then
       mv "$src" "$dst"
       echo "    $dst" >&2

@@ -41,7 +41,7 @@ ifndef::imagesdir[:imagesdir: ../../images]
 
 Bausteinsicht follows a **pipes-and-filters** architecture with a clear separation between data formats:
 
-[plantuml, solution-decomposition, png]
+[plantuml, solution-decomposition, svg]
 ....
 @startuml
 !include <C4/C4_Container>

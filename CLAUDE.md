@@ -17,6 +17,7 @@ Architecture-as-code tool with draw.io as visual frontend and bidirectional sync
 - PRD path: `src/docs/PRD/`
 - Spec path: `src/docs/spec/`
 - Security reports: `src/docs/security/` (fortlaufend, mit Changelog)
+- Diagrams: embed PlantUML as **SVG**, not PNG — `[plantuml, <id>, svg]` for inline blocks, `--image-format svg` for committed arc42 diagrams (`export`/`generate-arc42-docs.sh`/`generate-arc42-sequences.sh`). SVG scales without quality loss and GitHub's AsciiDoc blob preview renders committed SVGs referenced via `image::` (#560).
 
 ### Technology Stack
 - Implementation language: **Go** (ADR-002)

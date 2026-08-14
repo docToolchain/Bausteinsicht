@@ -24,7 +24,7 @@ Your hand-tuned positions survive. Sync moves nothing you have arranged; it only
 
 The **Container View** drills one level deeper — the containers inside the Online Shop boundary, with the external systems they talk to. This, too, comes straight from the model:
 
-[plantuml, tutorial-containers, png]
+[plantuml, tutorial-containers, svg]
 ....
 @startuml
 !include <C4/C4_Container>

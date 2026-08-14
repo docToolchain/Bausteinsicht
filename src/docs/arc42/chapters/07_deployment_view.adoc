@@ -14,7 +14,7 @@ ifndef::imagesdir[:imagesdir: ../../images]
 
 Bausteinsicht is a single-binary CLI tool that runs on the developer's local machine. There is no server, no database, and no network communication at runtime.
 
-[plantuml, deployment-overview, png]
+[plantuml, deployment-overview, svg]
 ....
 @startuml
 skinparam shadowing false

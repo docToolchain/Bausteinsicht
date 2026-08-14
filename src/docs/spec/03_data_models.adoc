@@ -35,7 +35,7 @@ Bausteinsicht works with three data formats that must be kept in sync:
 
 The JSON model is a tree of entities rooted at `BausteinsichtModel`. The diagram shows composition (filled diamond — the parent owns the child) and references (dashed arrow — one entity refers to another **by ID**). Cardinalities use UML notation.
 
-[plantuml, model-entity-model, png]
+[plantuml, model-entity-model, svg]
 ....
 @startuml
 hide circle
@@ -316,7 +316,7 @@ A `DocLink` is a typed link to an external documentation artifact, usable on bot
 
 An element's optional `status` follows this intended progression (the `status` command groups elements by it):
 
-[plantuml, element-lifecycle, png]
+[plantuml, element-lifecycle, svg]
 ....
 @startuml
 hide empty description

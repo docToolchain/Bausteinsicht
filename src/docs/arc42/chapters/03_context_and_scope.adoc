@@ -19,7 +19,7 @@ Bausteinsicht sits between the architecture model (JSON files) and draw.io diagr
 
 The following activity diagram shows how Bausteinsicht fits into the daily architecture workflow. The architect chooses between editing the text model or the visual diagram — Bausteinsicht synchronizes both directions.
 
-[plantuml, business-context-process, png]
+[plantuml, business-context-process, svg]
 ....
 @startuml
 skinparam shadowing false
@@ -79,7 +79,7 @@ stop
 
 The core loop above covers day-to-day editing. Bausteinsicht's other ~30 commands enter or feed off that loop at specific points rather than replacing it — grouped here by where they attach, not detailed step-by-step (chapter 6's Runtime View has the sequence diagrams for that level of detail, themselves generated via `bausteinsicht export-sequence` from `dynamicViews` in `architecture.jsonc`).
 
-[plantuml, business-context-extended, png]
+[plantuml, business-context-extended, svg]
 ....
 @startuml
 skinparam shadowing false
@@ -121,7 +121,7 @@ stop
 ==== System Context
 
 .System Context (generated from architecture model)
-image::arc42/architecture-context.png[System Context,width=80%]
+image::arc42/architecture-context.svg[System Context,width=80%]
 
 include::context-elements.adoc[]
 
