@@ -502,14 +502,15 @@ func addRelationshipToAdjacency(
 //  3. Row N: elements connected to row N-1
 //  4. Remaining: any unconnected elements at the end
 //
-// Within each row, the next element is chosen by adjacency to the last
-// placed element (greedy neighbor selection), with alphabetical fallback.
+// Row *membership* only; within-row order is decided afterwards by
+// minimizeCrossings, which needs every row assigned first so it can weigh
+// each row against both of its neighbors.
 func assignBFSRows(ids []string, adj map[string]map[string]bool, connectedToActor map[string]bool) [][]string {
 	placed := make(map[string]bool)
 	var rows [][]string
 
 	if row0 := seedActorRow(ids, connectedToActor, placed); len(row0) > 0 {
-		rows = append(rows, orderByAdjacency(row0, adj))
+		rows = append(rows, row0)
 	}
 
 	// Subsequent rows: BFS from previous row.
@@ -518,7 +519,7 @@ func assignBFSRows(ids []string, adj map[string]map[string]bool, connectedToActo
 		if len(nextRow) == 0 {
 			break
 		}
-		rows = append(rows, orderByAdjacency(nextRow, adj))
+		rows = append(rows, nextRow)
 	}
 
 	// Remaining: elements not reached by BFS (no relationships).
@@ -526,7 +527,7 @@ func assignBFSRows(ids []string, adj map[string]map[string]bool, connectedToActo
 		rows = append(rows, remaining)
 	}
 
-	return rows
+	return minimizeCrossings(rows, adj)
 }
 
 // seedActorRow returns, sorted, the ids directly or indirectly connected to
@@ -622,54 +623,166 @@ func placeBFSRows(
 	return contentWidth, contentHeight
 }
 
-// orderByAdjacency reorders elements so that each next element is a neighbor
-// of the previously placed one (greedy). Falls back to original order.
-func orderByAdjacency(ids []string, adj map[string]map[string]bool) []string {
-	if len(ids) <= 1 {
-		return ids
+// minimizeCrossings reorders elements *within* each row (row membership is
+// unchanged — only the left-to-right position within a row moves) to reduce
+// edge crossings between adjacent rows. Uses the barycenter method from
+// Sugiyama-style layered graph drawing: repeatedly sweep top-down and
+// bottom-up, reordering each row by the average position of its neighbors
+// in the already-reordered adjacent row (see sortByBarycenter). Barycenter
+// sweeps are not guaranteed to strictly improve every iteration, so this
+// tracks total crossings (countCrossings) across all sweeps — including the
+// untouched input — and returns whichever arrangement had the fewest.
+//
+// #607: replaces the previous greedy orderByAdjacency, which only chained
+// each row's own elements to each other and never considered where a row's
+// neighbors actually sit in the adjacent row — it could not reduce
+// crossings between rows, only within one.
+func minimizeCrossings(rows [][]string, adj map[string]map[string]bool) [][]string {
+	if len(rows) <= 1 {
+		return rows
 	}
 
-	remaining := make(map[string]bool, len(ids))
-	for _, id := range ids {
-		remaining[id] = true
-	}
+	best := copyRows(rows)
+	bestCrossings := countCrossings(best, adj)
 
-	result := make([]string, 0, len(ids))
-	// Start with the first element (alphabetically).
-	current := ids[0]
-	result = append(result, current)
-	delete(remaining, current)
-
-	for len(remaining) > 0 {
-		// Find a neighbor of current that is in remaining.
-		var next string
-		var candidates []string
-		for neighbor := range adj[current] {
-			if remaining[neighbor] {
-				candidates = append(candidates, neighbor)
+	current := copyRows(rows)
+	const sweeps = 4
+	for s := 0; s < sweeps; s++ {
+		if s%2 == 0 {
+			for i := 1; i < len(current); i++ {
+				current[i] = sortByBarycenter(current[i], current[i-1], adj)
 			}
-		}
-		if len(candidates) > 0 {
-			sort.Strings(candidates)
-			next = candidates[0]
 		} else {
-			// No neighbor found — pick alphabetically first remaining.
-			var fallback []string
-			for id := range remaining {
-				fallback = append(fallback, id)
+			for i := len(current) - 2; i >= 0; i-- {
+				current[i] = sortByBarycenter(current[i], current[i+1], adj)
 			}
-			if len(fallback) == 0 {
-				break
-			}
-			sort.Strings(fallback)
-			next = fallback[0]
 		}
-		result = append(result, next)
-		delete(remaining, next)
-		current = next
+		if c := countCrossings(current, adj); c < bestCrossings {
+			bestCrossings = c
+			best = copyRows(current)
+		}
 	}
 
+	return best
+}
+
+// copyRows returns a deep copy of rows so sweep iterations can be mutated
+// freely without disturbing the caller's original (needed as the "best so
+// far" baseline in minimizeCrossings).
+func copyRows(rows [][]string) [][]string {
+	out := make([][]string, len(rows))
+	for i, row := range rows {
+		out[i] = append([]string(nil), row...)
+	}
+	return out
+}
+
+// sortByBarycenter reorders row by the average position of each element's
+// neighbors (per adj) in refRow. Elements with no neighbor in refRow have no
+// signal to sort by, so they sort by their own original index — keeping
+// them close to where they already were rather than letting them drift to
+// an arbitrary edge on every sweep.
+func sortByBarycenter(row, refRow []string, adj map[string]map[string]bool) []string {
+	refPos := make(map[string]int, len(refRow))
+	for i, id := range refRow {
+		refPos[id] = i
+	}
+	origPos := make(map[string]int, len(row))
+	for i, id := range row {
+		origPos[id] = i
+	}
+
+	type scored struct {
+		id    string
+		score float64
+	}
+	scoredRow := make([]scored, len(row))
+	for i, id := range row {
+		sum, count := 0, 0
+		for neighbor := range adj[id] {
+			if pos, ok := refPos[neighbor]; ok {
+				sum += pos
+				count++
+			}
+		}
+		if count > 0 {
+			scoredRow[i] = scored{id: id, score: float64(sum) / float64(count)}
+		} else {
+			scoredRow[i] = scored{id: id, score: float64(origPos[id])}
+		}
+	}
+
+	sort.SliceStable(scoredRow, func(a, b int) bool { return scoredRow[a].score < scoredRow[b].score })
+
+	result := make([]string, len(row))
+	for i, s := range scoredRow {
+		result[i] = s.id
+	}
 	return result
+}
+
+// countCrossings sums, over every pair of adjacent rows, the number of edge
+// pairs that cross when drawn as straight lines between the two rows — the
+// standard adjacent-layer crossing count used to evaluate layered graph
+// drawings.
+func countCrossings(rows [][]string, adj map[string]map[string]bool) int {
+	total := 0
+	for i := 0; i < len(rows)-1; i++ {
+		total += countCrossingsBetweenRows(rows[i], rows[i+1], adj)
+	}
+	return total
+}
+
+// countCrossingsBetweenRows counts crossings among edges strictly between
+// upper and lower (edges within a single row, or elsewhere in the graph,
+// are out of scope here — those aren't drawn between these two rows).
+// Two edges (u1,l1) and (u2,l2), u1 before u2 in upper, cross iff their
+// lower endpoints are in the opposite order (l1 after l2).
+func countCrossingsBetweenRows(upper, lower []string, adj map[string]map[string]bool) int {
+	return countPairwiseCrossings(collectRowEdges(upper, lower, adj))
+}
+
+// rowEdge is one edge between a row-index in the upper row and a row-index
+// in the lower row (positions, not element IDs — crossing detection only
+// needs relative order).
+type rowEdge struct{ u, l int }
+
+// collectRowEdges finds every adjacency between upper and lower and records
+// it as a (upper-index, lower-index) pair.
+func collectRowEdges(upper, lower []string, adj map[string]map[string]bool) []rowEdge {
+	lowerPos := make(map[string]int, len(lower))
+	for i, id := range lower {
+		lowerPos[id] = i
+	}
+
+	var edges []rowEdge
+	for ui, u := range upper {
+		for neighbor := range adj[u] {
+			if li, ok := lowerPos[neighbor]; ok {
+				edges = append(edges, rowEdge{u: ui, l: li})
+			}
+		}
+	}
+	return edges
+}
+
+// countPairwiseCrossings counts how many pairs of edges cross: (u1,l1) and
+// (u2,l2) with u1 before u2 cross iff their lower endpoints are inverted
+// (l1 after l2).
+func countPairwiseCrossings(edges []rowEdge) int {
+	crossings := 0
+	for i := 0; i < len(edges); i++ {
+		for j := i + 1; j < len(edges); j++ {
+			if edgesCross(edges[i], edges[j]) {
+				crossings++
+			}
+		}
+	}
+	return crossings
+}
+
+func edgesCross(a, b rowEdge) bool {
+	return (a.u < b.u && a.l > b.l) || (a.u > b.u && a.l < b.l)
 }
 
 // resolveToScopeChild resolves an element ID to a scope child ID.
