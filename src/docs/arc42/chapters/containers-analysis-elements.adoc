@@ -1,0 +1,45 @@
+[cols="2,1,1,3"]
+|===
+| Element | Kind | Technology | Description
+
+| CLI
+| container
+| Go / Cobra
+| Command-line interface providing validate, sync, export, and watch commands
+
+| Constraints
+| container
+| Go
+| Validation constraints for model linting and consistency checking
+
+| Graph
+| container
+| Go
+| Relationship graph analysis — cycle detection and dependency depth
+
+| Health
+| container
+| Go
+| Architecture health scoring — completeness, conformance, and complexity
+
+| Model
+| container
+| Go
+| JSONC architecture model management — loading, validation, and mutation
+
+| Overlay
+| container
+| Go
+| Metric heatmap overlay application and removal on draw.io diagrams
+
+| Search
+| container
+| Go
+| Element and relationship search with filtering and pattern matching
+
+| Stale
+| container
+| Go
+| Detects unused or forgotten architecture elements via git history and ADR/status metadata
+
+|===

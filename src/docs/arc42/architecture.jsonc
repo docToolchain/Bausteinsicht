@@ -888,6 +888,64 @@
       ],
       "description": "Internal containers of Bausteinsicht with external actor interactions"
     },
+    "containers-sync": {
+      "title": "Sync Core Containers",
+      "scope": "bausteinsicht",
+      "include": [
+        "bausteinsicht.cli",
+        "bausteinsicht.model",
+        "bausteinsicht.sync",
+        "bausteinsicht.drawio",
+        "bausteinsicht.watcher",
+        "bausteinsicht.template"
+      ],
+      "description": "The bidirectional sync loop: CLI, model, drawio, sync engine, watcher, and template resolution"
+    },
+    "containers-io": {
+      "title": "Export & Import Containers",
+      "scope": "bausteinsicht",
+      "include": [
+        "bausteinsicht.cli",
+        "bausteinsicht.model",
+        "bausteinsicht.export",
+        "bausteinsicht.exporter",
+        "bausteinsicht.importer",
+        "bausteinsicht.diagram",
+        "bausteinsicht.table",
+        "bausteinsicht.lsp"
+      ],
+      "description": "Containers reading and writing external formats: images, DSLs, text diagrams, tables, and the language server"
+    },
+    "containers-analysis": {
+      "title": "Analysis & Governance Containers",
+      "scope": "bausteinsicht",
+      "include": [
+        "bausteinsicht.cli",
+        "bausteinsicht.model",
+        "bausteinsicht.graph",
+        "bausteinsicht.health",
+        "bausteinsicht.stale",
+        "bausteinsicht.constraints",
+        "bausteinsicht.search",
+        "bausteinsicht.overlay"
+      ],
+      "description": "Read-only architecture-quality containers: dependency graph analysis, health scoring, stale-element detection, constraint linting, search, and metric overlays"
+    },
+    "containers-evolution": {
+      "title": "Evolution & Tooling Containers",
+      "scope": "bausteinsicht",
+      "include": [
+        "bausteinsicht.cli",
+        "bausteinsicht.model",
+        "bausteinsicht.changelog",
+        "bausteinsicht.diff",
+        "bausteinsicht.snapshot",
+        "bausteinsicht.workspace",
+        "bausteinsicht.schema",
+        "bausteinsicht.layout"
+      ],
+      "description": "Versioning and tooling containers: changelog, as-is/to-be diff, snapshots, multi-model workspaces, JSON Schema generation, and auto-layout"
+    },
     "context": {
       "title": "System Context",
       "include": [

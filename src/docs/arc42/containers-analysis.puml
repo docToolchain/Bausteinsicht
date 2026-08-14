@@ -1,0 +1,31 @@
+@startuml
+!include <C4/C4_Container>
+
+System_Boundary(bausteinsicht, "Bausteinsicht") {
+  Container(bausteinsicht_cli, "CLI", "Go / Cobra", "Command-line interface providing validate, sync, export, and watch commands")
+  Container(bausteinsicht_constraints, "Constraints", "Go", "Validation constraints for model linting and consistency checking")
+  Container(bausteinsicht_graph, "Graph", "Go", "Relationship graph analysis — cycle detection and dependency depth")
+  Container(bausteinsicht_health, "Health", "Go", "Architecture health scoring — completeness, conformance, and complexity")
+  Container(bausteinsicht_model, "Model", "Go", "JSONC architecture model management — loading, validation, and mutation")
+  Container(bausteinsicht_overlay, "Overlay", "Go", "Metric heatmap overlay application and removal on draw.io diagrams")
+  Container(bausteinsicht_search, "Search", "Go", "Element and relationship search with filtering and pattern matching")
+  Container(bausteinsicht_stale, "Stale", "Go", "Detects unused or forgotten architecture elements via git history and ADR/status metadata")
+}
+
+Rel(bausteinsicht_cli, bausteinsicht_model, "loads/saves JSONC")
+Rel(bausteinsicht_cli, bausteinsicht, "triggers sync")
+Rel(bausteinsicht_cli, bausteinsicht_search, "searches elements")
+Rel(bausteinsicht_cli, bausteinsicht_constraints, "validates constraints")
+Rel(bausteinsicht_cli, bausteinsicht_graph, "triggers graph analysis")
+Rel(bausteinsicht_cli, bausteinsicht_health, "triggers health scoring")
+Rel(bausteinsicht_cli, bausteinsicht_overlay, "triggers overlay apply/remove")
+Rel(bausteinsicht_cli, bausteinsicht_stale, "triggers stale-element detection")
+Rel(bausteinsicht, bausteinsicht_model, "comment-preserving updates")
+Rel(bausteinsicht_search, bausteinsicht_model, "searches elements")
+Rel(bausteinsicht_constraints, bausteinsicht_model, "validates model")
+Rel(bausteinsicht_graph, bausteinsicht_model, "reads elements and relationships")
+Rel(bausteinsicht_health, bausteinsicht_model, "reads elements for scoring")
+Rel(bausteinsicht_stale, bausteinsicht, "reads/writes risk-color marking")
+Rel(bausteinsicht_stale, bausteinsicht_model, "reads status/ADR metadata")
+Rel(bausteinsicht_stale, bausteinsicht_overlay, "reuses heatmap color scale")
+@enduml
