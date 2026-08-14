@@ -62,16 +62,16 @@ func updateElementPosition(doc *drawio.Document, elemID string, pos ElementPosit
 					return
 				}
 				if id, ok := getAttr(elem, "bausteinsicht_id"); ok && id == elemID {
-					// Find mxGeometry child and update coordinates
-					for _, child := range elem.ChildElements() {
-						if child.Tag == "mxGeometry" {
-							child.CreateAttr("x", fmt.Sprintf("%.0f", pos.X))
-							child.CreateAttr("y", fmt.Sprintf("%.0f", pos.Y))
-							child.CreateAttr("width", fmt.Sprintf("%.0f", pos.Width))
-							child.CreateAttr("height", fmt.Sprintf("%.0f", pos.Height))
-							found = true
-							break
-						}
+					// mxGeometry is nested inside an mxCell child, not a direct
+					// child of the <object> element itself (drawio.CreateElement
+					// always emits object > mxCell > mxGeometry) — search the
+					// whole subtree rather than only direct children.
+					if geom := findMxGeometry(elem); geom != nil {
+						geom.CreateAttr("x", fmt.Sprintf("%.0f", pos.X))
+						geom.CreateAttr("y", fmt.Sprintf("%.0f", pos.Y))
+						geom.CreateAttr("width", fmt.Sprintf("%.0f", pos.Width))
+						geom.CreateAttr("height", fmt.Sprintf("%.0f", pos.Height))
+						found = true
 					}
 				}
 			})
@@ -82,6 +82,21 @@ func updateElementPosition(doc *drawio.Document, elemID string, pos ElementPosit
 	}
 
 	return fmt.Errorf("element %s not found in diagram", elemID)
+}
+
+// findMxGeometry searches elem's subtree (not just direct children) for an
+// mxGeometry element, matching drawio.CreateElement's object > mxCell >
+// mxGeometry nesting.
+func findMxGeometry(elem *etree.Element) *etree.Element {
+	if elem.Tag == "mxGeometry" {
+		return elem
+	}
+	for _, child := range elem.ChildElements() {
+		if geom := findMxGeometry(child); geom != nil {
+			return geom
+		}
+	}
+	return nil
 }
 
 // walkElements recursively walks through all elements in the tree.
