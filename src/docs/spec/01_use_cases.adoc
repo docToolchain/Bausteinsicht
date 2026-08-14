@@ -49,7 +49,7 @@ ifndef::imagesdir[:imagesdir: ../../images]
 
 ==== Activity Diagram
 
-[plantuml, uc01-init, png]
+[plantuml, uc01-init, svg]
 ....
 @startuml
 start
@@ -102,7 +102,7 @@ stop
 
 ==== Activity Diagram
 
-[plantuml, uc02-define-elements, png]
+[plantuml, uc02-define-elements, svg]
 ....
 @startuml
 start
@@ -157,7 +157,7 @@ stop
 
 ==== Activity Diagram
 
-[plantuml, uc03-forward-sync, png]
+[plantuml, uc03-forward-sync, svg]
 ....
 @startuml
 start
@@ -229,7 +229,7 @@ stop
 
 ==== Activity Diagram
 
-[plantuml, uc04-reverse-sync, png]
+[plantuml, uc04-reverse-sync, svg]
 ....
 @startuml
 start
@@ -324,7 +324,7 @@ stop
 
 ==== Activity Diagram
 
-[plantuml, uc05-watch, png]
+[plantuml, uc05-watch, svg]
 ....
 @startuml
 start
@@ -378,7 +378,7 @@ stop
 
 ==== Activity Diagram
 
-[plantuml, uc06-llm, png]
+[plantuml, uc06-llm, svg]
 ....
 @startuml
 start
@@ -437,7 +437,7 @@ Navigation is page-based — one draw.io page per view, with generated cross-pag
 
 ==== Activity Diagram
 
-[plantuml, uc07-drilldown, png]
+[plantuml, uc07-drilldown, svg]
 ....
 @startuml
 start
@@ -501,7 +501,7 @@ stop
 
 ==== Activity Diagram
 
-[plantuml, uc08-export, png]
+[plantuml, uc08-export, svg]
 ....
 @startuml
 start

@@ -164,7 +164,7 @@ Open `architecture.drawio` in draw.io. You will find three pages — **System Co
 
 The **System Context** view of the sample model looks like this — generated entirely from the JSONC, no manual drawing:
 
-[plantuml, tutorial-context, png]
+[plantuml, tutorial-context, svg]
 ....
 @startuml
 !include <C4/C4_Context>

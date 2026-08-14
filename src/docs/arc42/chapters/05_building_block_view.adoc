@@ -13,7 +13,7 @@ ifndef::imagesdir[:imagesdir: ../../images]
 === Level 1: Overall System
 
 .Container View (generated from architecture model)
-image::arc42/architecture-containers.png[Container View,width=80%]
+image::arc42/architecture-containers.svg[Container View,width=80%]
 
 ==== Motivation
 
@@ -134,7 +134,7 @@ NOTE: `internal/chaos` (fault-injection helper), `internal/benchmarks`, and `int
 The sync engine is the most complex package. It decomposes into five sub-components.
 
 .Sync Engine Components (generated from architecture model via draw.io export)
-image::arc42/architecture-sync-components.png[Sync Engine Components,width=80%]
+image::arc42/architecture-sync-components.svg[Sync Engine Components,width=80%]
 
 ==== Building Blocks
 
@@ -146,7 +146,7 @@ include::sync-components-elements.adoc[]
 The draw.io package handles all mxGraph XML concerns.
 
 .draw.io Package Components (generated from architecture model via draw.io export)
-image::arc42/architecture-drawio-components.png[draw.io Package Components,width=80%]
+image::arc42/architecture-drawio-components.svg[draw.io Package Components,width=80%]
 
 ==== Building Blocks
 
@@ -156,7 +156,7 @@ include::drawio-components-elements.adoc[]
 === Level 2: Model Package
 
 .Model Package Components (generated from architecture model via draw.io export)
-image::arc42/architecture-model-components.png[Model Package Components,width=80%]
+image::arc42/architecture-model-components.svg[Model Package Components,width=80%]
 
 ==== Building Blocks
 
@@ -168,7 +168,7 @@ include::model-components-elements.adoc[]
 The CLI is the thinnest layer (no business logic — see Conventions below), but at 41 files across ~15 subcommands it's grouped into 7 components by concern rather than one component per file, for the same reason `model`'s 7 files map to 5 components above: file-level granularity would be noise at this diagram's zoom level.
 
 .CLI Package Components (generated from architecture model via draw.io export)
-image::arc42/architecture-cli-components.png[CLI Package Components,width=80%]
+image::arc42/architecture-cli-components.svg[CLI Package Components,width=80%]
 
 ==== Building Blocks
 
@@ -180,7 +180,7 @@ include::cli-components-elements.adoc[]
 Text-based diagram export components (Mermaid C4, PlantUML) and markdown wrapping.
 
 .Diagram Package Components (generated from architecture model via draw.io export)
-image::arc42/architecture-diagram-components.png[Diagram Package Components,width=80%]
+image::arc42/architecture-diagram-components.svg[Diagram Package Components,width=80%]
 
 ==== Building Blocks
 
@@ -192,7 +192,7 @@ include::diagram-components-elements.adoc[]
 Import components for Structurizr DSL and LikeC4 format conversion to Bausteinsicht model.
 
 .Importer Package Components (generated from architecture model via draw.io export)
-image::arc42/architecture-importer-components.png[Importer Package Components,width=80%]
+image::arc42/architecture-importer-components.svg[Importer Package Components,width=80%]
 
 ==== Building Blocks
 
@@ -204,7 +204,7 @@ include::importer-components-elements.adoc[]
 Export components for converting Bausteinsicht model to external formats (Structurizr DSL).
 
 .Exporter Package Components (generated from architecture model via draw.io export)
-image::arc42/architecture-exporter-components.png[Exporter Package Components,width=80%]
+image::arc42/architecture-exporter-components.svg[Exporter Package Components,width=80%]
 
 ==== Building Blocks
 
@@ -216,7 +216,7 @@ include::exporter-components-elements.adoc[]
 Element and relationship search with pattern matching and filtering.
 
 .Search Package Components (generated from architecture model via draw.io export)
-image::arc42/architecture-search-components.png[Search Package Components,width=80%]
+image::arc42/architecture-search-components.svg[Search Package Components,width=80%]
 
 ==== Building Blocks
 

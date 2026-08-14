@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # scripts/generate-arc42-docs.sh — regenerate arc42 chapter 5's generated
-# artifacts (element tables, PlantUML sources, PNG diagrams) from
+# artifacts (element tables, PlantUML sources, SVG diagrams) from
 # src/docs/arc42/architecture.jsonc via `bausteinsicht` CLI calls, instead
 # of the manual, easy-to-forget process that caused the drift fixed in #524
 # (11 packages missing from the model) and #526 (chapter 5's generated
@@ -12,7 +12,7 @@
 #
 # Requirements:
 #   - `bausteinsicht` binary on PATH, or built via `make build` first
-#   - draw.io CLI (`drawio-export` wrapper or `drawio`) for the PNG step;
+#   - draw.io CLI (`drawio-export` wrapper or `drawio`) for the SVG step;
 #     headless export needs a running dbus + xvfb-run -a (see CLAUDE.md's
 #     "Headless draw.io Export" section) — this script starts dbus itself
 #     if it isn't already running, but assumes xvfb-run is installed
@@ -24,7 +24,10 @@
 #      include::'d into a chapter section that already has its own heading)
 #   2. `export-diagram --view <view> --diagram-format plantuml` ->
 #      src/docs/arc42/<view>.puml
-#   3. `export --view <view>` -> src/docs/images/arc42/architecture-<view>.png
+#   3. `export --view <view> --image-format svg` ->
+#      src/docs/images/arc42/architecture-<view>.svg (#560: SVG over PNG —
+#      scales without quality loss, keeps text selectable, GitHub's AsciiDoc
+#      blob preview renders committed SVGs referenced via image::)
 #
 # Regenerates every view defined in architecture.jsonc — the view list is
 # read from the model itself (not hardcoded), so a newly added view gets
@@ -94,15 +97,15 @@ for view in "${VIEWS[@]}"; do
   echo "    $out" >&2
 done
 
-# ── 3. PNG diagrams (headless draw.io) ──────────────────────────────────────
-echo "==> Regenerating PNG diagrams..." >&2
+# ── 3. SVG diagrams (headless draw.io) ──────────────────────────────────────
+echo "==> Regenerating SVG diagrams..." >&2
 
 # No --drawio-path needed: `export` auto-detects drawio-export/drawio/draw.io
 # via PATH lookup on its own (internal/export.ResolveDrawioBinary). Passing
 # a bare command name (not a real filesystem path) via --drawio-path fails,
 # since that flag is for an explicit path, not a PATH-searchable name.
 if ! command -v drawio-export >/dev/null 2>&1 && ! command -v drawio >/dev/null 2>&1; then
-  echo "    WARNING: no draw.io CLI found (drawio-export/drawio) — skipping PNG export." >&2
+  echo "    WARNING: no draw.io CLI found (drawio-export/drawio) — skipping SVG export." >&2
   echo "    Element tables and .puml files were still regenerated." >&2
 else
   if ! pgrep -x dbus-daemon >/dev/null 2>&1; then
@@ -114,11 +117,11 @@ else
   WORK="$(mktemp -d)"
   trap 'rm -rf "$WORK"' EXIT
 
-  xvfb-run -a "$BIN" export --model "$MODEL" --output "$WORK" >&2
+  xvfb-run -a "$BIN" export --model "$MODEL" --output "$WORK" --image-format svg >&2
 
   for view in "${VIEWS[@]}"; do
-    src="$WORK/architecture-$view.png"
-    dst="$IMAGES_DIR/architecture-$view.png"
+    src="$WORK/architecture-$view.svg"
+    dst="$IMAGES_DIR/architecture-$view.svg"
     if [ -f "$src" ]; then
       cp "$src" "$dst"
       echo "    $dst" >&2

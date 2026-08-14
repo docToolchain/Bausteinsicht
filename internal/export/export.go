@@ -121,6 +121,15 @@ func BuildExportArgs(opts ExportOptions) []string {
 	if opts.EmbedDiagram {
 		args = append(args, "--embed-diagram")
 	}
+	// SVG-only: draw.io defaults to embedding fonts, and falls back to
+	// rasterizing each text label as an embedded base64 PNG whenever it
+	// can't embed a proper font subset headlessly — ballooning file size
+	// (observed ~20x) and defeating the point of choosing SVG over PNG in
+	// the first place (#560). Text then relies on the viewer's system
+	// fonts instead, the normal trade-off for unembedded SVG text.
+	if opts.Format == "svg" {
+		args = append(args, "--embed-svg-fonts", "false")
+	}
 	// Only pass --scale for values > 1. Scale=1 is draw.io's native resolution
 	// and does not need an explicit flag. Scale > 1 (e.g. 2.0 for retina) uses
 	// the GPU rendering pipeline and requires hardware GPU acceleration.

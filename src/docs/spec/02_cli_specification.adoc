@@ -785,6 +785,8 @@ Exports draw.io diagram views to image files (PNG or SVG) using the draw.io CLI.
 
 NOTE: Use `--image-format svg` when element `link` fields must remain clickable in the output. SVG export preserves `link` attributes as native `<a href>` elements, which are clickable when the SVG is embedded in HTML or processed by Asciidoctor PDF. PNG export is a raster format and discards all link information.
 
+NOTE: SVG export always passes draw.io's `--embed-svg-fonts false` internally (not a flag; not applicable to PNG). Without it, draw.io falls back to rasterizing each text label as an embedded base64 PNG whenever it can't embed a font subset headlessly, inflating file size by roughly 20× for no visual benefit (#560). Text then relies on the viewer's system fonts — the normal trade-off for unembedded SVG text, and how GitHub's own AsciiDoc blob preview renders these diagrams.
+
 **JSON output structure** (the `errors` array is present only on partial failure):
 [source,json]
 ----

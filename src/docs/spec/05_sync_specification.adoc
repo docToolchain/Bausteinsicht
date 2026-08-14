@@ -492,7 +492,7 @@ When structural changes cannot be applied via patching (e.g., element deletion),
 
 === Sync Algorithm
 
-[plantuml, sync-algorithm, png]
+[plantuml, sync-algorithm, svg]
 ....
 @startuml
 start

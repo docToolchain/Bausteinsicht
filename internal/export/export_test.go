@@ -256,6 +256,46 @@ func TestBuildExportArgs_WithoutEmbed(t *testing.T) {
 	}
 }
 
+// TestBuildExportArgs_SVGDisablesFontEmbedding verifies SVG exports pass
+// --embed-svg-fonts false. Without it, draw.io rasterizes each text label as
+// an embedded base64 PNG fallback (observed: ~20x file size, e.g. 41KB PNG
+// export vs. 722KB SVG export of the same page) whenever it can't embed a
+// proper font subset headlessly — directly defeating #560's point of
+// switching to SVG for smaller, diff-friendlier diagram assets. PNG format
+// is unaffected: the flag is SVG-only in draw.io's CLI.
+func TestBuildExportArgs_SVGDisablesFontEmbedding(t *testing.T) {
+	svgArgs := BuildExportArgs(ExportOptions{
+		Format:     "svg",
+		PageIndex:  1,
+		OutputPath: "/tmp/out.svg",
+		InputFile:  "arch.drawio",
+	})
+	found := false
+	for i, arg := range svgArgs {
+		if arg == "--embed-svg-fonts" {
+			found = true
+			if i+1 >= len(svgArgs) || svgArgs[i+1] != "false" {
+				t.Errorf("--embed-svg-fonts must be followed by \"false\", got args: %v", svgArgs)
+			}
+		}
+	}
+	if !found {
+		t.Errorf("expected --embed-svg-fonts false for SVG export, got: %v", svgArgs)
+	}
+
+	pngArgs := BuildExportArgs(ExportOptions{
+		Format:     "png",
+		PageIndex:  1,
+		OutputPath: "/tmp/out.png",
+		InputFile:  "arch.drawio",
+	})
+	for _, arg := range pngArgs {
+		if arg == "--embed-svg-fonts" {
+			t.Errorf("--embed-svg-fonts should not be present for PNG export, got: %v", pngArgs)
+		}
+	}
+}
+
 func TestOutputFileName(t *testing.T) {
 	tests := []struct {
 		viewKey string

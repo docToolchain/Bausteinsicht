@@ -97,7 +97,7 @@ customer -> onlineshop_mobile_app : 1. tap 'Place Order'
 
 Rendered, the sample model's checkout flow becomes a full sequence diagram — the same `dynamicViews` steps, now readable at a glance:
 
-[plantuml, tutorial-checkout, png]
+[plantuml, tutorial-checkout, svg]
 ....
 @startuml
 title Checkout Flow
