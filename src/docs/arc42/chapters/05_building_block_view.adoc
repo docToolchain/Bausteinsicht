@@ -128,6 +128,53 @@ Every production package, grouped by role. Each row is a Level-1 building block:
 
 NOTE: `internal/chaos` (fault-injection helper), `internal/benchmarks`, and `internal/e2eplan` (the e2e-test-plan report generator's plan-ID registry, see #519) are **test-only** utilities, not production building blocks.
 
+==== Container View by Domain
+
+The full Container View above packs all ~24 containers and their relationships onto one page — accurate, but dense enough to be hard to read at the level of individual boxes and connector labels (#604). Two containers sit at the centre of nearly every relationship: `cli` (the entry point every command wires through) and `model` (the data structure nearly every package reads or writes) — a hub-and-spoke shape no simple grouping fully untangles. The four views below group the remaining containers by functional domain, each alongside `cli` and `model` for context, trading one complete picture for four legible ones.
+
+=== Level 2: Sync Core Containers
+
+The bidirectional sync loop: CLI, model, drawio, sync engine, watcher, and template resolution.
+
+.Sync Core Containers (generated from architecture model via draw.io export)
+image::arc42/architecture-containers-sync.svg[Sync Core Containers,width=80%]
+
+==== Building Blocks
+
+include::containers-sync-elements.adoc[]
+
+=== Level 2: Export & Import Containers
+
+Containers reading and writing external formats: images, DSLs, text diagrams, tables, and the language server.
+
+.Export & Import Containers (generated from architecture model via draw.io export)
+image::arc42/architecture-containers-io.svg[Export & Import Containers,width=80%]
+
+==== Building Blocks
+
+include::containers-io-elements.adoc[]
+
+=== Level 2: Analysis & Governance Containers
+
+Read-only architecture-quality containers: dependency graph analysis, health scoring, stale-element detection, constraint linting, search, and metric overlays.
+
+.Analysis & Governance Containers (generated from architecture model via draw.io export)
+image::arc42/architecture-containers-analysis.svg[Analysis & Governance Containers,width=80%]
+
+==== Building Blocks
+
+include::containers-analysis-elements.adoc[]
+
+=== Level 2: Evolution & Tooling Containers
+
+Versioning and tooling containers: changelog, as-is/to-be diff, snapshots, multi-model workspaces, JSON Schema generation, and auto-layout.
+
+.Evolution & Tooling Containers (generated from architecture model via draw.io export)
+image::arc42/architecture-containers-evolution.svg[Evolution & Tooling Containers,width=80%]
+
+==== Building Blocks
+
+include::containers-evolution-elements.adoc[]
 
 === Level 2: Sync Engine
 

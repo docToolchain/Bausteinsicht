@@ -1,0 +1,45 @@
+[cols="2,1,1,3"]
+|===
+| Element | Kind | Technology | Description
+
+| Changelog
+| container
+| Go
+| Architecture changelog generation between two git refs
+
+| CLI
+| container
+| Go / Cobra
+| Command-line interface providing validate, sync, export, and watch commands
+
+| Diff
+| container
+| Go
+| As-is vs. to-be architecture comparison
+
+| Layout
+| container
+| Go
+| Auto-layout algorithms for positioning elements in draw.io diagrams
+
+| Model
+| container
+| Go
+| JSONC architecture model management — loading, validation, and mutation
+
+| Schema
+| container
+| Go
+| JSON Schema generation from Go model types for IDE autocompletion
+
+| Snapshot
+| container
+| Go
+| Versioned architecture snapshot storage and restore
+
+| Workspace
+| container
+| Go
+| Multi-model workspace configuration loading and merging
+
+|===

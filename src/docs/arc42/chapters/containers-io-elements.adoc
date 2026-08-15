@@ -1,0 +1,45 @@
+[cols="2,1,1,3"]
+|===
+| Element | Kind | Technology | Description
+
+| CLI
+| container
+| Go / Cobra
+| Command-line interface providing validate, sync, export, and watch commands
+
+| Diagram
+| container
+| Go
+| Text-based diagram export to Mermaid C4 and PlantUML formats with markdown wrapping
+
+| Export
+| container
+| Go
+| Export diagrams to PNG, SVG, and other visual formats via draw.io CLI
+
+| Exporter
+| container
+| Go
+| Architecture export to Structurizr DSL and other formats
+
+| Importer
+| container
+| Go
+| Import architecture from Structurizr DSL, LikeC4, and XMI/Enterprise Architect formats
+
+| Language Server
+| container
+| Go
+| Language Server Protocol implementation for VS Code and other editors
+
+| Model
+| container
+| Go
+| JSONC architecture model management — loading, validation, and mutation
+
+| Table
+| container
+| Go
+| Export architecture to CSV and Markdown table formats
+
+|===

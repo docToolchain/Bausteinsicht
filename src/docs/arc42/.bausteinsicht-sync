@@ -1,9 +1,14 @@
 {
-  "checksum": "sha256:f1359bea7e9df1dd6a45e50555c022385f9e39b3a1fe040ca2d03c0711fa9fe8",
-  "timestamp": "2026-07-03T17:24:25Z",
-  "model_hash": "sha256:604c86d23fb3db0cd887f6f81d4ca39e88a0ccc80f0380aed6c96db111fc4057",
-  "drawio_hash": "sha256:88a454f7a96ad02445e1d4d299d7c44e9e28029093ec6269f3171b7c876ae045",
+  "checksum": "sha256:f42ec60c43471ba757117d4d26ff1e18d1a477485e1eb442bc05ac9903ca2bb3",
+  "timestamp": "2026-08-14T10:28:26Z",
+  "model_hash": "sha256:5cd9d914fb7edef9e549edbdcb1c4609f2baab7d4e75cbc10ae4c4669a918ac2",
+  "drawio_hash": "sha256:44bc4b66915a685afe78a81de84211f9a0655c11093402d2760b1e2d04da7fe0",
   "elements": {
+    "architect": {
+      "title": "Software Architect",
+      "description": "Edits the JSONC model or draw.io diagrams directly and runs bausteinsicht CLI commands (sync, init, watch, stale, ...). Deliberately not included in the \"context\" view's structural diagram (see that chapter's NOTE) — modeled here so dynamicViews (chapter 6 runtime scenarios) can reference it as a real participant.",
+      "kind": "actor"
+    },
     "bausteinsicht": {
       "title": "Bausteinsicht",
       "description": "Architecture-as-code tool with draw.io as visual frontend and bidirectional synchronization",
@@ -161,7 +166,7 @@
     },
     "bausteinsicht.importer": {
       "title": "Importer",
-      "description": "Import architecture from Structurizr DSL and LikeC4 formats",
+      "description": "Import architecture from Structurizr DSL, LikeC4, and XMI/Enterprise Architect formats",
       "technology": "Go",
       "kind": "container"
     },
@@ -174,6 +179,12 @@
     "bausteinsicht.importer.structurizr": {
       "title": "Structurizr",
       "description": "Structurizr DSL parsing and model conversion",
+      "technology": "Go",
+      "kind": "component"
+    },
+    "bausteinsicht.importer.xmi": {
+      "title": "XMI",
+      "description": "XMI/Enterprise Architect parsing and model conversion. Buffers the whole file in memory and converts Windows-1252 to UTF-8 before parsing (peak RSS ~2x file size); a 200MB read cap is enforced.",
       "technology": "Go",
       "kind": "component"
     },
@@ -331,10 +342,20 @@
       "description": "draw.io desktop or web application for visual diagram editing",
       "kind": "external_system"
     },
+    "git": {
+      "title": "Git",
+      "description": "Version control read via `git log` by stale detection and changelog generation; optional (both degrade gracefully outside a git repository). Same context-view exclusion rationale as \"architect\".",
+      "kind": "external_system"
+    },
     "ide": {
       "title": "IDE",
       "description": "IDE with JSON Schema support for JSONC editing with autocompletion",
       "kind": "external_system"
+    },
+    "llm_agent": {
+      "title": "LLM Agent",
+      "description": "Uses bausteinsicht CLI commands (add, sync, ...) programmatically, typically with --format json output. Same context-view exclusion rationale as \"architect\".",
+      "kind": "actor"
     }
   },
   "relationships": [
@@ -901,6 +922,7 @@
     "bausteinsicht.importer": true,
     "bausteinsicht.importer.likec4": true,
     "bausteinsicht.importer.structurizr": true,
+    "bausteinsicht.importer.xmi": true,
     "bausteinsicht.layout": true,
     "bausteinsicht.lsp": true,
     "bausteinsicht.model": true,

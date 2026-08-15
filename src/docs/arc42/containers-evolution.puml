@@ -1,0 +1,32 @@
+@startuml
+!include <C4/C4_Container>
+
+System_Boundary(bausteinsicht, "Bausteinsicht") {
+  Container(bausteinsicht_changelog, "Changelog", "Go", "Architecture changelog generation between two git refs")
+  Container(bausteinsicht_cli, "CLI", "Go / Cobra", "Command-line interface providing validate, sync, export, and watch commands")
+  Container(bausteinsicht_diff, "Diff", "Go", "As-is vs. to-be architecture comparison")
+  Container(bausteinsicht_layout, "Layout", "Go", "Auto-layout algorithms for positioning elements in draw.io diagrams")
+  Container(bausteinsicht_model, "Model", "Go", "JSONC architecture model management — loading, validation, and mutation")
+  Container(bausteinsicht_schema, "Schema", "Go", "JSON Schema generation from Go model types for IDE autocompletion")
+  Container(bausteinsicht_snapshot, "Snapshot", "Go", "Versioned architecture snapshot storage and restore")
+  Container(bausteinsicht_workspace, "Workspace", "Go", "Multi-model workspace configuration loading and merging")
+}
+
+Rel(bausteinsicht_cli, bausteinsicht_model, "loads/saves JSONC")
+Rel(bausteinsicht_cli, bausteinsicht, "triggers sync")
+Rel(bausteinsicht_cli, bausteinsicht_changelog, "triggers changelog generation")
+Rel(bausteinsicht_cli, bausteinsicht_diff, "triggers as-is/to-be diff")
+Rel(bausteinsicht_cli, bausteinsicht_layout, "triggers auto-layout")
+Rel(bausteinsicht_cli, bausteinsicht_schema, "triggers schema generation")
+Rel(bausteinsicht_cli, bausteinsicht_snapshot, "manages snapshots")
+Rel(bausteinsicht_cli, bausteinsicht_workspace, "loads/merges workspace config")
+Rel(bausteinsicht, bausteinsicht_model, "comment-preserving updates")
+Rel(bausteinsicht_changelog, bausteinsicht_diff, "computes as-is/to-be delta per ref")
+Rel(bausteinsicht_changelog, bausteinsicht_model, "loads model at each git ref")
+Rel(bausteinsicht_diff, bausteinsicht_model, "reads as-is/to-be sections")
+Rel(bausteinsicht_layout, bausteinsicht, "writes computed positions")
+Rel(bausteinsicht_layout, bausteinsicht_model, "reads element hierarchy")
+Rel(bausteinsicht_schema, bausteinsicht_model, "reflects Go struct types")
+Rel(bausteinsicht_snapshot, bausteinsicht_model, "serializes/restores model state")
+Rel(bausteinsicht_workspace, bausteinsicht_model, "merges multiple models")
+@enduml
