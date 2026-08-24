@@ -87,6 +87,49 @@ func TestAddViewCmd_MergeViewFields(t *testing.T) {
 	}
 }
 
+// TestAddViewCmd_InvalidKeys covers the key rejection branch of "add view" at
+// the command level. Shares invalidKeys with the specification tests so all
+// three identifier commands are held to the same contract (#582).
+func TestAddViewCmd_InvalidKeys(t *testing.T) {
+	for _, key := range invalidKeys {
+		t.Run(key, func(t *testing.T) {
+			dir := t.TempDir()
+			modelPath := writeViewTestModel(t, dir)
+
+			cmd := NewRootCmd()
+			cmd.SilenceErrors = true
+			cmd.SilenceUsage = true
+			cmd.SetArgs([]string{"add", "view", key,
+				"--model", modelPath,
+				"--title", "Test",
+			})
+			err := cmd.Execute()
+			if err == nil {
+				t.Fatalf("expected error for invalid view key %q", key)
+			}
+			if e, ok := err.(*exitError); ok && e.code != 1 {
+				t.Errorf("expected exit code 1, got %d", e.code)
+			}
+		})
+	}
+}
+
+// TestAddViewCmd_CamelCaseKey is the "add view" half of the #582 regression:
+// the view validator was lowercase-only.
+func TestAddViewCmd_CamelCaseKey(t *testing.T) {
+	dir := t.TempDir()
+	modelPath := writeViewTestModel(t, dir)
+
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"add", "view", "systemLandscape",
+		"--model", modelPath,
+		"--title", "System Landscape",
+	})
+	if err := cmd.Execute(); err != nil {
+		t.Errorf("unexpected error for camelCase view key: %v", err)
+	}
+}
+
 func writeViewTestModel(t *testing.T, dir string) string {
 	t.Helper()
 	p := filepath.Join(dir, "architecture.jsonc")
