@@ -236,7 +236,7 @@ _Updated by `/risk-mitigate` on 2026-03-04_
 | SAST | ✅ Present | `staticcheck` blocking (via `lint` job); `gosec`/`nilaway` run in CI non-blocking for now, tracked in #551 |
 | AI Code Review | ✅ Present | Claude Code with code-review plugin; PR merge policy requires review |
 | Property-Based Tests | ✅ Set up | `pgregory.net/rapid` — label roundtrip + escapeHTML + trimBrackets property tests |
-| SonarQube Quality Gate | ✅ Present | SonarCloud on all PRs; new-code coverage gate ≥ 80% (see override policy in PR Merge Policy section); `sonar.qualitygate.wait=true` in `sonar-project.properties` |
+| SonarQube Quality Gate | ✅ Present | SonarCloud on all PRs; new-code coverage gate ≥ 65% (see override policy in PR Merge Policy section); `sonar.qualitygate.wait=true` in `sonar-project.properties`. SonarCloud is the single source of coverage truth — Codecov was retired in #612 |
 | Sampling Review (~20%) | ✅ Present | PR merge policy: security review + code review required |
 
 **Overall Status:** 10/10 measures active

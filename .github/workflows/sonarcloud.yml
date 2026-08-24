@@ -38,13 +38,6 @@ jobs:
           go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
           golangci-lint run --out-format json > golangci-report.json || true
 
-      - name: Upload coverage to Codecov (optional backup)
-        uses: codecov/codecov-action@v4
-        with:
-          files: ./coverage.out
-          flags: go-coverage
-          fail_ci_if_error: false
-
       # SONAR_TOKEN is not exposed to workflows triggered by a fork PR, so the
       # scan below cannot run for forks. Stage only the coverage report as an
       # artifact; the trusted "SonarCloud Analysis (fork PRs)" workflow_run
