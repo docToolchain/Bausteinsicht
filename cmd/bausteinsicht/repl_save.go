@@ -45,15 +45,34 @@ func (s *replState) saveCommand() error {
 // model using comment-preserving patch operations. Falls back by returning an error
 // whenever any existing element was modified or any relationship was removed or changed
 // (which require a full rewrite). Only pure inserts use the comment-preserving path.
+// relSig is a relationship's full-value identity, used to compare
+// relationships as a multiset (they have no stable ID like elements do).
+type relSig struct{ from, to, label, kind string }
+
 func (s *replState) patchSave() error {
 	onDisk, err := model.Load(s.modelPath)
 	if err != nil {
 		return fmt.Errorf("reading model: %w", err)
 	}
 
-	// Reject element deletions or modifications (value-based compare).
+	if err := rejectModifiedElements(onDisk, s.model); err != nil {
+		return err
+	}
+	if err := rejectModifiedRelationships(onDisk, s.model); err != nil {
+		return err
+	}
+	if err := s.insertNewElements(onDisk); err != nil {
+		return err
+	}
+	return s.appendNewRelationships(onDisk)
+}
+
+// rejectModifiedElements returns an error if any element present in onDisk
+// was deleted or value-modified in mem — patchSave only ever adds, never
+// edits, so any such change requires a full save instead.
+func rejectModifiedElements(onDisk, mem *model.BausteinsichtModel) error {
 	for id, onDiskElem := range onDisk.Model {
-		memElem, ok := s.model.Model[id]
+		memElem, ok := mem.Model[id]
 		if !ok {
 			return fmt.Errorf("element %q was deleted; full save required", id)
 		}
@@ -61,11 +80,14 @@ func (s *replState) patchSave() error {
 			return fmt.Errorf("element %q was modified; full save required", id)
 		}
 	}
+	return nil
+}
 
-	// Reject relationship deletions or modifications (multiset compare by full value).
-	type relSig struct{ from, to, label, kind string }
-	memRelMultiset := make(map[relSig]int, len(s.model.Relationships))
-	for _, r := range s.model.Relationships {
+// rejectModifiedRelationships returns an error if any relationship present
+// in onDisk is missing from mem (compared as a multiset by full value).
+func rejectModifiedRelationships(onDisk, mem *model.BausteinsichtModel) error {
+	memRelMultiset := make(map[relSig]int, len(mem.Relationships))
+	for _, r := range mem.Relationships {
 		memRelMultiset[relSig{r.From, r.To, r.Label, r.Kind}]++
 	}
 	for _, r := range onDisk.Relationships {
@@ -75,8 +97,12 @@ func (s *replState) patchSave() error {
 		}
 		memRelMultiset[sig]--
 	}
+	return nil
+}
 
-	// Insert new top-level elements.
+// insertNewElements patches onto disk every top-level element present in
+// s.model but not yet in onDisk.
+func (s *replState) insertNewElements(onDisk *model.BausteinsichtModel) error {
 	for id, elem := range s.model.Model {
 		if _, exists := onDisk.Model[id]; exists {
 			continue
@@ -93,8 +119,12 @@ func (s *replState) patchSave() error {
 			return fmt.Errorf("inserting element %s: %w", capturedID, perr)
 		}
 	}
+	return nil
+}
 
-	// Append only truly new relationships (those not already on disk).
+// appendNewRelationships patches onto disk every relationship in s.model
+// that isn't already present on disk (compared as a multiset by full value).
+func (s *replState) appendNewRelationships(onDisk *model.BausteinsichtModel) error {
 	onDiskRelMultiset := make(map[relSig]int, len(onDisk.Relationships))
 	for _, r := range onDisk.Relationships {
 		onDiskRelMultiset[relSig{r.From, r.To, r.Label, r.Kind}]++
@@ -116,7 +146,6 @@ func (s *replState) patchSave() error {
 			return fmt.Errorf("appending relationship: %w", perr)
 		}
 	}
-
 	return nil
 }
 

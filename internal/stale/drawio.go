@@ -30,31 +30,37 @@ func MarkInDrawio(staleElements []StaleElement, drawioPath string) error {
 	}
 
 	for _, page := range pages {
-		root := page.Root()
-		if root == nil {
-			continue
-		}
-
-		idMap := make(map[string]*etree.Element)
-		for _, obj := range root.SelectElements("object") {
-			if bausteinsichtID := obj.SelectAttr("bausteinsicht_id"); bausteinsichtID != nil {
-				idMap[bausteinsichtID.Value] = obj
-			}
-		}
-
-		for _, staleElem := range staleElements {
-			obj, exists := idMap[staleElem.ID]
-			if !exists {
-				continue
-			}
-			markStaleElement(obj, staleElem)
-		}
+		markPageStaleElements(page, staleElements)
 	}
 
 	if err := drawio.SaveDocument(drawioPath, doc); err != nil {
 		return fmt.Errorf("saving draw.io document: %w", err)
 	}
 	return nil
+}
+
+// markPageStaleElements marks the stale elements present on page, matching
+// by bausteinsicht_id.
+func markPageStaleElements(page *drawio.Page, staleElements []StaleElement) {
+	root := page.Root()
+	if root == nil {
+		return
+	}
+
+	idMap := make(map[string]*etree.Element)
+	for _, obj := range root.SelectElements("object") {
+		if bausteinsichtID := obj.SelectAttr("bausteinsicht_id"); bausteinsichtID != nil {
+			idMap[bausteinsichtID.Value] = obj
+		}
+	}
+
+	for _, staleElem := range staleElements {
+		obj, exists := idMap[staleElem.ID]
+		if !exists {
+			continue
+		}
+		markStaleElement(obj, staleElem)
+	}
 }
 
 // UnmarkInDrawio removes stale visual indicators from all diagram pages,
@@ -73,51 +79,9 @@ func UnmarkInDrawio(drawioPath string) (int, error) {
 			continue
 		}
 		for _, obj := range root.SelectElements("object") {
-			cell := obj.FindElement("mxCell")
-			if cell == nil {
-				continue
+			if unmarkStaleElement(obj) {
+				count++
 			}
-			originalFillAttr := cell.SelectAttr(overlay.OriginalFillAttr)
-			if originalFillAttr == nil {
-				continue
-			}
-			style := cell.SelectAttrValue("style", "")
-			if originalFillAttr.Value == "" {
-				// fillColor was originally absent — remove it instead of restoring a value.
-				style = removeStyleProperties(style, []string{"fillColor"})
-			} else {
-				style = setStyleProperty(style, "fillColor", originalFillAttr.Value)
-			}
-
-			// Restore original stroke color: if it was absent originally, remove the key.
-			originalStroke := cell.SelectAttrValue(originalStrokeColorAttr, "")
-			if originalStroke != "" {
-				style = setStyleProperty(style, "strokeColor", originalStroke)
-			} else {
-				style = removeStyleProperties(style, []string{"strokeColor"})
-			}
-
-			// Restore original stroke width: if it was absent originally, remove the key.
-			originalWidth := cell.SelectAttrValue(originalStrokeWidthAttr, "")
-			if originalWidth != "" {
-				style = setStyleProperty(style, "strokeWidth", originalWidth)
-			} else {
-				style = removeStyleProperties(style, []string{"strokeWidth"})
-			}
-
-			cell.CreateAttr("style", style)
-			cell.RemoveAttr(overlay.OriginalFillAttr)
-			cell.RemoveAttr(originalStrokeColorAttr)
-			cell.RemoveAttr(originalStrokeWidthAttr)
-
-			// Restore original tooltip (remove the stale tooltip if none was set before).
-			originalTooltip := obj.SelectAttrValue(originalTooltipAttr, "")
-			obj.RemoveAttr("tooltip")
-			obj.RemoveAttr(originalTooltipAttr)
-			if originalTooltip != "" {
-				obj.CreateAttr("tooltip", originalTooltip)
-			}
-			count++
 		}
 	}
 
@@ -125,6 +89,67 @@ func UnmarkInDrawio(drawioPath string) (int, error) {
 		return 0, fmt.Errorf("saving draw.io document: %w", err)
 	}
 	return count, nil
+}
+
+// unmarkStaleElement restores obj's original fill/stroke/tooltip from the
+// data-original-* attributes markStaleElement recorded, and removes those
+// attributes. Reports whether obj actually was marked (had a saved fill).
+func unmarkStaleElement(obj *etree.Element) bool {
+	cell := obj.FindElement("mxCell")
+	if cell == nil {
+		return false
+	}
+	originalFillAttr := cell.SelectAttr(overlay.OriginalFillAttr)
+	if originalFillAttr == nil {
+		return false
+	}
+
+	restoreCellStyle(cell, originalFillAttr.Value)
+	restoreTooltip(obj)
+	return true
+}
+
+// restoreCellStyle rewrites cell's style attribute, restoring (or removing,
+// if it was originally absent) fillColor/strokeColor/strokeWidth from the
+// data-original-* attributes, then removes those attributes.
+func restoreCellStyle(cell *etree.Element, originalFill string) {
+	style := cell.SelectAttrValue("style", "")
+	if originalFill == "" {
+		// fillColor was originally absent — remove it instead of restoring a value.
+		style = removeStyleProperties(style, []string{"fillColor"})
+	} else {
+		style = setStyleProperty(style, "fillColor", originalFill)
+	}
+
+	// Restore original stroke color: if it was absent originally, remove the key.
+	if originalStroke := cell.SelectAttrValue(originalStrokeColorAttr, ""); originalStroke != "" {
+		style = setStyleProperty(style, "strokeColor", originalStroke)
+	} else {
+		style = removeStyleProperties(style, []string{"strokeColor"})
+	}
+
+	// Restore original stroke width: if it was absent originally, remove the key.
+	if originalWidth := cell.SelectAttrValue(originalStrokeWidthAttr, ""); originalWidth != "" {
+		style = setStyleProperty(style, "strokeWidth", originalWidth)
+	} else {
+		style = removeStyleProperties(style, []string{"strokeWidth"})
+	}
+
+	cell.CreateAttr("style", style)
+	cell.RemoveAttr(overlay.OriginalFillAttr)
+	cell.RemoveAttr(originalStrokeColorAttr)
+	cell.RemoveAttr(originalStrokeWidthAttr)
+}
+
+// restoreTooltip restores obj's original tooltip, removing the stale
+// tooltip if none was set before.
+func restoreTooltip(obj *etree.Element) {
+	originalTooltip := obj.SelectAttrValue(originalTooltipAttr, "")
+	obj.RemoveAttr("tooltip")
+	obj.RemoveAttr(originalTooltipAttr)
+	if originalTooltip != "" {
+		obj.CreateAttr("tooltip", originalTooltip)
+	}
 }
 
 // markStaleElement applies a risk-color fill to the mxCell of an <object> element.

@@ -318,3 +318,68 @@ func TestRemoveStyleProperties_EmptyStyle(t *testing.T) {
 		t.Errorf("expected empty string, got: %s", got)
 	}
 }
+
+// TestMarkInDrawio_NoPages covers MarkInDrawio's "no diagram page found"
+// branch: a syntactically valid draw.io document with zero <diagram> pages.
+func TestMarkInDrawio_NoPages(t *testing.T) {
+	xml := `<?xml version="1.0" encoding="UTF-8"?><mxfile></mxfile>`
+	path := writeTempDrawio(t, xml)
+
+	err := MarkInDrawio([]StaleElement{{ID: "shop.api"}}, path)
+	if err == nil {
+		t.Fatal("expected an error for a document with no pages")
+	}
+}
+
+// TestUnmarkStaleElement_NoCell covers unmarkStaleElement's cell==nil
+// branch: an <object> with no mxCell child.
+func TestUnmarkStaleElement_NoCell(t *testing.T) {
+	obj := etree.NewElement("object")
+	obj.CreateAttr("bausteinsicht_id", "shop.api")
+	if unmarkStaleElement(obj) {
+		t.Error("expected unmarkStaleElement to report false for an object with no mxCell")
+	}
+}
+
+// TestUnmarkInDrawio_RestoresOriginalStrokeAndTooltip covers the
+// "restore a non-empty original value" branches of restoreCellStyle
+// (strokeColor/strokeWidth) and restoreTooltip, which
+// TestUnmarkInDrawio_RestoresOriginalFill's fixture leaves unset (only
+// exercising the "was absent, remove it" branches).
+func TestUnmarkInDrawio_RestoresOriginalStrokeAndTooltip(t *testing.T) {
+	xml := `<?xml version="1.0" encoding="UTF-8"?>` +
+		`<mxfile><diagram id="d1" name="Page"><mxGraphModel><root>` +
+		`<mxCell id="0"/><mxCell id="1" parent="0"/>` +
+		`<object bausteinsicht_id="shop.api" tooltip="⚠ STALE" data-original-tooltip="Original tooltip">` +
+		`<mxCell id="cell1" style="fillColor=#FF6666;strokeColor=#FF6666;strokeWidth=2;" ` +
+		`data-original-fill="#dae8fc" data-original-stroke-color="#000000" data-original-stroke-width="1" ` +
+		`vertex="1" parent="1"/>` +
+		`</object>` +
+		`</root></mxGraphModel></diagram></mxfile>`
+	path := writeTempDrawio(t, xml)
+
+	count, err := UnmarkInDrawio(path)
+	if err != nil {
+		t.Fatalf("UnmarkInDrawio: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected 1 unmarked element, got %d", count)
+	}
+
+	tree := etree.NewDocument()
+	if err := tree.ReadFromFile(path); err != nil {
+		t.Fatalf("reading saved file: %v", err)
+	}
+	obj := tree.FindElement("//object[@bausteinsicht_id='shop.api']")
+	cell := obj.FindElement("mxCell")
+	style := cell.SelectAttrValue("style", "")
+	if !strings.Contains(style, "strokeColor=#000000") {
+		t.Errorf("expected original strokeColor restored, got style: %s", style)
+	}
+	if !strings.Contains(style, "strokeWidth=1") {
+		t.Errorf("expected original strokeWidth restored, got style: %s", style)
+	}
+	if obj.SelectAttrValue("tooltip", "") != "Original tooltip" {
+		t.Errorf("expected original tooltip restored, got: %q", obj.SelectAttrValue("tooltip", ""))
+	}
+}

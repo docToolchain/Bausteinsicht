@@ -416,3 +416,45 @@ func TestReplOverwrite_EmptyDescriptionKeepsExisting(t *testing.T) {
 		t.Errorf("empty input should keep existing description, got %q", got)
 	}
 }
+
+// TestReplPatchSave_InsertFailsOnReadOnlyDir covers insertNewElements' (and
+// transitively patchSave's) PatchInsert error branch: model.Load succeeds
+// (the file itself is readable), but the write fails because PatchInsert
+// writes atomically via a temp file in the same directory (model/patch.go),
+// which needs write permission on the *directory*, not the file — distinct
+// from TestReplPatchSave_InvalidModelPath, which fails at the initial
+// model.Load (read) step.
+func TestReplPatchSave_InsertFailsOnReadOnlyDir(t *testing.T) {
+	s, path := newFileReplState(t, "")
+	s.model.Model["newelement"] = model.Element{Kind: "actor", Title: "New"}
+
+	dir := filepath.Dir(path)
+	if err := os.Chmod(dir, 0o500); err != nil {
+		t.Fatalf("chmod: %v", err)
+	}
+	defer func() { _ = os.Chmod(dir, 0o700) }() // restore so t.TempDir() cleanup can remove it
+
+	if err := s.patchSave(); err == nil {
+		t.Fatal("expected an error writing to a model whose directory is read-only")
+	}
+}
+
+// TestReplPatchSave_AppendRelationshipFailsOnReadOnlyDir is
+// TestReplPatchSave_InsertFailsOnReadOnlyDir's relationship counterpart —
+// covers appendNewRelationships' own PatchInsert error branch specifically
+// (no new element, so insertNewElements is a no-op and never reaches its
+// own PatchInsert call).
+func TestReplPatchSave_AppendRelationshipFailsOnReadOnlyDir(t *testing.T) {
+	s, path := newFileReplState(t, "")
+	s.model.Relationships = append(s.model.Relationships, model.Relationship{From: "customer", To: "webshop", Label: "uses"})
+
+	dir := filepath.Dir(path)
+	if err := os.Chmod(dir, 0o500); err != nil {
+		t.Fatalf("chmod: %v", err)
+	}
+	defer func() { _ = os.Chmod(dir, 0o700) }()
+
+	if err := s.patchSave(); err == nil {
+		t.Fatal("expected an error writing to a model whose directory is read-only")
+	}
+}
