@@ -143,7 +143,7 @@ Before merging any PR:
 4. **Code review** on the changes
 
 #### Quality Gate Override Policy
-SonarCloud's **New Code Coverage** gate (threshold: **65%**) may trip on PRs that touch previously-untested legacy code without adding new logic. A verified **behavior-preserving refactor** may be admin-merged despite the gate if ALL of these hold:
+SonarCloud's **New Code Coverage** gate (threshold: **80%**, as configured in the SonarCloud UI — see #612) may trip on PRs that touch previously-untested legacy code without adding new logic. A verified **behavior-preserving refactor** may be admin-merged despite the gate if ALL of these hold:
 - All functional CI checks are green (build, unit tests, lint, golangci-lint)
 - An independent code review confirms no new logic was added
 - The merge reason is noted in the PR description (e.g. "admin merge: refactor only, gate tripped by legacy untested lines")
@@ -236,7 +236,7 @@ _Updated by `/risk-mitigate` on 2026-03-04_
 | SAST | ✅ Present | `staticcheck` blocking (via `lint` job); `gosec`/`nilaway` run in CI non-blocking for now, tracked in #551 |
 | AI Code Review | ✅ Present | Claude Code with code-review plugin; PR merge policy requires review |
 | Property-Based Tests | ✅ Set up | `pgregory.net/rapid` — label roundtrip + escapeHTML + trimBrackets property tests |
-| SonarQube Quality Gate | ✅ Present | SonarCloud on all PRs; new-code coverage gate ≥ 65% (see override policy in PR Merge Policy section); `sonar.qualitygate.wait=true` in `sonar-project.properties`. SonarCloud is the single source of coverage truth — Codecov was retired in #612 |
+| SonarQube Quality Gate | ✅ Present | SonarCloud on all PRs; new-code coverage gate ≥ 80% (see override policy in PR Merge Policy section); `sonar.qualitygate.wait=true` in `sonar-project.properties`. SonarCloud is the single source of coverage truth — Codecov was retired in #612 |
 | Sampling Review (~20%) | ✅ Present | PR merge policy: security review + code review required |
 
 **Overall Status:** 10/10 measures active
