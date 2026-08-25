@@ -154,7 +154,7 @@ func isExcluded(kind string, excludeKinds []string) bool {
 }
 
 // isTagExcluded returns true if any of the element's tags appear in excludeTags.
-func isTagExcluded(elemTags []string, excludeTags []string) bool {
+func isTagExcluded(elemTags, excludeTags []string) bool {
 	if len(excludeTags) == 0 {
 		return false
 	}
