@@ -133,3 +133,108 @@ func TestImportCmd_NonExistentFile_ExitCode1(t *testing.T) {
 		t.Errorf("expected exit code 1, got %d", ee.code)
 	}
 }
+
+// TestImportCmd_TextSummary covers the post-import summary text (#482 v1):
+// per-kind counts, views count, and the fresh-import next-steps hint.
+func TestImportCmd_TextSummary(t *testing.T) {
+	dsl := absDSL(t, "internal", "importer", "structurizr", "testdata", "simple.dsl")
+	outFile := filepath.Join(t.TempDir(), "architecture.jsonc")
+	out, err := executeImportCmd("import", "--from", "structurizr", "--output", outFile, dsl)
+	if err != nil {
+		t.Fatalf("expected no error, got %v\nOutput: %s", err, out)
+	}
+	for _, want := range []string{
+		"person: 1",
+		"container: 3",
+		"system: 2",
+		"views: 2",
+		"Next steps: bausteinsicht sync, bausteinsicht export diagram",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected summary to contain %q, got:\n%s", want, out)
+		}
+	}
+}
+
+// TestImportCmd_JSONSummary covers --json's machine-readable summary shape.
+func TestImportCmd_JSONSummary(t *testing.T) {
+	dsl := absDSL(t, "internal", "importer", "structurizr", "testdata", "simple.dsl")
+	outFile := filepath.Join(t.TempDir(), "architecture.jsonc")
+	out, err := executeImportCmd("import", "--from", "structurizr", "--output", outFile, "--json", dsl)
+	if err != nil {
+		t.Fatalf("expected no error, got %v\nOutput: %s", err, out)
+	}
+
+	var summary struct {
+		Elements   map[string]int `json:"elements"`
+		OutputPath string         `json:"outputPath"`
+		Views      int            `json:"views"`
+		Warnings   []string       `json:"warnings"`
+	}
+	if err := json.Unmarshal([]byte(out), &summary); err != nil {
+		t.Fatalf("--json output is not valid JSON: %v\noutput:\n%s", err, out)
+	}
+	if summary.Elements["container"] != 3 {
+		t.Errorf("expected 3 containers, got %d (elements=%v)", summary.Elements["container"], summary.Elements)
+	}
+	if summary.OutputPath != outFile {
+		t.Errorf("expected outputPath %q, got %q", outFile, summary.OutputPath)
+	}
+	if summary.Views != 2 {
+		t.Errorf("expected views=2, got %d", summary.Views)
+	}
+	if summary.Warnings == nil {
+		t.Error("expected warnings to be a non-nil (possibly empty) array in JSON output")
+	}
+}
+
+// TestImportCmd_DryRunSuppressesSummary covers that --dry-run prints only the
+// model JSON — no per-kind counts, no next-steps hint, since nothing was
+// persisted.
+func TestImportCmd_DryRunSuppressesSummary(t *testing.T) {
+	dsl := absDSL(t, "internal", "importer", "structurizr", "testdata", "simple.dsl")
+	out, err := executeImportCmd("import", "--from", "structurizr", "--dry-run", dsl)
+	if err != nil {
+		t.Fatalf("expected no error, got %v\nOutput: %s", err, out)
+	}
+	if strings.Contains(out, "Next steps:") {
+		t.Errorf("--dry-run must not print a next-steps hint, got:\n%s", out)
+	}
+	if strings.Contains(out, "container:") {
+		t.Errorf("--dry-run must not print per-kind counts, got:\n%s", out)
+	}
+}
+
+// TestImportCmd_ForceOverwriteHintsDiff covers that overwriting an existing
+// output file with --force hints at `bausteinsicht diff` instead of `sync`.
+func TestImportCmd_ForceOverwriteHintsDiff(t *testing.T) {
+	dsl := absDSL(t, "internal", "importer", "structurizr", "testdata", "simple.dsl")
+	outFile := filepath.Join(t.TempDir(), "architecture.jsonc")
+	if err := os.WriteFile(outFile, []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out, err := executeImportCmd("import", "--from", "structurizr", "--output", outFile, "--force", dsl)
+	if err != nil {
+		t.Fatalf("expected no error with --force, got %v", err)
+	}
+	if !strings.Contains(out, "Next steps: bausteinsicht diff") {
+		t.Errorf("expected --force overwrite to hint at \"bausteinsicht diff\", got:\n%s", out)
+	}
+	if strings.Contains(out, "bausteinsicht sync") {
+		t.Errorf("--force overwrite must not also hint at \"bausteinsicht sync\", got:\n%s", out)
+	}
+}
+
+// TestImportCmd_XMINoViewsLine covers that the views line is omitted in text
+// mode when the importer produced zero views (XMI never populates Views).
+func TestImportCmd_XMINoViewsLine(t *testing.T) {
+	xmi := absDSL(t, "internal", "importer", "xmi", "testdata", "basic.xmi")
+	outFile := filepath.Join(t.TempDir(), "architecture.jsonc")
+	out, err := executeImportCmd("import", "--from", "xmi", "--output", outFile, xmi)
+	if err != nil {
+		t.Fatalf("expected no error, got %v\nOutput: %s", err, out)
+	}
+	if strings.Contains(out, "views:") {
+		t.Errorf("expected no \"views:\" line for an XMI import with zero views, got:\n%s", out)
+	}
+}
