@@ -13,6 +13,15 @@ type position struct {
 	X, Y float64
 }
 
+// elemLayoutInputs bundles the read-only inputs shared by the row-placement
+// helpers below — the same three values threaded through unchanged whether
+// laying out tiers or BFS rows.
+type elemLayoutInputs struct {
+	flat      map[string]*model.Element
+	templates *drawio.TemplateSet
+	cfg       layoutConfig
+}
+
 type layoutConfig struct {
 	pageWidth  float64 // 1169 (A4 landscape)
 	elementGap float64 // 40
@@ -263,7 +272,7 @@ func placeLayered(
 ) (contentWidth, contentHeight float64) {
 	tiers, tierKeys := groupIntoTiers(ids, flat, kindTier, maxTier)
 
-	rows, maxRowWidth, endY := placeTierRows(tierKeys, tiers, flat, templates, cfg, originX, originY, positions)
+	rows, maxRowWidth, endY := placeTierRows(tierKeys, tiers, elemLayoutInputs{flat: flat, templates: templates, cfg: cfg}, position{X: originX, Y: originY}, positions)
 	centerRows(rows, maxRowWidth, positions)
 
 	contentWidth = maxRowWidth
@@ -311,23 +320,15 @@ func groupIntoTiers(ids []string, flat map[string]*model.Element, kindTier map[s
 // wrapping to a new row when the page width would be exceeded. Returns the
 // resulting rows (for later centering), the widest row's width, and the Y
 // position immediately after the last row.
-func placeTierRows(
-	tierKeys []int,
-	tiers map[int][]string,
-	flat map[string]*model.Element,
-	templates *drawio.TemplateSet,
-	cfg layoutConfig,
-	originX, originY float64,
-	positions map[string]position,
-) (rows []layeredRow, maxRowWidth float64, endY float64) {
-	curY := originY
+func placeTierRows(tierKeys []int, tiers map[int][]string, in elemLayoutInputs, origin position, positions map[string]position) (rows []layeredRow, maxRowWidth float64, endY float64) {
+	curY := origin.Y
 
 	for _, tier := range tierKeys {
 		elems := tiers[tier]
 		sort.Strings(elems)
 
 		var tierRows []layeredRow
-		tierRows, curY = placeOneTier(elems, flat, templates, cfg, originX, curY, positions)
+		tierRows, curY = placeOneTier(elems, in.flat, in.templates, in.cfg, origin.X, curY, positions)
 		for _, row := range tierRows {
 			rows = append(rows, row)
 			if row.width > maxRowWidth {
@@ -423,7 +424,7 @@ func placeBFS(
 ) (contentWidth, contentHeight float64) {
 	adj, connectedToActor := buildScopeAdjacency(ids, actorIDs, relationships)
 	rows := assignBFSRows(ids, adj, connectedToActor)
-	return placeBFSRows(rows, flat, templates, cfg, originX, originY, minRowWidth, positions)
+	return placeBFSRows(rows, elemLayoutInputs{flat: flat, templates: templates, cfg: cfg}, position{X: originX, Y: originY}, minRowWidth, positions)
 }
 
 // buildScopeAdjacency builds an adjacency map among ids (scope children)
@@ -575,15 +576,9 @@ func unplacedSorted(ids []string, placed map[string]bool) []string {
 // placeBFSRows places each BFS row left-aligned starting at (originX,
 // originY), wrapping to a new line when minRowWidth would be exceeded, and
 // returns the overall content width/height.
-func placeBFSRows(
-	rows [][]string,
-	flat map[string]*model.Element,
-	templates *drawio.TemplateSet,
-	cfg layoutConfig,
-	originX, originY float64,
-	minRowWidth float64,
-	positions map[string]position,
-) (contentWidth, contentHeight float64) {
+func placeBFSRows(rows [][]string, in elemLayoutInputs, origin position, minRowWidth float64, positions map[string]position) (contentWidth, contentHeight float64) {
+	flat, templates, cfg := in.flat, in.templates, in.cfg
+	originX, originY := origin.X, origin.Y
 	curY := originY
 	maxWidth := 0.0
 
