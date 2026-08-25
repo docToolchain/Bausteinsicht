@@ -65,11 +65,33 @@ jobs:
 
             # shellcheck disable=SC2016  # backticks are literal markdown code-fence text in the issue body, not command substitution
             BODY=$(printf 'Found stale branches (not merged to main, >7 days old):\n\n%s\n\n**Recommendation:**\nReview if these branches should be:\n1. Merged (if still relevant work)\n2. Deleted (if work is abandoned or superseded)\n\nDelete with:\n```bash\ngit fetch origin\ngit branch -D <branch>\ngit push origin --delete <branch>\n```' "$STALE_BRANCHES")
-            gh issue create \
-              --title "🧹 Cleanup: Stale branches found" \
-              --body "$BODY" \
-              --label infrastructure \
-              2>/dev/null || echo "Issue already exists or other error"
+
+            # Update the existing open tracking issue instead of creating a new
+            # one every run — a plain `gh issue create` has no duplicate-title
+            # detection, so it always succeeds and silently piled up multiple
+            # open "Cleanup: Stale branches found" issues in parallel (#619).
+            EXISTING_ISSUE=$(gh issue list \
+              --search '"🧹 Cleanup: Stale branches found" in:title' \
+              --state open --json number --jq '.[0].number')
+            if [ -n "$EXISTING_ISSUE" ]; then
+              gh issue comment "$EXISTING_ISSUE" --body "$BODY"
+            else
+              gh issue create \
+                --title "🧹 Cleanup: Stale branches found" \
+                --body "$BODY" \
+                --label infrastructure
+            fi
           else
             echo "✅ No stale branches found" >> "$GITHUB_STEP_SUMMARY"
+
+            # Close the tracking issue left over from a previous run — no
+            # point leaving it open with a now-stale branch list once the
+            # branches are gone (#619).
+            EXISTING_ISSUE=$(gh issue list \
+              --search '"🧹 Cleanup: Stale branches found" in:title' \
+              --state open --json number --jq '.[0].number')
+            if [ -n "$EXISTING_ISSUE" ]; then
+              gh issue close "$EXISTING_ISSUE" \
+                --comment "No stale branches found in this run — closing."
+            fi
           fi
