@@ -156,192 +156,244 @@ func applyRelSwap(newFrom, newTo string, m *model.BausteinsichtModel, result *Re
 func applyElementChange(ch ElementChange, m *model.BausteinsichtModel, flatModel map[string]*model.Element, lastElemMap map[string]bool, priorSync bool, result *ReverseResult) {
 	switch ch.Type {
 	case Modified:
-		// Reject empty title updates from draw.io (#150).
-		if ch.Field == "title" && strings.TrimSpace(ch.NewValue) == "" {
-			result.Warnings = append(result.Warnings,
-				fmt.Sprintf("Element %q: ignoring empty title from draw.io", ch.ID))
-			return
-		}
-		err := modifyElement(m, ch.ID, func(e *model.Element) {
-			switch ch.Field {
-			case "title":
-				e.Title = ch.NewValue
-			case "description":
-				e.Description = ch.NewValue
-			case "technology":
-				e.Technology = ch.NewValue
-			}
-		})
-		if err != nil {
-			result.Warnings = append(result.Warnings,
-				fmt.Sprintf("Element %q not found in model: %v", ch.ID, err))
-			return
-		}
-		result.ElementsUpdated++
-
+		applyReverseElementModified(ch, m, result)
 	case Deleted:
-		err := deleteElement(m, ch.ID)
-		if err != nil {
-			result.Warnings = append(result.Warnings,
-				fmt.Sprintf("Element %q could not be deleted: %v", ch.ID, err))
-			return
-		}
-		result.ElementsDeleted++
-		// Clean orphaned relationships referencing the deleted element (#266).
-		prefix := ch.ID + "."
-		var kept []model.Relationship
-		for _, r := range m.Relationships {
-			if r.From == ch.ID || r.To == ch.ID ||
-				strings.HasPrefix(r.From, prefix) || strings.HasPrefix(r.To, prefix) {
-				result.RelationshipsDeleted++
-				continue
-			}
-			kept = append(kept, r)
-		}
-		m.Relationships = kept
-		// Clean stale references from view include/exclude lists.
-		for viewID, v := range m.Views {
-			v.Include = removeFromSlice(v.Include, ch.ID)
-			v.Exclude = removeFromSlice(v.Exclude, ch.ID)
-			m.Views[viewID] = v
-		}
-		result.Warnings = append(result.Warnings,
-			fmt.Sprintf("Element %q was deleted in draw.io and removed from model", ch.ID))
-
+		applyReverseElementDeleted(ch, m, result)
 	case Added:
-		if m.Model == nil {
-			m.Model = make(map[string]model.Element)
+		applyReverseElementAdded(ch, m, flatModel, lastElemMap, priorSync, result)
+	}
+}
+
+// applyReverseElementModified writes a title/description/technology edit
+// made in draw.io back to the model.
+func applyReverseElementModified(ch ElementChange, m *model.BausteinsichtModel, result *ReverseResult) {
+	// Reject empty title updates from draw.io (#150).
+	if ch.Field == "title" && strings.TrimSpace(ch.NewValue) == "" {
+		result.Warnings = append(result.Warnings,
+			fmt.Sprintf("Element %q: ignoring empty title from draw.io", ch.ID))
+		return
+	}
+	err := modifyElement(m, ch.ID, func(e *model.Element) {
+		switch ch.Field {
+		case "title":
+			e.Title = ch.NewValue
+		case "description":
+			e.Description = ch.NewValue
+		case "technology":
+			e.Technology = ch.NewValue
 		}
-		// Use the pre-computed flat model to check existence across the full
-		// hierarchy. A naive m.Model[ch.ID] check misses nested elements whose
-		// IDs are dot-paths (e.g. "parent.child"), causing them to be
-		// re-created as spurious top-level entries with empty titles (#307).
-		if _, exists := flatModel[ch.ID]; exists {
-			// Check if this element was already synced from draw.io in a previous sync.
-			// If it was, it's on a different page now - that's normal, skip silently.
-			if lastElemMap[ch.ID] {
-				// Already synced before (possibly on another page) - no action needed.
-				return
-			}
-			// Element exists in model but wasn't synced from draw.io before - that's a
-			// genuine conflict. Only warn if a prior sync actually happened; on the
-			// very first sync the user legitimately has it in both places.
-			hasLastState := priorSync
-			if hasLastState {
-				result.Warnings = append(result.Warnings,
-					fmt.Sprintf("Element %q from draw.io skipped: ID already exists in model (not synced from draw.io)", ch.ID))
-			}
+	})
+	if err != nil {
+		result.Warnings = append(result.Warnings,
+			fmt.Sprintf("Element %q not found in model: %v", ch.ID, err))
+		return
+	}
+	result.ElementsUpdated++
+}
+
+// applyReverseElementDeleted removes an element deleted in draw.io from the
+// model, along with the relationships and view references it leaves behind.
+func applyReverseElementDeleted(ch ElementChange, m *model.BausteinsichtModel, result *ReverseResult) {
+	err := deleteElement(m, ch.ID)
+	if err != nil {
+		result.Warnings = append(result.Warnings,
+			fmt.Sprintf("Element %q could not be deleted: %v", ch.ID, err))
+		return
+	}
+	result.ElementsDeleted++
+	// Clean orphaned relationships referencing the deleted element (#266).
+	prefix := ch.ID + "."
+	var kept []model.Relationship
+	for _, r := range m.Relationships {
+		if r.From == ch.ID || r.To == ch.ID ||
+			strings.HasPrefix(r.From, prefix) || strings.HasPrefix(r.To, prefix) {
+			result.RelationshipsDeleted++
+			continue
+		}
+		kept = append(kept, r)
+	}
+	m.Relationships = kept
+	// Clean stale references from view include/exclude lists.
+	for viewID, v := range m.Views {
+		v.Include = removeFromSlice(v.Include, ch.ID)
+		v.Exclude = removeFromSlice(v.Exclude, ch.ID)
+		m.Views[viewID] = v
+	}
+	result.Warnings = append(result.Warnings,
+		fmt.Sprintf("Element %q was deleted in draw.io and removed from model", ch.ID))
+}
+
+// applyReverseElementAdded imports an element that was created directly in
+// draw.io, unless it turns out to already exist in the model (either
+// already synced before, or a genuine model/draw.io ID collision).
+func applyReverseElementAdded(ch ElementChange, m *model.BausteinsichtModel, flatModel map[string]*model.Element, lastElemMap map[string]bool, priorSync bool, result *ReverseResult) {
+	if m.Model == nil {
+		m.Model = make(map[string]model.Element)
+	}
+	// Use the pre-computed flat model to check existence across the full
+	// hierarchy. A naive m.Model[ch.ID] check misses nested elements whose
+	// IDs are dot-paths (e.g. "parent.child"), causing them to be
+	// re-created as spurious top-level entries with empty titles (#307).
+	if _, exists := flatModel[ch.ID]; exists {
+		// Check if this element was already synced from draw.io in a previous sync.
+		// If it was, it's on a different page now - that's normal, skip silently.
+		if lastElemMap[ch.ID] {
+			// Already synced before (possibly on another page) - no action needed.
 			return
 		}
-		kind := firstSpecKind(m)
-		m.Model[ch.ID] = model.Element{
-			Kind:  kind,
-			Title: ch.NewValue,
+		// Element exists in model but wasn't synced from draw.io before - that's a
+		// genuine conflict. Only warn if a prior sync actually happened; on the
+		// very first sync the user legitimately has it in both places.
+		if priorSync {
+			result.Warnings = append(result.Warnings,
+				fmt.Sprintf("Element %q from draw.io skipped: ID already exists in model (not synced from draw.io)", ch.ID))
 		}
-		result.ElementsCreated++
-		result.Warnings = append(result.Warnings,
-			fmt.Sprintf("New element %q added from draw.io (kind=%q) — review and assign a meaningful ID and kind.", ch.ID, kind))
+		return
 	}
+	kind := firstSpecKind(m)
+	m.Model[ch.ID] = model.Element{
+		Kind:  kind,
+		Title: ch.NewValue,
+	}
+	result.ElementsCreated++
+	result.Warnings = append(result.Warnings,
+		fmt.Sprintf("New element %q added from draw.io (kind=%q) — review and assign a meaningful ID and kind.", ch.ID, kind))
 }
 
 func applyRelationshipChange(ch RelationshipChange, m *model.BausteinsichtModel, flatModel map[string]*model.Element, lastRelMap map[string]bool, modelRelMap map[string]RelationshipState, priorSync bool, result *ReverseResult) {
 	switch ch.Type {
 	case Modified:
-		updated := false
-		if ch.Index >= 0 && ch.Index < len(m.Relationships) {
-			r := m.Relationships[ch.Index]
-			if r.From == ch.From && r.To == ch.To {
-				if ch.Field == "label" {
-					m.Relationships[ch.Index].Label = ch.NewValue
-				}
-				updated = true
-			}
-		}
-		// Fallback: search by from/to if index does not match.
-		if !updated {
-			for i, r := range m.Relationships {
-				if r.From == ch.From && r.To == ch.To {
-					if ch.Field == "label" {
-						m.Relationships[i].Label = ch.NewValue
-					}
-					updated = true
-					break
-				}
-			}
-		}
-		if updated {
-			result.RelationshipsUpdated++
-		} else {
-			result.Warnings = append(result.Warnings,
-				fmt.Sprintf("Relationship %q->%q not found in model", ch.From, ch.To))
-		}
-
+		applyReverseRelationshipModified(ch, m, result)
 	case Deleted:
-		before := len(m.Relationships)
-		if ch.Index >= 0 && ch.Index < len(m.Relationships) {
-			r := m.Relationships[ch.Index]
-			if r.From == ch.From && r.To == ch.To {
-				m.Relationships = append(m.Relationships[:ch.Index], m.Relationships[ch.Index+1:]...)
-			} else {
-				// Fallback: filter by from/to.
-				m.Relationships = filterRelationships(m.Relationships, ch.From, ch.To)
-			}
+		applyReverseRelationshipDeleted(ch, m, result)
+	case Added:
+		applyReverseRelationshipAdded(ch, m, flatModel, lastRelMap, modelRelMap, priorSync, result)
+	}
+}
+
+// applyReverseRelationshipModified writes a label edit made in draw.io back
+// to the model, preferring the connector's index but falling back to a
+// from/to search if the index no longer lines up (e.g. after a reorder).
+func applyReverseRelationshipModified(ch RelationshipChange, m *model.BausteinsichtModel, result *ReverseResult) {
+	updated := relabelRelationshipByIndex(ch, m)
+	if !updated {
+		// Fallback: search by from/to if index does not match.
+		updated = relabelRelationshipByFromTo(ch, m)
+	}
+	if updated {
+		result.RelationshipsUpdated++
+	} else {
+		result.Warnings = append(result.Warnings,
+			fmt.Sprintf("Relationship %q->%q not found in model", ch.From, ch.To))
+	}
+}
+
+// relabelRelationshipByIndex applies ch's label edit to the relationship at
+// ch.Index, if that slot still holds the same from/to pair. Reports whether
+// a match was found (and updated, when ch.Field is "label").
+func relabelRelationshipByIndex(ch RelationshipChange, m *model.BausteinsichtModel) bool {
+	if ch.Index < 0 || ch.Index >= len(m.Relationships) {
+		return false
+	}
+	r := m.Relationships[ch.Index]
+	if r.From != ch.From || r.To != ch.To {
+		return false
+	}
+	if ch.Field == "label" {
+		m.Relationships[ch.Index].Label = ch.NewValue
+	}
+	return true
+}
+
+// relabelRelationshipByFromTo is relabelRelationshipByIndex's fallback for
+// when ch.Index no longer lines up (e.g. after a reorder): it searches for
+// the first relationship matching ch's from/to pair instead.
+func relabelRelationshipByFromTo(ch RelationshipChange, m *model.BausteinsichtModel) bool {
+	for i, r := range m.Relationships {
+		if r.From != ch.From || r.To != ch.To {
+			continue
+		}
+		if ch.Field == "label" {
+			m.Relationships[i].Label = ch.NewValue
+		}
+		return true
+	}
+	return false
+}
+
+// applyReverseRelationshipDeleted removes a relationship deleted in draw.io
+// from the model, preferring the connector's index but falling back to a
+// from/to filter if the index no longer lines up.
+func applyReverseRelationshipDeleted(ch RelationshipChange, m *model.BausteinsichtModel, result *ReverseResult) {
+	before := len(m.Relationships)
+	if ch.Index >= 0 && ch.Index < len(m.Relationships) {
+		r := m.Relationships[ch.Index]
+		if r.From == ch.From && r.To == ch.To {
+			m.Relationships = append(m.Relationships[:ch.Index], m.Relationships[ch.Index+1:]...)
 		} else {
+			// Fallback: filter by from/to.
 			m.Relationships = filterRelationships(m.Relationships, ch.From, ch.To)
 		}
-		if len(m.Relationships) < before {
-			result.RelationshipsDeleted++
-		}
-
-	case Added:
-		// Validate that both endpoints exist in the model before adding (#329).
-		// Prevents stale relationships from old draw.io files being imported after model replacement.
-		if _, fromExists := flatModel[ch.From]; !fromExists {
-			result.Warnings = append(result.Warnings,
-				fmt.Sprintf("Relationship %q->%q rejected: From element %q does not exist in model", ch.From, ch.To, ch.From))
-			return
-		}
-		if _, toExists := flatModel[ch.To]; !toExists {
-			result.Warnings = append(result.Warnings,
-				fmt.Sprintf("Relationship %q->%q rejected: To element %q does not exist in model", ch.From, ch.To, ch.To))
-			return
-		}
-		// Check if this relationship was already synced from draw.io in a previous
-		// sync. Match on the connector index (relKey) so a genuinely new second
-		// relationship between the same pair (#142) stays distinct from the
-		// already-synced first one. If synced before, it's on a different page
-		// now - skip silently. (Reading a nil map yields false.)
-		if lastRelMap[relKey(ch.From, ch.To, ch.Index)] {
-			// Already synced before (possibly on another page) - no action needed.
-			return
-		}
-		// Check whether the model already holds this exact relationship, keyed the
-		// same way as the connector and the last-sync state (relKey over the global
-		// relationship index). This answers "does the model already have this
-		// relationship" directly, regardless of how many others share the pair, so
-		// a genuinely new connector (whose key is absent) is always imported.
-		if _, present := modelRelMap[relKey(ch.From, ch.To, ch.Index)]; present {
-			// Present in the model but not synced from draw.io. On the very first
-			// sync (no prior sync) this is expected - the user added it to both
-			// places - so skip silently; once a prior sync exists it is a genuine
-			// conflict, so warn.
-			if priorSync {
-				pageInfo := ""
-				if ch.PageID != "" {
-					pageInfo = fmt.Sprintf(" (on draw.io page %q)", ch.PageID)
-				}
-				result.Warnings = append(result.Warnings,
-					fmt.Sprintf("Relationship %q->%q already exists in model (not synced from draw.io), skipping duplicate%s", ch.From, ch.To, pageInfo))
-			}
-			return
-		}
-		m.Relationships = append(m.Relationships, model.Relationship{
-			From:  ch.From,
-			To:    ch.To,
-			Label: ch.NewValue,
-		})
-		result.RelationshipsCreated++
+	} else {
+		m.Relationships = filterRelationships(m.Relationships, ch.From, ch.To)
 	}
+	if len(m.Relationships) < before {
+		result.RelationshipsDeleted++
+	}
+}
+
+// applyReverseRelationshipAdded imports a relationship (connector) created
+// directly in draw.io, unless its endpoints don't exist in the model (#329)
+// or it turns out to already exist (either already synced before, or a
+// genuine model/draw.io collision).
+func applyReverseRelationshipAdded(ch RelationshipChange, m *model.BausteinsichtModel, flatModel map[string]*model.Element, lastRelMap map[string]bool, modelRelMap map[string]RelationshipState, priorSync bool, result *ReverseResult) {
+	// Validate that both endpoints exist in the model before adding (#329).
+	// Prevents stale relationships from old draw.io files being imported after model replacement.
+	if _, fromExists := flatModel[ch.From]; !fromExists {
+		result.Warnings = append(result.Warnings,
+			fmt.Sprintf("Relationship %q->%q rejected: From element %q does not exist in model", ch.From, ch.To, ch.From))
+		return
+	}
+	if _, toExists := flatModel[ch.To]; !toExists {
+		result.Warnings = append(result.Warnings,
+			fmt.Sprintf("Relationship %q->%q rejected: To element %q does not exist in model", ch.From, ch.To, ch.To))
+		return
+	}
+	// Check if this relationship was already synced from draw.io in a previous
+	// sync. Match on the connector index (relKey) so a genuinely new second
+	// relationship between the same pair (#142) stays distinct from the
+	// already-synced first one. If synced before, it's on a different page
+	// now - skip silently. (Reading a nil map yields false.)
+	if lastRelMap[relKey(ch.From, ch.To, ch.Index)] {
+		// Already synced before (possibly on another page) - no action needed.
+		return
+	}
+	// Check whether the model already holds this exact relationship, keyed the
+	// same way as the connector and the last-sync state (relKey over the global
+	// relationship index). This answers "does the model already have this
+	// relationship" directly, regardless of how many others share the pair, so
+	// a genuinely new connector (whose key is absent) is always imported.
+	if _, present := modelRelMap[relKey(ch.From, ch.To, ch.Index)]; present {
+		// Present in the model but not synced from draw.io. On the very first
+		// sync (no prior sync) this is expected - the user added it to both
+		// places - so skip silently; once a prior sync exists it is a genuine
+		// conflict, so warn.
+		if priorSync {
+			pageInfo := ""
+			if ch.PageID != "" {
+				pageInfo = fmt.Sprintf(" (on draw.io page %q)", ch.PageID)
+			}
+			result.Warnings = append(result.Warnings,
+				fmt.Sprintf("Relationship %q->%q already exists in model (not synced from draw.io), skipping duplicate%s", ch.From, ch.To, pageInfo))
+		}
+		return
+	}
+	m.Relationships = append(m.Relationships, model.Relationship{
+		From:  ch.From,
+		To:    ch.To,
+		Label: ch.NewValue,
+	})
+	result.RelationshipsCreated++
 }
 
 // filterRelationships returns all relationships except those matching from/to.
