@@ -157,6 +157,62 @@ func TestAddSpecificationCmd_CamelCaseKeys(t *testing.T) {
 	}
 }
 
+// TestAddSpecificationElementCmd_AutoDetectFails covers
+// loadModelForSpecificationCmd's auto-detect error branch: no --model flag,
+// and no .jsonc file in the working directory for AutoDetect to find.
+func TestAddSpecificationElementCmd_AutoDetectFails(t *testing.T) {
+	dir := t.TempDir()
+	restore := chdir(t, dir)
+	defer restore()
+
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"add", "specification", "element", "custom_type", "--notation", "Box"})
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error when no .jsonc file exists for auto-detection")
+	}
+}
+
+// TestAddSpecificationRelationshipCmd_LoadModelFails covers
+// loadModelForSpecificationCmd's model.Load error branch: --model points at
+// a file that isn't valid JSONC.
+func TestAddSpecificationRelationshipCmd_LoadModelFails(t *testing.T) {
+	dir := t.TempDir()
+	modelPath := filepath.Join(dir, "architecture.jsonc")
+	if err := os.WriteFile(modelPath, []byte("not valid jsonc {{{"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"add", "specification", "relationship", "custom_rel",
+		"--model", modelPath,
+		"--notation", "->",
+	})
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error loading a malformed model file")
+	}
+}
+
+// chdir changes the working directory for the duration of a test and
+// returns a func to restore it — used to exercise AutoDetect's cwd-scanning
+// behavior without depending on the ambient test-runner working directory.
+func chdir(t *testing.T, dir string) func() {
+	t.Helper()
+	orig, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	return func() {
+		if err := os.Chdir(orig); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
 func writeSpecTestModel(t *testing.T, dir string) string {
 	t.Helper()
 	p := filepath.Join(dir, "architecture.jsonc")

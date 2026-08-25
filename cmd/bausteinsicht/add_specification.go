@@ -42,30 +42,11 @@ func runAddSpecificationElement(cmd *cobra.Command, args []string) error {
 	notation, _ := cmd.Flags().GetString("notation")
 	description, _ := cmd.Flags().GetString("description")
 	container, _ := cmd.Flags().GetBool("container")
-
-	modelPath, _ := cmd.Flags().GetString("model")
 	format, _ := cmd.Flags().GetString("format")
 
-	// Validate key format
-	if !isValidKey(key) {
-		return exitWithCode(
-			fmt.Errorf("invalid specification key %q: must start with a letter and contain only letters, digits, hyphens, or underscores", key),
-			1,
-		)
-	}
-
-	// Load model
-	if modelPath == "" {
-		detected, err := model.AutoDetect(".")
-		if err != nil {
-			return exitWithCode(fmt.Errorf("auto-detecting model: %w", err), 2)
-		}
-		modelPath = detected
-	}
-
-	m, err := model.Load(modelPath)
+	m, modelPath, err := loadModelForSpecificationCmd(cmd, key)
 	if err != nil {
-		return exitWithCode(fmt.Errorf("loading model: %w", err), 2)
+		return err
 	}
 
 	// Add element kind
@@ -134,30 +115,11 @@ func runAddSpecificationRelationship(cmd *cobra.Command, args []string) error {
 	notation, _ := cmd.Flags().GetString("notation")
 	description, _ := cmd.Flags().GetString("description")
 	dashed, _ := cmd.Flags().GetBool("dashed")
-
-	modelPath, _ := cmd.Flags().GetString("model")
 	format, _ := cmd.Flags().GetString("format")
 
-	// Validate key format
-	if !isValidKey(key) {
-		return exitWithCode(
-			fmt.Errorf("invalid specification key %q: must start with a letter and contain only letters, digits, hyphens, or underscores", key),
-			1,
-		)
-	}
-
-	// Load model
-	if modelPath == "" {
-		detected, err := model.AutoDetect(".")
-		if err != nil {
-			return exitWithCode(fmt.Errorf("auto-detecting model: %w", err), 2)
-		}
-		modelPath = detected
-	}
-
-	m, err := model.Load(modelPath)
+	m, modelPath, err := loadModelForSpecificationCmd(cmd, key)
 	if err != nil {
-		return exitWithCode(fmt.Errorf("loading model: %w", err), 2)
+		return err
 	}
 
 	// Add relationship kind
@@ -201,4 +163,33 @@ func runAddSpecificationRelationship(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+// loadModelForSpecificationCmd validates key, then auto-detects (if
+// --model was omitted) and loads the model shared by "add specification
+// element" and "add specification relationship" — both need the exact same
+// key-validation-then-load sequence before diverging on what they add.
+func loadModelForSpecificationCmd(cmd *cobra.Command, key string) (*model.BausteinsichtModel, string, error) {
+	if !isValidKey(key) {
+		return nil, "", exitWithCode(
+			fmt.Errorf("invalid specification key %q: must start with a letter and contain only letters, digits, hyphens, or underscores", key),
+			1,
+		)
+	}
+
+	modelPath, _ := cmd.Flags().GetString("model")
+	if modelPath == "" {
+		detected, err := model.AutoDetect(".")
+		if err != nil {
+			return nil, "", exitWithCode(fmt.Errorf("auto-detecting model: %w", err), 2)
+		}
+		modelPath = detected
+	}
+
+	m, err := model.Load(modelPath)
+	if err != nil {
+		return nil, "", exitWithCode(fmt.Errorf("loading model: %w", err), 2)
+	}
+
+	return m, modelPath, nil
 }

@@ -17,6 +17,13 @@
 // several plan lines, or a subtest name that predates this convention.
 package e2eplan
 
+// Subtest names for e2e/jsonc_comment_preservation_test.go, named here
+// (rather than repeated inline) since each covers several plan lines below.
+const (
+	testJSONCCommentPreservationReverseSync = "TestJSONCCommentPreservation/ReverseSync"
+	testJSONCCommentPreservationAddElement  = "TestJSONCCommentPreservation/AddElement"
+)
+
 // Registry maps a plan ID to the qualified go-test name(s) — in
 // "TestFunc" or "TestFunc/Subtest" form, matching the "Test" field of `go
 // test -json` events — that automate it. A plan ID mapped to more than one
@@ -24,12 +31,12 @@ package e2eplan
 var Registry = map[string][]string{
 	// e2e/jsonc_comment_preservation_test.go — subtest names predate the
 	// "<planID>_" convention and one subtest covers multiple plan lines.
-	"4.16": {"TestJSONCCommentPreservation/ReverseSync"},
-	"4.17": {"TestJSONCCommentPreservation/ReverseSync"},
-	"4.18": {"TestJSONCCommentPreservation/ReverseSync"},
-	"6.25": {"TestJSONCCommentPreservation/AddElement"},
-	"6.26": {"TestJSONCCommentPreservation/AddElement"},
-	"6.27": {"TestJSONCCommentPreservation/AddElement"},
+	"4.16": {testJSONCCommentPreservationReverseSync},
+	"4.17": {testJSONCCommentPreservationReverseSync},
+	"4.18": {testJSONCCommentPreservationReverseSync},
+	"6.25": {testJSONCCommentPreservationAddElement},
+	"6.26": {testJSONCCommentPreservationAddElement},
+	"6.27": {testJSONCCommentPreservationAddElement},
 	"6.28": {"TestJSONCCommentPreservation/AddElementMixedComments"},
 	"6.29": {"TestJSONCCommentPreservation/TwoSequentialAdds"},
 	"6.30": {"TestJSONCCommentPreservation/AddRelationship"},
