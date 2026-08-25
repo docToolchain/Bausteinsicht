@@ -180,50 +180,60 @@ func (s *replState) listCommand(parts []string) {
 
 	switch parts[0] {
 	case "elements":
-		flat, _ := model.FlattenElements(s.model)
-		ids := make([]string, 0, len(flat))
-		for id := range flat {
-			ids = append(ids, id)
-		}
-		sort.Strings(ids)
-		fmt.Printf("\n%-30s %-15s %-40s\n", "ID", "Kind", "Title")
-		fmt.Println(strings.Repeat("-", 85))
-		for _, id := range ids {
-			elem := flat[id]
-			fmt.Printf("%-30s %-15s %-40s\n", id, elem.Kind, elem.Title)
-		}
-
+		s.listElements()
 	case "relationships":
-		fmt.Printf("\n%-20s → %-20s %-30s\n", "From", "To", "Label")
-		fmt.Println(strings.Repeat("-", 70))
-		rels := make([]model.Relationship, len(s.model.Relationships))
-		copy(rels, s.model.Relationships)
-		sort.Slice(rels, func(i, j int) bool {
-			if rels[i].From != rels[j].From {
-				return rels[i].From < rels[j].From
-			}
-			if rels[i].To != rels[j].To {
-				return rels[i].To < rels[j].To
-			}
-			return rels[i].Label < rels[j].Label
-		})
-		for _, rel := range rels {
-			fmt.Printf("%-20s → %-20s %-30s\n", rel.From, rel.To, rel.Label)
-		}
-
+		s.listRelationships()
 	case "views":
-		keys := make([]string, 0, len(s.model.Views))
-		for k := range s.model.Views {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-		fmt.Printf("\n%-20s %-50s\n", "Key", "Title")
-		fmt.Println(strings.Repeat("-", 70))
-		for _, key := range keys {
-			fmt.Printf("%-20s %-50s\n", key, s.model.Views[key].Title)
-		}
+		s.listViews()
 	}
 	fmt.Println()
+}
+
+func (s *replState) listElements() {
+	flat, _ := model.FlattenElements(s.model)
+	ids := make([]string, 0, len(flat))
+	for id := range flat {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	fmt.Printf("\n%-30s %-15s %-40s\n", "ID", "Kind", "Title")
+	fmt.Println(strings.Repeat("-", 85))
+	for _, id := range ids {
+		elem := flat[id]
+		fmt.Printf("%-30s %-15s %-40s\n", id, elem.Kind, elem.Title)
+	}
+}
+
+func (s *replState) listRelationships() {
+	fmt.Printf("\n%-20s → %-20s %-30s\n", "From", "To", "Label")
+	fmt.Println(strings.Repeat("-", 70))
+	rels := make([]model.Relationship, len(s.model.Relationships))
+	copy(rels, s.model.Relationships)
+	sort.Slice(rels, func(i, j int) bool {
+		if rels[i].From != rels[j].From {
+			return rels[i].From < rels[j].From
+		}
+		if rels[i].To != rels[j].To {
+			return rels[i].To < rels[j].To
+		}
+		return rels[i].Label < rels[j].Label
+	})
+	for _, rel := range rels {
+		fmt.Printf("%-20s → %-20s %-30s\n", rel.From, rel.To, rel.Label)
+	}
+}
+
+func (s *replState) listViews() {
+	keys := make([]string, 0, len(s.model.Views))
+	for k := range s.model.Views {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	fmt.Printf("\n%-20s %-50s\n", "Key", "Title")
+	fmt.Println(strings.Repeat("-", 70))
+	for _, key := range keys {
+		fmt.Printf("%-20s %-50s\n", key, s.model.Views[key].Title)
+	}
 }
 
 func (s *replState) addCommand(parts []string) {
@@ -240,84 +250,28 @@ func (s *replState) addCommand(parts []string) {
 }
 
 func (s *replState) addElementInteractive() {
-	fmt.Print("Element ID: ")
-	s.scanner.Scan()
-	id := strings.TrimSpace(s.scanner.Text())
-	if id == "" {
-		fmt.Println("Aborted (empty ID)")
-		return
-	}
-	if !isValidKey(id) {
-		fmt.Printf("Invalid ID %q: must start with a letter and contain only letters, digits, hyphens, or underscores\n", id)
+	id, ok := s.promptElementID()
+	if !ok {
 		return
 	}
 
 	if existing, exists := s.model.Model[id]; exists {
-		fmt.Printf("Element '%s' already exists.\n", id)
-		fmt.Printf("  Updating:  kind, title, description\n")
-		preserved := []string{}
-		if len(existing.Children) > 0 {
-			preserved = append(preserved, fmt.Sprintf("%d child(ren)", len(existing.Children)))
-		}
-		if existing.Technology != "" {
-			preserved = append(preserved, "technology")
-		}
-		if len(existing.Tags) > 0 {
-			preserved = append(preserved, "tags")
-		}
-		if existing.Status != "" {
-			preserved = append(preserved, "status")
-		}
-		if len(existing.Decisions) > 0 {
-			preserved = append(preserved, "decisions")
-		}
-		if len(existing.Metadata) > 0 {
-			preserved = append(preserved, "metadata")
-		}
-		if len(preserved) > 0 {
-			fmt.Printf("  Preserving: %s\n", strings.Join(preserved, ", "))
-		}
-		fmt.Print("Overwrite? (yes/no): ")
-		s.scanner.Scan()
-		if strings.ToLower(strings.TrimSpace(s.scanner.Text())) != "yes" {
-			fmt.Println("Aborted")
+		if !s.confirmOverwriteExistingElement(id, existing) {
 			return
 		}
 	}
 
-	fmt.Print("Kind: ")
-	s.scanner.Scan()
-	kind := strings.TrimSpace(s.scanner.Text())
-	if kind == "" {
-		fmt.Println("Aborted (kind must not be empty)")
-		return
-	}
-	if len(s.model.Specification.Elements) > 0 {
-		if _, ok := s.model.Specification.Elements[kind]; !ok {
-			fmt.Printf("Unknown kind %q; valid kinds: %s\n", kind, validKinds(s.model))
-			return
-		}
-	}
-
-	fmt.Print("Title: ")
-	s.scanner.Scan()
-	title := strings.TrimSpace(s.scanner.Text())
-	if title == "" {
-		fmt.Println("Aborted (title must not be empty)")
+	kind, ok := s.promptElementKind()
+	if !ok {
 		return
 	}
 
-	existingDesc := s.model.Model[id].Description
-	if existingDesc != "" {
-		fmt.Printf("Description (optional) [%s]: ", existingDesc)
-	} else {
-		fmt.Print("Description (optional): ")
+	title, ok := s.promptElementTitle()
+	if !ok {
+		return
 	}
-	s.scanner.Scan()
-	desc := strings.TrimSpace(s.scanner.Text())
-	if desc == "" {
-		desc = existingDesc
-	}
+
+	desc := s.promptElementDescription(s.model.Model[id].Description)
 
 	if !s.saveUndo() {
 		fmt.Println("(warning: undo not available for this change)")
@@ -332,6 +286,113 @@ func (s *replState) addElementInteractive() {
 	s.model.Model[id] = updated
 	s.modified = true
 	fmt.Printf("✅ Added element '%s'\n", id)
+}
+
+// promptElementID prompts for and validates a new/existing element ID.
+func (s *replState) promptElementID() (string, bool) {
+	fmt.Print("Element ID: ")
+	s.scanner.Scan()
+	id := strings.TrimSpace(s.scanner.Text())
+	if id == "" {
+		fmt.Println("Aborted (empty ID)")
+		return "", false
+	}
+	if !isValidKey(id) {
+		fmt.Printf("Invalid ID %q: must start with a letter and contain only letters, digits, hyphens, or underscores\n", id)
+		return "", false
+	}
+	return id, true
+}
+
+// confirmOverwriteExistingElement tells the user which fields of an
+// existing element addElementInteractive will overwrite vs. preserve, and
+// asks for confirmation. Reports whether the user confirmed.
+func (s *replState) confirmOverwriteExistingElement(id string, existing model.Element) bool {
+	fmt.Printf("Element '%s' already exists.\n", id)
+	fmt.Printf("  Updating:  kind, title, description\n")
+	if preserved := describePreservedFields(existing); len(preserved) > 0 {
+		fmt.Printf("  Preserving: %s\n", strings.Join(preserved, ", "))
+	}
+	fmt.Print("Overwrite? (yes/no): ")
+	s.scanner.Scan()
+	if strings.ToLower(strings.TrimSpace(s.scanner.Text())) != "yes" {
+		fmt.Println("Aborted")
+		return false
+	}
+	return true
+}
+
+// describePreservedFields lists existing's non-empty fields that
+// addElementInteractive does not prompt for, so the user knows they will
+// survive an overwrite.
+func describePreservedFields(existing model.Element) []string {
+	var preserved []string
+	if len(existing.Children) > 0 {
+		preserved = append(preserved, fmt.Sprintf("%d child(ren)", len(existing.Children)))
+	}
+	if existing.Technology != "" {
+		preserved = append(preserved, "technology")
+	}
+	if len(existing.Tags) > 0 {
+		preserved = append(preserved, "tags")
+	}
+	if existing.Status != "" {
+		preserved = append(preserved, "status")
+	}
+	if len(existing.Decisions) > 0 {
+		preserved = append(preserved, "decisions")
+	}
+	if len(existing.Metadata) > 0 {
+		preserved = append(preserved, "metadata")
+	}
+	return preserved
+}
+
+// promptElementKind prompts for and validates a kind against the
+// specification (if one is defined).
+func (s *replState) promptElementKind() (string, bool) {
+	fmt.Print("Kind: ")
+	s.scanner.Scan()
+	kind := strings.TrimSpace(s.scanner.Text())
+	if kind == "" {
+		fmt.Println("Aborted (kind must not be empty)")
+		return "", false
+	}
+	if len(s.model.Specification.Elements) > 0 {
+		if _, ok := s.model.Specification.Elements[kind]; !ok {
+			fmt.Printf("Unknown kind %q; valid kinds: %s\n", kind, validKinds(s.model))
+			return "", false
+		}
+	}
+	return kind, true
+}
+
+// promptElementTitle prompts for a non-empty title.
+func (s *replState) promptElementTitle() (string, bool) {
+	fmt.Print("Title: ")
+	s.scanner.Scan()
+	title := strings.TrimSpace(s.scanner.Text())
+	if title == "" {
+		fmt.Println("Aborted (title must not be empty)")
+		return "", false
+	}
+	return title, true
+}
+
+// promptElementDescription prompts for an optional description, defaulting
+// to existingDesc (shown as the prompt's bracketed default) when left blank.
+func (s *replState) promptElementDescription(existingDesc string) string {
+	if existingDesc != "" {
+		fmt.Printf("Description (optional) [%s]: ", existingDesc)
+	} else {
+		fmt.Print("Description (optional): ")
+	}
+	s.scanner.Scan()
+	desc := strings.TrimSpace(s.scanner.Text())
+	if desc == "" {
+		desc = existingDesc
+	}
+	return desc
 }
 
 func (s *replState) addRelationshipInteractive() {
@@ -407,7 +468,6 @@ func (s *replState) removeCommand(parts []string) {
 	}
 
 	pushed := s.saveUndo()
-
 	popUndo := func() {
 		if pushed && len(s.undoStack) > 0 {
 			s.undoStack = s.undoStack[:len(s.undoStack)-1]
@@ -416,46 +476,58 @@ func (s *replState) removeCommand(parts []string) {
 
 	switch parts[0] {
 	case "element":
-		id := parts[1]
-		// Only top-level elements can be removed this way; nested children
-		// (dot-path IDs like "shop.api") must be edited in the JSONC directly.
-		if _, exists := s.model.Model[id]; !exists {
-			fmt.Printf("Element '%s' not found (nested elements must be edited in the model file)\n", id)
-			popUndo()
-			return
-		}
-		delete(s.model.Model, id)
-		s.modified = true
-		fmt.Printf("✅ Removed element '%s'\n", id)
-
+		s.removeElementCommand(parts[1], popUndo)
 	case "relationship":
-		if len(parts) < 3 {
-			fmt.Println("Usage: remove relationship <from> <to> [label]")
-			popUndo()
-			return
+		s.removeRelationshipCommand(parts[1:], popUndo)
+	}
+}
+
+// removeElementCommand removes a top-level element from the model. Only
+// top-level elements can be removed this way; nested children (dot-path IDs
+// like "shop.api") must be edited in the JSONC directly. popUndo rolls back
+// the undo-stack push removeCommand already made, if this ends up a no-op.
+func (s *replState) removeElementCommand(id string, popUndo func()) {
+	if _, exists := s.model.Model[id]; !exists {
+		fmt.Printf("Element '%s' not found (nested elements must be edited in the model file)\n", id)
+		popUndo()
+		return
+	}
+	delete(s.model.Model, id)
+	s.modified = true
+	fmt.Printf("✅ Removed element '%s'\n", id)
+}
+
+// removeRelationshipCommand removes the first relationship matching
+// args[0]->args[1] (and, if given, the label in args[2:]). popUndo rolls
+// back the undo-stack push removeCommand already made, if this ends up a
+// no-op (usage error or no match found).
+func (s *replState) removeRelationshipCommand(args []string, popUndo func()) {
+	if len(args) < 2 {
+		fmt.Println("Usage: remove relationship <from> <to> [label]")
+		popUndo()
+		return
+	}
+	from, to := args[0], args[1]
+	wantLabel := ""
+	if len(args) >= 3 {
+		wantLabel = strings.Join(args[2:], " ")
+	}
+	removed := false
+	rels := s.model.Relationships[:0]
+	for _, r := range s.model.Relationships {
+		if !removed && r.From == from && r.To == to && (wantLabel == "" || r.Label == wantLabel) {
+			removed = true
+			continue
 		}
-		from, to := parts[1], parts[2]
-		wantLabel := ""
-		if len(parts) >= 4 {
-			wantLabel = strings.Join(parts[3:], " ")
-		}
-		removed := false
-		rels := s.model.Relationships[:0]
-		for _, r := range s.model.Relationships {
-			if !removed && r.From == from && r.To == to && (wantLabel == "" || r.Label == wantLabel) {
-				removed = true
-				continue
-			}
-			rels = append(rels, r)
-		}
-		s.model.Relationships = rels
-		if removed {
-			s.modified = true
-			fmt.Printf("✅ Removed relationship %s → %s\n", from, to)
-		} else {
-			fmt.Printf("Relationship %s → %s not found\n", from, to)
-			popUndo()
-		}
+		rels = append(rels, r)
+	}
+	s.model.Relationships = rels
+	if removed {
+		s.modified = true
+		fmt.Printf("✅ Removed relationship %s → %s\n", from, to)
+	} else {
+		fmt.Printf("Relationship %s → %s not found\n", from, to)
+		popUndo()
 	}
 }
 
