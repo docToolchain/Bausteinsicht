@@ -46,8 +46,18 @@ func Apply(drawioPath string, metrics *MetricsFile, metricKey string, scheme Col
 	normalized := Normalize(extracted, higherIsBetter)
 
 	root := doc.Root()
+	applyColorToMxCells(root, normalized, scheme)
+	applyColorToObjectWrappedCells(root, normalized, scheme)
 
-	// Bare mxCell children (hand-crafted or connector elements)
+	if err := doc.WriteToFile(drawioPath); err != nil {
+		return fmt.Errorf("writing draw.io file: %w", err)
+	}
+	return nil
+}
+
+// applyColorToMxCells colors bare mxCell children (hand-crafted or
+// connector elements), keyed by their own "id" attribute.
+func applyColorToMxCells(root *etree.Element, normalized map[string]float64, scheme ColorScheme) {
 	for _, cell := range root.FindElements(".//mxGraphModel/root/mxCell") {
 		elementID := cell.SelectAttrValue("id", "")
 		if elementID == "" || elementID == "0" || elementID == "1" {
@@ -57,9 +67,12 @@ func Apply(drawioPath string, metrics *MetricsFile, metricKey string, scheme Col
 			applyColor(cell, normVal, scheme)
 		}
 	}
+}
 
-	// <object>-wrapped elements (bausteinsicht sync output).
-	// Match on bausteinsicht_id so metrics.json uses model IDs, not page-scoped draw.io IDs.
+// applyColorToObjectWrappedCells colors <object>-wrapped elements
+// (bausteinsicht sync output). Matches on bausteinsicht_id so metrics.json
+// uses model IDs, not page-scoped draw.io IDs.
+func applyColorToObjectWrappedCells(root *etree.Element, normalized map[string]float64, scheme ColorScheme) {
 	for _, obj := range root.FindElements(".//mxGraphModel/root/object") {
 		bsID := obj.SelectAttrValue("bausteinsicht_id", "")
 		if bsID == "" {
@@ -72,11 +85,6 @@ func Apply(drawioPath string, metrics *MetricsFile, metricKey string, scheme Col
 			}
 		}
 	}
-
-	if err := doc.WriteToFile(drawioPath); err != nil {
-		return fmt.Errorf("writing draw.io file: %w", err)
-	}
-	return nil
 }
 
 func Remove(drawioPath string) error {

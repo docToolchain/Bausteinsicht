@@ -426,3 +426,31 @@ func TestApply_InvalidMetricKey(t *testing.T) {
 		t.Error("expected error for unknown metric key, got nil")
 	}
 }
+
+// TestApply_FileNotFound covers Apply's ReadFromFile error branch.
+func TestApply_FileNotFound(t *testing.T) {
+	metrics := metricsFor(map[string]float64{"a": 50})
+	err := Apply("/nonexistent/path.drawio", metrics, "coverage", DefaultColorScheme)
+	if err == nil {
+		t.Error("expected error for a nonexistent draw.io file, got nil")
+	}
+}
+
+// TestApply_ObjectWithoutBausteinsichtID covers
+// applyColorToObjectWrappedCells' bsID=="" skip branch: an <object> element
+// with no bausteinsicht_id attribute at all (unlike drawioWithObjects,
+// which always sets one).
+func TestApply_ObjectWithoutBausteinsichtID(t *testing.T) {
+	xml := `<?xml version="1.0"?><mxfile><diagram><mxGraphModel><root>` +
+		`<mxCell id="0"/><mxCell id="1" parent="0"/>` +
+		`<object id="stray-obj"><mxCell style="fillColor=#ffffff;" vertex="1" parent="1"/></object>` +
+		`</root></mxGraphModel></diagram></mxfile>`
+	path := writeTempDrawio(t, xml)
+	metrics := metricsFor(map[string]float64{"stray-obj": 50})
+
+	if err := Apply(path, metrics, "coverage", DefaultColorScheme); err != nil {
+		t.Fatalf("Apply: %v", err)
+	}
+	// No assertion beyond "did not panic/error" — the object has no
+	// bausteinsicht_id, so it must simply be skipped, not matched.
+}

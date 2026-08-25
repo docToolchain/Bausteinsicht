@@ -25,57 +25,59 @@ func newSnapshotDiffCmd() *cobra.Command {
 }
 
 func runSnapshotDiff(cmd *cobra.Command, args []string) error {
-	snapshotID1 := args[0]
 	format, _ := cmd.Flags().GetString("format")
 	modelPath, _ := cmd.Flags().GetString("model")
 
 	manager := snapshot.NewManager(".")
 
-	// Load first snapshot
-	if !manager.Exists(snapshotID1) {
-		return exitWithCode(fmt.Errorf("snapshot not found: %s", snapshotID1), 2)
-	}
-
-	snap1, err := manager.Load(snapshotID1)
+	model1, err := loadSnapshotModel(manager, args[0])
 	if err != nil {
-		return exitWithCode(fmt.Errorf("loading snapshot %s: %w", snapshotID1, err), 2)
-	}
-	if snap1 == nil || snap1.Model == nil {
-		return exitWithCode(fmt.Errorf("snapshot %s contains no model data", snapshotID1), 1)
+		return err
 	}
 
-	var model2 *model.BausteinsichtModel
+	model2, err := resolveSecondModel(manager, args, modelPath)
+	if err != nil {
+		return err
+	}
 
-	// Load second snapshot or current state
+	diffs := diffModels(model1, model2)
+	return writeDiffOutput(cmd, diffs, format)
+}
+
+// loadSnapshotModel loads snapshot id and returns its model, failing if the
+// snapshot doesn't exist or carries no model data.
+func loadSnapshotModel(manager *snapshot.Manager, id string) (*model.BausteinsichtModel, error) {
+	if !manager.Exists(id) {
+		return nil, exitWithCode(fmt.Errorf("snapshot not found: %s", id), 2)
+	}
+	snap, err := manager.Load(id)
+	if err != nil {
+		return nil, exitWithCode(fmt.Errorf("loading snapshot %s: %w", id, err), 2)
+	}
+	if snap == nil || snap.Model == nil {
+		return nil, exitWithCode(fmt.Errorf("snapshot %s contains no model data", id), 1)
+	}
+	return snap.Model, nil
+}
+
+// resolveSecondModel returns the second comparand: a second snapshot's
+// model when args carries two IDs, otherwise the current on-disk model.
+func resolveSecondModel(manager *snapshot.Manager, args []string, modelPath string) (*model.BausteinsichtModel, error) {
 	if len(args) == 2 {
-		snapshotID2 := args[1]
-		if !manager.Exists(snapshotID2) {
-			return exitWithCode(fmt.Errorf("snapshot not found: %s", snapshotID2), 2)
-		}
-		snap2, err := manager.Load(snapshotID2)
-		if err != nil {
-			return exitWithCode(fmt.Errorf("loading snapshot %s: %w", snapshotID2, err), 2)
-		}
-		if snap2 == nil || snap2.Model == nil {
-			return exitWithCode(fmt.Errorf("snapshot %s contains no model data", snapshotID2), 1)
-		}
-		model2 = snap2.Model
-	} else {
-		// Load current model
-		if modelPath == "" {
-			modelPath = "architecture.jsonc"
-		}
-		m, err := model.Load(modelPath)
-		if err != nil {
-			return exitWithCode(fmt.Errorf("loading current model: %w", err), 2)
-		}
-		model2 = m
+		return loadSnapshotModel(manager, args[1])
 	}
+	if modelPath == "" {
+		modelPath = "architecture.jsonc"
+	}
+	m, err := model.Load(modelPath)
+	if err != nil {
+		return nil, exitWithCode(fmt.Errorf("loading current model: %w", err), 2)
+	}
+	return m, nil
+}
 
-	// Compare models
-	diffs := diffModels(snap1.Model, model2)
-
-	// Output results
+// writeDiffOutput renders diffs in the requested format to cmd's stdout.
+func writeDiffOutput(cmd *cobra.Command, diffs *ModelDiff, format string) error {
 	switch format {
 	case "json":
 		data, err := json.MarshalIndent(diffs, "", "  ")
@@ -88,7 +90,6 @@ func runSnapshotDiff(cmd *cobra.Command, args []string) error {
 	default:
 		return exitWithCode(fmt.Errorf("unknown format: %s", format), 2)
 	}
-
 	return nil
 }
 
