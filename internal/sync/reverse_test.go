@@ -893,3 +893,249 @@ func TestApplyReverse_DeletedElementCleansNestedRelationships(t *testing.T) {
 		t.Errorf("expected RelationshipsDeleted=2, got %d", r.RelationshipsDeleted)
 	}
 }
+
+// TestApplyReverse_RelationshipLabelUpdated_FallbackByFromTo covers
+// relabelRelationshipByFromTo: when ch.Index no longer lines up with the
+// model's current array position (e.g. after a reorder), the label update
+// must still find the relationship by from/to.
+func TestApplyReverse_RelationshipLabelUpdated_FallbackByFromTo(t *testing.T) {
+	m := modelWithRel("a", "b", "old label")
+	cs := relChangeSet("a", "b", Modified, "label", "old label", "new label")
+	cs.DrawioRelationshipChanges[0].Index = 5 // stale/mismatched index
+
+	r := ApplyReverse(cs, m, nil)
+
+	if m.Relationships[0].Label != "new label" {
+		t.Errorf("expected label %q via fallback, got %q", "new label", m.Relationships[0].Label)
+	}
+	if r.RelationshipsUpdated != 1 {
+		t.Errorf("expected RelationshipsUpdated=1, got %d", r.RelationshipsUpdated)
+	}
+}
+
+// TestApplyReverse_RelationshipDeleted_FallbackByFromTo covers
+// filterRelationships via applyReverseRelationshipDeleted's fallback path:
+// a stale ch.Index must not prevent the relationship from being found and
+// deleted by from/to.
+func TestApplyReverse_RelationshipDeleted_FallbackByFromTo(t *testing.T) {
+	m := modelWithRel("a", "b", "calls")
+	cs := relChangeSet("a", "b", Deleted, "", "", "")
+	cs.DrawioRelationshipChanges[0].Index = 5 // stale/mismatched index
+
+	r := ApplyReverse(cs, m, nil)
+
+	if len(m.Relationships) != 0 {
+		t.Errorf("expected relationship to be removed via fallback, got %d remaining", len(m.Relationships))
+	}
+	if r.RelationshipsDeleted != 1 {
+		t.Errorf("expected RelationshipsDeleted=1, got %d", r.RelationshipsDeleted)
+	}
+}
+
+// TestApplyReverse_RelationshipLabelUpdated_IndexMismatchFallsBack covers
+// relabelRelationshipByIndex's from/to-mismatch branch: ch.Index is within
+// bounds but points at a different relationship, so the update must still
+// find the right one via the from/to fallback (not just an out-of-range
+// index, which TestApplyReverse_RelationshipLabelUpdated_FallbackByFromTo
+// already covers).
+func TestApplyReverse_RelationshipLabelUpdated_IndexMismatchFallsBack(t *testing.T) {
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"a": {Kind: "container", Title: "a"},
+			"b": {Kind: "container", Title: "b"},
+			"c": {Kind: "container", Title: "c"},
+		},
+		Relationships: []model.Relationship{
+			{From: "a", To: "c", Label: "unrelated"},
+			{From: "a", To: "b", Label: "old label"},
+		},
+	}
+	cs := relChangeSet("a", "b", Modified, "label", "old label", "new label")
+	cs.DrawioRelationshipChanges[0].Index = 0 // in bounds, but that slot is a->c, not a->b
+
+	r := ApplyReverse(cs, m, nil)
+
+	if m.Relationships[1].Label != "new label" {
+		t.Errorf("expected label %q via fallback, got %q", "new label", m.Relationships[1].Label)
+	}
+	if r.RelationshipsUpdated != 1 {
+		t.Errorf("expected RelationshipsUpdated=1, got %d", r.RelationshipsUpdated)
+	}
+}
+
+// TestApplyReverse_RelationshipDeleted_IndexMismatchFallsBack is the delete
+// counterpart of the index-mismatch-fallback case above.
+func TestApplyReverse_RelationshipDeleted_IndexMismatchFallsBack(t *testing.T) {
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"a": {Kind: "container", Title: "a"},
+			"b": {Kind: "container", Title: "b"},
+			"c": {Kind: "container", Title: "c"},
+		},
+		Relationships: []model.Relationship{
+			{From: "a", To: "c", Label: "unrelated"},
+			{From: "a", To: "b", Label: "calls"},
+		},
+	}
+	cs := relChangeSet("a", "b", Deleted, "", "", "")
+	cs.DrawioRelationshipChanges[0].Index = 0 // in bounds, but that slot is a->c, not a->b
+
+	r := ApplyReverse(cs, m, nil)
+
+	if len(m.Relationships) != 1 || m.Relationships[0].To != "c" {
+		t.Errorf("expected only a->c to remain, got %+v", m.Relationships)
+	}
+	if r.RelationshipsDeleted != 1 {
+		t.Errorf("expected RelationshipsDeleted=1, got %d", r.RelationshipsDeleted)
+	}
+}
+
+// TestApplyReverse_RelationshipAddedToElementMissing is the "To" side
+// counterpart of TestApplyReverse_RelationshipAddedStaleElementsRejected
+// (which only covers a missing "From").
+func TestApplyReverse_RelationshipAddedToElementMissing(t *testing.T) {
+	m := modelWithRel("x", "y", "")
+	m.Relationships = []model.Relationship{}
+	cs := relChangeSet("x", "nonexistent", Added, "", "", "uses")
+
+	r := ApplyReverse(cs, m, nil)
+
+	if len(m.Relationships) != 0 {
+		t.Fatalf("expected 0 relationships (stale rejected), got %d", len(m.Relationships))
+	}
+	warnText := strings.Join(r.Warnings, "; ")
+	if !strings.Contains(warnText, "nonexistent") || !strings.Contains(warnText, "does not exist") {
+		t.Errorf("expected warning mentioning non-existent To element, got: %s", warnText)
+	}
+}
+
+// TestApplyReverse_ElementAddedAlreadySyncedSkipped covers the
+// "already synced from draw.io before" skip branch: the element exists in
+// the model AND was recorded in the last sync state, so a re-appearing
+// Added change (e.g. the element moved to another page) is a silent no-op.
+func TestApplyReverse_ElementAddedAlreadySyncedSkipped(t *testing.T) {
+	m := simpleModel("api", "API", "", "")
+	cs := elemChangeSet("api", Added, "", "", "API")
+	lastState := &SyncState{
+		Timestamp: "2026-01-01T00:00:00Z",
+		Elements:  map[string]ElementState{"api": {Title: "API", Kind: "container"}},
+	}
+
+	r := ApplyReverse(cs, m, lastState)
+
+	if r.ElementsCreated != 0 {
+		t.Errorf("expected 0 elements created (already synced), got %d", r.ElementsCreated)
+	}
+	if len(r.Warnings) != 0 {
+		t.Errorf("expected no warnings for an element already synced before, got: %v", r.Warnings)
+	}
+}
+
+// TestApplyReverse_ElementDeletedNotFoundWarns covers deleteElement's error
+// path: a Deleted change for an ID that doesn't exist in the model at all.
+func TestApplyReverse_ElementDeletedNotFoundWarns(t *testing.T) {
+	m := simpleModel("api", "API", "", "")
+	cs := elemChangeSet("nonexistent", Deleted, "", "", "")
+
+	r := ApplyReverse(cs, m, nil)
+
+	if r.ElementsDeleted != 0 {
+		t.Errorf("expected 0 elements deleted, got %d", r.ElementsDeleted)
+	}
+	warnText := strings.Join(r.Warnings, "; ")
+	if !strings.Contains(warnText, "could not be deleted") {
+		t.Errorf("expected a \"could not be deleted\" warning, got: %s", warnText)
+	}
+}
+
+// TestApplyReverse_ElementAddedNilModelMap covers applyReverseElementAdded's
+// m.Model-is-nil initialization branch.
+func TestApplyReverse_ElementAddedNilModelMap(t *testing.T) {
+	m := &model.BausteinsichtModel{
+		Specification: model.Specification{
+			Elements: map[string]model.ElementKind{"container": {Notation: "box"}},
+		},
+	}
+	cs := elemChangeSet("newElem", Added, "", "", "New Element")
+
+	r := ApplyReverse(cs, m, nil)
+
+	if r.ElementsCreated != 1 {
+		t.Fatalf("expected 1 element created, got %d", r.ElementsCreated)
+	}
+	if _, ok := m.Model["newElem"]; !ok {
+		t.Error("expected new element to be present in the initialized Model map")
+	}
+}
+
+// TestApplyReverse_RelationshipAddedDuplicateWithPageID covers the
+// pageInfo-in-warning branch of applyReverseRelationshipAdded: a duplicate
+// relationship rejection where the incoming change carries a draw.io PageID.
+func TestApplyReverse_RelationshipAddedDuplicateWithPageID(t *testing.T) {
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"a": {Kind: "container", Title: "A"},
+			"b": {Kind: "container", Title: "B"},
+		},
+		Relationships: []model.Relationship{
+			{From: "a", To: "b", Label: "uses"}, // index 0, present in model but never synced from draw.io
+		},
+	}
+	lastState := &SyncState{
+		Timestamp: "2026-07-26T00:00:00Z", // a prior sync completed
+	}
+	cs := &ChangeSet{
+		DrawioRelationshipChanges: []RelationshipChange{
+			{From: "a", To: "b", Index: 0, Type: Added, NewValue: "uses", PageID: "view-context"},
+		},
+	}
+
+	r := ApplyReverse(cs, m, lastState)
+
+	if len(m.Relationships) != 1 {
+		t.Fatalf("expected the duplicate to be rejected, got %d relationships", len(m.Relationships))
+	}
+	warnText := strings.Join(r.Warnings, "; ")
+	if !strings.Contains(warnText, "view-context") {
+		t.Errorf("expected warning to mention the draw.io page, got: %s", warnText)
+	}
+}
+
+// TestApplyReverse_RelationshipAddedAlreadySyncedSkipped covers the
+// lastRelMap-hit branch: the relationship was already synced from draw.io
+// in a previous sync (e.g. it now appears on a different page), so a
+// re-appearing Added change is a silent no-op.
+func TestApplyReverse_RelationshipAddedAlreadySyncedSkipped(t *testing.T) {
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"a": {Kind: "container", Title: "A"},
+			"b": {Kind: "container", Title: "B"},
+		},
+		Relationships: []model.Relationship{
+			{From: "a", To: "b", Label: "uses"},
+		},
+	}
+	lastState := &SyncState{
+		Timestamp: "2026-07-26T00:00:00Z",
+		Relationships: []RelationshipState{
+			{From: "a", To: "b", Index: 0, Label: "uses"},
+		},
+	}
+	cs := &ChangeSet{
+		DrawioRelationshipChanges: []RelationshipChange{
+			{From: "a", To: "b", Index: 0, Type: Added, NewValue: "uses"},
+		},
+	}
+
+	r := ApplyReverse(cs, m, lastState)
+
+	if len(m.Relationships) != 1 {
+		t.Fatalf("expected no new relationship, got %d", len(m.Relationships))
+	}
+	if r.RelationshipsCreated != 0 {
+		t.Errorf("expected RelationshipsCreated=0, got %d", r.RelationshipsCreated)
+	}
+	if len(r.Warnings) != 0 {
+		t.Errorf("expected no warnings for an already-synced relationship, got: %v", r.Warnings)
+	}
+}
