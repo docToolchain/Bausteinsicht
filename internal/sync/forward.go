@@ -101,6 +101,23 @@ type ForwardResult struct {
 	Warnings          []string
 }
 
+// forwardRenderInputs bundles the read-only inputs threaded through the
+// forward-sync render pipeline below: the change set being built, the
+// target document/page, style templates, the flattened/full model, and the
+// result accumulator. Most S107 "too many parameters" findings in this file
+// were the same 4-6 of these values being passed individually through a
+// dozen-plus functions; page is unset (nil) above the point where a
+// specific view's page has been resolved.
+type forwardRenderInputs struct {
+	cs        *ChangeSet
+	doc       *drawio.Document
+	page      *drawio.Page
+	templates *drawio.TemplateSet
+	flat      map[string]*model.Element
+	model     *model.BausteinsichtModel
+	result    *ForwardResult
+}
+
 // ApplyForward applies ModelElementChanges and ModelRelationshipChanges from cs
 // to doc, using templates for styles and m for element data.
 // When the model defines views, elements and relationships are placed on their
@@ -121,55 +138,42 @@ func ApplyForward(
 		fwdOpts = opts[0]
 	}
 
+	in := forwardRenderInputs{cs: cs, doc: doc, templates: templates, flat: flat, model: m, result: result}
+
 	if len(m.Views) == 0 {
-		applyForwardToPage(cs, doc, templates, flat, nil, m, result)
+		applyForwardToPage(in, nil)
 		return result
 	}
 
-	applyForwardPerView(cs, doc, templates, flat, m, &fwdOpts, result)
+	applyForwardPerView(in, &fwdOpts)
 	return result
 }
 
 // applyForwardToPage applies all changes to a single page (legacy/no-views mode).
-func applyForwardToPage(
-	cs *ChangeSet,
-	doc *drawio.Document,
-	templates *drawio.TemplateSet,
-	flat map[string]*model.Element,
-	elemFilter map[string]bool,
-	m *model.BausteinsichtModel,
-	result *ForwardResult,
-) {
-	page := firstPage(doc)
+func applyForwardToPage(in forwardRenderInputs, elemFilter map[string]bool) {
+	page := firstPage(in.doc)
 	if page == nil {
-		result.Warnings = append(result.Warnings, "no page found in document")
+		in.result.Warnings = append(in.result.Warnings, "no page found in document")
 		return
 	}
-	applyChangesToPage(cs, page, templates, flat, elemFilter, "", "", &m.Specification, result)
+	in.page = page
+	applyChangesToPage(in, elemFilter, "", "")
 
 	// Reconcile orphaned elements: remove any element on the page whose
 	// bausteinsicht_id is not present in the current model. This handles
 	// cases where the sync state is missing or the model was emptied. (#110)
-	reconcileOrphanedElements(page, flat, result)
+	reconcileOrphanedElements(page, in.flat, in.result)
 
 	// Synchronize documentation-link icons (element Link/Decisions/DocLinks) with the model. (#543)
-	synchronizeDocLinkIcons(page, m)
+	synchronizeDocLinkIcons(page, in.model)
 }
 
 // applyForwardPerView iterates over model views and applies changes per page.
-func applyForwardPerView(
-	cs *ChangeSet,
-	doc *drawio.Document,
-	templates *drawio.TemplateSet,
-	flat map[string]*model.Element,
-	m *model.BausteinsichtModel,
-	opts *ForwardOptions,
-	result *ForwardResult,
-) {
-	drillDownLinks := buildDrillDownLinks(m)
+func applyForwardPerView(in forwardRenderInputs, opts *ForwardOptions) {
+	drillDownLinks := buildDrillDownLinks(in.model)
 
-	for viewID, view := range m.Views {
-		applyForwardToView(cs, doc, templates, flat, m, opts, viewID, view, drillDownLinks, result)
+	for viewID, view := range in.model.Views {
+		applyForwardToView(in, opts, viewID, view, drillDownLinks)
 	}
 }
 
@@ -189,29 +193,20 @@ func buildDrillDownLinks(m *model.BausteinsichtModel) map[string]string {
 // applyForwardToView runs the full forward-sync pipeline for a single view's
 // page: placement of new elements, model changes, connectors, reconciliation,
 // drill-down links, back navigation, metadata/legend, and doc-link icons.
-func applyForwardToView(
-	cs *ChangeSet,
-	doc *drawio.Document,
-	templates *drawio.TemplateSet,
-	flat map[string]*model.Element,
-	m *model.BausteinsichtModel,
-	opts *ForwardOptions,
-	viewID string,
-	view model.View,
-	drillDownLinks map[string]string,
-	result *ForwardResult,
-) {
+func applyForwardToView(in forwardRenderInputs, opts *ForwardOptions, viewID string, view model.View, drillDownLinks map[string]string) {
+	m := in.model
 	pageID := "view-" + viewID
-	page := doc.GetPage(pageID)
+	page := in.doc.GetPage(pageID)
 	if page == nil {
-		result.Warnings = append(result.Warnings, "no page found for view: "+viewID)
+		in.result.Warnings = append(in.result.Warnings, "no page found for view: "+viewID)
 		return
 	}
+	in.page = page
 
 	viewCopy := view
 	resolved, err := model.ResolveView(m, &viewCopy)
 	if err != nil {
-		result.Warnings = append(result.Warnings, "resolving view "+viewID+": "+err.Error())
+		in.result.Warnings = append(in.result.Warnings, "resolving view "+viewID+": "+err.Error())
 		return
 	}
 
@@ -229,7 +224,7 @@ func applyForwardToView(
 	}
 
 	if scopeID != "" {
-		createScopeBoundary(scopeID, viewID, page, templates, flat, &m.Specification, result)
+		createScopeBoundary(scopeID, viewID, page, in.templates, in.flat, &m.Specification, in.result)
 		// Include scope element in the filter so connectors targeting the
 		// boundary element are rendered (#217).
 		elemSet[scopeID] = true
@@ -240,22 +235,22 @@ func applyForwardToView(
 	// position elements on fresh pages. applyChangesToPage will then
 	// skip Added elements that are already placed. For existing pages,
 	// this handles elements newly included via view changes (#231).
-	populateNewPage(page, viewID, scopeID, templates, flat, elemSet, m, result)
+	populateNewPage(in, viewID, scopeID, elemSet)
 
-	applyChangesToPage(cs, page, templates, flat, elemSet, viewID, scopeID, &m.Specification, result)
+	applyChangesToPage(in, elemSet, viewID, scopeID)
 
 	// Populate connectors for relationships whose endpoints are both
 	// on the page but whose connector doesn't exist yet. This handles
 	// relationships involving newly populated elements (#231).
-	populateConnectors(page, viewID, scopeID, m, elemSet, templates, result)
+	populateConnectors(in, viewID, scopeID, elemSet)
 
 	// Reconciliation: remove elements on the page that are no longer
 	// in the resolved view (e.g., after exclude list changes). #102
-	reconcileViewPage(page, elemSet, flat, scopeID, viewID, result)
+	reconcileViewPage(page, elemSet, in.flat, scopeID, viewID, in.result)
 
 	// Set drill-down links on elements that have a detail view. (#198)
 	// Drill-down links take priority over user-defined element links (ADR-009).
-	result.Warnings = append(result.Warnings, applyDrillDownLinks(page, drillDownLinks)...)
+	in.result.Warnings = append(in.result.Warnings, applyDrillDownLinks(page, drillDownLinks)...)
 
 	// Create back-navigation button on detail views (views with scope). (#198)
 	if scopeID != "" {
@@ -263,7 +258,7 @@ func applyForwardToView(
 	}
 
 	// Create metadata and legend boxes on each view page. (#233)
-	applyViewMetadataAndLegend(page, viewID, view, m, opts, elemSet, flat, templates, result)
+	applyViewMetadataAndLegend(in, opts, viewID, view, elemSet)
 
 	// Synchronize documentation-link icons (element Link/Decisions/DocLinks) with the model. (#543)
 	synchronizeDocLinkIcons(page, m)
@@ -274,28 +269,19 @@ func applyForwardToView(
 
 // applyViewMetadataAndLegend creates the metadata and legend boxes on page,
 // if enabled by config. (#233)
-func applyViewMetadataAndLegend(
-	page *drawio.Page,
-	viewID string,
-	view model.View,
-	m *model.BausteinsichtModel,
-	opts *ForwardOptions,
-	elemSet map[string]bool,
-	flat map[string]*model.Element,
-	templates *drawio.TemplateSet,
-	result *ForwardResult,
-) {
+func applyViewMetadataAndLegend(in forwardRenderInputs, opts *ForwardOptions, viewID string, view model.View, elemSet map[string]bool) {
+	m := in.model
 	metadataEnabled := m.Config.Metadata == nil || *m.Config.Metadata
 	legendEnabled := m.Config.Legend == nil || *m.Config.Legend
 
 	if metadataEnabled && opts != nil {
-		if createMetadata(page, viewID, view, m.Config, opts.ModelPath, opts.SyncTime) {
-			result.MetadataUpdated++
+		if createMetadata(in.page, viewID, view, m.Config, opts.ModelPath, opts.SyncTime) {
+			in.result.MetadataUpdated++
 		}
 	}
 	if legendEnabled {
-		if createLegend(page, viewID, m.Specification, templates, elemSet, flat) {
-			result.MetadataUpdated++
+		if createLegend(in.page, viewID, m.Specification, in.templates, elemSet, in.flat) {
+			in.result.MetadataUpdated++
 		}
 	}
 }
@@ -304,26 +290,17 @@ func applyViewMetadataAndLegend(
 // the view's resolved set that aren't already present.
 // For new pages, this populates elements already in sync state (#184, #188).
 // For existing pages, this adds elements newly included via view changes (#231).
-func populateNewPage(
-	page *drawio.Page,
-	viewID string,
-	scopeID string,
-	templates *drawio.TemplateSet,
-	flat map[string]*model.Element,
-	elemSet map[string]bool,
-	m *model.BausteinsichtModel,
-	result *ForwardResult,
-) {
-	toPlace := collectElementsToPlace(page, scopeID, elemSet)
+func populateNewPage(in forwardRenderInputs, viewID string, scopeID string, elemSet map[string]bool) {
+	toPlace := collectElementsToPlace(in.page, scopeID, elemSet)
 	if len(toPlace) == 0 {
 		return
 	}
 
-	if isFreshPage(page, scopeID) {
-		layoutMode := viewLayoutMode(m, page.ID())
-		placeElementsWithLayout(page, viewID, scopeID, templates, flat, m, toPlace, layoutMode, result)
+	if isFreshPage(in.page, scopeID) {
+		layoutMode := viewLayoutMode(in.model, in.page.ID())
+		placeElementsWithLayout(in, viewID, scopeID, toPlace, layoutMode)
 	} else {
-		placeElementsIncrementally(page, viewID, scopeID, templates, flat, m, toPlace, result)
+		placeElementsIncrementally(in, viewID, scopeID, toPlace)
 	}
 }
 
@@ -368,21 +345,12 @@ func viewLayoutMode(m *model.BausteinsichtModel, pageID string) string {
 // placeElementsWithLayout uses the layout engine to position toPlace on a
 // fresh page, resizing the scope boundary to fit if the engine computed
 // boundary dimensions.
-func placeElementsWithLayout(
-	page *drawio.Page,
-	viewID string,
-	scopeID string,
-	templates *drawio.TemplateSet,
-	flat map[string]*model.Element,
-	m *model.BausteinsichtModel,
-	toPlace []string,
-	layoutMode string,
-	result *ForwardResult,
-) {
-	lr := computeLayout(toPlace, flat, templates, m.ElementOrder, scopeID, layoutMode, m.Relationships)
+func placeElementsWithLayout(in forwardRenderInputs, viewID string, scopeID string, toPlace []string, layoutMode string) {
+	m := in.model
+	lr := computeLayout(toPlace, in.flat, in.templates, m.ElementOrder, scopeID, layoutMode, m.Relationships)
 
 	if scopeID != "" && lr.BoundaryWidth > 0 && lr.BoundaryHeight > 0 {
-		resizeScopeBoundary(page, scopeID, lr.BoundaryX, lr.BoundaryY, lr.BoundaryWidth, lr.BoundaryHeight)
+		resizeScopeBoundary(in.page, scopeID, lr.BoundaryX, lr.BoundaryY, lr.BoundaryWidth, lr.BoundaryHeight)
 	}
 
 	sort.Strings(toPlace)
@@ -391,27 +359,19 @@ func placeElementsWithLayout(
 		if !ok {
 			continue
 		}
-		placeSingleElement(id, viewID, scopeID, page, templates, flat, &m.Specification, pos.X, pos.Y, false, result)
+		placeSingleElement(id, viewID, scopeID, in.page, in.templates, in.flat, &m.Specification, pos.X, pos.Y, false, in.result)
 	}
 }
 
 // placeElementsIncrementally falls back to cursor-based grid placement for
 // elements newly included on an existing (non-fresh) page.
-func placeElementsIncrementally(
-	page *drawio.Page,
-	viewID string,
-	scopeID string,
-	templates *drawio.TemplateSet,
-	flat map[string]*model.Element,
-	m *model.BausteinsichtModel,
-	toPlace []string,
-	result *ForwardResult,
-) {
+func placeElementsIncrementally(in forwardRenderInputs, viewID string, scopeID string, toPlace []string) {
+	page := in.page
 	pl := computePlacement(page)
 	pl.childCount[scopeID] = countScopeChildren(page, viewID, scopeID)
 	initialChildCount := pl.childCount[scopeID]
 	for _, id := range toPlace {
-		applyElementAdded(id, viewID, scopeID, page, templates, flat, &m.Specification, &pl, result)
+		applyElementAdded(id, viewID, scopeID, page, in.templates, in.flat, &in.model.Specification, &pl, in.result)
 	}
 	// Expand only when new children were added in this pass (#330).
 	if scopeID != "" && pl.childCount[scopeID] > initialChildCount {
@@ -433,15 +393,8 @@ func connectorStyle(baseStyle, kind string, spec *model.Specification) string {
 // populateConnectors creates connectors for all model relationships whose
 // (possibly lifted) endpoints are both on the page but no connector exists yet.
 // This ensures relationships involving newly populated elements are rendered (#231).
-func populateConnectors(
-	page *drawio.Page,
-	viewID string,
-	scopeID string,
-	m *model.BausteinsichtModel,
-	elemSet map[string]bool,
-	templates *drawio.TemplateSet,
-	result *ForwardResult,
-) {
+func populateConnectors(in forwardRenderInputs, viewID string, scopeID string, elemSet map[string]bool) {
+	m := in.model
 	dashedForPair := computeDashedPairs(m, elemSet, scopeID)
 
 	liftedSeen := make(map[string]bool)
@@ -454,7 +407,7 @@ func populateConnectors(
 		if isDuplicateLiftedRelationship(from, to, isLifted, liftedSeen) {
 			continue
 		}
-		createConnectorIfAbsent(page, viewID, from, to, i, rel.Label, dashedForPair[from+"->"+to], templates, result)
+		createConnectorIfAbsent(in, viewID, from, to, i, rel.Label, dashedForPair[from+"->"+to])
 	}
 }
 
@@ -503,22 +456,13 @@ func liftModelRelationshipEndpoints(rel model.Relationship, elemSet map[string]b
 
 // createConnectorIfAbsent creates the connector for a (possibly lifted)
 // relationship on page, unless a connector already exists at that index.
-func createConnectorIfAbsent(
-	page *drawio.Page,
-	viewID string,
-	from, to string,
-	index int,
-	label string,
-	dashed bool,
-	templates *drawio.TemplateSet,
-	result *ForwardResult,
-) {
+func createConnectorIfAbsent(in forwardRenderInputs, viewID string, from, to string, index int, label string, dashed bool) {
 	srcRef := scopedCellID(viewID, from)
 	tgtRef := scopedCellID(viewID, to)
-	if page.FindConnector(srcRef, tgtRef, index) != nil {
+	if in.page.FindConnector(srcRef, tgtRef, index) != nil {
 		return // Already exists.
 	}
-	style := templates.GetConnectorStyle()
+	style := in.templates.GetConnectorStyle()
 	if dashed {
 		style = mergeStyles(style, "dashed=1;")
 	}
@@ -530,8 +474,8 @@ func createConnectorIfAbsent(
 		TargetRef: tgtRef,
 		Index:     index,
 	}
-	page.CreateConnector(data, style)
-	result.ConnectorsCreated++
+	in.page.CreateConnector(data, style)
+	in.result.ConnectorsCreated++
 }
 
 // scopedCellID returns a page-scoped cell ID to ensure file-wide uniqueness.
@@ -653,23 +597,14 @@ func createScopeBoundary(
 // viewID is used to scope cell IDs for file-wide uniqueness (empty = legacy).
 // scopeID identifies the boundary element for parenting children (empty = no scope).
 // spec provides tag definitions for applying tag-based styles.
-func applyChangesToPage(
-	cs *ChangeSet,
-	page *drawio.Page,
-	templates *drawio.TemplateSet,
-	flat map[string]*model.Element,
-	elemFilter map[string]bool,
-	viewID string,
-	scopeID string,
-	spec *model.Specification,
-	result *ForwardResult,
-) {
+func applyChangesToPage(in forwardRenderInputs, elemFilter map[string]bool, viewID string, scopeID string) {
+	page := in.page
 	pl := computePlacement(page)
 	pl.childCount[scopeID] = countScopeChildren(page, viewID, scopeID)
 	initialChildCount := pl.childCount[scopeID]
 
-	applyModelElementChanges(cs, page, templates, flat, elemFilter, viewID, scopeID, spec, &pl, result)
-	applyModelRelationshipChanges(cs, page, templates, elemFilter, viewID, scopeID, spec, result)
+	applyModelElementChanges(in, elemFilter, viewID, scopeID, &pl)
+	applyModelRelationshipChanges(in, elemFilter, viewID, scopeID)
 
 	// Expand scope boundary to fit any children added in this pass (#330).
 	if scopeID != "" && pl.childCount[scopeID] > initialChildCount {
@@ -678,32 +613,22 @@ func applyChangesToPage(
 }
 
 // applyModelElementChanges applies Added/Modified/Deleted element changes from cs to page.
-func applyModelElementChanges(
-	cs *ChangeSet,
-	page *drawio.Page,
-	templates *drawio.TemplateSet,
-	flat map[string]*model.Element,
-	elemFilter map[string]bool,
-	viewID string,
-	scopeID string,
-	spec *model.Specification,
-	pl *placement,
-	result *ForwardResult,
-) {
-	for _, ch := range cs.ModelElementChanges {
+func applyModelElementChanges(in forwardRenderInputs, elemFilter map[string]bool, viewID string, scopeID string, pl *placement) {
+	spec := &in.model.Specification
+	for _, ch := range in.cs.ModelElementChanges {
 		switch ch.Type {
 		case Added:
 			if elemFilter != nil && !elemFilter[ch.ID] {
 				continue
 			}
-			applyElementAdded(ch.ID, viewID, scopeID, page, templates, flat, spec, pl, result)
+			applyElementAdded(ch.ID, viewID, scopeID, in.page, in.templates, in.flat, spec, pl, in.result)
 		case Modified:
 			if elemFilter != nil && !elemFilter[ch.ID] && ch.ID != scopeID {
 				continue
 			}
-			applyElementModified(ch, page, templates, flat, result)
+			applyElementModified(ch, in.page, in.templates, in.flat, in.result)
 		case Deleted:
-			applyElementDeleted(ch, viewID, page, result)
+			applyElementDeleted(ch, viewID, in.page, in.result)
 		}
 	}
 }
@@ -730,26 +655,17 @@ func applyElementDeleted(ch ElementChange, viewID string, page *drawio.Page, res
 // (e.g., api→db) and a lifted relationship (e.g., api.catalog→db lifted to
 // api→db) map to the same pair, the direct one's label is used for the
 // connector.
-func applyModelRelationshipChanges(
-	cs *ChangeSet,
-	page *drawio.Page,
-	templates *drawio.TemplateSet,
-	elemFilter map[string]bool,
-	viewID string,
-	scopeID string,
-	spec *model.Specification,
-	result *ForwardResult,
-) {
+func applyModelRelationshipChanges(in forwardRenderInputs, elemFilter map[string]bool, viewID string, scopeID string) {
 	liftedSeen := make(map[string]bool)
 	for pass := 0; pass < 2; pass++ {
-		for _, ch := range cs.ModelRelationshipChanges {
+		for _, ch := range in.cs.ModelRelationshipChanges {
 			if ch.Type == Deleted {
 				if pass == 0 {
-					applyRelationshipDeleted(ch, viewID, page, result)
+					applyRelationshipDeleted(ch, viewID, in.page, in.result)
 				}
 				continue
 			}
-			applyRelationshipUpsert(ch, pass, elemFilter, viewID, scopeID, page, templates, spec, liftedSeen, result)
+			applyRelationshipUpsert(in, ch, pass, elemFilter, viewID, scopeID, liftedSeen)
 		}
 	}
 }
@@ -770,18 +686,7 @@ func applyRelationshipDeleted(ch RelationshipChange, viewID string, page *drawio
 // applyRelationshipUpsert applies a single Added/Modified relationship change
 // for one pass of the two-pass direct/lifted processing in
 // applyModelRelationshipChanges.
-func applyRelationshipUpsert(
-	ch RelationshipChange,
-	pass int,
-	elemFilter map[string]bool,
-	viewID string,
-	scopeID string,
-	page *drawio.Page,
-	templates *drawio.TemplateSet,
-	spec *model.Specification,
-	liftedSeen map[string]bool,
-	result *ForwardResult,
-) {
+func applyRelationshipUpsert(in forwardRenderInputs, ch RelationshipChange, pass int, elemFilter map[string]bool, viewID string, scopeID string, liftedSeen map[string]bool) {
 	from, to, ok := liftRelationshipEndpoints(ch, elemFilter, scopeID)
 	if !ok {
 		return
@@ -794,21 +699,23 @@ func applyRelationshipUpsert(
 		return // Second pass: only lifted relationships
 	}
 
+	page := in.page
+	spec := &in.model.Specification
 	switch ch.Type {
 	case Added:
 		if isDuplicateLiftedRelationship(from, to, isLifted, liftedSeen) {
 			return
 		}
 		lifted := RelationshipChange{From: from, To: to, Index: ch.Index, Type: ch.Type, NewValue: ch.NewValue, Kind: ch.Kind}
-		applyRelAdded(lifted, viewID, page, templates, spec, result)
+		applyRelAdded(lifted, viewID, page, in.templates, spec, in.result)
 	case Modified:
 		page.UpdateConnectorLabel(from, to, ch.Index, ch.NewValue)
 		// Recompute style from the template base rather than patching the
 		// existing style, so a kind change that flips dashed on or off is
 		// reflected either way (#518), mirroring UpdateElementKind's
 		// full-replacement approach.
-		page.SetConnectorStyle(from, to, ch.Index, connectorStyle(templates.GetConnectorStyle(), ch.Kind, spec))
-		result.ConnectorsUpdated++
+		page.SetConnectorStyle(from, to, ch.Index, connectorStyle(in.templates.GetConnectorStyle(), ch.Kind, spec))
+		in.result.ConnectorsUpdated++
 	}
 }
 

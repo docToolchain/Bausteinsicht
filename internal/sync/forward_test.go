@@ -359,7 +359,7 @@ func TestPopulateConnectors_LiftedDashedIsOrderIndependent(t *testing.T) {
 		{From: "api.sub1", To: "queue", Kind: "sync"},
 		{From: "api.sub2", To: "queue", Kind: "async"},
 	})
-	populateConnectors(page1, "", "", m1, elemSet, ts, &ForwardResult{})
+	populateConnectors(forwardRenderInputs{page: page1, templates: ts, model: m1, result: &ForwardResult{}}, "", "", elemSet)
 
 	// Dashed relationship first, non-dashed one second (reversed order).
 	doc2 := drawio.NewDocument()
@@ -368,7 +368,7 @@ func TestPopulateConnectors_LiftedDashedIsOrderIndependent(t *testing.T) {
 		{From: "api.sub2", To: "queue", Kind: "async"},
 		{From: "api.sub1", To: "queue", Kind: "sync"},
 	})
-	populateConnectors(page2, "", "", m2, elemSet, ts, &ForwardResult{})
+	populateConnectors(forwardRenderInputs{page: page2, templates: ts, model: m2, result: &ForwardResult{}}, "", "", elemSet)
 
 	for i, page := range []*drawio.Page{page1, page2} {
 		conn := page.FindConnector("api", "queue", 0)

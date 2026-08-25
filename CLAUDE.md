@@ -120,6 +120,7 @@ e2e/                   # Automated end-to-end pipeline tests (Go); testdata/ hol
 - **draw.io elements carry `bausteinsicht_id` attribute** — this is the synchronization anchor between the two file formats.
 - **Views filter what is rendered** — each view has `include`/`exclude` lists; `model.ResolveView` expands them to a flat element ID set.
 - **Templates are `.drawio` files** — visual styles come from template pages, not hardcoded; `internal/drawio.TemplateSet` loads and clones them.
+- **Functions take at most 7 parameters** — SonarCloud's `go:S107` gate. When more inherently belong together (e.g. a `*ChangeSet`, page/document, templates, flattened model, and result accumulator threaded unchanged through a whole call chain, as in `internal/sync/forward.go`), bundle them into a small local struct (`fooRenderInputs`) rather than repeating the same 5-6 params function after function — that's usually a sign the bundle already exists implicitly and just needs a name, not a sign of over-abstraction.
 - **Run a single package's tests:** `go test ./internal/sync/` (or any other package path)
 - **Run a single test:** `go test -run TestName ./internal/sync/`
 - **Run automated E2E tests:** `go test ./e2e/ -v` — exercises full import→sync→adoc pipeline; SVG export step auto-skips if draw.io CLI is absent

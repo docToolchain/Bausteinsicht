@@ -58,6 +58,32 @@ type drawioElemSnapshot struct {
 	kind        string
 }
 
+// presence pairs a value with whether it was actually found on the side
+// being compared — the three-way (model / draw.io / last-sync) comparison
+// functions below always receive a state value together with its presence
+// flag, never independently, so bundling them cuts one parameter per side.
+type presence[T any] struct {
+	value T
+	found bool
+}
+
+// elemScanContext bundles the change-set and the last-sync-state
+// environment threaded unchanged through the per-element comparison calls.
+type elemScanContext struct {
+	cs           *ChangeSet
+	lastState    *SyncState
+	visibleElems map[string]bool
+	newPageOnly  map[string]bool
+}
+
+// relScanContext is elemScanContext's relationship-side counterpart.
+type relScanContext struct {
+	cs          *ChangeSet
+	modelRels   map[string]RelationshipState
+	drawioRels  map[string]RelationshipState
+	visibleRels map[string]bool
+}
+
 // relKey returns a canonical key for a relationship.
 // The index disambiguates multiple relationships between the same pair.
 func relKey(from, to string, index int) string {
@@ -530,7 +556,12 @@ func detectElementChangeForID(
 	lastElem, inLast := lastState.Elements[id]
 
 	detectModelElementChange(cs, id, me, inModel, lastElem, inLast)
-	detectDrawioElementChange(cs, id, de, inDrawio, lastElem, inLast, lastState, visibleElems, newPageOnly)
+	detectDrawioElementChange(
+		elemScanContext{cs: cs, lastState: lastState, visibleElems: visibleElems, newPageOnly: newPageOnly},
+		id,
+		presence[drawioElemSnapshot]{value: de, found: inDrawio},
+		presence[ElementState]{value: lastElem, found: inLast},
+	)
 
 	// Conflicts: both sides modified the same field
 	if inModel && inDrawio && inLast {
@@ -561,26 +592,18 @@ func detectModelElementChange(cs *ChangeSet, id string, me *model.Element, inMod
 
 // detectDrawioElementChange appends the draw.io-side ElementChange for a
 // single element, comparing against last-sync state.
-func detectDrawioElementChange(
-	cs *ChangeSet,
-	id string,
-	de drawioElemSnapshot,
-	inDrawio bool,
-	lastElem ElementState,
-	inLast bool,
-	lastState *SyncState,
-	visibleElems map[string]bool,
-	newPageOnly map[string]bool,
-) {
+func detectDrawioElementChange(ctx elemScanContext, id string, drawio presence[drawioElemSnapshot], last presence[ElementState]) {
+	de, inDrawio := drawio.value, drawio.found
+	lastElem, inLast := last.value, last.found
 	switch {
 	case inDrawio && !inLast:
-		cs.DrawioElementChanges = append(cs.DrawioElementChanges, ElementChange{ID: id, Type: Added})
+		ctx.cs.DrawioElementChanges = append(ctx.cs.DrawioElementChanges, ElementChange{ID: id, Type: Added})
 	case !inDrawio && inLast:
-		appendDrawioDeletionIfVisible(cs, id, lastState, visibleElems, newPageOnly)
+		appendDrawioDeletionIfVisible(ctx.cs, id, ctx.lastState, ctx.visibleElems, ctx.newPageOnly)
 	case inDrawio && inLast:
-		appendIfChanged(id, fieldTitle, lastElem.Title, de.title, &cs.DrawioElementChanges)
-		appendIfChanged(id, fieldDescription, lastElem.Description, de.description, &cs.DrawioElementChanges)
-		appendIfChanged(id, fieldTechnology, lastElem.Technology, de.technology, &cs.DrawioElementChanges)
+		appendIfChanged(id, fieldTitle, lastElem.Title, de.title, &ctx.cs.DrawioElementChanges)
+		appendIfChanged(id, fieldDescription, lastElem.Description, de.description, &ctx.cs.DrawioElementChanges)
+		appendIfChanged(id, fieldTechnology, lastElem.Technology, de.technology, &ctx.cs.DrawioElementChanges)
 		// Note: kind is not compared on the draw.io side because scope
 		// boundary elements have a derived kind (e.g. "system_boundary")
 		// that legitimately differs from the model kind ("system").
@@ -804,21 +827,23 @@ func detectRelationshipChangeForKey(
 
 	from, to, index := resolveRelFromTo(mr, lr, dr)
 
-	detectModelRelationshipChange(cs, from, to, index, mr, inModel, lr, inLast)
-	detectDrawioRelationshipChange(cs, k, from, to, index, dr, inDrawio, lr, inLast, modelRels, drawioRels, visibleRels)
+	detectModelRelationshipChange(cs, from, to, index,
+		presence[RelationshipState]{value: mr, found: inModel},
+		presence[RelationshipState]{value: lr, found: inLast},
+	)
+	detectDrawioRelationshipChange(
+		relScanContext{cs: cs, modelRels: modelRels, drawioRels: drawioRels, visibleRels: visibleRels},
+		k, from, to, index,
+		presence[RelationshipState]{value: dr, found: inDrawio},
+		presence[RelationshipState]{value: lr, found: inLast},
+	)
 }
 
 // detectModelRelationshipChange appends the model-side RelationshipChange
 // for a single relationship, comparing against last-sync state.
-func detectModelRelationshipChange(
-	cs *ChangeSet,
-	from, to string,
-	index int,
-	mr RelationshipState,
-	inModel bool,
-	lr RelationshipState,
-	inLast bool,
-) {
+func detectModelRelationshipChange(cs *ChangeSet, from, to string, index int, model, last presence[RelationshipState]) {
+	mr, inModel := model.value, model.found
+	lr, inLast := last.value, last.found
 	switch {
 	case inModel && !inLast:
 		cs.ModelRelationshipChanges = append(cs.ModelRelationshipChanges, RelationshipChange{
@@ -838,26 +863,16 @@ func detectModelRelationshipChange(
 
 // detectDrawioRelationshipChange appends the draw.io-side RelationshipChange
 // for a single relationship, comparing against last-sync state.
-func detectDrawioRelationshipChange(
-	cs *ChangeSet,
-	k string,
-	from, to string,
-	index int,
-	dr RelationshipState,
-	inDrawio bool,
-	lr RelationshipState,
-	inLast bool,
-	modelRels map[string]RelationshipState,
-	drawioRels map[string]RelationshipState,
-	visibleRels map[string]bool,
-) {
+func detectDrawioRelationshipChange(ctx relScanContext, k string, from, to string, index int, drawio, last presence[RelationshipState]) {
+	dr, inDrawio := drawio.value, drawio.found
+	lr, inLast := last.value, last.found
 	switch {
 	case inDrawio && !inLast:
-		appendAddedDrawioRelationship(cs, from, to, index, dr, modelRels)
+		appendAddedDrawioRelationship(ctx.cs, from, to, index, dr, ctx.modelRels)
 	case !inDrawio && inLast:
-		appendDeletedDrawioRelationship(cs, k, from, to, index, drawioRels, visibleRels)
+		appendDeletedDrawioRelationship(ctx.cs, k, from, to, index, ctx.drawioRels, ctx.visibleRels)
 	case inDrawio && inLast && dr.Label != lr.Label:
-		cs.DrawioRelationshipChanges = append(cs.DrawioRelationshipChanges, RelationshipChange{
+		ctx.cs.DrawioRelationshipChanges = append(ctx.cs.DrawioRelationshipChanges, RelationshipChange{
 			From: from, To: to, Index: index, Type: Modified, Field: fieldLabel,
 			OldValue: lr.Label, NewValue: dr.Label,
 		})
