@@ -461,3 +461,129 @@ func TestReplAddRelationship_ToNotFound(t *testing.T) {
 		t.Error("no relationship should have been added for unknown to")
 	}
 }
+
+// TestReplListCommand_EmptyArgs covers listCommand's own len(parts)==0
+// guard. Unreachable through executeCommand (which checks args length
+// first), but listCommand is a distinct unit that should not panic if
+// called directly with no subcommand.
+func TestReplListCommand_EmptyArgs(t *testing.T) {
+	s := newTestReplState("")
+	s.listCommand(nil) // should not panic
+}
+
+// TestReplAddCommand_EmptyArgs is addCommand's equivalent of
+// TestReplListCommand_EmptyArgs.
+func TestReplAddCommand_EmptyArgs(t *testing.T) {
+	s := newTestReplState("")
+	s.addCommand(nil) // should not panic
+}
+
+// TestReplRemoveRelationship_OnlyFromGiven covers
+// removeRelationshipCommand's own len(args)<2 guard specifically (distinct
+// from TestReplRemoveRelationship_InsufficientArgs, which supplies zero
+// args and never gets past removeCommand's own length check).
+func TestReplRemoveRelationship_OnlyFromGiven(t *testing.T) {
+	s := newTestReplState("")
+	s.removeCommand([]string{"relationship", "a"}) // missing <to>
+	if len(s.undoStack) != 0 {
+		t.Errorf("undo stack should be cleaned up, got len %d", len(s.undoStack))
+	}
+}
+
+// TestReplListRelationships_Sorted covers listRelationships' sort
+// comparator's tie-breaking branches (same From, different To; same
+// From+To, different Label) — a single-relationship model never exercises
+// the comparator body at all.
+func TestReplListRelationships_Sorted(t *testing.T) {
+	s := newTestReplState("")
+	s.model.Model["shop"] = model.Element{Kind: "system", Title: "Shop"}
+	s.model.Relationships = []model.Relationship{
+		{From: "customer", To: "shop", Label: "browses"},
+		{From: "customer", To: "webshop", Label: "uses"},
+		{From: "customer", To: "webshop", Label: "buys"},
+	}
+	s.listRelationships() // should not panic; ordering itself isn't asserted here
+}
+
+// TestReplListViews covers listViews' loop, never exercised by the default
+// test model (which has zero views).
+func TestReplListViews(t *testing.T) {
+	s := newTestReplState("")
+	s.model.Views = map[string]model.View{
+		"overview": {Title: "Overview"},
+	}
+	s.listViews() // should not panic
+}
+
+// TestReplRemoveRelationship_KeepsOthers covers the loop's "keep" branch in
+// removeRelationshipCommand: removing one relationship out of several must
+// leave the others in place, not just empty the whole slice.
+func TestReplRemoveRelationship_KeepsOthers(t *testing.T) {
+	s := newTestReplState("")
+	s.model.Relationships = []model.Relationship{
+		{From: "customer", To: "webshop", Label: "uses"},
+		{From: "webshop", To: "customer", Label: "notifies"},
+	}
+	s.removeCommand([]string{"relationship", "customer", "webshop"})
+	if len(s.model.Relationships) != 1 {
+		t.Fatalf("expected 1 relationship to remain, got %d", len(s.model.Relationships))
+	}
+	if s.model.Relationships[0].From != "webshop" {
+		t.Errorf("expected the unrelated relationship to survive, got %+v", s.model.Relationships[0])
+	}
+}
+
+// TestReplAddElement_HappyPath covers addElementInteractive's full
+// completion tail (undo save, Model-map init, final assignment) — every
+// other add-element test aborts partway through.
+func TestReplAddElement_HappyPath(t *testing.T) {
+	s := newTestReplState("newservice\nsystem\nNew Service\nA new service\n")
+	s.addElementInteractive()
+	elem, ok := s.model.Model["newservice"]
+	if !ok {
+		t.Fatal("expected element 'newservice' to be added")
+	}
+	if elem.Kind != "system" || elem.Title != "New Service" || elem.Description != "A new service" {
+		t.Errorf("unexpected element: %+v", elem)
+	}
+	if !s.modified {
+		t.Error("expected s.modified to be true")
+	}
+}
+
+// TestReplAddElement_UnknownKind covers promptElementKind's rejection
+// branch: a kind not present in the model's specification.
+func TestReplAddElement_UnknownKind(t *testing.T) {
+	s := newTestReplState("newservice\nbogus\n")
+	s.addElementInteractive()
+	if _, ok := s.model.Model["newservice"]; ok {
+		t.Error("element should not have been added (unknown kind)")
+	}
+}
+
+// TestDescribePreservedFields_AllFields covers every branch of
+// describePreservedFields — the existing overwrite test only ever exercises
+// an element with none of these fields set.
+func TestDescribePreservedFields_AllFields(t *testing.T) {
+	existing := model.Element{
+		Children:   map[string]model.Element{"child": {}},
+		Technology: "Go",
+		Tags:       []string{"core"},
+		Status:     "active",
+		Decisions:  []string{"ADR-001"},
+		Metadata:   map[string]string{"owner": "team-a"},
+	}
+	preserved := describePreservedFields(existing)
+	for _, want := range []string{"1 child(ren)", "technology", "tags", "status", "decisions", "metadata"} {
+		found := false
+		for _, p := range preserved {
+			if p == want {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("expected %q in preserved fields, got: %v", want, preserved)
+		}
+	}
+}
