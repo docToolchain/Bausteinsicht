@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -425,6 +426,9 @@ func TestReplOverwrite_EmptyDescriptionKeepsExisting(t *testing.T) {
 // from TestReplPatchSave_InvalidModelPath, which fails at the initial
 // model.Load (read) step.
 func TestReplPatchSave_InsertFailsOnReadOnlyDir(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("os.Chmod does not restrict directory write access on Windows (ACL-based, not POSIX mode bits)")
+	}
 	s, path := newFileReplState(t, "")
 	s.model.Model["newelement"] = model.Element{Kind: "actor", Title: "New"}
 
@@ -445,6 +449,9 @@ func TestReplPatchSave_InsertFailsOnReadOnlyDir(t *testing.T) {
 // (no new element, so insertNewElements is a no-op and never reaches its
 // own PatchInsert call).
 func TestReplPatchSave_AppendRelationshipFailsOnReadOnlyDir(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("os.Chmod does not restrict directory write access on Windows (ACL-based, not POSIX mode bits)")
+	}
 	s, path := newFileReplState(t, "")
 	s.model.Relationships = append(s.model.Relationships, model.Relationship{From: "customer", To: "webshop", Label: "uses"})
 
