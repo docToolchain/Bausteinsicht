@@ -1251,9 +1251,12 @@ Imports an architecture model from an external DSL and writes a Bausteinsicht `.
 | `--dry-run` | Print the generated model to stdout instead of writing the file. | No | `false`
 | `--force` | Overwrite the output file if it already exists. | No | `false`
 | `--kind-map` | XMI only: comma-separated `Type=kind` overrides (e.g. `Component=service,Class=entity`). | No | (none)
+| `--json` | Print the post-import summary as machine-readable JSON instead of human-readable text. | No | `false`
 |===
 
 **Behavior:** parses the source DSL, maps people/systems/containers and relationships, and generates a matching specification. Exit `2` if the output file already exists and neither `--force` nor `--dry-run` is set — `--dry-run` prints to stdout and skips the existence check, so it never fails on an existing output. Exit `1` on any other import failure (unknown `--from`, unreadable input, parse/encoding error).
+
+**Post-import summary:** on a successful (non-dry-run) import, prints an element count per kind, the output file path, the generated view count (omitted when zero — `xmi` never produces views), and any warnings collected during import. `--json` emits the same information as `{"elements":{"<kind>":<count>,...},"outputPath":"...","views":<count>,"warnings":["..."]}` instead (the `views` key is present but `0` in JSON mode, unlike the omitted text line, since machine consumers should not have to distinguish "zero" from "absent"). Followed by a next-steps hint: `bausteinsicht sync` and `bausteinsicht export diagram` on a fresh import; `bausteinsicht diff` instead of `sync` when `--force` overwrote an existing output file (the existing file likely already has synced draw.io state, so reviewing the delta is more useful than re-syncing). The hint is suppressed entirely under `--dry-run`, since nothing was persisted.
 
 **XMI-specific behavior:** reads XMI 2.1 files (e.g., Enterprise Architect exports). UML element types are mapped to Bausteinsicht element kinds using `--kind-map` overrides or the built-in defaults (e.g., `uml:Component` → `component`). EA stereotypes (inside `xmi:Extension`) take precedence over the UML type mapping. Unknown UML types produce a warning and are imported with kind `element`. Unresolvable relationship endpoints are skipped with a warning. DOCTYPE declarations are rejected (XXE mitigation). Element hierarchy depth is capped at 50 levels. This is a **one-way migration** — XMI-specific data (layout, tagged values, OCL constraints) is not preserved.
 
