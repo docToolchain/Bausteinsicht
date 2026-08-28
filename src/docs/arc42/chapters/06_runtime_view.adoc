@@ -116,6 +116,8 @@ image::arc42/architecture-sequence-snapshot-management.svg[Snapshot Management,w
 
 `diff` compares two model states; `changelog` walks git history calling `diff` at each relevant commit to build a human-readable architecture changelog.
 
+`import-graph` is the reverse side of the code-governance bridge (#562, ADR-013): it reads a language-neutral `codegraph` JSON document (emitted by a code-side extractor such as the https://github.com/docToolchain/bausteinsicht-archunit[bausteinsicht-archunit] adapter), projects it onto model elements via their `codeMapping`, and writes the result as the model's `asIs` snapshot — the first code-derived (rather than model-authored) `asIs`. A subsequent `diff` run then surfaces any relationship present in the real code but missing from `toBe` as drift.
+
 .As-Is/To-Be Diff and Changelog Generation (generated from `dynamicViews.diff-and-changelog` in architecture.jsonc via `bausteinsicht export-sequence`)
 image::arc42/architecture-sequence-diff-and-changelog.svg[Diff and Changelog,width=80%]
 

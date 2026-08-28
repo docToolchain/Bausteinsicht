@@ -110,6 +110,10 @@ See link:01_use_cases.html[Use Cases] for the functional overview of all CLI com
 | Import a model from Structurizr DSL or LikeC4
 | Implemented
 
+| `bausteinsicht import-graph`
+| Project a code-derived codegraph JSON onto model elements via codeMapping and write it as the asIs snapshot
+| Implemented
+
 | `bausteinsicht generate-template`
 | Generate a draw.io template from the specification
 | Implemented
@@ -1261,6 +1265,40 @@ Imports an architecture model from an external DSL and writes a Bausteinsicht `.
 **XMI-specific behavior:** reads XMI 2.1 files (e.g., Enterprise Architect exports). UML element types are mapped to Bausteinsicht element kinds using `--kind-map` overrides or the built-in defaults (e.g., `uml:Component` → `component`). EA stereotypes (inside `xmi:Extension`) take precedence over the UML type mapping. Unknown UML types produce a warning and are imported with kind `element`. Unresolvable relationship endpoints are skipped with a warning. DOCTYPE declarations are rejected (XXE mitigation). Element hierarchy depth is capped at 50 levels. This is a **one-way migration** — XMI-specific data (layout, tagged values, OCL constraints) is not preserved.
 
 **Structurizr-specific behavior:** a view's `autoLayout <direction>` directive is mapped to Bausteinsicht's `layered` layout (there is no direction-aware equivalent). The direction argument itself is not preserved, and a warning is emitted noting the dropped value (e.g. `line 12: view "context": autoLayout direction "lr" not preserved, mapped to layout: "layered"`). `include *` on a `container`/`component` view is expanded to also include the view's scope's children (e.g. `["*", "<scope>.*"]`, plus the parent scope for `component` views), matching Structurizr's semantics where a scoped view's wildcard include means "everything visible in this scope" rather than Bausteinsicht's default top-level-only `*` match. `filtered`, `dynamic`, and `deployment` views are not supported and are skipped with a warning (#512).
+
+==== `bausteinsicht import-graph`
+
+Projects a code-derived, language-neutral `codegraph` JSON document onto model elements via their `codeMapping`, and writes the result as the model's `asIs` snapshot — the reverse side of the code-governance bridge (#562, ADR-013). Run `bausteinsicht diff` afterwards to compare it against `toBe`.
+
+**Arguments:** `<codegraph-file>` (required) — the codegraph JSON document, typically produced by a code-side extractor (e.g. https://github.com/docToolchain/bausteinsicht-archunit[bausteinsicht-archunit]'s `CodeGraphExporter` for Java).
+
+**Flags:**
+
+[cols="2,3,1,1"]
+|===
+| Flag | Description | Required | Default
+
+| `--model` | Model file path. | No | auto-detect
+| `--format` | Output format: `text` or `json`. | No | `text`
+|===
+
+**Behavior:** builds a `package -> elementID` map from every element's `codeMapping.packages` (longest-prefix, dot-boundary match — mirrors ArchUnit's package matcher: `com.acme.api` covers `com.acme.api.internal` but not `com.acme.apiextra`), then resolves each codegraph node/edge through it. Intra-element edges (both endpoints resolving to the same element) are dropped as implementation detail. Packages with no covering `codeMapping` are collected and reported, not silently dropped. The resulting element/relationship set overwrites `asIs` in the model file (a full-rewrite save, per ADR-011 — this is a modification, not a pure insertion).
+
+**Exit codes:**
+
+* `0` -- import successful
+* `1` -- model has no element with a `codeMapping`, or the `asIs` write failed
+* `2` -- codegraph file not found, unreadable, malformed, or invalid `--format`
+
+**Example:**
+[source,bash]
+----
+$ bausteinsicht import-graph reality.codegraph.json
+Imported code graph (java): 12 nodes, 8 edges
+Mapped: 5 elements, 4 relationships
+Unmapped packages (3): com.acme.legacy.util, com.acme.legacy.helpers, com.acme.test
+asIs snapshot written to architecture.jsonc
+----
 
 ==== `bausteinsicht generate-template`
 

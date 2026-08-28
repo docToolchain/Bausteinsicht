@@ -8,7 +8,7 @@
 
 == Status
 
-Accepted (staged) — the reverse/drift path and the `codeMapping` field (R5) are decided and land in this ADR's implementation slice, with their shape validated by an external Variant C prototype (see <<variant-c-prototype>>). The forward mechanism (Variant A/B/C) is staged, with two open points gating the target variant (see <<open-questions>>).
+Accepted (staged) — the reverse/drift path and the `codeMapping` field (R5) are decided **and implemented** (`internal/codegraph`, `bausteinsicht import-graph`), with their shape validated by an external Variant C prototype (see <<variant-c-prototype>>). Variant B is **skipped** (see <<decision>>) — Variant C's proof-of-concept role is already filled by the prototype. The `RuleBackend` abstraction (R1) turns out to require **no new code** — see <<rulebackend-r1>>. Two open points still gate Variant C's move from *prototype* to *official* (see <<open-questions>>).
 
 == Context
 
@@ -128,12 +128,27 @@ The result is **weight-sensitive by design**: C leads only if the JSONC-as-publi
 ----
 +
 `packages` holds bare prefixes without ArchUnit's trailing `..` — the consuming adapter appends that itself (see <<variant-c-prototype>>'s `BausteinsichtRules.matchers()`). This is a **reversal** from this ADR's first draft, which had adopted #572's R6 per-backend-keyed proposal (`{"java": {...}, "go": {...}}`) speculatively. Once the Variant C prototype surfaced, matching its validated, tested contract exactly took priority over a shape nothing had exercised yet — see <<variant-c-prototype>>. Per-backend keying is deferred to <<open-questions>>, to be revisited only when a second backend (#574, Go) actually needs an element to carry more than one language's mapping simultaneously. See `src/docs/spec/03_data_models.adoc`, section "CodeMapping Properties".
-* **Reverse/drift path** (shared by all forward variants): a graph extractor (`jdeps` or a small ArchUnit-based tool — the prototype's `CodeGraphExporter` is exactly this) dumps the real package-dependency graph as a `codegraph` JSON document → Bausteinsicht ingests it as an `asIs` snapshot (projected through `codeMapping`) → the existing `bausteinsicht diff` command compares it against `toBe` → proposes curated model patches. An ArchUnit failure is *ambiguous* (wrong code vs. stale model), so a human decides; edits are proposed, never written back silently. This is the model's first **code-derived** `asIs` snapshot — until now `asIs`/`toBe` were both always model-authored or `snapshot save`-captured.
-* **Prototype the forward mechanism with Variant B** (fastest proof, zero new parser) for the *diagram-intermediate* path; **Variant A is retained as a fallback** for expressiveness if C stalls; **Variant C is the target** and now has a working reference implementation, conditional on the open points below.
+* **Reverse/drift path** (shared by all forward variants) — **implemented**: a graph extractor (`jdeps` or a small ArchUnit-based tool — the prototype's `CodeGraphExporter` is exactly this) dumps the real package-dependency graph as a `codegraph` JSON document → `bausteinsicht import-graph` ingests it, projects it through `codeMapping`, and writes it as the model's `asIs` snapshot → the existing `bausteinsicht diff` command compares it against `toBe` and reports the gap. An ArchUnit failure is *ambiguous* (wrong code vs. stale model), so a human decides; `import-graph` writes `asIs` directly (that's what it's for — a fresh capture of reality on each run) but never touches `toBe`, and no patch is ever proposed or written back into the model/`toBe` silently. This is the model's first **code-derived** `asIs` snapshot — until now `asIs`/`toBe` were both always model-authored or `snapshot save`-captured.
+* **Skip Variant B.** Its only purpose was to be the *fastest proof that the forward direction can work at all* — that proof now exists, more thoroughly, via the Variant C prototype (a real `mvn verify` round-trip, not just a diagram-adherence check). Building a Bausteinsicht-side PlantUML emitter now would duplicate that proof for no remaining benefit. **Variant A remains a fallback** if Variant C stalls on its open governance questions (see <<open-questions>>) and a lower-commitment path is needed later; it is not being built now either. **Variant C is the target**, with a working reference implementation, conditional on the open points below.
 
-=== Not yet implemented by this ADR
+[[rulebackend-r1]]
+=== RuleBackend abstraction (R1) — satisfied by construction, no code needed
 
-The `codegraph` schema, the `import-graph` command, the Variant B PlantUML emitter, and the `RuleBackend` abstraction (R1/R4) are follow-up work, not part of this ADR's initial code slice (which lands only the `codeMapping` field). Scoping them as separate PRs keeps each one reviewable; see References for the tracking issues.
+#562's R4 and #572's R1 both call for extracting "the backend-specific parts... into a pluggable interface/contract" before a second backend (#574, Go) arrives. Having now actually built the reverse path, that pluggable interface turns out to already exist — as a matter of what got built, not as a deliberate abstraction step:
+
+* `internal/codegraph.Project()` contains **zero** ArchUnit/Java-specific logic. It resolves packages to elements via generic dot-boundary prefix matching and builds a generic `model.ModelSnapshot`. `CodeGraph.Language` is carried through purely as report metadata — nothing branches on it.
+* `bausteinsicht import-graph` is equally generic: it validates `codegraph.Kind`/`SchemaVersion`, not `Language`.
+* All backend-specific work (extracting a real dependency graph from real code, emitting it as `codegraph` JSON) already lives *outside* Bausteinsicht, in per-language extractor tooling (the ArchUnit-based `CodeGraphExporter` today; a `go list`-based one for #574 tomorrow) — exactly where #562's own constraints section says it must ("Bausteinsicht cannot extract a dependency graph from [any language's] code itself").
+
+There is therefore no branching behavior in Bausteinsicht's own code for a `RuleBackend` interface to abstract *over* — introducing one now would be an interface with one real implementation and one imagined one, guessed at before #574 exists to validate the guess against. That is the specific premature-abstraction failure mode #572's own R1 warns against ("Validate this abstraction against the cheapest backend... before committing to it for the rest") and that this project's engineering conventions rule out generally (no abstractions beyond what the task requires). **Decision: do not add a `RuleBackend` Go interface now.** Revisit only if #574's actual implementation surfaces real per-backend branching Bausteinsicht's own code would need to make — which, on the evidence of the reverse path, may never happen.
+
+This does **not** close out R4/R1 in full: the *constraint→target-rule translation table* — mapping each `bausteinsicht lint` rule (`no-relationship`, `no-circular-dependency`, ...) to its per-backend equivalent expression — is still unwritten, and unlike the reverse-path abstraction question, that table has no "it turned out to already exist" shortcut; it has to be authored once a second backend's forward side gives it something concrete to map to.
+
+=== Implementation status
+
+* **Landed:** `codeMapping` field (`internal/model`); the `codegraph` package (`internal/codegraph` — types, `Load`, `Project`) implementing the reverse-path projection algorithm above; the `bausteinsicht import-graph <codegraph-file>` command wiring it to `asIs`; the `codegraph.schema.json` JSON Schema (`bausteinsicht schema generate --type codegraph`); the R1 finding (<<rulebackend-r1>>) that no `RuleBackend` interface is needed yet.
+* **Explicitly not built:** the Variant B PlantUML emitter (superseded by the Variant C prototype, see above) and a `RuleBackend` Go interface (no real second implementation to validate it against yet, see <<rulebackend-r1>>).
+* **Still genuinely missing:** the constraint→target-rule translation table (#572 R4) and Bausteinsicht-side forward rule emission for Variant C (which is, by design, entirely on the Java adapter's side — not a Bausteinsicht gap so much as a deliberate non-goal of Variant C itself).
 
 [[open-questions]]
 == Open Questions
@@ -141,10 +156,12 @@ The `codegraph` schema, the `import-graph` command, the Variant B PlantUML emitt
 Gating the forward mechanism's move from B to C:
 
 * Must the failing gate be a **native JUnit/IDE test** (→ Variant C/A), or is a **separate CI step** running the Bausteinsicht binary against an extracted graph acceptable (→ extractor + BS engine)?
-* Are we willing to treat the **JSONC model as a stable, versioned public API**? Partially answered by <<variant-c-prototype>> — a real adapter already depends on the shape — but not yet a formal commitment (versioning policy, compatibility guarantees).
-* Who **owns** the Java-side adapter (Variant C) long-term? A prototype owner exists (ascheman, `docToolchain/bausteinsicht-archunit`), but its README lists the license as "TBD — to be aligned with the docToolchain organisation's policy," so its path to becoming the *official* adapter (vs. staying a reference prototype) is still open.
-* Diagram/export format for the Variant B emitter: plain-component PlantUML flavour only — the default C4 export is not adapter-parseable.
+* Are we willing to treat the **JSONC model as a stable, versioned public API**? Partially answered by <<variant-c-prototype>> — a real adapter already depends on the shape — but not yet a formal commitment (versioning policy, compatibility guarantees). Tracked as its own decision: https://github.com/docToolchain/Bausteinsicht/issues/601[Bausteinsicht#601].
+* Who **owns** the Java-side adapter (Variant C) long-term? A prototype owner exists (ascheman, `docToolchain/bausteinsicht-archunit`), but its README lists the license as "TBD — to be aligned with the docToolchain organisation's policy," so its path to becoming the *official* adapter (vs. staying a reference prototype) is still open. Tracked as its own decision, in the adapter's own repo: https://github.com/docToolchain/bausteinsicht-archunit/issues/1[bausteinsicht-archunit#1].
 * Should `codeMapping` become per-backend-keyed (#572 R6) once a second backend (#574, Go) exists, or does the flat shape decided here turn out to generalise (e.g. by adding a sibling field rather than reshaping this one)? Deliberately not decided now — see <<variant-c-prototype>>.
+* Does #574 (Go)'s actual implementation ever need Bausteinsicht's own code to branch on backend/language? If yes, that's the trigger to revisit <<rulebackend-r1>>'s "no interface needed" call — see that section.
+
+Moot, since Variant B was skipped (kept here for the historical record): diagram/export format for the Variant B emitter would have been plain-component PlantUML flavour only — the default C4 export is not adapter-parseable.
 
 Cross-cutting with #572 (tracked there, not here):
 
@@ -159,12 +176,14 @@ Cross-cutting with #572 (tracked there, not here):
 * Its exact shape is not speculative: a real, tested adapter (<<variant-c-prototype>>) already reads it and builds passing ArchUnit rules from it.
 * The reverse/drift path reuses `asIs`/`toBe`/`diff` unchanged — no new mechanism, no new UI, no new command family beyond `import-graph`.
 * The flat shape is the simplest thing that could work and is what's actually running today; per-backend keying is deferred rather than paid for upfront.
+* Skipping Variant B and the `RuleBackend` interface avoids two speculative builds whose only justification would have been "we might need this later" — in both cases, evidence (the prototype; the reverse path's actual shape) showed the work either wasn't needed at all or would need redoing anyway.
 
 === Negative
 
 * The flat shape does not (yet) support one element mapping to more than one backend's code simultaneously — deferred per <<open-questions>>, and would be a breaking schema change if needed later.
 * The staged decision leaves the *target* forward variant (C) unresolved as an *official* commitment; teams adopting `codeMapping` today are anchoring elements without a guaranteed-stable public-API promise yet, even though a working adapter already exists.
-* Bausteinsicht's own `import-graph`/forward-emitter side (consuming `codeMapping` and producing/reading `codegraph`) is still unimplemented — the prototype validates the *contract*, not the Bausteinsicht-side implementation.
+* Skipping Variant B means there is no Bausteinsicht-side forward path at all right now — teams get drift detection (`import-graph` + `diff`) but not enforcement (a failing build/test) unless they adopt the external prototype adapter directly.
+* No `RuleBackend` interface exists in Bausteinsicht's code to point to as "the extension point for backend N+1" — <<rulebackend-r1>>'s finding is currently only documented here, not encoded in the type system. A reader of `internal/codegraph` alone wouldn't know backend-extensibility was even a design goal.
 
 === Risk
 
@@ -176,5 +195,10 @@ Cross-cutting with #572 (tracked there, not here):
 * https://github.com/docToolchain/Bausteinsicht/issues/570[#570] — RFE: Model DDD / Hexagonal Architecture with xMolecules-aligned vocabulary (umbrella; this ADR is a descendant of its layer 4 "Bridge to code").
 * https://github.com/docToolchain/Bausteinsicht/issues/572[#572] — RFE: Multi-language code-governance backends beyond ArchUnit/JVM. Proposes per-backend `codeMapping` keying (R6) and the `RuleBackend` abstraction (R1); this ADR deliberately does *not* adopt the R6 keying yet — see <<variant-c-prototype>> and <<open-questions>>.
 * https://github.com/docToolchain/bausteinsicht-archunit[docToolchain/bausteinsicht-archunit] — the Variant C prototype whose contract this ADR's `codeMapping` shape matches exactly.
+* Governance decisions spun out of <<open-questions>>: https://github.com/docToolchain/Bausteinsicht/issues/601[Bausteinsicht#601] (JSONC as stable public API) and https://github.com/docToolchain/bausteinsicht-archunit/issues/1[bausteinsicht-archunit#1] (adapter ownership/license).
 * `src/docs/spec/03_data_models.adoc`, section "CodeMapping Properties".
 * `internal/model/types.go` — `Element.CodeMapping`, `CodeMapping`.
+* `internal/codegraph/` — `CodeGraph`/`Node`/`Edge` types, `Load`, `Project` (the reverse-path projection algorithm), `HasAnyCodeMapping`.
+* `cmd/bausteinsicht/import_graph.go` — the `bausteinsicht import-graph` command.
+* `schemas/codegraph.schema.json` — the `codegraph` document's own JSON Schema.
+* `src/docs/spec/02_cli_specification.adoc`, section "`bausteinsicht import-graph`".

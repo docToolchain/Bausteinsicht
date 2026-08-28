@@ -7,6 +7,7 @@ System_Ext(ide, "IDE", "IDE with JSON Schema support for JSONC editing with auto
 System_Boundary(bausteinsicht, "Bausteinsicht") {
   Container(bausteinsicht_changelog, "Changelog", "Go", "Architecture changelog generation between two git refs")
   Container(bausteinsicht_cli, "CLI", "Go / Cobra", "Command-line interface providing validate, sync, export, and watch commands")
+  Container(bausteinsicht_codegraph, "CodeGraph", "Go", "Reverse code-governance-bridge contract: projects a language-neutral package-dependency graph onto model elements via codeMapping to produce an asIs snapshot")
   Container(bausteinsicht_constraints, "Constraints", "Go", "Validation constraints for model linting and consistency checking")
   Container(bausteinsicht_diagram, "Diagram", "Go", "Text-based diagram export to Mermaid C4 and PlantUML formats with markdown wrapping")
   Container(bausteinsicht_diff, "Diff", "Go", "As-is vs. to-be architecture comparison")
