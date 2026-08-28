@@ -269,8 +269,20 @@ type Element struct {
 	LastModified string             `json:"lastModified,omitempty"` // RFC3339 timestamp (optional override for git-based staleness detection)
 	Children     map[string]Element `json:"children,omitempty"`
 	Metadata     map[string]string  `json:"metadata,omitempty"`
-	Link         string             `json:"link,omitempty"`     // hyperlink on the draw.io shape and in SVG export
-	DocLinks     []DocLink          `json:"docLinks,omitempty"` // typed documentation links, rendered as clickable icons (#543)
+	Link         string             `json:"link,omitempty"`        // hyperlink on the draw.io shape and in SVG export
+	DocLinks     []DocLink          `json:"docLinks,omitempty"`    // typed documentation links, rendered as clickable icons (#543)
+	CodeMapping  *CodeMapping       `json:"codeMapping,omitempty"` // element → real code locations for the code-governance bridge (#562)
+}
+
+// CodeMapping anchors a model element to real code for the code-governance
+// bridge (ArchUnit first, #562). Flat (not keyed per backend) matching the
+// validated Variant C prototype contract — see
+// https://github.com/docToolchain/bausteinsicht-archunit and ADR-013.
+type CodeMapping struct {
+	// Packages are backend-native package/namespace/module prefixes that
+	// belong to this element, prefix-matched the way ArchUnit's package
+	// matcher works (e.g. "com.acme.backend.api").
+	Packages []string `json:"packages,omitempty"`
 }
 
 // DocLink is a typed link from a diagram element or view to an external

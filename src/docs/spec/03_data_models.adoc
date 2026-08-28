@@ -50,6 +50,7 @@ class TagDefinition
 class PatternDefinition
 class DecisionRecord
 class DocLink
+class CodeMapping
 class Element
 class Relationship
 class View
@@ -75,6 +76,7 @@ Element *-- "0..*" Element : children
 Element ..> ElementKind : kind
 Element ..> DecisionRecord : decisions
 Element *-- "0..*" DocLink : docLinks
+Element *-- "0..1" CodeMapping : codeMapping
 
 Relationship ..> Element : from / to
 Relationship ..> RelationshipKind : kind
@@ -281,6 +283,11 @@ The model has these top-level sections. `specification`, `model`, `relationships
 | DocLink[]
 | no
 | Typed documentation links (arc42 chapter, ADR, PRD/persona, spec, ...), rendered as clickable icons next to the element in HTML/SVG export — independent of `link`/`decisions`, which also get their own icons. See <<DocLink Properties>> and ADR-009's "Extension: Doc/ADR Drilldown Icons (#543)".
+
+| `codeMapping`
+| CodeMapping
+| no
+| Anchors this element to real code for the code-governance bridge (ArchUnit first). Consumed by `import-graph`/forward rule generation — not yet by any shipped command, but already validated against a real adapter, see <<CodeMapping Properties>> and ADR-013.
 |===
 
 The **key** of each element in the model object (e.g., `"customer"`, `"api"`) serves as its unique ID.
@@ -310,6 +317,32 @@ A `DocLink` is a typed link to an external documentation artifact, usable on bot
 | no
 | Icon tooltip text. Defaults to `type` when omitted.
 |===
+
+[[CodeMapping Properties]]
+==== CodeMapping Properties
+
+[cols="1,1,1,3"]
+|===
+| Property | Type | Required | Description
+
+| `packages`
+| string[]
+| no
+| Package prefixes belonging to this element, without the trailing ArchUnit `..` wildcard — the consuming adapter appends it itself (e.g. `"com.acme.backend.orders"`, not `"com.acme.backend.orders.."`).
+|===
+
+[source,jsonc]
+----
+"orders": {
+  "kind": "container",
+  "title": "Order API",
+  "codeMapping": { "packages": ["com.acme.backend.orders"] }
+}
+----
+
+This exact shape is validated end-to-end by an external prototype adapter, https://github.com/docToolchain/bausteinsicht-archunit — its `BausteinsichtRules.fromModel()` reads this field to build ArchUnit rules (forward), and its `CodeGraphExporter` dumps the real package graph as a `codegraph` JSON document for Bausteinsicht to ingest as an `asIs` snapshot (reverse). See ADR-013 for the full design and staging of the code-governance bridge this field anchors.
+
+NOTE: `codeMapping` is flat — one mapping per element — not keyed per backend. A polyglot element (e.g. a service with both a Java implementation and a generated .NET client) is out of scope until a second backend actually needs it; see ADR-013's "Open Questions".
 
 [[element-lifecycle]]
 ==== Element Lifecycle
