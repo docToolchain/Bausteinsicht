@@ -155,6 +155,37 @@ func TestExportSequenceCmd_FileOutput(t *testing.T) {
 	}
 }
 
+// TestExportSequenceCmd_JSONWithOutput (#631): --output + --format json must
+// write files to disk and report "path" (not "source") in the JSON array.
+func TestExportSequenceCmd_JSONWithOutput(t *testing.T) {
+	modelPath := writeSequenceModel(t)
+	outDir := t.TempDir()
+	var buf bytes.Buffer
+	root := NewRootCmd()
+	root.SetOut(&buf)
+	root.SetArgs([]string{"export-sequence", "--model", modelPath, "--output", outDir, "--format", "json"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var entries []map[string]interface{}
+	if err := json.Unmarshal(buf.Bytes(), &entries); err != nil {
+		t.Fatalf("invalid JSON: %v\noutput:\n%s", err, buf.String())
+	}
+	if len(entries) == 0 {
+		t.Fatal("expected at least one entry in JSON output")
+	}
+	p, ok := entries[0]["path"].(string)
+	if !ok || p == "" {
+		t.Errorf("expected non-empty 'path' field, got: %v", entries[0])
+	}
+	if _, err := os.ReadFile(p); err != nil {
+		t.Errorf("expected file to exist at %q: %v", p, err)
+	}
+	if _, hasSource := entries[0]["source"]; hasSource {
+		t.Error("expected no 'source' field when --output is set")
+	}
+}
+
 func TestExportSequenceCmd_NoDynamicViews(t *testing.T) {
 	dir := t.TempDir()
 	modelPath := filepath.Join(dir, "architecture.jsonc")

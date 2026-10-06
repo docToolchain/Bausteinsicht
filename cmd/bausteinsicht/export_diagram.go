@@ -115,12 +115,19 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 		return exitWithCode(fmt.Errorf("unknown diagram format %q: valid values are \"plantuml\", \"mermaid\", \"dot\", \"d2\", \"html\", or \"structurizr\"", diagramFormat), 2)
 	}
 
-	// When --format json, output structured JSON with diagram source. (#241)
+	// When --format json, output structured JSON. (#241, #631)
+	// With --output: write files and report "path"; without: report "source".
 	if outputFormat == "json" {
+		if outputDir != "" {
+			if err := os.MkdirAll(outputDir, 0750); err != nil {
+				return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
+			}
+		}
 		type diagramEntry struct {
 			View   string `json:"view"`
 			Format string `json:"format"`
-			Source string `json:"source"`
+			Source string `json:"source,omitempty"`
+			Path   string `json:"path,omitempty"`
 		}
 		var entries []diagramEntry
 		keys := sortedKeys(views)
@@ -129,11 +136,17 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 			if fmtErr != nil {
 				return exitWithCode(fmtErr, 1)
 			}
-			entries = append(entries, diagramEntry{
-				View:   key,
-				Format: diagramFormat,
-				Source: result,
-			})
+			entry := diagramEntry{View: key, Format: diagramFormat}
+			if outputDir == "" {
+				entry.Source = result
+			} else {
+				outPath := filepath.Join(outputDir, export.SafeViewKey(key)+"."+ext)
+				if err := os.WriteFile(outPath, []byte(result), 0600); err != nil { //nolint:gosec
+					return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
+				}
+				entry.Path = outPath
+			}
+			entries = append(entries, entry)
 		}
 		data, _ := json.MarshalIndent(entries, "", "  ")
 		_, _ = fmt.Fprintln(cmd.OutOrStdout(), string(data))
@@ -182,12 +195,19 @@ func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map
 		return exitWithCode(fmt.Errorf("unsupported format: %s", diagramFormat), 2)
 	}
 
-	// When --format json, output structured JSON with diagram source
+	// When --format json, output structured JSON. (#631)
+	// With --output: write files and report "path"; without: report "source".
 	if outputFormat == "json" {
+		if outputDir != "" {
+			if err := os.MkdirAll(outputDir, 0750); err != nil {
+				return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
+			}
+		}
 		type diagramEntry struct {
 			View   string `json:"view"`
 			Format string `json:"format"`
-			Source string `json:"source"`
+			Source string `json:"source,omitempty"`
+			Path   string `json:"path,omitempty"`
 		}
 		var entries []diagramEntry
 		keys := sortedKeys(views)
@@ -196,11 +216,22 @@ func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map
 			if fmtErr != nil {
 				return exitWithCode(fmtErr, 1)
 			}
-			entries = append(entries, diagramEntry{
-				View:   key,
-				Format: diagramFormat,
-				Source: result,
-			})
+			entry := diagramEntry{View: key, Format: diagramFormat}
+			if outputDir == "" {
+				entry.Source = result
+			} else {
+				var outPath string
+				if diagramFormat == "html" {
+					outPath = filepath.Join(outputDir, export.SafeViewKey(key)+".html")
+				} else {
+					outPath = filepath.Join(outputDir, "architecture-"+export.SafeViewKey(key)+"."+ext)
+				}
+				if err := os.WriteFile(outPath, []byte(result), 0600); err != nil { //nolint:gosec
+					return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
+				}
+				entry.Path = outPath
+			}
+			entries = append(entries, entry)
 		}
 		data, _ := json.MarshalIndent(entries, "", "  ")
 		_, _ = fmt.Fprintln(cmd.OutOrStdout(), string(data))

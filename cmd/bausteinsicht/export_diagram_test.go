@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -190,5 +191,86 @@ func TestExportDiagram_StructurizrToFile(t *testing.T) {
 	}
 	if !strings.Contains(string(data), "workspace {") {
 		t.Errorf("workspace.dsl missing 'workspace {': %s", data)
+	}
+}
+
+// TestExportDiagram_JSONWithOutput_* (#631): --output + --format json must write
+// files to disk and report "path" (not "source") in the JSON array.
+
+func TestExportDiagram_JSONWithOutput_PlantUML(t *testing.T) {
+	modelPath := writeExportDiagramModel(t)
+	outDir := t.TempDir()
+	out, err := executeRootCmd("export-diagram", "--model", modelPath,
+		"--diagram-format", "plantuml", "--output", outDir, "--format", "json")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var entries []map[string]interface{}
+	if err := json.Unmarshal([]byte(out), &entries); err != nil {
+		t.Fatalf("invalid JSON: %v\noutput:\n%s", err, out)
+	}
+	if len(entries) == 0 {
+		t.Fatal("expected at least one entry in JSON output")
+	}
+	for _, e := range entries {
+		p, ok := e["path"].(string)
+		if !ok || p == "" {
+			t.Errorf("expected non-empty 'path' field in entry, got: %v", e)
+			continue
+		}
+		if _, err := os.ReadFile(p); err != nil {
+			t.Errorf("expected file to exist at path %q: %v", p, err)
+		}
+	}
+	if _, hasSource := entries[0]["source"]; hasSource {
+		t.Error("expected no 'source' field when --output is set")
+	}
+}
+
+func TestExportDiagram_JSONWithOutput_Mermaid(t *testing.T) {
+	modelPath := writeExportDiagramModel(t)
+	outDir := t.TempDir()
+	out, err := executeRootCmd("export-diagram", "--model", modelPath,
+		"--diagram-format", "mermaid", "--output", outDir, "--format", "json")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var entries []map[string]interface{}
+	if err := json.Unmarshal([]byte(out), &entries); err != nil {
+		t.Fatalf("invalid JSON: %v\noutput:\n%s", err, out)
+	}
+	if len(entries) == 0 {
+		t.Fatal("expected at least one entry")
+	}
+	p, ok := entries[0]["path"].(string)
+	if !ok || p == "" {
+		t.Errorf("expected 'path' field, got: %v", entries[0])
+	}
+	if _, err := os.ReadFile(p); err != nil {
+		t.Errorf("expected .mmd file at %q: %v", p, err)
+	}
+}
+
+func TestExportDiagram_JSONWithOutput_DOT(t *testing.T) {
+	modelPath := writeExportDiagramModel(t)
+	outDir := t.TempDir()
+	out, err := executeRootCmd("export-diagram", "--model", modelPath,
+		"--diagram-format", "dot", "--output", outDir, "--format", "json")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var entries []map[string]interface{}
+	if err := json.Unmarshal([]byte(out), &entries); err != nil {
+		t.Fatalf("invalid JSON: %v\noutput:\n%s", err, out)
+	}
+	if len(entries) == 0 {
+		t.Fatal("expected at least one entry")
+	}
+	p, ok := entries[0]["path"].(string)
+	if !ok || p == "" {
+		t.Errorf("expected 'path' field, got: %v", entries[0])
+	}
+	if _, err := os.ReadFile(p); err != nil {
+		t.Errorf("expected .dot file at %q: %v", p, err)
 	}
 }

@@ -94,16 +94,33 @@ func runExportSequence(cmd *cobra.Command, _ []string) error {
 		return diagram.RenderSequencePlantUML(v, flat)
 	}
 
-	// JSON output.
+	// JSON output. (#631) With --output: write files and report "path"; without: report "source".
 	if format == "json" {
+		if outputDir != "" {
+			if err := os.MkdirAll(outputDir, 0750); err != nil {
+				return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
+			}
+		}
 		type entry struct {
 			View   string `json:"view"`
 			Format string `json:"format"`
-			Source string `json:"source"`
+			Source string `json:"source,omitempty"`
+			Path   string `json:"path,omitempty"`
 		}
 		var entries []entry
 		for _, v := range views {
-			entries = append(entries, entry{View: v.Key, Format: diagramFormat, Source: render(v)})
+			e := entry{View: v.Key, Format: diagramFormat}
+			if outputDir == "" {
+				e.Source = render(v)
+			} else {
+				filename := "sequence-" + export.SafeViewKey(v.Key) + "." + ext
+				outPath := filepath.Join(outputDir, filename)
+				if err := os.WriteFile(outPath, []byte(render(v)), 0600); err != nil { //nolint:gosec
+					return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
+				}
+				e.Path = outPath
+			}
+			entries = append(entries, e)
 		}
 		data, _ := json.MarshalIndent(entries, "", "  ")
 		_, _ = fmt.Fprintln(cmd.OutOrStdout(), string(data))
