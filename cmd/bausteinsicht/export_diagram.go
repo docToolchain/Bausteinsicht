@@ -60,11 +60,9 @@ func writeExportFile(outPath string, content []byte) (string, error) {
 // buildExportEntry constructs one exportJSONEntry for a rendered view.
 // In source-mode (outputDir == "") the diagram text is stored as Source.
 // In path-mode the file is written and Source is cleared; Path holds the
-// absolute path. Copying content into a local variable before taking its
-// address prevents pointer-aliasing if callers ever change from := to =.
+// absolute path.
 func buildExportEntry(viewKey, format, content, outputDir, filename string) (exportJSONEntry, error) {
-	src := content // copy so &src is a distinct pointer per call
-	entry := exportJSONEntry{View: viewKey, Format: format, Source: &src}
+	entry := exportJSONEntry{View: viewKey, Format: format, Source: &content}
 	if outputDir != "" {
 		absPath, err := writeExportFile(filepath.Join(outputDir, filename), []byte(content))
 		if err != nil {
@@ -116,6 +114,8 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 		return exitWithCode(fmt.Errorf("loading model: %w", err), 2)
 	}
 
+	// Read outputFormat early: needed by both the structurizr block below and
+	// the generic plantuml/mermaid/dot/d2/html paths further down.
 	outputFormat, _ := cmd.Flags().GetString("format")
 
 	// Structurizr DSL export: outputs the whole workspace in one file.
@@ -258,8 +258,8 @@ func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map
 
 	// When --format json, output structured JSON. (#631)
 	// With --output: write files and report absolute "path"; without: report "source".
-	// JSON filenames use SafeViewKey(key)+"."+ext (no architecture- prefix) so the
-	// JSON envelope is consistent across plantuml/mermaid/dot/d2/html.
+	// Uses fileNameFor so JSON and non-JSON paths always produce identical filenames
+	// for the same format — no drift between modes.
 	// views is pre-filtered by the caller (runExportDiagram passes only the requested
 	// view(s)), so viewKey is intentionally not re-checked here.
 	if outputFormat == "json" {
@@ -270,7 +270,7 @@ func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map
 			if fmtErr != nil {
 				return exitWithCode(fmtErr, 1)
 			}
-			entry, entryErr := buildExportEntry(key, diagramFormat, result, outputDir, export.SafeViewKey(key)+"."+ext)
+			entry, entryErr := buildExportEntry(key, diagramFormat, result, outputDir, fileNameFor(key))
 			if entryErr != nil {
 				return exitWithCode(entryErr, 2)
 			}

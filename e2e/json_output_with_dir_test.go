@@ -162,6 +162,81 @@ func TestExportDiagramJSONWithOutputDir_HTML(t *testing.T) {
 	}
 }
 
+func assertDiagramJSONOutputDir(t *testing.T, stdout, outDir string) {
+	t.Helper()
+	var entries []map[string]interface{}
+	if err := json.Unmarshal([]byte(strings.TrimSpace(stdout)), &entries); err != nil {
+		t.Fatalf("invalid JSON: %v\noutput:\n%s", err, stdout)
+	}
+	if len(entries) == 0 {
+		t.Fatal("expected at least one entry")
+	}
+	for i, e := range entries {
+		if _, hasSource := e["source"]; hasSource {
+			t.Errorf("entry[%d]: expected no 'source' when --output is set", i)
+		}
+		p, ok := e["path"].(string)
+		if !ok || p == "" {
+			t.Errorf("entry[%d]: expected non-empty 'path', got: %v", i, e)
+			continue
+		}
+		if !filepath.IsAbs(p) {
+			t.Errorf("entry[%d]: expected absolute path, got: %q", i, p)
+		}
+		if _, err := os.ReadFile(p); err != nil {
+			t.Errorf("entry[%d]: file missing at %q: %v", i, p, err)
+		}
+	}
+}
+
+func TestExportDiagramJSONWithOutputDir_DOT(t *testing.T) {
+	bin := buildBinary(t)
+	dir := t.TempDir()
+	runCLI(t, bin, dir, "init")
+
+	outDir := filepath.Join(dir, "out-dot")
+	stdout, _, code := runCLISplit(t, bin, dir,
+		"export-diagram", "--diagram-format", "dot",
+		"--output", outDir, "--format", "json",
+	)
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, stdout)
+	}
+	assertDiagramJSONOutputDir(t, stdout, outDir)
+}
+
+func TestExportDiagramJSONWithOutputDir_D2(t *testing.T) {
+	bin := buildBinary(t)
+	dir := t.TempDir()
+	runCLI(t, bin, dir, "init")
+
+	outDir := filepath.Join(dir, "out-d2")
+	stdout, _, code := runCLISplit(t, bin, dir,
+		"export-diagram", "--diagram-format", "d2",
+		"--output", outDir, "--format", "json",
+	)
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, stdout)
+	}
+	assertDiagramJSONOutputDir(t, stdout, outDir)
+}
+
+func TestExportDiagramJSONWithOutputDir_Structurizr(t *testing.T) {
+	bin := buildBinary(t)
+	dir := t.TempDir()
+	runCLI(t, bin, dir, "init")
+
+	outDir := filepath.Join(dir, "out-structurizr")
+	stdout, _, code := runCLISplit(t, bin, dir,
+		"export-diagram", "--diagram-format", "structurizr",
+		"--output", outDir, "--format", "json",
+	)
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, stdout)
+	}
+	assertDiagramJSONOutputDir(t, stdout, outDir)
+}
+
 func TestExportSequenceJSONWithOutputDir(t *testing.T) {
 	bin := buildBinary(t)
 	dir := t.TempDir()

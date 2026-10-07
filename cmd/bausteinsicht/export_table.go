@@ -119,7 +119,7 @@ func exportTableJSON(cmd *cobra.Command, m *model.BausteinsichtModel, viewKey st
 	if outputDir == "" {
 		return nil
 	}
-	absPath, writeErr := writeExportFile(filepath.Join(outputDir, "elements.json"), data)
+	absPath, writeErr := writeExportFile(filepath.Join(outputDir, "elements.json"), append(data, '\n'))
 	if writeErr != nil {
 		return exitWithCode(writeErr, 2)
 	}
