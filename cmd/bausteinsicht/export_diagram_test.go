@@ -281,3 +281,25 @@ func TestExportDiagram_JSONWithOutput_D2(t *testing.T) {
 		"--model", modelPath, "--diagram-format", "d2", "--output", outDir, "--format", "json")
 	assertJSONPathEntries(t, entries)
 }
+
+// TestExportDiagram_JSONSourceMode verifies that --format json without --output
+// emits "source" (not "path") for each entry — backward-compat source mode.
+func TestExportDiagram_JSONSourceMode(t *testing.T) {
+	modelPath := writeExportDiagramModel(t)
+	entries := runExportDiagramJSON(t, "--model", modelPath, "--diagram-format", "plantuml", "--format", "json")
+	if len(entries) == 0 {
+		t.Fatal("expected at least one entry")
+	}
+	for i, e := range entries {
+		src, ok := e["source"].(string)
+		if !ok {
+			t.Errorf("entry[%d]: expected 'source' field in source-mode, got: %v", i, e)
+		}
+		if src == "" {
+			t.Errorf("entry[%d]: expected non-empty 'source' content", i)
+		}
+		if _, hasPath := e["path"]; hasPath {
+			t.Errorf("entry[%d]: unexpected 'path' field when --output is not set", i)
+		}
+	}
+}

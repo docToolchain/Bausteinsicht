@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -103,29 +102,20 @@ func runExportSequence(cmd *cobra.Command, _ []string) error {
 		}
 		entries := make([]exportJSONEntry, 0, len(views))
 		for _, v := range views {
-			source := render(v)
-			e := exportJSONEntry{View: v.Key, Format: diagramFormat, Source: source}
+			src := render(v)
+			e := exportJSONEntry{View: v.Key, Format: diagramFormat, Source: &src}
 			if outputDir != "" {
 				filename := "sequence-" + export.SafeViewKey(v.Key) + "." + ext
-				outPath := filepath.Join(outputDir, filename)
-				if err := os.WriteFile(outPath, []byte(source), 0600); err != nil { //nolint:gosec // output files are non-sensitive documentation
-					return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
+				absPath, writeErr := writeExportFile(filepath.Join(outputDir, filename), []byte(src))
+				if writeErr != nil {
+					return exitWithCode(writeErr, 2)
 				}
-				absPath, err := filepath.Abs(outPath)
-				if err != nil {
-					return exitWithCode(fmt.Errorf("resolving output path: %w", err), 2)
-				}
-				e.Source = ""
+				e.Source = nil
 				e.Path = absPath
 			}
 			entries = append(entries, e)
 		}
-		data, marshalErr := json.MarshalIndent(entries, "", "  ")
-		if marshalErr != nil {
-			return exitWithCode(fmt.Errorf("marshalling output: %w", marshalErr), 2)
-		}
-		_, _ = fmt.Fprintln(cmd.OutOrStdout(), string(data))
-		return nil
+		return emitExportJSON(cmd, entries)
 	}
 
 	// Text / file output.
