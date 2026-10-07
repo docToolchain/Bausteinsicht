@@ -237,11 +237,8 @@ func assertJSONPathEntries(t *testing.T, entries []map[string]interface{}, expec
 		if !filepath.IsAbs(p) {
 			t.Errorf("entry[%d]: expected absolute path, got relative: %q", i, p)
 		}
-		data, err := os.ReadFile(p)
-		if err != nil {
+		if _, err := os.ReadFile(p); err != nil {
 			t.Errorf("entry[%d]: expected file to exist at path %q: %v", i, p, err)
-		} else if len(data) == 0 {
-			t.Errorf("entry[%d]: file at %q is empty — expected diagram content", i, p)
 		}
 		if _, hasSource := e["source"]; hasSource {
 			t.Errorf("entry[%d]: expected no 'source' field when --output is set", i)

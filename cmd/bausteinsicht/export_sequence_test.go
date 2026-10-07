@@ -121,12 +121,14 @@ func TestExportSequenceCmd_JSONOutput_SourceMode(t *testing.T) {
 	if len(entries) == 0 {
 		t.Fatal("expected at least one entry")
 	}
-	src, ok := entries[0]["source"].(string)
-	if !ok || src == "" {
-		t.Errorf("expected non-empty 'source' field without --output, got: %v", entries[0])
-	}
-	if _, hasPath := entries[0]["path"]; hasPath {
-		t.Error("expected no 'path' field when --output is not set")
+	for i, e := range entries {
+		src, ok := e["source"].(string)
+		if !ok || src == "" {
+			t.Errorf("entry[%d]: expected non-empty 'source' field without --output, got: %v", i, e)
+		}
+		if _, hasPath := e["path"]; hasPath {
+			t.Errorf("entry[%d]: expected no 'path' field when --output is not set", i)
+		}
 	}
 }
 

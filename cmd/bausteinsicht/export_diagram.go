@@ -40,17 +40,19 @@ func emitExportJSON(cmd *cobra.Command, entries []exportJSONEntry) error {
 }
 
 // writeExportFile creates the parent directory if needed, writes content to
-// outPath, and returns its absolute path.
+// outPath, and returns its absolute path. The absolute path is resolved before
+// writing so that a failure to resolve (e.g. deleted working directory) does
+// not orphan a file on disk.
 func writeExportFile(outPath string, content []byte) (string, error) {
-	if err := os.MkdirAll(filepath.Dir(outPath), 0750); err != nil {
-		return "", fmt.Errorf("creating output directory: %w", err)
-	}
-	if err := os.WriteFile(outPath, content, 0600); err != nil { //nolint:gosec // output files are non-sensitive documentation
-		return "", fmt.Errorf("writing output: %w", err)
-	}
 	absPath, err := filepath.Abs(outPath)
 	if err != nil {
 		return "", fmt.Errorf("resolving output path: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(absPath), 0750); err != nil {
+		return "", fmt.Errorf("creating output directory: %w", err)
+	}
+	if err := os.WriteFile(absPath, content, 0600); err != nil { //nolint:gosec // output files are non-sensitive documentation
+		return "", fmt.Errorf("writing output: %w", err)
 	}
 	return absPath, nil
 }
@@ -137,14 +139,11 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 			_, _ = fmt.Fprint(cmd.OutOrStdout(), dsl)
 			return nil
 		}
-		if err := os.MkdirAll(outputDir, 0750); err != nil {
-			return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
+		absPath, writeErr := writeExportFile(filepath.Join(outputDir, "workspace.dsl"), []byte(dsl))
+		if writeErr != nil {
+			return exitWithCode(writeErr, 2)
 		}
-		outPath := filepath.Join(outputDir, "workspace.dsl")
-		if err := os.WriteFile(outPath, []byte(dsl), 0600); err != nil { //nolint:gosec // output files are non-sensitive documentation
-			return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
-		}
-		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", outPath)
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", absPath)
 		return nil
 	}
 
@@ -296,16 +295,11 @@ func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map
 				_, _ = fmt.Fprint(cmd.OutOrStdout(), result)
 				return nil
 			}
-
-			if err := os.MkdirAll(outputDir, 0750); err != nil {
-				return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
+			absPath, writeErr := writeExportFile(filepath.Join(outputDir, fileNameFor(viewKey)), []byte(result))
+			if writeErr != nil {
+				return exitWithCode(writeErr, 2)
 			}
-
-			outPath := filepath.Join(outputDir, fileNameFor(viewKey))
-			if err := os.WriteFile(outPath, []byte(result), 0600); err != nil {
-				return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
-			}
-			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", outPath)
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", absPath)
 			return nil
 		}
 
@@ -322,15 +316,11 @@ func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map
 				continue
 			}
 
-			if err := os.MkdirAll(outputDir, 0750); err != nil {
-				return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
+			absPath, writeErr := writeExportFile(filepath.Join(outputDir, fileNameFor(key)), []byte(result))
+			if writeErr != nil {
+				return exitWithCode(writeErr, 2)
 			}
-
-			outPath := filepath.Join(outputDir, fileNameFor(key))
-			if err := os.WriteFile(outPath, []byte(result), 0600); err != nil {
-				return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
-			}
-			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", outPath)
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", absPath)
 		}
 		return nil
 	}
@@ -348,15 +338,11 @@ func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map
 			continue
 		}
 
-		if err := os.MkdirAll(outputDir, 0750); err != nil {
-			return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
+		absPath, writeErr := writeExportFile(filepath.Join(outputDir, fileNameFor(key)), []byte(result))
+		if writeErr != nil {
+			return exitWithCode(writeErr, 2)
 		}
-
-		outPath := filepath.Join(outputDir, fileNameFor(key))
-		if err := os.WriteFile(outPath, []byte(result), 0600); err != nil {
-			return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
-		}
-		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", outPath)
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", absPath)
 	}
 
 	return nil

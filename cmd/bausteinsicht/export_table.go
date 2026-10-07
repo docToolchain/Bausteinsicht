@@ -55,9 +55,9 @@ func runExportTable(cmd *cobra.Command, _ []string) error {
 		return exitWithCode(fmt.Errorf("loading model: %w", err), 2)
 	}
 
-	// When --format json is set, output structured JSON instead of a table. (#239)
+	// When --format json is set, output structured JSON instead of a table. (#239, #631)
 	if format == "json" {
-		return exportTableJSON(cmd, m, viewKey, combined)
+		return exportTableJSON(cmd, m, viewKey, combined, outputDir)
 	}
 
 	var f table.Format
@@ -105,16 +105,28 @@ func runExportTable(cmd *cobra.Command, _ []string) error {
 	return nil
 }
 
-// exportTableJSON outputs the table data as JSON. (#239)
-func exportTableJSON(cmd *cobra.Command, m *model.BausteinsichtModel, viewKey string, combined bool) error {
+// exportTableJSON outputs the table data as JSON. (#239, #631)
+// With outputDir: writes elements.json to disk and prints absolute path to stderr.
+// Without outputDir: writes JSON to stdout.
+func exportTableJSON(cmd *cobra.Command, m *model.BausteinsichtModel, viewKey string, combined bool, outputDir string) error {
 	rows, err := table.CollectRows(m, viewKey, combined)
 	if err != nil {
 		return exitWithCode(err, 1)
 	}
-	data, err := json.MarshalIndent(rows, "", "  ")
-	if err != nil {
-		return exitWithCode(fmt.Errorf("marshaling JSON: %w", err), 2)
+	data, marshalErr := json.MarshalIndent(rows, "", "  ")
+	if marshalErr != nil {
+		return exitWithCode(fmt.Errorf("marshaling JSON: %w", marshalErr), 2)
 	}
-	_, _ = fmt.Fprintln(cmd.OutOrStdout(), string(data))
+	if outputDir == "" {
+		if _, err := cmd.OutOrStdout().Write(append(data, '\n')); err != nil {
+			return exitWithCode(fmt.Errorf("writing JSON output: %w", err), 2)
+		}
+		return nil
+	}
+	absPath, writeErr := writeExportFile(filepath.Join(outputDir, "elements.json"), data)
+	if writeErr != nil {
+		return exitWithCode(writeErr, 2)
+	}
+	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", absPath)
 	return nil
 }
