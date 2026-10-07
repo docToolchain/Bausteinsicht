@@ -33,7 +33,8 @@ func emitExportJSON(cmd *cobra.Command, entries []exportJSONEntry) error {
 	if err != nil {
 		return fmt.Errorf("marshalling JSON output: %w", err)
 	}
-	if _, err := cmd.OutOrStdout().Write(append(data, '\n')); err != nil {
+	data = append(data, '\n')
+	if _, err := cmd.OutOrStdout().Write(data); err != nil {
 		return fmt.Errorf("writing JSON output: %w", err)
 	}
 	return nil
@@ -62,15 +63,16 @@ func writeExportFile(outPath string, content []byte) (string, error) {
 // In path-mode the file is written and Source is cleared; Path holds the
 // absolute path.
 func buildExportEntry(viewKey, format, content, outputDir, filename string) (exportJSONEntry, error) {
-	entry := exportJSONEntry{View: viewKey, Format: format, Source: &content}
-	if outputDir != "" {
-		absPath, err := writeExportFile(filepath.Join(outputDir, filename), []byte(content))
-		if err != nil {
-			return exportJSONEntry{}, err
-		}
-		entry.Source = nil
-		entry.Path = absPath
+	entry := exportJSONEntry{View: viewKey, Format: format}
+	if outputDir == "" {
+		entry.Source = &content
+		return entry, nil
 	}
+	absPath, err := writeExportFile(filepath.Join(outputDir, filename), []byte(content))
+	if err != nil {
+		return exportJSONEntry{}, err
+	}
+	entry.Path = absPath
 	return entry, nil
 }
 
@@ -212,7 +214,7 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 		return nil
 	}
 
-	for key := range views {
+	for _, key := range sortedKeys(views) {
 		result, fmtErr := diagram.FormatView(m, key, f)
 		if fmtErr != nil {
 			return exitWithCode(fmtErr, 1)

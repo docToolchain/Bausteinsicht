@@ -357,6 +357,26 @@ func TestExportDiagram_JSONWithOutput_Structurizr(t *testing.T) {
 	}
 }
 
+func TestExportDiagram_JSONSourceMode_AllFormats(t *testing.T) {
+	modelPath := writeExportDiagramModel(t)
+	for _, f := range []string{"mermaid", "dot", "d2", "html", "structurizr"} {
+		t.Run(f, func(t *testing.T) {
+			entries := runExportDiagramJSON(t, "--model", modelPath, "--diagram-format", f, "--format", "json")
+			if len(entries) == 0 {
+				t.Fatal("expected at least one entry")
+			}
+			for i, e := range entries {
+				if s, ok := e["source"].(string); !ok || s == "" {
+					t.Errorf("entry[%d]: expected non-empty 'source', got: %v", i, e)
+				}
+				if _, hasPath := e["path"]; hasPath {
+					t.Errorf("entry[%d]: unexpected 'path' in source-mode", i)
+				}
+			}
+		})
+	}
+}
+
 // TestExportDiagram_JSONSourceMode verifies that --format json without --output
 // emits "source" (not "path") for each entry — backward-compat source mode.
 func TestExportDiagram_JSONSourceMode(t *testing.T) {

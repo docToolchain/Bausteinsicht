@@ -40,6 +40,9 @@ func runExportTable(cmd *cobra.Command, _ []string) error {
 			return exitWithCode(fmt.Errorf("--output: %w", err), 2)
 		}
 	}
+	if combined && viewKey != "" {
+		_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "warning: --view is ignored when --combined is set")
+	}
 
 	if modelPath == "" {
 		detected, err := model.AutoDetect(".")
@@ -122,13 +125,17 @@ func exportTableJSON(cmd *cobra.Command, m *model.BausteinsichtModel, viewKey st
 		}
 		return nil
 	}
+	// File names mirror the non-JSON convention (elements.<ext>,
+	// <view>-elements.<ext>, all-views-elements.<ext>) so modes never collide.
 	viewLabel := viewKey
-	filename := "elements.json"
-	if combined {
+	filename := "all-views-elements.json"
+	switch {
+	case combined:
 		viewLabel = "combined"
-	} else if viewKey == "" {
+		filename = "elements.json"
+	case viewKey == "":
 		viewLabel = "all"
-	} else {
+	default:
 		filename = export.SafeViewKey(viewKey) + "-elements.json"
 	}
 	absPath, writeErr := writeExportFile(filepath.Join(outputDir, filename), dataWithNewline)
@@ -136,7 +143,7 @@ func exportTableJSON(cmd *cobra.Command, m *model.BausteinsichtModel, viewKey st
 		return exitWithCode(writeErr, 2)
 	}
 	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", absPath)
-	entry := exportJSONEntry{View: viewLabel, Format: "json", Path: absPath}
+	entry := exportJSONEntry{View: viewLabel, Format: "table", Path: absPath}
 	if err := emitExportJSON(cmd, []exportJSONEntry{entry}); err != nil {
 		return exitWithCode(err, 2)
 	}
