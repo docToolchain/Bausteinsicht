@@ -39,7 +39,7 @@ func runLint(cmd *cobra.Command, _ []string) error {
 
 	if len(m.Constraints) == 0 {
 		if format == "json" {
-			return lintOutputJSONNoConstraints(cmd)
+			return lintOutputJSON(cmd, constraints.Result{})
 		}
 		if _, err := fmt.Fprintln(cmd.OutOrStdout(), "No constraints defined."); err != nil {
 			return err
@@ -53,25 +53,6 @@ func runLint(cmd *cobra.Command, _ []string) error {
 		return lintOutputJSON(cmd, result)
 	}
 	return lintOutputText(cmd, result)
-}
-
-func lintOutputJSONNoConstraints(cmd *cobra.Command) error {
-	type jsonResult struct {
-		Constraints int                     `json:"constraints"`
-		Violations  []constraints.Violation `json:"violations"`
-		Message     string                  `json:"message"`
-	}
-	out := jsonResult{
-		Constraints: 0,
-		Violations:  []constraints.Violation{},
-		Message:     "No constraints defined.",
-	}
-	data, err := json.MarshalIndent(out, "", "  ")
-	if err != nil {
-		return err
-	}
-	_, err = fmt.Fprintln(cmd.OutOrStdout(), string(data))
-	return err
 }
 
 func lintOutputJSON(cmd *cobra.Command, r constraints.Result) error {
