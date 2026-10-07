@@ -273,3 +273,11 @@ func TestExportDiagram_JSONWithOutput_HTML(t *testing.T) {
 		"--model", modelPath, "--diagram-format", "html", "--output", outDir, "--format", "json")
 	assertJSONPathEntries(t, entries)
 }
+
+func TestExportDiagram_JSONWithOutput_D2(t *testing.T) {
+	modelPath := writeExportDiagramModel(t)
+	outDir := t.TempDir()
+	entries := runExportDiagramJSON(t,
+		"--model", modelPath, "--diagram-format", "d2", "--output", outDir, "--format", "json")
+	assertJSONPathEntries(t, entries)
+}

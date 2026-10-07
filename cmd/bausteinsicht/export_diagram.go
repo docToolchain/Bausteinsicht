@@ -15,13 +15,12 @@ import (
 )
 
 // exportJSONEntry is the JSON shape for one exported view or sequence.
-// Exactly one of Source or Path is set per entry:
-//   - Source (omitempty): diagram text, present when --output is not given
-//   - Path (omitempty): absolute path to the written file, present when --output is given
+// Exactly one of Source or Path is populated per entry:
+//   - Source: diagram text, set when --output is not given (omitempty omits it for path-mode)
+//   - Path: absolute path to the written file, set when --output is given
 //
-// Both fields carry omitempty so an empty render result in source-mode omits
-// the key entirely rather than emitting "source":"" — callers should test for
-// "path" absence to detect source-mode, not "source" presence.
+// In path-mode the render loop explicitly clears Source before appending the
+// entry, so omitempty correctly suppresses "source":"" in the JSON output.
 type exportJSONEntry struct {
 	View   string `json:"view"`
 	Format string `json:"format"`
@@ -134,19 +133,19 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 	// With --output: write files and report absolute "path"; without: report "source".
 	if outputFormat == "json" {
 		keys := sortedKeys(views)
+		if outputDir != "" {
+			if err := os.MkdirAll(outputDir, 0750); err != nil {
+				return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
+			}
+		}
 		entries := make([]exportJSONEntry, 0, len(keys))
 		for _, key := range keys {
 			result, fmtErr := diagram.FormatView(m, key, f)
 			if fmtErr != nil {
 				return exitWithCode(fmtErr, 1)
 			}
-			entry := exportJSONEntry{View: key, Format: diagramFormat}
-			if outputDir == "" {
-				entry.Source = result
-			} else {
-				if err := os.MkdirAll(outputDir, 0750); err != nil {
-					return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
-				}
+			entry := exportJSONEntry{View: key, Format: diagramFormat, Source: result}
+			if outputDir != "" {
 				outPath := filepath.Join(outputDir, export.SafeViewKey(key)+"."+ext)
 				if err := os.WriteFile(outPath, []byte(result), 0600); err != nil { //nolint:gosec // output files are non-sensitive documentation
 					return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
@@ -155,11 +154,15 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 				if err != nil {
 					return exitWithCode(fmt.Errorf("resolving output path: %w", err), 2)
 				}
+				entry.Source = ""
 				entry.Path = absPath
 			}
 			entries = append(entries, entry)
 		}
-		data, _ := json.MarshalIndent(entries, "", "  ")
+		data, marshalErr := json.MarshalIndent(entries, "", "  ")
+		if marshalErr != nil {
+			return exitWithCode(fmt.Errorf("marshalling output: %w", marshalErr), 2)
+		}
 		_, _ = fmt.Fprintln(cmd.OutOrStdout(), string(data))
 		return nil
 	}
@@ -219,19 +222,19 @@ func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map
 	// With --output: write files and report absolute "path"; without: report "source".
 	if outputFormat == "json" {
 		keys := sortedKeys(views)
+		if outputDir != "" {
+			if err := os.MkdirAll(outputDir, 0750); err != nil {
+				return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
+			}
+		}
 		entries := make([]exportJSONEntry, 0, len(keys))
 		for _, key := range keys {
 			result, fmtErr := renderFunc(m, key)
 			if fmtErr != nil {
 				return exitWithCode(fmtErr, 1)
 			}
-			entry := exportJSONEntry{View: key, Format: diagramFormat}
-			if outputDir == "" {
-				entry.Source = result
-			} else {
-				if err := os.MkdirAll(outputDir, 0750); err != nil {
-					return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
-				}
+			entry := exportJSONEntry{View: key, Format: diagramFormat, Source: result}
+			if outputDir != "" {
 				outPath := filepath.Join(outputDir, fileNameFor(key))
 				if err := os.WriteFile(outPath, []byte(result), 0600); err != nil { //nolint:gosec // output files are non-sensitive documentation
 					return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
@@ -240,11 +243,15 @@ func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map
 				if err != nil {
 					return exitWithCode(fmt.Errorf("resolving output path: %w", err), 2)
 				}
+				entry.Source = ""
 				entry.Path = absPath
 			}
 			entries = append(entries, entry)
 		}
-		data, _ := json.MarshalIndent(entries, "", "  ")
+		data, marshalErr := json.MarshalIndent(entries, "", "  ")
+		if marshalErr != nil {
+			return exitWithCode(fmt.Errorf("marshalling output: %w", marshalErr), 2)
+		}
 		_, _ = fmt.Fprintln(cmd.OutOrStdout(), string(data))
 		return nil
 	}
