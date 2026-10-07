@@ -251,10 +251,9 @@ func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map
 		return exitWithCode(fmt.Errorf("unsupported format: %s", diagramFormat), 2)
 	}
 
-	// fileNameFor returns the canonical non-JSON output filename for a view key.
-	// DOT/D2 keep the "architecture-" prefix (existing behaviour); HTML does not.
-	// The JSON path uses SafeViewKey(key)+"."+ext directly so the JSON envelope
-	// filenames are consistent across all formats (no prefix anywhere).
+	// fileNameFor returns the canonical output filename for a view key, shared by
+	// both the JSON and non-JSON paths so both modes always write identical names.
+	// DOT/D2 keep the "architecture-" prefix via OutputFileName; HTML uses no prefix.
 	fileNameFor := func(key string) string {
 		if diagramFormat == "html" {
 			return export.SafeViewKey(key) + ".html"

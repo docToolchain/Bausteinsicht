@@ -111,16 +111,11 @@ func exportTableJSON(cmd *cobra.Command, m *model.BausteinsichtModel, viewKey st
 	if err != nil {
 		return exitWithCode(err, 1)
 	}
-	dataWithNewline, marshalErr := func() ([]byte, error) {
-		d, e := json.MarshalIndent(rows, "", "  ")
-		if e != nil {
-			return nil, e
-		}
-		return append(d, '\n'), nil
-	}()
-	if marshalErr != nil {
-		return exitWithCode(fmt.Errorf("marshaling JSON: %w", marshalErr), 2)
+	data, err := json.MarshalIndent(rows, "", "  ")
+	if err != nil {
+		return exitWithCode(fmt.Errorf("marshaling JSON: %w", err), 2)
 	}
+	dataWithNewline := append(data, '\n')
 	if outputDir == "" {
 		if _, err := cmd.OutOrStdout().Write(dataWithNewline); err != nil {
 			return exitWithCode(fmt.Errorf("writing JSON output: %w", err), 2)
@@ -128,12 +123,15 @@ func exportTableJSON(cmd *cobra.Command, m *model.BausteinsichtModel, viewKey st
 		return nil
 	}
 	viewLabel := viewKey
+	filename := "elements.json"
 	if combined {
 		viewLabel = "combined"
 	} else if viewKey == "" {
 		viewLabel = "all"
+	} else {
+		filename = export.SafeViewKey(viewKey) + "-elements.json"
 	}
-	absPath, writeErr := writeExportFile(filepath.Join(outputDir, "elements.json"), dataWithNewline)
+	absPath, writeErr := writeExportFile(filepath.Join(outputDir, filename), dataWithNewline)
 	if writeErr != nil {
 		return exitWithCode(writeErr, 2)
 	}

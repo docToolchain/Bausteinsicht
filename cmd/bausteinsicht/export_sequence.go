@@ -119,6 +119,9 @@ func runExportSequence(cmd *cobra.Command, _ []string) error {
 	// Text / file output.
 	for _, v := range views {
 		source := render(v)
+		if source == "" {
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "warning: view %q resolved to empty diagram\n", v.Key)
+		}
 
 		if outputDir == "" {
 			_, _ = fmt.Fprint(cmd.OutOrStdout(), source)

@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/docToolchain/Bausteinsicht/internal/export"
 )
 
 const exportDiagramTestModel = `{
@@ -272,7 +274,7 @@ func TestExportDiagram_JSONWithOutput_DOT(t *testing.T) {
 	for i, e := range entries {
 		p := e["path"].(string)
 		view := e["view"].(string)
-		expected := "architecture-" + view + ".dot"
+		expected := "architecture-" + export.SafeViewKey(view) + ".dot"
 		if filepath.Base(p) != expected {
 			t.Errorf("entry[%d]: expected filename %q, got %q", i, expected, filepath.Base(p))
 		}
@@ -297,7 +299,7 @@ func TestExportDiagram_JSONWithOutput_D2(t *testing.T) {
 	for i, e := range entries {
 		p := e["path"].(string)
 		view := e["view"].(string)
-		expected := "architecture-" + view + ".d2"
+		expected := "architecture-" + export.SafeViewKey(view) + ".d2"
 		if filepath.Base(p) != expected {
 			t.Errorf("entry[%d]: expected filename %q, got %q", i, expected, filepath.Base(p))
 		}

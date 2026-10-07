@@ -197,6 +197,9 @@ func assertDiagramJSONOutputDir(t *testing.T, stdout, outDir string) {
 		if !filepath.IsAbs(p) {
 			t.Errorf("entry[%d]: expected absolute path, got: %q", i, p)
 		}
+		if !strings.HasPrefix(p, outDir) {
+			t.Errorf("entry[%d]: path %q not inside outDir %q", i, p, outDir)
+		}
 		if _, err := os.ReadFile(p); err != nil {
 			t.Errorf("entry[%d]: file missing at %q: %v", i, p, err)
 		}
