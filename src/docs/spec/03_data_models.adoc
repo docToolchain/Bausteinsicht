@@ -216,6 +216,35 @@ The model has these top-level sections. `specification`, `model`, `relationships
 }
 ----
 
+==== Element Kind Properties
+
+[cols="1,1,1,3"]
+|===
+| Property | Type | Required | Description
+
+| `notation`
+| string
+| yes
+| Display name of the kind (also used to infer the C4 macro, see below).
+
+| `description`
+| string
+| no
+| Free-text explanation of the kind.
+
+| `container`
+| boolean
+| no
+| Whether elements of this kind may have `children`.
+
+| `c4`
+| string
+| no
+| Explicit C4 macro used by `export-diagram` (PlantUML/Mermaid), e.g. `"Person"`, `"System_Ext"`, `"ContainerDb"`. Allowed values: `Person`, `Person_Ext`, `System`, `System_Ext`, `SystemDb`, `SystemDb_Ext`, `SystemQueue`, `SystemQueue_Ext`, `Container`, `Container_Ext`, `ContainerDb`, `ContainerDb_Ext`, `ContainerQueue`, `ContainerQueue_Ext`, `Component`, `Component_Ext`, `ComponentDb`, `ComponentDb_Ext`, `ComponentQueue`, `ComponentQueue_Ext` (BR-035). Overrides the key- and notation-based inference.
+|===
+
+Without `c4`, the macro is inferred from the kind key (`actor`, `person`, `system`, `external_system`, `container`, `ui`, `mobile`, `filestore`, `datastore`, `queue`, `component`) and then from the notation (for example `Person`/`Actor` → `Person`, `External System` → `System_Ext`). Kinds that match neither fall back to `System` with a warning — see the `export-diagram` command in link:02_cli_specification.html[02_cli_specification] (#633).
+
 ==== Element Properties
 
 [cols="1,1,1,3"]
@@ -880,6 +909,7 @@ type ElementKind struct {
     Notation    string `json:"notation"`
     Description string `json:"description,omitempty"`
     Container   bool   `json:"container,omitempty"`
+    C4          string `json:"c4,omitempty"`
 }
 
 type RelationshipKind struct {
