@@ -202,6 +202,15 @@ func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map
 		return exitWithCode(fmt.Errorf("unsupported format: %s", diagramFormat), 2)
 	}
 
+	// fileNameFor returns the canonical output filename for a view key.
+	// Defined once so the JSON and non-JSON paths share the same convention.
+	fileNameFor := func(key string) string {
+		if diagramFormat == "html" {
+			return export.SafeViewKey(key) + ".html"
+		}
+		return export.OutputFileName(key, ext)
+	}
+
 	// When --format json, output structured JSON. (#631)
 	// With --output: write files and report absolute "path"; without: report "source".
 	if outputFormat == "json" {
@@ -221,12 +230,7 @@ func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map
 			if outputDir == "" {
 				entry.Source = result
 			} else {
-				var outPath string
-				if diagramFormat == "html" {
-					outPath = filepath.Join(outputDir, export.SafeViewKey(key)+".html")
-				} else {
-					outPath = filepath.Join(outputDir, export.OutputFileName(key, ext))
-				}
+				outPath := filepath.Join(outputDir, fileNameFor(key))
 				if err := os.WriteFile(outPath, []byte(result), 0600); err != nil { //nolint:gosec
 					return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
 				}
@@ -262,7 +266,7 @@ func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map
 				return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
 			}
 
-			outPath := filepath.Join(outputDir, export.SafeViewKey(viewKey)+".html")
+			outPath := filepath.Join(outputDir, fileNameFor(viewKey))
 			if err := os.WriteFile(outPath, []byte(result), 0600); err != nil {
 				return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
 			}
@@ -270,7 +274,7 @@ func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map
 			return nil
 		}
 
-		// Multiple views: export each as separate HTML file
+		// Multiple views: export each as separate file
 		keys := sortedKeys(views)
 		for _, key := range keys {
 			result, err := renderFunc(m, key)
@@ -287,7 +291,7 @@ func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map
 				return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
 			}
 
-			outPath := filepath.Join(outputDir, export.SafeViewKey(key)+".html")
+			outPath := filepath.Join(outputDir, fileNameFor(key))
 			if err := os.WriteFile(outPath, []byte(result), 0600); err != nil {
 				return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
 			}
@@ -296,7 +300,7 @@ func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map
 		return nil
 	}
 
-	// For DOT and D2: export each view separately
+	// For DOT, D2 and other formats: export each view separately
 	keys := sortedKeys(views)
 	for _, key := range keys {
 		result, err := renderFunc(m, key)
@@ -313,7 +317,7 @@ func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map
 			return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
 		}
 
-		outPath := filepath.Join(outputDir, export.OutputFileName(key, ext))
+		outPath := filepath.Join(outputDir, fileNameFor(key))
 		if err := os.WriteFile(outPath, []byte(result), 0600); err != nil {
 			return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
 		}

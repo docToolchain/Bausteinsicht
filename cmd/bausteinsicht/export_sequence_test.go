@@ -102,6 +102,34 @@ func TestExportSequenceCmd_JSONOutput(t *testing.T) {
 	}
 }
 
+// TestExportSequenceCmd_JSONOutput_SourceMode verifies that without --output the
+// "source" field is present and non-empty (backward-compat for source mode).
+func TestExportSequenceCmd_JSONOutput_SourceMode(t *testing.T) {
+	modelPath := writeSequenceModel(t)
+	var outBuf, errBuf bytes.Buffer
+	root := NewRootCmd()
+	root.SetOut(&outBuf)
+	root.SetErr(&errBuf)
+	root.SetArgs([]string{"export-sequence", "--model", modelPath, "--format", "json"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v\nstderr: %s", err, errBuf.String())
+	}
+	var entries []map[string]interface{}
+	if err := json.Unmarshal(outBuf.Bytes(), &entries); err != nil {
+		t.Fatalf("invalid JSON: %v\noutput:\n%s", err, outBuf.String())
+	}
+	if len(entries) == 0 {
+		t.Fatal("expected at least one entry")
+	}
+	src, ok := entries[0]["source"].(string)
+	if !ok || src == "" {
+		t.Errorf("expected non-empty 'source' field without --output, got: %v", entries[0])
+	}
+	if _, hasPath := entries[0]["path"]; hasPath {
+		t.Error("expected no 'path' field when --output is not set")
+	}
+}
+
 func TestExportSequenceCmd_ViewFilter(t *testing.T) {
 	modelPath := writeSequenceModel(t)
 	var buf bytes.Buffer

@@ -175,4 +175,22 @@ func TestExportSequenceJSONWithOutputDir(t *testing.T) {
 	if _, hasSource := entries[0]["source"]; hasSource {
 		t.Error("expected no 'source' field when --output is set")
 	}
+
+	// Backward-compat: without --output the "source" field must still be present.
+	stdoutSrc, _, code2 := runCLISplit(t, bin, dir,
+		"export-sequence", "--model", modelPath, "--format", "json",
+	)
+	if code2 != 0 {
+		t.Fatalf("source mode exit %d: %s", code2, stdoutSrc)
+	}
+	var srcEntries []map[string]interface{}
+	if err := json.Unmarshal([]byte(strings.TrimSpace(stdoutSrc)), &srcEntries); err != nil {
+		t.Fatalf("invalid JSON (source mode): %v\noutput:\n%s", err, stdoutSrc)
+	}
+	if len(srcEntries) == 0 {
+		t.Fatal("expected entries in source-mode JSON output")
+	}
+	if _, ok := srcEntries[0]["source"]; !ok {
+		t.Error("expected 'source' field when --output is NOT set")
+	}
 }
