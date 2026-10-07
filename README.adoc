@@ -46,6 +46,8 @@ This JSONC model produces the diagram above:
 }
 ----
 
+NOTE: `export-diagram` (C4-PlantUML / Mermaid) picks the C4 macro from the element kind: first an optional `"c4": "Person"` override in the specification, then the kind key (`actor`, `person`, `system`, `external_system`, `container`, `ui`, `mobile`, `filestore`, `datastore`, `queue`, `component`), then the notation (`Person`, `External System`, `Database`, ...). Kinds that match none of these render as `System(...)` and print a warning.
+
 === Jobs to be Done
 
 **Define architecture in text, get diagrams automatically** — write a JSONC model and run `bausteinsicht sync`.

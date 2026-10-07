@@ -108,7 +108,7 @@ The architecture model has four sections:
   // 1. Specification: Define element kinds and relationship kinds
   "specification": {
     "elements": {
-      "actor":     { "notation": "Actor", "description": "A person or external system" },
+      "actor":     { "notation": "Actor", "description": "A person who uses the system" },
       "system":    { "notation": "Software System", "container": true },
       "container": { "notation": "Container", "container": true },
       "component": { "notation": "Component", "container": true }
@@ -165,6 +165,7 @@ The architecture model has four sections:
 
 - **Element IDs** are the JSONC object keys (e.g., `customer`, `frontend`). Nested elements are referenced via dot notation: `onlineshop.api.catalog`.
 - **`container: true`** in the specification allows an element kind to have children.
+- **C4 macro of a kind** (`export-diagram` PlantUML/Mermaid): an explicit `"c4": "Person"` in the kind definition wins; otherwise the kind **key** is used (`actor` and `person` → `Person`, `system`, `external_system` → `System_Ext`, `container`/`ui`/`mobile`/`filestore` → `Container`, `datastore` → `ContainerDb`, `queue` → `ContainerQueue`, `component`), then the **notation** (`Person`, `External System`, `Database`, ...). Any other kind renders as `System(...)` and prints a warning — use `c4` to choose the macro for custom kind names.
 - **Views** control what appears on each draw.io diagram page:
   - `include`: List of element IDs or glob patterns (`onlineshop.*`)
   - `scope`: Element whose boundary is drawn as a swimlane

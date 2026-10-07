@@ -282,6 +282,9 @@
     "ElementKind": {
       "additionalProperties": false,
       "properties": {
+        "c4": {
+          "type": "string"
+        },
         "container": {
           "type": "boolean"
         },

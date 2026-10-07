@@ -199,6 +199,11 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 		warnIfEmptyView(cmd, m, key, view)
 	}
 
+	// C4 macros are only used by the PlantUML and Mermaid renderers (#633).
+	if diagramFormat == "plantuml" || diagramFormat == "mermaid" {
+		warnUnmappedKinds(cmd, m, views)
+	}
+
 	// Handle new export formats (DOT, D2, HTML) — with JSON envelope support
 	switch diagramFormat {
 	case "dot", "d2", "html":
@@ -338,6 +343,31 @@ func warnIfEmptyView(cmd *cobra.Command, m *model.BausteinsichtModel, key string
 	if len(resolved) == 0 {
 		_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
 			"WARNING: view %q resolves to 0 elements — check its scope/include/exclude; the exported diagram will be empty\n", key)
+	}
+}
+
+// warnUnmappedKinds prints one stderr warning per element kind that has no C4
+// macro mapping and would silently render as System(...) (#633).
+func warnUnmappedKinds(cmd *cobra.Command, m *model.BausteinsichtModel, views map[string]model.View) {
+	warned := map[string]bool{}
+	for _, key := range sortedKeys(views) {
+		kinds, err := diagram.UnmappedKinds(m, key)
+		if err != nil {
+			continue
+		}
+		for _, kind := range kinds {
+			if warned[kind] {
+				continue
+			}
+			warned[kind] = true
+			if _, declared := m.Specification.Elements[kind]; declared {
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
+					"WARNING: element kind %q is not a recognised C4 kind and is rendered as System(...) — set specification.elements.%s.c4 to choose a macro\n", kind, kind)
+			} else {
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
+					"WARNING: element kind %q is not declared in specification.elements and is rendered as System(...)\n", kind)
+			}
+		}
 	}
 }
 

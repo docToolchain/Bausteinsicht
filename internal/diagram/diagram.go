@@ -97,10 +97,10 @@ func FormatView(m *model.BausteinsichtModel, viewKey string, f Format) (string, 
 	sort.Strings(resolved)
 
 	// Determine C4 level from view content.
-	level := detectLevel(resolved, flat, view.Scope)
+	level := detectLevel(resolved, flat, view.Scope, &m.Specification)
 
 	// Separate scope-internal elements from external ones.
-	scopeElems, externalElems := partitionElements(resolved, flat, view.Scope)
+	scopeElems, externalElems := partitionElements(resolved, flat, view.Scope, &m.Specification)
 
 	// Filter relationships to those visible in this view.
 	elemSet := make(map[string]bool, len(resolved))
@@ -112,32 +112,39 @@ func FormatView(m *model.BausteinsichtModel, viewKey string, f Format) (string, 
 	}
 	rels := filterRelationships(m.Relationships, elemSet, &m.Specification)
 
+	bnd := resolveBoundary(view, flat, &m.Specification)
+
 	var b strings.Builder
 	switch f {
 	case PlantUML:
-		writePlantUML(&b, view, level, scopeElems, externalElems, rels, flat)
+		writePlantUML(&b, view, level, scopeElems, externalElems, rels, bnd)
 	case Mermaid:
-		writeMermaid(&b, view, level, scopeElems, externalElems, rels, flat)
+		writeMermaid(&b, view, level, scopeElems, externalElems, rels, bnd)
 	}
 	return b.String(), nil
 }
 
 type elemEntry struct {
-	ID   string
-	Elem *model.Element
+	ID    string
+	Elem  *model.Element
+	Macro string
 }
 
-func detectLevel(resolved []string, flat map[string]*model.Element, scope string) string {
+// detectLevel derives the C4 level from the macros the view's elements
+// resolve to (see C4Macro), so override- and notation-mapped kinds select the
+// matching C4 include (C4_Container / C4_Component).
+func detectLevel(resolved []string, flat map[string]*model.Element, scope string, spec *model.Specification) string {
 	hasContainer := false
 	for _, id := range resolved {
 		elem := flat[id]
 		if elem == nil {
 			continue
 		}
-		if elem.Kind == "component" {
+		macro, _ := C4Macro(spec, elem.Kind)
+		if strings.HasPrefix(macro, "Component") {
 			return "Component"
 		}
-		if elem.Kind == "container" {
+		if strings.HasPrefix(macro, "Container") {
 			hasContainer = true
 		}
 	}
@@ -147,16 +154,18 @@ func detectLevel(resolved []string, flat map[string]*model.Element, scope string
 	return "Context"
 }
 
-func partitionElements(resolved []string, flat map[string]*model.Element, scope string) (inside, outside []elemEntry) {
+func partitionElements(resolved []string, flat map[string]*model.Element, scope string, spec *model.Specification) (inside, outside []elemEntry) {
 	for _, id := range resolved {
 		elem := flat[id]
 		if elem == nil {
 			continue
 		}
+		macro, _ := C4Macro(spec, elem.Kind)
+		entry := elemEntry{ID: id, Elem: elem, Macro: macro}
 		if scope != "" && strings.HasPrefix(id, scope+".") {
-			inside = append(inside, elemEntry{id, elem})
+			inside = append(inside, entry)
 		} else {
-			outside = append(outside, elemEntry{id, elem})
+			outside = append(outside, entry)
 		}
 	}
 	return
@@ -214,27 +223,83 @@ func liftToVisible(id string, elemSet map[string]bool) string {
 	}
 }
 
-func c4Macro(kind string) string {
-	switch kind {
-	case "actor":
-		return "Person"
-	case "system":
-		return "System"
-	case "external_system":
-		return "System_Ext"
-	case "container", "ui", "mobile":
-		return "Container"
-	case "datastore":
-		return "ContainerDb"
-	case "queue":
-		return "ContainerQueue"
-	case "filestore":
-		return "Container"
-	case "component":
-		return "Component"
-	default:
-		return "System"
+// c4MacroByKey maps well-known element kind keys to C4 macros.
+var c4MacroByKey = map[string]string{
+	"actor":           "Person",
+	"person":          "Person",
+	"system":          "System",
+	"external_system": "System_Ext",
+	"container":       "Container",
+	"ui":              "Container",
+	"mobile":          "Container",
+	"filestore":       "Container",
+	"datastore":       "ContainerDb",
+	"queue":           "ContainerQueue",
+	"component":       "Component",
+}
+
+// c4MacroByNotation maps lower-cased kind notations to C4 macros.
+var c4MacroByNotation = map[string]string{
+	"person":          "Person",
+	"actor":           "Person",
+	"system":          "System",
+	"software system": "System",
+	"external system": "System_Ext",
+	"container":       "Container",
+	"database":        "ContainerDb",
+	"data store":      "ContainerDb",
+	"datastore":       "ContainerDb",
+	"queue":           "ContainerQueue",
+	"component":       "Component",
+}
+
+// C4Macro resolves the C4 macro for an element kind: an explicit
+// specification c4 override wins, then the kind key, then the kind's notation.
+// ok is false when none matches and the macro falls back to System (#633).
+func C4Macro(spec *model.Specification, kind string) (macro string, ok bool) {
+	var def model.ElementKind
+	if spec != nil {
+		def = spec.Elements[kind]
 	}
+	if def.C4 != "" {
+		return def.C4, true
+	}
+	if m, found := c4MacroByKey[strings.ToLower(kind)]; found {
+		return m, true
+	}
+	if m, found := c4MacroByNotation[strings.ToLower(strings.TrimSpace(def.Notation))]; found {
+		return m, true
+	}
+	return "System", false
+}
+
+// UnmappedKinds returns the sorted, de-duplicated element kinds in the view
+// that C4Macro cannot resolve and that therefore render as System (#633).
+func UnmappedKinds(m *model.BausteinsichtModel, viewKey string) ([]string, error) {
+	view, ok := m.Views[viewKey]
+	if !ok {
+		return nil, fmt.Errorf("view %q not found", viewKey)
+	}
+	resolved, err := model.ResolveView(m, &view)
+	if err != nil {
+		return nil, err
+	}
+	flat, _ := model.FlattenElements(m)
+	resolved = applyTagFiltering(resolved, flat, view.FilterTags, view.ExcludeTags)
+	seen := map[string]bool{}
+	var kinds []string
+	for _, id := range resolved {
+		elem := flat[id]
+		if elem == nil || seen[elem.Kind] {
+			continue
+		}
+		seen[elem.Kind] = true
+		if _, ok := C4Macro(&m.Specification, elem.Kind); !ok {
+			kinds = append(kinds, elem.Kind)
+		}
+	}
+	sort.Strings(kinds)
+	return kinds, nil
 }
 
 func sanitizeID(id string) string {
@@ -249,7 +314,7 @@ func escapeQuotes(s string) string {
 // Mermaid's C4 diagram syntax use the same macro-call format, so both
 // writePlantUML and writeMermaid share this.
 func writeC4Element(b *strings.Builder, e elemEntry, indent string) {
-	macro := c4Macro(e.Elem.Kind)
+	macro := e.Macro
 	if e.Elem.Technology != "" {
 		fmt.Fprintf(b, "%s%s(%s, \"%s\", \"%s\", \"%s\")\n",
 			indent, macro, sanitizeID(e.ID),
@@ -261,22 +326,28 @@ func writeC4Element(b *strings.Builder, e elemEntry, indent string) {
 	}
 }
 
-// resolveBoundaryMacro determines the C4 boundary macro and display title
-// for a scoped view's boundary box, shared by PlantUML and Mermaid output:
-// System_Boundary by default, Container_Boundary when the scope element's
-// kind is "container". Falls back to the scope's raw ID as the title if the
-// scope element isn't found in flat.
-func resolveBoundaryMacro(view model.View, flat map[string]*model.Element) (boundaryMacro, scopeTitle string) {
+// boundary is the C4 boundary box of a scoped view: its macro and display title.
+type boundary struct {
+	Macro string
+	Title string
+}
+
+// resolveBoundary determines the C4 boundary macro and display title for a
+// scoped view's boundary box, shared by PlantUML and Mermaid output:
+// Container_Boundary when the scope element's kind resolves to a Container
+// macro (via c4 override, key or notation, see C4Macro), System_Boundary
+// otherwise. Falls back to the scope's raw ID as the title if the scope
+// element isn't found in flat.
+func resolveBoundary(view model.View, flat map[string]*model.Element, spec *model.Specification) boundary {
 	scopeElem := flat[view.Scope]
-	scopeTitle = view.Scope
+	bnd := boundary{Macro: "System_Boundary", Title: view.Scope}
 	if scopeElem != nil {
-		scopeTitle = scopeElem.Title
+		bnd.Title = scopeElem.Title
+		if macro, _ := C4Macro(spec, scopeElem.Kind); macro == "Container" || macro == "Container_Ext" {
+			bnd.Macro = "Container_Boundary"
+		}
 	}
-	boundaryMacro = "System_Boundary"
-	if scopeElem != nil && scopeElem.Kind == "container" {
-		boundaryMacro = "Container_Boundary"
-	}
-	return boundaryMacro, scopeTitle
+	return bnd
 }
 
 // writeScopeSection writes a view's scope boundary with its internal
@@ -284,15 +355,14 @@ func resolveBoundaryMacro(view model.View, flat map[string]*model.Element) (boun
 // Shared by writePlantUML and writeMermaid, which differ only in
 // indentation convention (PlantUML: no base indent, 2-space nesting;
 // Mermaid: 4-space base indent, 4-space nesting).
-func writeScopeSection(b *strings.Builder, view model.View, flat map[string]*model.Element, inside []elemEntry, outerIndent, innerIndent string) {
+func writeScopeSection(b *strings.Builder, view model.View, bnd boundary, inside []elemEntry, outerIndent, innerIndent string) {
 	if view.Scope == "" {
 		for _, e := range inside {
 			writeC4Element(b, e, outerIndent)
 		}
 		return
 	}
-	boundaryMacro, scopeTitle := resolveBoundaryMacro(view, flat)
-	fmt.Fprintf(b, "%s%s(%s, \"%s\") {\n", outerIndent, boundaryMacro, sanitizeID(view.Scope), escapeQuotes(scopeTitle))
+	fmt.Fprintf(b, "%s%s(%s, \"%s\") {\n", outerIndent, bnd.Macro, sanitizeID(view.Scope), escapeQuotes(bnd.Title))
 	for _, e := range inside {
 		writeC4Element(b, e, innerIndent)
 	}
@@ -301,7 +371,7 @@ func writeScopeSection(b *strings.Builder, view model.View, flat map[string]*mod
 
 // --- PlantUML ---
 
-func writePlantUML(b *strings.Builder, view model.View, level string, inside, outside []elemEntry, rels []relEntry, flat map[string]*model.Element) {
+func writePlantUML(b *strings.Builder, view model.View, level string, inside, outside []elemEntry, rels []relEntry, bnd boundary) {
 	b.WriteString("@startuml\n")
 	fmt.Fprintf(b, "!include <C4/C4_%s>\n\n", level)
 
@@ -311,7 +381,7 @@ func writePlantUML(b *strings.Builder, view model.View, level string, inside, ou
 	}
 
 	// Scope boundary with internal elements.
-	writeScopeSection(b, view, flat, inside, "", "  ")
+	writeScopeSection(b, view, bnd, inside, "", "  ")
 
 	writePlantUMLRelationships(b, rels)
 
@@ -340,7 +410,7 @@ func writePlantUMLRelationships(b *strings.Builder, rels []relEntry) {
 
 // --- Mermaid ---
 
-func writeMermaid(b *strings.Builder, view model.View, level string, inside, outside []elemEntry, rels []relEntry, flat map[string]*model.Element) {
+func writeMermaid(b *strings.Builder, view model.View, level string, inside, outside []elemEntry, rels []relEntry, bnd boundary) {
 	fmt.Fprintf(b, "C4%s\n", level)
 	fmt.Fprintf(b, "    title %s\n\n", view.Title)
 
@@ -348,7 +418,7 @@ func writeMermaid(b *strings.Builder, view model.View, level string, inside, out
 		writeC4Element(b, e, "    ")
 	}
 
-	writeScopeSection(b, view, flat, inside, "    ", "        ")
+	writeScopeSection(b, view, bnd, inside, "    ", "        ")
 
 	// Relationships. r.Dashed is intentionally not applied here: Mermaid's
 	// own C4 diagram docs mark UpdateRelStyle's $lineStyle=DashedLine() as
