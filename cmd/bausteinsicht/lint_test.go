@@ -206,9 +206,9 @@ func TestLint_JSONOutput_NoConstraints(t *testing.T) {
 		t.Fatalf("expected no error, got %v\nOutput: %s", err, out)
 	}
 	var result struct {
-		Passed     bool        `json:"passed"`
-		Total      int         `json:"total"`
-		Violations interface{} `json:"violations"`
+		Passed     bool              `json:"passed"`
+		Total      int               `json:"total"`
+		Violations []json.RawMessage `json:"violations"`
 	}
 	if err := json.Unmarshal([]byte(strings.TrimSpace(out)), &result); err != nil {
 		t.Fatalf("expected valid JSON, got parse error: %v\nOutput: %s", err, out)
@@ -218,6 +218,9 @@ func TestLint_JSONOutput_NoConstraints(t *testing.T) {
 	}
 	if result.Total != 0 {
 		t.Errorf("expected total=0, got %d", result.Total)
+	}
+	if result.Violations == nil || len(result.Violations) != 0 {
+		t.Errorf("expected violations to be an empty array (not null), got: %s", out)
 	}
 }
 
