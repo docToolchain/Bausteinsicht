@@ -238,10 +238,25 @@ type Specification struct {
 	Decisions     []DecisionRecord             `json:"decisions,omitempty"`
 }
 
+// ElementKind defines an element kind in the specification. C4 optionally
+// overrides the C4 macro that export-diagram uses for elements of this kind (#633).
 type ElementKind struct {
 	Notation    string `json:"notation"`
 	Description string `json:"description,omitempty"`
 	Container   bool   `json:"container,omitempty"`
+	C4          string `json:"c4,omitempty"`
+}
+
+// IsValidC4Macro reports whether name is a C4 macro accepted for ElementKind.C4.
+func IsValidC4Macro(name string) bool {
+	switch name {
+	case "Person", "Person_Ext",
+		"System", "System_Ext", "SystemDb", "SystemDb_Ext", "SystemQueue", "SystemQueue_Ext",
+		"Container", "Container_Ext", "ContainerDb", "ContainerDb_Ext", "ContainerQueue", "ContainerQueue_Ext",
+		"Component", "Component_Ext", "ComponentDb", "ComponentDb_Ext", "ComponentQueue", "ComponentQueue_Ext":
+		return true
+	}
+	return false
 }
 
 type RelationshipKind struct {

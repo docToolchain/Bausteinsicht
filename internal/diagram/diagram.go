@@ -100,7 +100,7 @@ func FormatView(m *model.BausteinsichtModel, viewKey string, f Format) (string, 
 	level := detectLevel(resolved, flat, view.Scope)
 
 	// Separate scope-internal elements from external ones.
-	scopeElems, externalElems := partitionElements(resolved, flat, view.Scope)
+	scopeElems, externalElems := partitionElements(resolved, flat, view.Scope, &m.Specification)
 
 	// Filter relationships to those visible in this view.
 	elemSet := make(map[string]bool, len(resolved))
@@ -123,8 +123,9 @@ func FormatView(m *model.BausteinsichtModel, viewKey string, f Format) (string, 
 }
 
 type elemEntry struct {
-	ID   string
-	Elem *model.Element
+	ID    string
+	Elem  *model.Element
+	Macro string
 }
 
 func detectLevel(resolved []string, flat map[string]*model.Element, scope string) string {
@@ -147,16 +148,18 @@ func detectLevel(resolved []string, flat map[string]*model.Element, scope string
 	return "Context"
 }
 
-func partitionElements(resolved []string, flat map[string]*model.Element, scope string) (inside, outside []elemEntry) {
+func partitionElements(resolved []string, flat map[string]*model.Element, scope string, spec *model.Specification) (inside, outside []elemEntry) {
 	for _, id := range resolved {
 		elem := flat[id]
 		if elem == nil {
 			continue
 		}
+		macro, _ := C4Macro(spec, elem.Kind)
+		entry := elemEntry{ID: id, Elem: elem, Macro: macro}
 		if scope != "" && strings.HasPrefix(id, scope+".") {
-			inside = append(inside, elemEntry{id, elem})
+			inside = append(inside, entry)
 		} else {
-			outside = append(outside, elemEntry{id, elem})
+			outside = append(outside, entry)
 		}
 	}
 	return
@@ -214,27 +217,82 @@ func liftToVisible(id string, elemSet map[string]bool) string {
 	}
 }
 
-func c4Macro(kind string) string {
-	switch kind {
-	case "actor":
-		return "Person"
-	case "system":
-		return "System"
-	case "external_system":
-		return "System_Ext"
-	case "container", "ui", "mobile":
-		return "Container"
-	case "datastore":
-		return "ContainerDb"
-	case "queue":
-		return "ContainerQueue"
-	case "filestore":
-		return "Container"
-	case "component":
-		return "Component"
-	default:
-		return "System"
+// c4MacroByKey maps well-known element kind keys to C4 macros.
+var c4MacroByKey = map[string]string{
+	"actor":           "Person",
+	"person":          "Person",
+	"system":          "System",
+	"external_system": "System_Ext",
+	"container":       "Container",
+	"ui":              "Container",
+	"mobile":          "Container",
+	"filestore":       "Container",
+	"datastore":       "ContainerDb",
+	"queue":           "ContainerQueue",
+	"component":       "Component",
+}
+
+// c4MacroByNotation maps lower-cased kind notations to C4 macros.
+var c4MacroByNotation = map[string]string{
+	"person":          "Person",
+	"actor":           "Person",
+	"system":          "System",
+	"software system": "System",
+	"external system": "System_Ext",
+	"container":       "Container",
+	"database":        "ContainerDb",
+	"data store":      "ContainerDb",
+	"datastore":       "ContainerDb",
+	"queue":           "ContainerQueue",
+	"component":       "Component",
+}
+
+// C4Macro resolves the C4 macro for an element kind: an explicit
+// specification c4 override wins, then the kind key, then the kind's notation.
+// ok is false when none matches and the macro falls back to System (#633).
+func C4Macro(spec *model.Specification, kind string) (macro string, ok bool) {
+	var def model.ElementKind
+	if spec != nil {
+		def = spec.Elements[kind]
 	}
+	if def.C4 != "" {
+		return def.C4, true
+	}
+	if m, found := c4MacroByKey[kind]; found {
+		return m, true
+	}
+	if m, found := c4MacroByNotation[strings.ToLower(strings.TrimSpace(def.Notation))]; found {
+		return m, true
+	}
+	return "System", false
+}
+
+// UnmappedKinds returns the sorted, de-duplicated element kinds in the view
+// that C4Macro cannot resolve and that therefore render as System (#633).
+func UnmappedKinds(m *model.BausteinsichtModel, viewKey string) ([]string, error) {
+	view, ok := m.Views[viewKey]
+	if !ok {
+		return nil, fmt.Errorf("view %q not found", viewKey)
+	}
+	resolved, err := model.ResolveView(m, &view)
+	if err != nil {
+		return nil, err
+	}
+	flat, _ := model.FlattenElements(m)
+	seen := map[string]bool{}
+	var kinds []string
+	for _, id := range resolved {
+		elem := flat[id]
+		if elem == nil || seen[elem.Kind] {
+			continue
+		}
+		seen[elem.Kind] = true
+		if _, ok := C4Macro(&m.Specification, elem.Kind); !ok {
+			kinds = append(kinds, elem.Kind)
+		}
+	}
+	sort.Strings(kinds)
+	return kinds, nil
 }
 
 func sanitizeID(id string) string {
@@ -249,7 +307,7 @@ func escapeQuotes(s string) string {
 // Mermaid's C4 diagram syntax use the same macro-call format, so both
 // writePlantUML and writeMermaid share this.
 func writeC4Element(b *strings.Builder, e elemEntry, indent string) {
-	macro := c4Macro(e.Elem.Kind)
+	macro := e.Macro
 	if e.Elem.Technology != "" {
 		fmt.Fprintf(b, "%s%s(%s, \"%s\", \"%s\", \"%s\")\n",
 			indent, macro, sanitizeID(e.ID),

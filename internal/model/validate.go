@@ -2,6 +2,7 @@ package model
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -41,6 +42,7 @@ func Validate(m *BausteinsichtModel) []ValidationError {
 // ValidateWithWarnings checks the model for consistency and returns errors and warnings.
 func ValidateWithWarnings(m *BausteinsichtModel) ValidationResult {
 	var result ValidationResult
+	result.Errors = append(result.Errors, validateElementKinds(m)...)
 	result.Errors = append(result.Errors, validateElements(m)...)
 	result.Errors = append(result.Errors, validateRelationships(m)...)
 	result.Errors = append(result.Errors, validateViews(m)...)
@@ -53,6 +55,26 @@ func ValidateWithWarnings(m *BausteinsichtModel) ValidationResult {
 	result.Warnings = append(result.Warnings, validateOrphanDecisions(m)...)
 	result.Warnings = append(result.Warnings, validateSupersededDecisions(m)...)
 	return result
+}
+
+// validateElementKinds checks that an element kind's optional c4 override is a
+// known C4 macro name (BR-035, #633).
+func validateElementKinds(m *BausteinsichtModel) []ValidationError {
+	var errs []ValidationError
+	kinds := make([]string, 0, len(m.Specification.Elements))
+	for k := range m.Specification.Elements {
+		kinds = append(kinds, k)
+	}
+	sort.Strings(kinds)
+	for _, k := range kinds {
+		if c4 := m.Specification.Elements[k].C4; c4 != "" && !IsValidC4Macro(c4) {
+			errs = append(errs, ValidationError{
+				Path:    "specification.elements." + k + ".c4",
+				Message: fmt.Sprintf("unknown c4 macro %q (see the specification for the allowed C4 macro names)", c4),
+			})
+		}
+	}
+	return errs
 }
 
 // validateEmptyModel checks for models with no specification or no elements.

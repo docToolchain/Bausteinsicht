@@ -479,3 +479,46 @@ func TestExportDiagram_Structurizr_ViewRejectedAndWriteFailure(t *testing.T) {
 		}
 	}
 }
+
+const c4KindTestModel = `{
+  "specification": {
+    "elements": {
+      "person": {"notation": "Person"},
+      "system": {"notation": "Software System"},
+      "widget": {"notation": "Widget"}
+    }
+  },
+  "model": {
+    "customer": {"kind": "person", "title": "Customer"},
+    "shop":     {"kind": "system", "title": "Shop"},
+    "gizmo":    {"kind": "widget", "title": "Gizmo"}
+  },
+  "relationships": [{"from": "customer", "to": "shop", "label": "places order"}],
+  "views": {"context": {"title": "Context", "include": ["*"]}}
+}`
+
+// TestExportDiagram_C4KindMapping (#633): person renders as Person(), and an
+// unrecognised kind warns once on stderr instead of silently becoming System().
+func TestExportDiagram_C4KindMapping(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "architecture.jsonc")
+	if err := os.WriteFile(p, []byte(c4KindTestModel), 0600); err != nil {
+		t.Fatal(err)
+	}
+	var outBuf, errBuf bytes.Buffer
+	root := NewRootCmd()
+	root.SetOut(&outBuf)
+	root.SetErr(&errBuf)
+	root.SetArgs([]string{"export-diagram", "--model", p, "--view", "context"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(outBuf.String(), "Person(customer,") {
+		t.Errorf("expected Person(customer, ...), got:\n%s", outBuf.String())
+	}
+	if got := strings.Count(errBuf.String(), `element kind "widget"`); got != 1 {
+		t.Errorf("expected exactly one widget warning, got %d:\n%s", got, errBuf.String())
+	}
+	if strings.Contains(errBuf.String(), `element kind "person"`) {
+		t.Errorf("person must not be warned about:\n%s", errBuf.String())
+	}
+}

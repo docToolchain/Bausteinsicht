@@ -651,3 +651,24 @@ func TestValidate_ViewWithInvalidExcludeTag(t *testing.T) {
 		t.Errorf("expected error for views.filtered.exclude-tags, got %v", errs)
 	}
 }
+
+// TestValidate_ElementKindC4Override (#633): the optional c4 macro override on
+// an element kind must be a known C4 macro name.
+func TestValidate_ElementKindC4Override(t *testing.T) {
+	m := buildValidModel()
+	m.Specification.Elements["actor"] = ElementKind{Notation: "Actor", C4: "Person_Ext"}
+	if errs := Validate(m); len(errs) != 0 {
+		t.Fatalf("expected valid c4 override to pass, got %v", errs)
+	}
+
+	m.Specification.Elements["actor"] = ElementKind{Notation: "Actor", C4: "Persn"}
+	var found bool
+	for _, e := range Validate(m) {
+		if strings.Contains(e.Path, "specification.elements.actor") && strings.Contains(e.Message, "c4") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected a validation error for unknown c4 macro \"Persn\"")
+	}
+}
