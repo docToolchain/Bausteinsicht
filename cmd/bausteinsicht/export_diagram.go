@@ -211,7 +211,7 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 	// Handle new export formats (DOT, D2, HTML) — with JSON envelope support
 	switch diagramFormat {
 	case "dot", "d2", "html":
-		return handleNewFormats(cmd, m, views, diagramFormat, outputFormat, outputDir, viewKey)
+		return handleNewFormats(cmd, m, views, diagramFormat, outputFormat, outputDir)
 	}
 
 	var f diagram.Format
@@ -263,7 +263,7 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 	return nil
 }
 
-func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map[string]model.View, diagramFormat, outputFormat, outputDir, viewKey string) error {
+func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map[string]model.View, diagramFormat, outputFormat, outputDir string) error {
 	var renderFunc func(*model.BausteinsichtModel, string) (string, error)
 	var ext string
 
@@ -297,8 +297,7 @@ func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map
 	// format: DOT/D2 get "architecture-<key>.{dot,d2}", HTML/plantuml/mermaid get
 	// "<key>.{html,puml,mmd}". This keeps the JSON "path" field consistent with the
 	// file that non-JSON mode would have written to the same directory.
-	// views is pre-filtered by the caller (runExportDiagram passes only the requested
-	// view(s)), so viewKey is intentionally not re-checked here.
+	// views is pre-filtered by the caller (runExportDiagram passes only the requested view(s)).
 	if outputFormat == "json" {
 		keys := sortedKeys(views)
 		items := make([]exportItem, 0, len(keys))
@@ -312,51 +311,7 @@ func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map
 		return emitExportItems(cmd, diagramFormat, outputDir, items)
 	}
 
-	// For HTML, create a single file containing all views
-	if diagramFormat == "html" {
-		// When exporting to HTML, we need to handle multiple views in a single file
-		if viewKey != "" {
-			// Single view HTML export
-			result, err := renderFunc(m, viewKey)
-			if err != nil {
-				return exitWithCode(err, 1)
-			}
-
-			if outputDir == "" {
-				_, _ = fmt.Fprint(cmd.OutOrStdout(), result)
-				return nil
-			}
-			absPath, writeErr := writeExportFile(filepath.Join(outputDir, fileNameFor(viewKey)), []byte(result))
-			if writeErr != nil {
-				return exitWithCode(writeErr, 2)
-			}
-			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", absPath)
-			return nil
-		}
-
-		// Multiple views: export each as separate file
-		keys := sortedKeys(views)
-		for _, key := range keys {
-			result, err := renderFunc(m, key)
-			if err != nil {
-				return exitWithCode(err, 1)
-			}
-
-			if outputDir == "" {
-				_, _ = fmt.Fprint(cmd.OutOrStdout(), result)
-				continue
-			}
-
-			absPath, writeErr := writeExportFile(filepath.Join(outputDir, fileNameFor(key)), []byte(result))
-			if writeErr != nil {
-				return exitWithCode(writeErr, 2)
-			}
-			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", absPath)
-		}
-		return nil
-	}
-
-	// For DOT, D2 and other formats: export each view separately
+	// Non-JSON: export each view separately (views is pre-filtered by the caller).
 	keys := sortedKeys(views)
 	for _, key := range keys {
 		result, err := renderFunc(m, key)

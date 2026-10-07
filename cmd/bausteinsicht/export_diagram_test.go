@@ -418,3 +418,64 @@ func TestEmitExportItems_FilenameCollision(t *testing.T) {
 		t.Errorf("expected no stdout on error, got: %s", outBuf.String())
 	}
 }
+
+func TestExportDiagram_NonJSONFileOutput_NewFormats(t *testing.T) {
+	modelPath := writeExportDiagramModel(t)
+	for format, want := range map[string]string{
+		"dot":  "architecture-context.dot",
+		"d2":   "architecture-context.d2",
+		"html": "context.html",
+	} {
+		t.Run(format, func(t *testing.T) {
+			outDir := t.TempDir()
+			if _, err := executeRootCmd("export-diagram", "--model", modelPath, "--view", "context",
+				"--diagram-format", format, "--output", outDir); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if _, err := os.Stat(filepath.Join(outDir, want)); err != nil {
+				t.Errorf("expected %s: %v", want, err)
+			}
+		})
+	}
+}
+
+func TestExportDiagram_NonJSONAllViewsToFiles(t *testing.T) {
+	modelPath := writeExportDiagramModel(t)
+	for _, format := range []string{"plantuml", "html", "dot"} {
+		t.Run(format, func(t *testing.T) {
+			outDir := t.TempDir()
+			if _, err := executeRootCmd("export-diagram", "--model", modelPath,
+				"--diagram-format", format, "--output", outDir); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			entries, _ := os.ReadDir(outDir)
+			if len(entries) != 2 {
+				t.Errorf("expected 2 files (one per view), got %d", len(entries))
+			}
+		})
+	}
+}
+
+func TestExportDiagram_Structurizr_ViewRejectedAndWriteFailure(t *testing.T) {
+	modelPath := writeExportDiagramModel(t)
+	if _, err := executeRootCmd("export-diagram", "--model", modelPath, "--diagram-format", "structurizr", "--view", "context"); err == nil {
+		t.Error("expected error for --view with structurizr")
+	}
+	blocker := filepath.Join(t.TempDir(), "file")
+	if err := os.WriteFile(blocker, []byte("x"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{
+		{"--diagram-format", "structurizr", "--format", "json"},
+		{"--diagram-format", "structurizr"},
+		{"--diagram-format", "plantuml", "--format", "json"},
+		{"--diagram-format", "plantuml"},
+		{"--diagram-format", "dot", "--format", "json"},
+		{"--diagram-format", "dot"},
+	} {
+		full := append([]string{"export-diagram", "--model", modelPath, "--output", filepath.Join(blocker, "sub")}, args...)
+		if _, err := executeRootCmd(full...); err == nil {
+			t.Errorf("expected write failure for %v", args)
+		}
+	}
+}
