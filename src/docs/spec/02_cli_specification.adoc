@@ -862,7 +862,7 @@ Exports element attributes as an AsciiDoc or Markdown table per view or as a com
 ** `--combined` → one deduplicated file `elements.adoc` (or `.md`).
 * Creates the output directory if it does not exist.
 
-**JSON output structure** — `--format json` emits an array of element rows (not a file list):
+**JSON output structure** — `--format json` always emits an array of element rows on stdout (not a file list), with or without `--output`. With `--output <dir>`, the same rows are additionally written to `all-views-elements.json`, `<view-key>-elements.json` or `elements.json` (same selection rules as above) and `Exported: <absolute path>` is printed to stderr (#631):
 [source,json]
 ----
 [
@@ -941,6 +941,15 @@ Exports views as text diagrams in one of several formats (C4-PlantUML, Mermaid, 
   { "view": "context", "format": "plantuml", "source": "@startuml\n!include <C4/C4_Context>\n..." }
 ]
 ----
+
+With `--output <dir>` the diagrams are written to files (same names as without `--format json`) and each entry carries the absolute `path` of its file instead of `source` (#631):
+[source,json]
+----
+[
+  { "view": "context", "format": "plantuml", "path": "/abs/docs/diagrams/context.puml" }
+]
+----
+Views whose keys map to the same output file name are rejected with exit code `1` before anything is written. `--diagram-format structurizr` yields a single entry with `"view": "workspace"` (file `workspace.dsl`).
 
 **Exit codes:**
 
@@ -1044,6 +1053,8 @@ Dynamic views describe the runtime behaviour of the system as ordered message se
   }
 ]
 ----
+
+With `--output <dir>` the files `sequence-<view-key>.<ext>` are written and each entry carries the absolute `path` instead of `source` (#631).
 
 **Exit codes:**
 

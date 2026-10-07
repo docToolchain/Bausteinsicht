@@ -14,6 +14,107 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// exportJSONEntry is the JSON shape for one exported view or sequence.
+// Exactly one of Source or Path is set per entry:
+//   - Source (*string, omitempty): pointer so the field is present even when the
+//     diagram renders to an empty string (source-mode). nil in path-mode → omitted.
+//   - Path (string, omitempty): absolute path to the written file, present in path-mode.
+type exportJSONEntry struct {
+	View   string  `json:"view"`
+	Format string  `json:"format"`
+	Source *string `json:"source,omitempty"`
+	Path   string  `json:"path,omitempty"`
+}
+
+// emitExportJSON marshals entries and writes them to cmd's stdout.
+// Returns a plain error; callers wrap with exitWithCode as needed.
+func emitExportJSON(cmd *cobra.Command, entries []exportJSONEntry) error {
+	data, err := json.MarshalIndent(entries, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshalling JSON output: %w", err)
+	}
+	data = append(data, '\n')
+	if _, err := cmd.OutOrStdout().Write(data); err != nil {
+		return fmt.Errorf("writing JSON output: %w", err)
+	}
+	return nil
+}
+
+// writeExportFile creates the parent directory if needed, writes content to
+// outPath, and returns its absolute path. The absolute path is resolved before
+// writing so that a failure to resolve (e.g. deleted working directory) does
+// not orphan a file on disk.
+func writeExportFile(outPath string, content []byte) (string, error) {
+	absPath, err := filepath.Abs(outPath)
+	if err != nil {
+		return "", fmt.Errorf("resolving output path: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(absPath), 0750); err != nil {
+		return "", fmt.Errorf("creating output directory: %w", err)
+	}
+	if err := os.WriteFile(absPath, content, 0600); err != nil { //nolint:gosec // output files are non-sensitive documentation
+		return "", fmt.Errorf("writing output: %w", err)
+	}
+	return absPath, nil
+}
+
+// exportItem is one fully rendered view awaiting output.
+type exportItem struct {
+	viewKey  string
+	filename string
+	content  string
+}
+
+// emitExportItems is the shared JSON-mode tail: it rejects items whose file
+// names collide, writes the files (when outputDir is set), logs "Exported:"
+// lines and prints the JSON array. Callers render every view first, so a render
+// error leaves no files behind; a write error part-way through can still leave
+// the files written so far on disk.
+func emitExportItems(cmd *cobra.Command, format, outputDir string, items []exportItem) error {
+	if outputDir != "" {
+		seen := make(map[string]string, len(items))
+		for _, it := range items {
+			if prev, dup := seen[it.filename]; dup {
+				return exitWithCode(fmt.Errorf("views %q and %q both map to output file %q", prev, it.viewKey, it.filename), 1)
+			}
+			seen[it.filename] = it.viewKey
+		}
+	}
+	entries := make([]exportJSONEntry, 0, len(items))
+	for _, it := range items {
+		entry, err := buildExportEntry(it.viewKey, format, it.content, outputDir, it.filename)
+		if err != nil {
+			return exitWithCode(err, 2)
+		}
+		if entry.Path != "" {
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", entry.Path)
+		}
+		entries = append(entries, entry)
+	}
+	if err := emitExportJSON(cmd, entries); err != nil {
+		return exitWithCode(err, 2)
+	}
+	return nil
+}
+
+// buildExportEntry constructs one exportJSONEntry for a rendered view.
+// In source-mode (outputDir == "") the diagram text is stored as Source.
+// In path-mode the file is written and Source is cleared; Path holds the
+// absolute path.
+func buildExportEntry(viewKey, format, content, outputDir, filename string) (exportJSONEntry, error) {
+	entry := exportJSONEntry{View: viewKey, Format: format}
+	if outputDir == "" {
+		entry.Source = &content
+		return entry, nil
+	}
+	absPath, err := writeExportFile(filepath.Join(outputDir, filename), []byte(content))
+	if err != nil {
+		return exportJSONEntry{}, err
+	}
+	entry.Path = absPath
+	return entry, nil
+}
+
 func newExportDiagramCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "export-diagram",
@@ -54,6 +155,10 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 		return exitWithCode(fmt.Errorf("loading model: %w", err), 2)
 	}
 
+	// Read outputFormat early: needed by both the structurizr block below and
+	// the generic plantuml/mermaid/dot/d2/html paths further down.
+	outputFormat, _ := cmd.Flags().GetString("format")
+
 	// Structurizr DSL export: outputs the whole workspace in one file.
 	if diagramFormat == "structurizr" {
 		// Structurizr exports the entire workspace, not individual views
@@ -61,18 +166,18 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 			return exitWithCode(fmt.Errorf("--view is not supported with structurizr format (exports entire workspace)"), 1)
 		}
 		dsl := dslexport.Export(m)
+		if outputFormat == "json" {
+			return emitExportItems(cmd, "structurizr", outputDir, []exportItem{{viewKey: "workspace", filename: "workspace.dsl", content: dsl}})
+		}
 		if outputDir == "" {
 			_, _ = fmt.Fprint(cmd.OutOrStdout(), dsl)
 			return nil
 		}
-		if err := os.MkdirAll(outputDir, 0750); err != nil {
-			return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
+		absPath, writeErr := writeExportFile(filepath.Join(outputDir, "workspace.dsl"), []byte(dsl))
+		if writeErr != nil {
+			return exitWithCode(writeErr, 2)
 		}
-		outPath := filepath.Join(outputDir, "workspace.dsl")
-		if err := os.WriteFile(outPath, []byte(dsl), 0600); err != nil { //nolint:gosec
-			return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
-		}
-		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", outPath)
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", absPath)
 		return nil
 	}
 
@@ -94,12 +199,10 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 		warnIfEmptyView(cmd, m, key, view)
 	}
 
-	outputFormat, _ := cmd.Flags().GetString("format")
-
 	// Handle new export formats (DOT, D2, HTML) — with JSON envelope support
 	switch diagramFormat {
 	case "dot", "d2", "html":
-		return handleNewFormats(cmd, m, views, diagramFormat, outputFormat, outputDir, viewKey)
+		return handleNewFormats(cmd, m, views, diagramFormat, outputFormat, outputDir)
 	}
 
 	var f diagram.Format
@@ -115,32 +218,22 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 		return exitWithCode(fmt.Errorf("unknown diagram format %q: valid values are \"plantuml\", \"mermaid\", \"dot\", \"d2\", \"html\", or \"structurizr\"", diagramFormat), 2)
 	}
 
-	// When --format json, output structured JSON with diagram source. (#241)
+	// When --format json, output structured JSON. (#241, #631)
+	// With --output: write files and report absolute "path"; without: report "source".
 	if outputFormat == "json" {
-		type diagramEntry struct {
-			View   string `json:"view"`
-			Format string `json:"format"`
-			Source string `json:"source"`
-		}
-		var entries []diagramEntry
 		keys := sortedKeys(views)
+		items := make([]exportItem, 0, len(keys))
 		for _, key := range keys {
 			result, fmtErr := diagram.FormatView(m, key, f)
 			if fmtErr != nil {
 				return exitWithCode(fmtErr, 1)
 			}
-			entries = append(entries, diagramEntry{
-				View:   key,
-				Format: diagramFormat,
-				Source: result,
-			})
+			items = append(items, exportItem{viewKey: key, filename: export.SafeViewKey(key) + "." + ext, content: result})
 		}
-		data, _ := json.MarshalIndent(entries, "", "  ")
-		_, _ = fmt.Fprintln(cmd.OutOrStdout(), string(data))
-		return nil
+		return emitExportItems(cmd, diagramFormat, outputDir, items)
 	}
 
-	for key := range views {
+	for _, key := range sortedKeys(views) {
 		result, fmtErr := diagram.FormatView(m, key, f)
 		if fmtErr != nil {
 			return exitWithCode(fmtErr, 1)
@@ -151,20 +244,17 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 			continue
 		}
 
-		if err := os.MkdirAll(outputDir, 0750); err != nil {
-			return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
+		absPath, writeErr := writeExportFile(filepath.Join(outputDir, export.SafeViewKey(key)+"."+ext), []byte(result))
+		if writeErr != nil {
+			return exitWithCode(writeErr, 2)
 		}
-		outPath := filepath.Join(outputDir, export.SafeViewKey(key)+"."+ext)
-		if err := os.WriteFile(outPath, []byte(result), 0600); err != nil { //nolint:gosec // output files are non-sensitive documentation
-			return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
-		}
-		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", outPath)
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", absPath)
 	}
 
 	return nil
 }
 
-func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map[string]model.View, diagramFormat, outputFormat, outputDir, viewKey string) error {
+func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map[string]model.View, diagramFormat, outputFormat, outputDir string) error {
 	var renderFunc func(*model.BausteinsichtModel, string) (string, error)
 	var ext string
 
@@ -182,85 +272,37 @@ func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map
 		return exitWithCode(fmt.Errorf("unsupported format: %s", diagramFormat), 2)
 	}
 
-	// When --format json, output structured JSON with diagram source
-	if outputFormat == "json" {
-		type diagramEntry struct {
-			View   string `json:"view"`
-			Format string `json:"format"`
-			Source string `json:"source"`
+	// fileNameFor returns the canonical output filename for a view key, shared by
+	// both the JSON and non-JSON paths so both modes always write identical names.
+	// DOT/D2 keep the "architecture-" prefix via OutputFileName; HTML uses no prefix.
+	fileNameFor := func(key string) string {
+		if diagramFormat == "html" {
+			return export.SafeViewKey(key) + ".html"
 		}
-		var entries []diagramEntry
+		return export.OutputFileName(key, ext)
+	}
+
+	// When --format json, output structured JSON. (#631)
+	// With --output: write files and report absolute "path"; without: report "source".
+	// Uses fileNameFor so JSON and non-JSON paths produce identical filenames per
+	// format: DOT/D2 get "architecture-<key>.{dot,d2}", HTML/plantuml/mermaid get
+	// "<key>.{html,puml,mmd}". This keeps the JSON "path" field consistent with the
+	// file that non-JSON mode would have written to the same directory.
+	// views is pre-filtered by the caller (runExportDiagram passes only the requested view(s)).
+	if outputFormat == "json" {
 		keys := sortedKeys(views)
+		items := make([]exportItem, 0, len(keys))
 		for _, key := range keys {
 			result, fmtErr := renderFunc(m, key)
 			if fmtErr != nil {
 				return exitWithCode(fmtErr, 1)
 			}
-			entries = append(entries, diagramEntry{
-				View:   key,
-				Format: diagramFormat,
-				Source: result,
-			})
+			items = append(items, exportItem{viewKey: key, filename: fileNameFor(key), content: result})
 		}
-		data, _ := json.MarshalIndent(entries, "", "  ")
-		_, _ = fmt.Fprintln(cmd.OutOrStdout(), string(data))
-		return nil
+		return emitExportItems(cmd, diagramFormat, outputDir, items)
 	}
 
-	// For HTML, create a single file containing all views
-	if diagramFormat == "html" {
-		// When exporting to HTML, we need to handle multiple views in a single file
-		if viewKey != "" {
-			// Single view HTML export
-			result, err := renderFunc(m, viewKey)
-			if err != nil {
-				return exitWithCode(err, 1)
-			}
-
-			if outputDir == "" {
-				_, _ = fmt.Fprint(cmd.OutOrStdout(), result)
-				return nil
-			}
-
-			if err := os.MkdirAll(outputDir, 0750); err != nil {
-				return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
-			}
-
-			outPath := filepath.Join(outputDir, export.SafeViewKey(viewKey)+".html")
-			if err := os.WriteFile(outPath, []byte(result), 0600); err != nil {
-				return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
-			}
-			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", outPath)
-			return nil
-		}
-
-		// Multiple views: export each as separate HTML file
-		keys := sortedKeys(views)
-		for _, key := range keys {
-			result, err := renderFunc(m, key)
-			if err != nil {
-				return exitWithCode(err, 1)
-			}
-
-			if outputDir == "" {
-				_, _ = fmt.Fprint(cmd.OutOrStdout(), result)
-				continue
-			}
-
-			if err := os.MkdirAll(outputDir, 0750); err != nil {
-				return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
-			}
-
-			outPath := filepath.Join(outputDir, export.SafeViewKey(key)+".html")
-			if err := os.WriteFile(outPath, []byte(result), 0600); err != nil {
-				return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
-			}
-			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", outPath)
-		}
-		return nil
-	}
-
-	// For DOT and D2: export each view separately
+	// Non-JSON: export each view separately (views is pre-filtered by the caller).
 	keys := sortedKeys(views)
 	for _, key := range keys {
 		result, err := renderFunc(m, key)
@@ -273,15 +315,11 @@ func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map
 			continue
 		}
 
-		if err := os.MkdirAll(outputDir, 0750); err != nil {
-			return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
+		absPath, writeErr := writeExportFile(filepath.Join(outputDir, fileNameFor(key)), []byte(result))
+		if writeErr != nil {
+			return exitWithCode(writeErr, 2)
 		}
-
-		outPath := filepath.Join(outputDir, "architecture-"+export.SafeViewKey(key)+"."+ext)
-		if err := os.WriteFile(outPath, []byte(result), 0600); err != nil {
-			return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
-		}
-		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", outPath)
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", absPath)
 	}
 
 	return nil
