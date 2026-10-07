@@ -33,14 +33,18 @@ func emitExportJSON(cmd *cobra.Command, entries []exportJSONEntry) error {
 	if err != nil {
 		return fmt.Errorf("marshalling JSON output: %w", err)
 	}
-	if _, err := fmt.Fprintln(cmd.OutOrStdout(), string(data)); err != nil {
+	if _, err := cmd.OutOrStdout().Write(append(data, '\n')); err != nil {
 		return fmt.Errorf("writing JSON output: %w", err)
 	}
 	return nil
 }
 
-// writeExportFile writes content to outPath and returns the absolute path.
+// writeExportFile creates the parent directory if needed, writes content to
+// outPath, and returns its absolute path.
 func writeExportFile(outPath string, content []byte) (string, error) {
+	if err := os.MkdirAll(filepath.Dir(outPath), 0750); err != nil {
+		return "", fmt.Errorf("creating output directory: %w", err)
+	}
 	if err := os.WriteFile(outPath, content, 0600); err != nil { //nolint:gosec // output files are non-sensitive documentation
 		return "", fmt.Errorf("writing output: %w", err)
 	}
@@ -57,7 +61,7 @@ func writeExportFile(outPath string, content []byte) (string, error) {
 // absolute path. Copying content into a local variable before taking its
 // address prevents pointer-aliasing if callers ever change from := to =.
 func buildExportEntry(viewKey, format, content, outputDir, filename string) (exportJSONEntry, error) {
-	src := content // local copy — safe to take address
+	src := content // copy so &src is a distinct pointer per call
 	entry := exportJSONEntry{View: viewKey, Format: format, Source: &src}
 	if outputDir != "" {
 		absPath, err := writeExportFile(filepath.Join(outputDir, filename), []byte(content))
@@ -120,11 +124,6 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 		}
 		dsl := dslexport.Export(m)
 		if outputFormat == "json" {
-			if outputDir != "" {
-				if err := os.MkdirAll(outputDir, 0750); err != nil {
-					return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
-				}
-			}
 			entry, entryErr := buildExportEntry("workspace", "structurizr", dsl, outputDir, "workspace.dsl")
 			if entryErr != nil {
 				return exitWithCode(entryErr, 2)
@@ -190,11 +189,6 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 	// With --output: write files and report absolute "path"; without: report "source".
 	if outputFormat == "json" {
 		keys := sortedKeys(views)
-		if outputDir != "" {
-			if err := os.MkdirAll(outputDir, 0750); err != nil {
-				return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
-			}
-		}
 		entries := make([]exportJSONEntry, 0, len(keys))
 		for _, key := range keys {
 			result, fmtErr := diagram.FormatView(m, key, f)
@@ -270,11 +264,6 @@ func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map
 	// view(s)), so viewKey is intentionally not re-checked here.
 	if outputFormat == "json" {
 		keys := sortedKeys(views)
-		if outputDir != "" {
-			if err := os.MkdirAll(outputDir, 0750); err != nil {
-				return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
-			}
-		}
 		entries := make([]exportJSONEntry, 0, len(keys))
 		for _, key := range keys {
 			result, fmtErr := renderFunc(m, key)

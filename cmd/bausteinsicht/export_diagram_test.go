@@ -217,28 +217,32 @@ func runExportDiagramJSON(t *testing.T, extraArgs ...string) []map[string]interf
 	return entries
 }
 
-func assertJSONPathEntries(t *testing.T, entries []map[string]interface{}) {
+func assertJSONPathEntries(t *testing.T, entries []map[string]interface{}, expectedFormat string) {
 	t.Helper()
 	if len(entries) == 0 {
 		t.Fatal("expected at least one entry in JSON output")
 	}
-	for _, e := range entries {
+	for i, e := range entries {
+		if v, ok := e["view"].(string); !ok || v == "" {
+			t.Errorf("entry[%d]: expected non-empty 'view' field, got: %v", i, e)
+		}
+		if f, ok := e["format"].(string); !ok || f != expectedFormat {
+			t.Errorf("entry[%d]: expected format=%q, got: %v", i, expectedFormat, e["format"])
+		}
 		p, ok := e["path"].(string)
 		if !ok || p == "" {
-			t.Errorf("expected non-empty 'path' field in entry, got: %v", e)
+			t.Errorf("entry[%d]: expected non-empty 'path' field, got: %v", i, e)
 			continue
 		}
 		if !filepath.IsAbs(p) {
-			t.Errorf("expected absolute path, got relative: %q", p)
+			t.Errorf("entry[%d]: expected absolute path, got relative: %q", i, p)
 		}
 		data, err := os.ReadFile(p)
 		if err != nil {
-			t.Errorf("expected file to exist at path %q: %v", p, err)
+			t.Errorf("entry[%d]: expected file to exist at path %q: %v", i, p, err)
 		} else if len(data) == 0 {
-			t.Errorf("file at %q is empty — expected diagram content", p)
+			t.Errorf("entry[%d]: file at %q is empty — expected diagram content", i, p)
 		}
-	}
-	for i, e := range entries {
 		if _, hasSource := e["source"]; hasSource {
 			t.Errorf("entry[%d]: expected no 'source' field when --output is set", i)
 		}
@@ -250,7 +254,7 @@ func TestExportDiagram_JSONWithOutput_PlantUML(t *testing.T) {
 	outDir := t.TempDir()
 	entries := runExportDiagramJSON(t,
 		"--model", modelPath, "--diagram-format", "plantuml", "--output", outDir, "--format", "json")
-	assertJSONPathEntries(t, entries)
+	assertJSONPathEntries(t, entries, "plantuml")
 }
 
 func TestExportDiagram_JSONWithOutput_Mermaid(t *testing.T) {
@@ -258,7 +262,7 @@ func TestExportDiagram_JSONWithOutput_Mermaid(t *testing.T) {
 	outDir := t.TempDir()
 	entries := runExportDiagramJSON(t,
 		"--model", modelPath, "--diagram-format", "mermaid", "--output", outDir, "--format", "json")
-	assertJSONPathEntries(t, entries)
+	assertJSONPathEntries(t, entries, "mermaid")
 }
 
 func TestExportDiagram_JSONWithOutput_DOT(t *testing.T) {
@@ -266,7 +270,7 @@ func TestExportDiagram_JSONWithOutput_DOT(t *testing.T) {
 	outDir := t.TempDir()
 	entries := runExportDiagramJSON(t,
 		"--model", modelPath, "--diagram-format", "dot", "--output", outDir, "--format", "json")
-	assertJSONPathEntries(t, entries)
+	assertJSONPathEntries(t, entries, "dot")
 }
 
 func TestExportDiagram_JSONWithOutput_HTML(t *testing.T) {
@@ -274,7 +278,7 @@ func TestExportDiagram_JSONWithOutput_HTML(t *testing.T) {
 	outDir := t.TempDir()
 	entries := runExportDiagramJSON(t,
 		"--model", modelPath, "--diagram-format", "html", "--output", outDir, "--format", "json")
-	assertJSONPathEntries(t, entries)
+	assertJSONPathEntries(t, entries, "html")
 }
 
 func TestExportDiagram_JSONWithOutput_D2(t *testing.T) {
@@ -282,7 +286,58 @@ func TestExportDiagram_JSONWithOutput_D2(t *testing.T) {
 	outDir := t.TempDir()
 	entries := runExportDiagramJSON(t,
 		"--model", modelPath, "--diagram-format", "d2", "--output", outDir, "--format", "json")
-	assertJSONPathEntries(t, entries)
+	assertJSONPathEntries(t, entries, "d2")
+}
+
+// TestExportDiagram_JSONWithOutput_Structurizr covers the structurizr JSON path
+// (source-mode without --output, path-mode with --output).
+func TestExportDiagram_JSONWithOutput_Structurizr(t *testing.T) {
+	modelPath := writeExportDiagramModel(t)
+	outDir := t.TempDir()
+
+	// path-mode
+	entries := runExportDiagramJSON(t,
+		"--model", modelPath, "--diagram-format", "structurizr", "--output", outDir, "--format", "json")
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry for structurizr, got %d", len(entries))
+	}
+	e := entries[0]
+	if v, ok := e["view"].(string); !ok || v != "workspace" {
+		t.Errorf("expected view=workspace, got: %v", e["view"])
+	}
+	if f, ok := e["format"].(string); !ok || f != "structurizr" {
+		t.Errorf("expected format=structurizr, got: %v", e["format"])
+	}
+	p, ok := e["path"].(string)
+	if !ok || p == "" {
+		t.Errorf("expected non-empty 'path', got: %v", e)
+	}
+	if !filepath.IsAbs(p) {
+		t.Errorf("expected absolute path, got: %q", p)
+	}
+	data, err := os.ReadFile(p)
+	if err != nil {
+		t.Errorf("expected file at %q: %v", p, err)
+	} else if len(data) == 0 {
+		t.Errorf("structurizr file at %q is empty", p)
+	}
+	if _, hasSource := e["source"]; hasSource {
+		t.Error("expected no 'source' field in path-mode")
+	}
+
+	// source-mode (no --output)
+	srcEntries := runExportDiagramJSON(t,
+		"--model", modelPath, "--diagram-format", "structurizr", "--format", "json")
+	if len(srcEntries) != 1 {
+		t.Fatalf("expected 1 source-mode entry, got %d", len(srcEntries))
+	}
+	src, ok := srcEntries[0]["source"].(string)
+	if !ok || src == "" {
+		t.Errorf("expected non-empty 'source' in source-mode, got: %v", srcEntries[0])
+	}
+	if _, hasPath := srcEntries[0]["path"]; hasPath {
+		t.Error("expected no 'path' field in source-mode")
+	}
 }
 
 // TestExportDiagram_JSONSourceMode verifies that --format json without --output

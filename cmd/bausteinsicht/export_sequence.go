@@ -95,11 +95,6 @@ func runExportSequence(cmd *cobra.Command, _ []string) error {
 
 	// JSON output. (#631) With --output: write files and report "path"; without: report "source".
 	if format == "json" {
-		if outputDir != "" {
-			if err := os.MkdirAll(outputDir, 0750); err != nil {
-				return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
-			}
-		}
 		entries := make([]exportJSONEntry, 0, len(views))
 		for _, v := range views {
 			src := render(v)
