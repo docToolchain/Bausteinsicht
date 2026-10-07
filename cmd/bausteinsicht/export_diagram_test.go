@@ -199,7 +199,7 @@ func TestExportDiagram_StructurizrToFile(t *testing.T) {
 // files to disk and report an absolute "path" (not "source") in the JSON array.
 // Uses separate stdout/stderr buffers to avoid stderr warnings polluting JSON parse.
 
-func runExportDiagramJSON(t *testing.T, outDir string, extraArgs ...string) []map[string]interface{} {
+func runExportDiagramJSON(t *testing.T, extraArgs ...string) []map[string]interface{} {
 	t.Helper()
 	var outBuf, errBuf bytes.Buffer
 	root := NewRootCmd()
@@ -243,7 +243,7 @@ func assertJSONPathEntries(t *testing.T, entries []map[string]interface{}) {
 func TestExportDiagram_JSONWithOutput_PlantUML(t *testing.T) {
 	modelPath := writeExportDiagramModel(t)
 	outDir := t.TempDir()
-	entries := runExportDiagramJSON(t, outDir,
+	entries := runExportDiagramJSON(t,
 		"--model", modelPath, "--diagram-format", "plantuml", "--output", outDir, "--format", "json")
 	assertJSONPathEntries(t, entries)
 }
@@ -251,7 +251,7 @@ func TestExportDiagram_JSONWithOutput_PlantUML(t *testing.T) {
 func TestExportDiagram_JSONWithOutput_Mermaid(t *testing.T) {
 	modelPath := writeExportDiagramModel(t)
 	outDir := t.TempDir()
-	entries := runExportDiagramJSON(t, outDir,
+	entries := runExportDiagramJSON(t,
 		"--model", modelPath, "--diagram-format", "mermaid", "--output", outDir, "--format", "json")
 	assertJSONPathEntries(t, entries)
 }
@@ -259,7 +259,7 @@ func TestExportDiagram_JSONWithOutput_Mermaid(t *testing.T) {
 func TestExportDiagram_JSONWithOutput_DOT(t *testing.T) {
 	modelPath := writeExportDiagramModel(t)
 	outDir := t.TempDir()
-	entries := runExportDiagramJSON(t, outDir,
+	entries := runExportDiagramJSON(t,
 		"--model", modelPath, "--diagram-format", "dot", "--output", outDir, "--format", "json")
 	assertJSONPathEntries(t, entries)
 }
@@ -267,7 +267,7 @@ func TestExportDiagram_JSONWithOutput_DOT(t *testing.T) {
 func TestExportDiagram_JSONWithOutput_HTML(t *testing.T) {
 	modelPath := writeExportDiagramModel(t)
 	outDir := t.TempDir()
-	entries := runExportDiagramJSON(t, outDir,
+	entries := runExportDiagramJSON(t,
 		"--model", modelPath, "--diagram-format", "html", "--output", outDir, "--format", "json")
 	assertJSONPathEntries(t, entries)
 }

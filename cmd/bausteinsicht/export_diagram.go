@@ -133,7 +133,7 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 				return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
 			}
 		}
-		var entries []diagramJSONEntry
+		entries := make([]diagramJSONEntry, 0, len(keys))
 		for _, key := range keys {
 			result, fmtErr := diagram.FormatView(m, key, f)
 			if fmtErr != nil {
@@ -147,7 +147,10 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 				if err := os.WriteFile(outPath, []byte(result), 0600); err != nil { //nolint:gosec
 					return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
 				}
-				absPath, _ := filepath.Abs(outPath)
+				absPath, err := filepath.Abs(outPath)
+				if err != nil {
+					return exitWithCode(fmt.Errorf("resolving output path: %w", err), 2)
+				}
 				entry.Path = absPath
 			}
 			entries = append(entries, entry)
@@ -208,7 +211,7 @@ func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map
 				return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
 			}
 		}
-		var entries []diagramJSONEntry
+		entries := make([]diagramJSONEntry, 0, len(keys))
 		for _, key := range keys {
 			result, fmtErr := renderFunc(m, key)
 			if fmtErr != nil {
@@ -227,7 +230,10 @@ func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map
 				if err := os.WriteFile(outPath, []byte(result), 0600); err != nil { //nolint:gosec
 					return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
 				}
-				absPath, _ := filepath.Abs(outPath)
+				absPath, err := filepath.Abs(outPath)
+				if err != nil {
+					return exitWithCode(fmt.Errorf("resolving output path: %w", err), 2)
+				}
 				entry.Path = absPath
 			}
 			entries = append(entries, entry)

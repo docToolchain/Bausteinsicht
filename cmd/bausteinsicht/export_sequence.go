@@ -101,15 +101,9 @@ func runExportSequence(cmd *cobra.Command, _ []string) error {
 				return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
 			}
 		}
-		type entry struct {
-			View   string `json:"view"`
-			Format string `json:"format"`
-			Source string `json:"source,omitempty"`
-			Path   string `json:"path,omitempty"`
-		}
-		var entries []entry
+		entries := make([]diagramJSONEntry, 0, len(views))
 		for _, v := range views {
-			e := entry{View: v.Key, Format: diagramFormat}
+			e := diagramJSONEntry{View: v.Key, Format: diagramFormat}
 			if outputDir == "" {
 				e.Source = render(v)
 			} else {
@@ -118,7 +112,10 @@ func runExportSequence(cmd *cobra.Command, _ []string) error {
 				if err := os.WriteFile(outPath, []byte(render(v)), 0600); err != nil { //nolint:gosec
 					return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
 				}
-				absPath, _ := filepath.Abs(outPath)
+				absPath, err := filepath.Abs(outPath)
+				if err != nil {
+					return exitWithCode(fmt.Errorf("resolving output path: %w", err), 2)
+				}
 				e.Path = absPath
 			}
 			entries = append(entries, e)
