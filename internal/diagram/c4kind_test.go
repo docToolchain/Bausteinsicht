@@ -45,6 +45,7 @@ func TestC4Macro_Resolution(t *testing.T) {
 		"datastore":    {Notation: "Whatever"},
 		"mixed-case":   {Notation: "  software SYSTEM "},
 		"external_sys": {Notation: "external system"},
+		"Actor":        {Notation: "System"},
 	}}
 	cases := []struct {
 		kind      string
@@ -61,6 +62,7 @@ func TestC4Macro_Resolution(t *testing.T) {
 		{"datastore", "ContainerDb", true},
 		{"mixed-case", "System", true},
 		{"external_sys", "System_Ext", true},
+		{"Actor", "Person", true},
 		{"Container", "Container", true},
 		{"DataStore", "ContainerDb", true},
 		{"widget", "System", false},
@@ -164,6 +166,7 @@ func TestBoundaryMacro_FollowsC4Mapping(t *testing.T) {
 		want string
 	}{
 		{"override", model.ElementKind{Notation: "Service", C4: "Container"}, "Container_Boundary(app,"},
+		{"override-ext", model.ElementKind{Notation: "Service", C4: "Container_Ext"}, "Container_Boundary(app,"},
 		{"notation", model.ElementKind{Notation: "Container"}, "Container_Boundary(app,"},
 		{"fallback", model.ElementKind{Notation: "Service"}, "System_Boundary(app,"},
 	}
