@@ -197,6 +197,30 @@ func TestLint_JSONOutput_Violation(t *testing.T) {
 	}
 }
 
+// TestLint_JSONOutput_NoConstraints (#632): --format json must emit valid JSON
+// even when the model has no constraints section (previously printed plain text).
+func TestLint_JSONOutput_NoConstraints(t *testing.T) {
+	p := writeModel(t, modelNoConstraints)
+	out, err := executeLintCmd("lint", "--model", p, "--format", "json")
+	if err != nil {
+		t.Fatalf("expected no error, got %v\nOutput: %s", err, out)
+	}
+	var result struct {
+		Constraints int         `json:"constraints"`
+		Violations  interface{} `json:"violations"`
+		Message     string      `json:"message"`
+	}
+	if err := json.Unmarshal([]byte(strings.TrimSpace(out)), &result); err != nil {
+		t.Fatalf("expected valid JSON, got parse error: %v\nOutput: %s", err, out)
+	}
+	if result.Constraints != 0 {
+		t.Errorf("expected constraints=0, got %d", result.Constraints)
+	}
+	if result.Message == "" {
+		t.Error("expected non-empty message field")
+	}
+}
+
 func TestLint_ViolationLists_Elements(t *testing.T) {
 	p := writeModel(t, modelWithViolation)
 	out, err := executeLintCmd("lint", "--model", p)
