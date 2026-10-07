@@ -38,6 +38,9 @@ func runLint(cmd *cobra.Command, _ []string) error {
 	}
 
 	if len(m.Constraints) == 0 {
+		if format == "json" {
+			return lintOutputJSON(cmd, constraints.Result{})
+		}
 		if _, err := fmt.Fprintln(cmd.OutOrStdout(), "No constraints defined."); err != nil {
 			return err
 		}
