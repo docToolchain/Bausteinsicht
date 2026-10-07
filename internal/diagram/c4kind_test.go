@@ -45,6 +45,7 @@ func TestC4Macro_Resolution(t *testing.T) {
 		"datastore":    {Notation: "Whatever"},
 		"mixed-case":   {Notation: "  software SYSTEM "},
 		"external_sys": {Notation: "external system"},
+		"Actor":        {Notation: "Whatever"},
 	}}
 	cases := []struct {
 		kind      string
@@ -61,6 +62,7 @@ func TestC4Macro_Resolution(t *testing.T) {
 		{"datastore", "ContainerDb", true},
 		{"mixed-case", "System", true},
 		{"external_sys", "System_Ext", true},
+		{"Actor", "Person", true},
 		{"widget", "System", false},
 		{"undefined-kind", "System", false},
 	}
@@ -130,5 +132,52 @@ func TestUnmappedKinds(t *testing.T) {
 
 	if _, err := UnmappedKinds(m, "nope"); err == nil {
 		t.Error("expected error for unknown view")
+	}
+}
+
+func scopedC4Model(scopeKind model.ElementKind) *model.BausteinsichtModel {
+	return &model.BausteinsichtModel{
+		Specification: model.Specification{
+			Elements: map[string]model.ElementKind{
+				"svc":   scopeKind,
+				"actor": {Notation: "Actor"},
+			},
+		},
+		Model: map[string]model.Element{
+			"user": {Kind: "actor", Title: "User"},
+			"app": {Kind: "svc", Title: "App", Children: map[string]model.Element{
+				"api": {Kind: "svc", Title: "API"},
+			}},
+		},
+		Views: map[string]model.View{
+			"v": {Title: "V", Scope: "app", Include: []string{"user", "app.*"}},
+		},
+	}
+}
+
+// TestBoundaryMacro_FollowsC4Mapping (#633): the scope boundary uses the same
+// kind resolution as elements (override / key / notation), not only the key "container".
+func TestBoundaryMacro_FollowsC4Mapping(t *testing.T) {
+	cases := []struct {
+		name string
+		kind model.ElementKind
+		want string
+	}{
+		{"override", model.ElementKind{Notation: "Service", C4: "Container"}, "Container_Boundary(app,"},
+		{"notation", model.ElementKind{Notation: "Container"}, "Container_Boundary(app,"},
+		{"fallback", model.ElementKind{Notation: "Service"}, "System_Boundary(app,"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, f := range []Format{PlantUML, Mermaid} {
+				out, err := FormatView(scopedC4Model(tc.kind), "v", f)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !strings.Contains(out, tc.want) {
+					t.Errorf("format %v: expected %s, got:\n%s", f, tc.want, out)
+				}
+			}
+		})
 	}
 }

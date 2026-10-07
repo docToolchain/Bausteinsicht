@@ -112,12 +112,14 @@ func FormatView(m *model.BausteinsichtModel, viewKey string, f Format) (string, 
 	}
 	rels := filterRelationships(m.Relationships, elemSet, &m.Specification)
 
+	bnd := resolveBoundary(view, flat, &m.Specification)
+
 	var b strings.Builder
 	switch f {
 	case PlantUML:
-		writePlantUML(&b, view, level, scopeElems, externalElems, rels, flat)
+		writePlantUML(&b, view, level, scopeElems, externalElems, rels, bnd)
 	case Mermaid:
-		writeMermaid(&b, view, level, scopeElems, externalElems, rels, flat)
+		writeMermaid(&b, view, level, scopeElems, externalElems, rels, bnd)
 	}
 	return b.String(), nil
 }
@@ -258,7 +260,7 @@ func C4Macro(spec *model.Specification, kind string) (macro string, ok bool) {
 	if def.C4 != "" {
 		return def.C4, true
 	}
-	if m, found := c4MacroByKey[kind]; found {
+	if m, found := c4MacroByKey[strings.ToLower(kind)]; found {
 		return m, true
 	}
 	if m, found := c4MacroByNotation[strings.ToLower(strings.TrimSpace(def.Notation))]; found {
@@ -319,22 +321,28 @@ func writeC4Element(b *strings.Builder, e elemEntry, indent string) {
 	}
 }
 
-// resolveBoundaryMacro determines the C4 boundary macro and display title
-// for a scoped view's boundary box, shared by PlantUML and Mermaid output:
-// System_Boundary by default, Container_Boundary when the scope element's
-// kind is "container". Falls back to the scope's raw ID as the title if the
-// scope element isn't found in flat.
-func resolveBoundaryMacro(view model.View, flat map[string]*model.Element) (boundaryMacro, scopeTitle string) {
+// boundary is the C4 boundary box of a scoped view: its macro and display title.
+type boundary struct {
+	Macro string
+	Title string
+}
+
+// resolveBoundary determines the C4 boundary macro and display title for a
+// scoped view's boundary box, shared by PlantUML and Mermaid output:
+// Container_Boundary when the scope element's kind resolves to a Container
+// macro (via c4 override, key or notation, see C4Macro), System_Boundary
+// otherwise. Falls back to the scope's raw ID as the title if the scope
+// element isn't found in flat.
+func resolveBoundary(view model.View, flat map[string]*model.Element, spec *model.Specification) boundary {
 	scopeElem := flat[view.Scope]
-	scopeTitle = view.Scope
+	bnd := boundary{Macro: "System_Boundary", Title: view.Scope}
 	if scopeElem != nil {
-		scopeTitle = scopeElem.Title
+		bnd.Title = scopeElem.Title
+		if macro, _ := C4Macro(spec, scopeElem.Kind); strings.HasPrefix(macro, "Container") {
+			bnd.Macro = "Container_Boundary"
+		}
 	}
-	boundaryMacro = "System_Boundary"
-	if scopeElem != nil && scopeElem.Kind == "container" {
-		boundaryMacro = "Container_Boundary"
-	}
-	return boundaryMacro, scopeTitle
+	return bnd
 }
 
 // writeScopeSection writes a view's scope boundary with its internal
@@ -342,15 +350,14 @@ func resolveBoundaryMacro(view model.View, flat map[string]*model.Element) (boun
 // Shared by writePlantUML and writeMermaid, which differ only in
 // indentation convention (PlantUML: no base indent, 2-space nesting;
 // Mermaid: 4-space base indent, 4-space nesting).
-func writeScopeSection(b *strings.Builder, view model.View, flat map[string]*model.Element, inside []elemEntry, outerIndent, innerIndent string) {
+func writeScopeSection(b *strings.Builder, view model.View, bnd boundary, inside []elemEntry, outerIndent, innerIndent string) {
 	if view.Scope == "" {
 		for _, e := range inside {
 			writeC4Element(b, e, outerIndent)
 		}
 		return
 	}
-	boundaryMacro, scopeTitle := resolveBoundaryMacro(view, flat)
-	fmt.Fprintf(b, "%s%s(%s, \"%s\") {\n", outerIndent, boundaryMacro, sanitizeID(view.Scope), escapeQuotes(scopeTitle))
+	fmt.Fprintf(b, "%s%s(%s, \"%s\") {\n", outerIndent, bnd.Macro, sanitizeID(view.Scope), escapeQuotes(bnd.Title))
 	for _, e := range inside {
 		writeC4Element(b, e, innerIndent)
 	}
@@ -359,7 +366,7 @@ func writeScopeSection(b *strings.Builder, view model.View, flat map[string]*mod
 
 // --- PlantUML ---
 
-func writePlantUML(b *strings.Builder, view model.View, level string, inside, outside []elemEntry, rels []relEntry, flat map[string]*model.Element) {
+func writePlantUML(b *strings.Builder, view model.View, level string, inside, outside []elemEntry, rels []relEntry, bnd boundary) {
 	b.WriteString("@startuml\n")
 	fmt.Fprintf(b, "!include <C4/C4_%s>\n\n", level)
 
@@ -369,7 +376,7 @@ func writePlantUML(b *strings.Builder, view model.View, level string, inside, ou
 	}
 
 	// Scope boundary with internal elements.
-	writeScopeSection(b, view, flat, inside, "", "  ")
+	writeScopeSection(b, view, bnd, inside, "", "  ")
 
 	writePlantUMLRelationships(b, rels)
 
@@ -398,7 +405,7 @@ func writePlantUMLRelationships(b *strings.Builder, rels []relEntry) {
 
 // --- Mermaid ---
 
-func writeMermaid(b *strings.Builder, view model.View, level string, inside, outside []elemEntry, rels []relEntry, flat map[string]*model.Element) {
+func writeMermaid(b *strings.Builder, view model.View, level string, inside, outside []elemEntry, rels []relEntry, bnd boundary) {
 	fmt.Fprintf(b, "C4%s\n", level)
 	fmt.Fprintf(b, "    title %s\n\n", view.Title)
 
@@ -406,7 +413,7 @@ func writeMermaid(b *strings.Builder, view model.View, level string, inside, out
 		writeC4Element(b, e, "    ")
 	}
 
-	writeScopeSection(b, view, flat, inside, "    ", "        ")
+	writeScopeSection(b, view, bnd, inside, "    ", "        ")
 
 	// Relationships. r.Dashed is intentionally not applied here: Mermaid's
 	// own C4 diagram docs mark UpdateRelStyle's $lineStyle=DashedLine() as

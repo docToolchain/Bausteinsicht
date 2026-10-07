@@ -360,8 +360,13 @@ func warnUnmappedKinds(cmd *cobra.Command, m *model.BausteinsichtModel, views ma
 				continue
 			}
 			warned[kind] = true
-			_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
-				"WARNING: element kind %q is not a recognised C4 kind and is rendered as System(...) — set specification.elements.%s.c4 to choose a macro\n", kind, kind)
+			if _, declared := m.Specification.Elements[kind]; declared {
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
+					"WARNING: element kind %q is not a recognised C4 kind and is rendered as System(...) — set specification.elements.%s.c4 to choose a macro\n", kind, kind)
+			} else {
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
+					"WARNING: element kind %q is not declared in specification.elements and is rendered as System(...)\n", kind)
+			}
 		}
 	}
 }

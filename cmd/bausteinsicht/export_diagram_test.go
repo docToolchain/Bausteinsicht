@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/docToolchain/Bausteinsicht/internal/export"
+	"github.com/docToolchain/Bausteinsicht/internal/model"
 )
 
 const exportDiagramTestModel = `{
@@ -520,5 +521,35 @@ func TestExportDiagram_C4KindMapping(t *testing.T) {
 	}
 	if strings.Contains(errBuf.String(), `element kind "person"`) {
 		t.Errorf("person must not be warned about:\n%s", errBuf.String())
+	}
+}
+
+// TestWarnUnmappedKinds_UndeclaredKind (#633): a kind missing from the
+// specification gets a "not declared" hint, not a pointer to a c4 path that
+// does not exist.
+func TestWarnUnmappedKinds_UndeclaredKind(t *testing.T) {
+	m := &model.BausteinsichtModel{
+		Specification: model.Specification{Elements: map[string]model.ElementKind{
+			"widget": {Notation: "Widget"},
+		}},
+		Model: map[string]model.Element{
+			"a": {Kind: "widget", Title: "A"},
+			"b": {Kind: "ghost", Title: "B"},
+		},
+		Views: map[string]model.View{"v": {Title: "V", Include: []string{"*"}}},
+	}
+	var errBuf bytes.Buffer
+	root := NewRootCmd()
+	root.SetErr(&errBuf)
+	warnUnmappedKinds(root, m, m.Views)
+	got := errBuf.String()
+	if !strings.Contains(got, "specification.elements.widget.c4") {
+		t.Errorf("expected c4 hint for declared kind widget, got:\n%s", got)
+	}
+	if !strings.Contains(got, `element kind "ghost" is not declared in specification.elements`) {
+		t.Errorf("expected 'not declared' warning for ghost, got:\n%s", got)
+	}
+	if strings.Contains(got, "specification.elements.ghost.c4") {
+		t.Errorf("must not point at a non-existent c4 path for ghost, got:\n%s", got)
 	}
 }
