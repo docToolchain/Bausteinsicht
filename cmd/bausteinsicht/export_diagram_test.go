@@ -235,8 +235,10 @@ func assertJSONPathEntries(t *testing.T, entries []map[string]interface{}) {
 			t.Errorf("expected file to exist at path %q: %v", p, err)
 		}
 	}
-	if _, hasSource := entries[0]["source"]; hasSource {
-		t.Error("expected no 'source' field when --output is set")
+	for i, e := range entries {
+		if _, hasSource := e["source"]; hasSource {
+			t.Errorf("entry[%d]: expected no 'source' field when --output is set", i)
+		}
 	}
 }
 

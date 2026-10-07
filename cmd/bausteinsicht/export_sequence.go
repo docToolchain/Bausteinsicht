@@ -96,21 +96,19 @@ func runExportSequence(cmd *cobra.Command, _ []string) error {
 
 	// JSON output. (#631) With --output: write files and report "path"; without: report "source".
 	if format == "json" {
-		if outputDir != "" {
-			if err := os.MkdirAll(outputDir, 0750); err != nil {
-				return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
-			}
-		}
-		entries := make([]diagramJSONEntry, 0, len(views))
+		entries := make([]exportJSONEntry, 0, len(views))
 		for _, v := range views {
-			e := diagramJSONEntry{View: v.Key, Format: diagramFormat}
+			e := exportJSONEntry{View: v.Key, Format: diagramFormat}
 			if outputDir == "" {
 				e.Source = render(v)
 			} else {
+				if err := os.MkdirAll(outputDir, 0750); err != nil {
+					return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
+				}
 				source := render(v)
 				filename := "sequence-" + export.SafeViewKey(v.Key) + "." + ext
 				outPath := filepath.Join(outputDir, filename)
-				if err := os.WriteFile(outPath, []byte(source), 0600); err != nil { //nolint:gosec
+				if err := os.WriteFile(outPath, []byte(source), 0600); err != nil { //nolint:gosec // output files are non-sensitive documentation
 					return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
 				}
 				absPath, err := filepath.Abs(outPath)

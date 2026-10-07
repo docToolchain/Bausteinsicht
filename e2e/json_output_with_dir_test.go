@@ -18,9 +18,6 @@ func TestExportDiagramJSONWithOutputDir(t *testing.T) {
 	runCLI(t, bin, dir, "init")
 
 	outDir := filepath.Join(dir, "out")
-	if err := os.MkdirAll(outDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
 
 	stdout, _, code := runCLISplit(t, bin, dir,
 		"export-diagram", "--diagram-format", "plantuml",
@@ -80,9 +77,6 @@ func TestExportDiagramJSONWithOutputDir_HTML(t *testing.T) {
 	runCLI(t, bin, dir, "init")
 
 	outDir := filepath.Join(dir, "out-html")
-	if err := os.MkdirAll(outDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
 
 	stdout, _, code := runCLISplit(t, bin, dir,
 		"export-diagram", "--diagram-format", "html",
@@ -143,9 +137,6 @@ func TestExportSequenceJSONWithOutputDir(t *testing.T) {
 	}
 
 	outDir := filepath.Join(dir, "out")
-	if err := os.MkdirAll(outDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
 
 	stdout, _, code := runCLISplit(t, bin, dir,
 		"export-sequence", "--model", modelPath,

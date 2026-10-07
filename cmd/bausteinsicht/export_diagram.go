@@ -14,9 +14,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// diagramJSONEntry is the JSON shape for a single exported view.
-// Source is set when no --output dir is given; Path when files are written.
-type diagramJSONEntry struct {
+// exportJSONEntry is the JSON shape for one exported view or sequence.
+// Exactly one of Source or Path is set per entry:
+//   - Source (omitempty): diagram text, present when --output is not given
+//   - Path (omitempty): absolute path to the written file, present when --output is given
+//
+// Both fields carry omitempty so an empty render result in source-mode omits
+// the key entirely rather than emitting "source":"" — callers should test for
+// "path" absence to detect source-mode, not "source" presence.
+type exportJSONEntry struct {
 	View   string `json:"view"`
 	Format string `json:"format"`
 	Source string `json:"source,omitempty"`
@@ -128,23 +134,21 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 	// With --output: write files and report absolute "path"; without: report "source".
 	if outputFormat == "json" {
 		keys := sortedKeys(views)
-		if outputDir != "" && len(keys) > 0 {
-			if err := os.MkdirAll(outputDir, 0750); err != nil {
-				return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
-			}
-		}
-		entries := make([]diagramJSONEntry, 0, len(keys))
+		entries := make([]exportJSONEntry, 0, len(keys))
 		for _, key := range keys {
 			result, fmtErr := diagram.FormatView(m, key, f)
 			if fmtErr != nil {
 				return exitWithCode(fmtErr, 1)
 			}
-			entry := diagramJSONEntry{View: key, Format: diagramFormat}
+			entry := exportJSONEntry{View: key, Format: diagramFormat}
 			if outputDir == "" {
 				entry.Source = result
 			} else {
+				if err := os.MkdirAll(outputDir, 0750); err != nil {
+					return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
+				}
 				outPath := filepath.Join(outputDir, export.SafeViewKey(key)+"."+ext)
-				if err := os.WriteFile(outPath, []byte(result), 0600); err != nil { //nolint:gosec
+				if err := os.WriteFile(outPath, []byte(result), 0600); err != nil { //nolint:gosec // output files are non-sensitive documentation
 					return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
 				}
 				absPath, err := filepath.Abs(outPath)
@@ -215,23 +219,21 @@ func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map
 	// With --output: write files and report absolute "path"; without: report "source".
 	if outputFormat == "json" {
 		keys := sortedKeys(views)
-		if outputDir != "" && len(keys) > 0 {
-			if err := os.MkdirAll(outputDir, 0750); err != nil {
-				return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
-			}
-		}
-		entries := make([]diagramJSONEntry, 0, len(keys))
+		entries := make([]exportJSONEntry, 0, len(keys))
 		for _, key := range keys {
 			result, fmtErr := renderFunc(m, key)
 			if fmtErr != nil {
 				return exitWithCode(fmtErr, 1)
 			}
-			entry := diagramJSONEntry{View: key, Format: diagramFormat}
+			entry := exportJSONEntry{View: key, Format: diagramFormat}
 			if outputDir == "" {
 				entry.Source = result
 			} else {
+				if err := os.MkdirAll(outputDir, 0750); err != nil {
+					return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
+				}
 				outPath := filepath.Join(outputDir, fileNameFor(key))
-				if err := os.WriteFile(outPath, []byte(result), 0600); err != nil { //nolint:gosec
+				if err := os.WriteFile(outPath, []byte(result), 0600); err != nil { //nolint:gosec // output files are non-sensitive documentation
 					return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
 				}
 				absPath, err := filepath.Abs(outPath)
