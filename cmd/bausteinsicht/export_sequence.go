@@ -103,19 +103,17 @@ func runExportSequence(cmd *cobra.Command, _ []string) error {
 		entries := make([]exportJSONEntry, 0, len(views))
 		for _, v := range views {
 			src := render(v)
-			e := exportJSONEntry{View: v.Key, Format: diagramFormat, Source: &src}
-			if outputDir != "" {
-				filename := "sequence-" + export.SafeViewKey(v.Key) + "." + ext
-				absPath, writeErr := writeExportFile(filepath.Join(outputDir, filename), []byte(src))
-				if writeErr != nil {
-					return exitWithCode(writeErr, 2)
-				}
-				e.Source = nil
-				e.Path = absPath
+			filename := "sequence-" + export.SafeViewKey(v.Key) + "." + ext
+			entry, entryErr := buildExportEntry(v.Key, diagramFormat, src, outputDir, filename)
+			if entryErr != nil {
+				return exitWithCode(entryErr, 2)
 			}
-			entries = append(entries, e)
+			entries = append(entries, entry)
 		}
-		return emitExportJSON(cmd, entries)
+		if err := emitExportJSON(cmd, entries); err != nil {
+			return exitWithCode(err, 2)
+		}
+		return nil
 	}
 
 	// Text / file output.
