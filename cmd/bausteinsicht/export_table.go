@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/docToolchain/Bausteinsicht/internal/export"
@@ -93,22 +92,18 @@ func runExportTable(cmd *cobra.Command, _ []string) error {
 		return nil
 	}
 
-	outPath := filepath.Join(outputDir, filename)
-	if err := os.MkdirAll(outputDir, 0750); err != nil {
-		return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
+	absPath, writeErr := writeExportFile(filepath.Join(outputDir, filename), []byte(result))
+	if writeErr != nil {
+		return exitWithCode(writeErr, 2)
 	}
-	if err := os.WriteFile(outPath, []byte(result), 0600); err != nil { //nolint:gosec // output files are non-sensitive documentation
-		return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
-	}
-
-	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", outPath)
+	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", absPath)
 	return nil
 }
 
 // exportTableJSON outputs the table data as JSON. (#239, #631)
-// Without outputDir: writes rows JSON to stdout directly.
-// With outputDir: writes rows JSON to elements.json and emits a JSON envelope
-// ([]exportJSONEntry with path) to stdout — consistent with export-diagram/sequence.
+// Always writes rows JSON to stdout regardless of --output, so callers always
+// receive the same shape. When outputDir is set, also writes rows to
+// elements.json on disk and prints the absolute path to stderr.
 func exportTableJSON(cmd *cobra.Command, m *model.BausteinsichtModel, viewKey string, combined bool, outputDir string) error {
 	rows, err := table.CollectRows(m, viewKey, combined)
 	if err != nil {
@@ -118,25 +113,16 @@ func exportTableJSON(cmd *cobra.Command, m *model.BausteinsichtModel, viewKey st
 	if marshalErr != nil {
 		return exitWithCode(fmt.Errorf("marshaling JSON: %w", marshalErr), 2)
 	}
-	if outputDir == "" {
-		if _, err := cmd.OutOrStdout().Write(append(data, '\n')); err != nil {
-			return exitWithCode(fmt.Errorf("writing JSON output: %w", err), 2)
-		}
-		return nil
+	if _, err := cmd.OutOrStdout().Write(append(data, '\n')); err != nil {
+		return exitWithCode(fmt.Errorf("writing JSON output: %w", err), 2)
 	}
-	viewLabel := viewKey
-	if combined {
-		viewLabel = "combined"
-	} else if viewKey == "" {
-		viewLabel = "all"
+	if outputDir == "" {
+		return nil
 	}
 	absPath, writeErr := writeExportFile(filepath.Join(outputDir, "elements.json"), data)
 	if writeErr != nil {
 		return exitWithCode(writeErr, 2)
 	}
-	entry := exportJSONEntry{View: viewLabel, Format: "json", Path: absPath}
-	if err := emitExportJSON(cmd, []exportJSONEntry{entry}); err != nil {
-		return exitWithCode(err, 2)
-	}
+	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", absPath)
 	return nil
 }

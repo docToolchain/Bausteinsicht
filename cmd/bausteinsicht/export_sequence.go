@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/docToolchain/Bausteinsicht/internal/diagram"
@@ -120,15 +119,12 @@ func runExportSequence(cmd *cobra.Command, _ []string) error {
 			continue
 		}
 
-		if err := os.MkdirAll(outputDir, 0750); err != nil {
-			return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
-		}
 		filename := "sequence-" + export.SafeViewKey(v.Key) + "." + ext
-		outPath := filepath.Join(outputDir, filename)
-		if err := os.WriteFile(outPath, []byte(source), 0600); err != nil { //nolint:gosec // output files are non-sensitive documentation
-			return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
+		absPath, writeErr := writeExportFile(filepath.Join(outputDir, filename), []byte(source))
+		if writeErr != nil {
+			return exitWithCode(writeErr, 2)
 		}
-		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", outPath)
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", absPath)
 	}
 
 	return nil

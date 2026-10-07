@@ -245,16 +245,21 @@ func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map
 		return exitWithCode(fmt.Errorf("unsupported format: %s", diagramFormat), 2)
 	}
 
-	// fileNameFor returns the canonical output filename for a view key.
-	// All formats use SafeViewKey(key)+"."+ext for consistency with the
-	// plantuml/mermaid path — the "architecture-" prefix from OutputFileName
-	// would make JSON path fields inconsistent across formats.
+	// fileNameFor returns the canonical non-JSON output filename for a view key.
+	// DOT/D2 keep the "architecture-" prefix (existing behaviour); HTML does not.
+	// The JSON path uses SafeViewKey(key)+"."+ext directly so the JSON envelope
+	// filenames are consistent across all formats (no prefix anywhere).
 	fileNameFor := func(key string) string {
-		return export.SafeViewKey(key) + "." + ext
+		if diagramFormat == "html" {
+			return export.SafeViewKey(key) + ".html"
+		}
+		return export.OutputFileName(key, ext)
 	}
 
 	// When --format json, output structured JSON. (#631)
 	// With --output: write files and report absolute "path"; without: report "source".
+	// JSON filenames use SafeViewKey(key)+"."+ext (no architecture- prefix) so the
+	// JSON envelope is consistent across plantuml/mermaid/dot/d2/html.
 	// views is pre-filtered by the caller (runExportDiagram passes only the requested
 	// view(s)), so viewKey is intentionally not re-checked here.
 	if outputFormat == "json" {
@@ -265,7 +270,7 @@ func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map
 			if fmtErr != nil {
 				return exitWithCode(fmtErr, 1)
 			}
-			entry, entryErr := buildExportEntry(key, diagramFormat, result, outputDir, fileNameFor(key))
+			entry, entryErr := buildExportEntry(key, diagramFormat, result, outputDir, export.SafeViewKey(key)+"."+ext)
 			if entryErr != nil {
 				return exitWithCode(entryErr, 2)
 			}
