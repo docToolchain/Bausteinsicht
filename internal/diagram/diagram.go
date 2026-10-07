@@ -97,7 +97,7 @@ func FormatView(m *model.BausteinsichtModel, viewKey string, f Format) (string, 
 	sort.Strings(resolved)
 
 	// Determine C4 level from view content.
-	level := detectLevel(resolved, flat, view.Scope)
+	level := detectLevel(resolved, flat, view.Scope, &m.Specification)
 
 	// Separate scope-internal elements from external ones.
 	scopeElems, externalElems := partitionElements(resolved, flat, view.Scope, &m.Specification)
@@ -130,17 +130,21 @@ type elemEntry struct {
 	Macro string
 }
 
-func detectLevel(resolved []string, flat map[string]*model.Element, scope string) string {
+// detectLevel derives the C4 level from the macros the view's elements
+// resolve to (see C4Macro), so override- and notation-mapped kinds select the
+// matching C4 include (C4_Container / C4_Component).
+func detectLevel(resolved []string, flat map[string]*model.Element, scope string, spec *model.Specification) string {
 	hasContainer := false
 	for _, id := range resolved {
 		elem := flat[id]
 		if elem == nil {
 			continue
 		}
-		if elem.Kind == "component" {
+		macro, _ := C4Macro(spec, elem.Kind)
+		if strings.HasPrefix(macro, "Component") {
 			return "Component"
 		}
-		if elem.Kind == "container" {
+		if strings.HasPrefix(macro, "Container") {
 			hasContainer = true
 		}
 	}
@@ -281,6 +285,7 @@ func UnmappedKinds(m *model.BausteinsichtModel, viewKey string) ([]string, error
 		return nil, err
 	}
 	flat, _ := model.FlattenElements(m)
+	resolved = applyTagFiltering(resolved, flat, view.FilterTags, view.ExcludeTags)
 	seen := map[string]bool{}
 	var kinds []string
 	for _, id := range resolved {
@@ -338,7 +343,7 @@ func resolveBoundary(view model.View, flat map[string]*model.Element, spec *mode
 	bnd := boundary{Macro: "System_Boundary", Title: view.Scope}
 	if scopeElem != nil {
 		bnd.Title = scopeElem.Title
-		if macro, _ := C4Macro(spec, scopeElem.Kind); strings.HasPrefix(macro, "Container") {
+		if macro, _ := C4Macro(spec, scopeElem.Kind); macro == "Container" || macro == "Container_Ext" {
 			bnd.Macro = "Container_Boundary"
 		}
 	}

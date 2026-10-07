@@ -925,7 +925,7 @@ Exports views as text diagrams in one of several formats (C4-PlantUML, Mermaid, 
 **Behavior:**
 
 * Loads the model and resolves view elements and relationships.
-* Auto-detects the C4 level (Context, Container, or Component) from the view content.
+* Auto-detects the C4 level (Context, Container, or Component) from the C4 macros the view's elements resolve to (see below), so kinds mapped via `c4` override or notation select the matching `C4_Container` / `C4_Component` include (#633).
 * Generates diagram source in the requested format. C4-PlantUML uses the stdlib include syntax (`!include <C4/C4_Context>`, etc.).
 * **C4 macro selection (PlantUML and Mermaid)** — each element is rendered with the C4 macro resolved from its kind, in this order (#633):
 . the kind's explicit `specification.elements.<kind>.c4` override, if set (for example `"c4": "Person"`);

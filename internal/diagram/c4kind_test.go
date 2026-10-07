@@ -45,7 +45,6 @@ func TestC4Macro_Resolution(t *testing.T) {
 		"datastore":    {Notation: "Whatever"},
 		"mixed-case":   {Notation: "  software SYSTEM "},
 		"external_sys": {Notation: "external system"},
-		"Actor":        {Notation: "Whatever"},
 	}}
 	cases := []struct {
 		kind      string
@@ -62,7 +61,8 @@ func TestC4Macro_Resolution(t *testing.T) {
 		{"datastore", "ContainerDb", true},
 		{"mixed-case", "System", true},
 		{"external_sys", "System_Ext", true},
-		{"Actor", "Person", true},
+		{"Container", "Container", true},
+		{"DataStore", "ContainerDb", true},
 		{"widget", "System", false},
 		{"undefined-kind", "System", false},
 	}
@@ -179,5 +179,69 @@ func TestBoundaryMacro_FollowsC4Mapping(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestDetectLevel_FollowsC4Mapping (#633): kinds mapped to Container/Component
+// only via c4 override or notation must select the matching C4 include.
+func TestDetectLevel_FollowsC4Mapping(t *testing.T) {
+	cases := []struct {
+		name string
+		kind model.ElementKind
+		want string
+	}{
+		{"container-override", model.ElementKind{Notation: "Service", C4: "Container"}, "!include <C4/C4_Container>"},
+		{"component-override", model.ElementKind{Notation: "Service", C4: "Component"}, "!include <C4/C4_Component>"},
+		{"container-notation", model.ElementKind{Notation: "Container"}, "!include <C4/C4_Container>"},
+		{"database-notation", model.ElementKind{Notation: "Database"}, "!include <C4/C4_Container>"},
+		{"fallback", model.ElementKind{Notation: "Service"}, "!include <C4/C4_Context>"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			m := &model.BausteinsichtModel{
+				Specification: model.Specification{Elements: map[string]model.ElementKind{"svc": tc.kind}},
+				Model:         map[string]model.Element{"a": {Kind: "svc", Title: "A"}},
+				Views:         map[string]model.View{"v": {Title: "V", Include: []string{"*"}}},
+			}
+			out, err := FormatView(m, "v", PlantUML)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(out, tc.want) {
+				t.Errorf("expected %s, got:\n%s", tc.want, out)
+			}
+		})
+	}
+}
+
+// TestBoundaryMacro_DatabaseScopeIsNotContainerBoundary (#633): ContainerDb /
+// ContainerQueue are not boundary types.
+func TestBoundaryMacro_DatabaseScopeIsNotContainerBoundary(t *testing.T) {
+	out, err := FormatView(scopedC4Model(model.ElementKind{Notation: "Database"}), "v", PlantUML)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "System_Boundary(app,") {
+		t.Errorf("expected System_Boundary for a database scope, got:\n%s", out)
+	}
+}
+
+// TestUnmappedKinds_RespectsTagFiltering (#633): elements dropped by the view's
+// tag filters are not rendered and must not be warned about.
+func TestUnmappedKinds_RespectsTagFiltering(t *testing.T) {
+	m := c4KindModel()
+	gizmo := m.Model["gizmo"]
+	gizmo.Tags = []string{"hidden"}
+	m.Model["gizmo"] = gizmo
+	v := m.Views["context"]
+	v.ExcludeTags = []string{"hidden"}
+	m.Views["context"] = v
+
+	got, err := UnmappedKinds(m, "context")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 0 {
+		t.Errorf("tag-excluded element must not be reported, got %v", got)
 	}
 }
