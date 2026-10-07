@@ -206,6 +206,9 @@ func TestExportSequenceCmd_JSONWithOutput(t *testing.T) {
 	if !ok || p == "" {
 		t.Errorf("expected non-empty 'path' field, got: %v", entries[0])
 	}
+	if !filepath.IsAbs(p) {
+		t.Errorf("expected absolute path, got relative: %q", p)
+	}
 	if _, err := os.ReadFile(p); err != nil {
 		t.Errorf("expected file to exist at %q: %v", p, err)
 	}

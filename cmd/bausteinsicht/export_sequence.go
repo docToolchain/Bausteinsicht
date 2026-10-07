@@ -107,9 +107,10 @@ func runExportSequence(cmd *cobra.Command, _ []string) error {
 			if outputDir == "" {
 				e.Source = render(v)
 			} else {
+				source := render(v)
 				filename := "sequence-" + export.SafeViewKey(v.Key) + "." + ext
 				outPath := filepath.Join(outputDir, filename)
-				if err := os.WriteFile(outPath, []byte(render(v)), 0600); err != nil { //nolint:gosec
+				if err := os.WriteFile(outPath, []byte(source), 0600); err != nil { //nolint:gosec
 					return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
 				}
 				absPath, err := filepath.Abs(outPath)
