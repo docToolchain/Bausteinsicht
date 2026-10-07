@@ -14,6 +14,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// diagramJSONEntry is the JSON shape for a single exported view.
+// Source is set when no --output dir is given; Path when files are written.
+type diagramJSONEntry struct {
+	View   string `json:"view"`
+	Format string `json:"format"`
+	Source string `json:"source,omitempty"`
+	Path   string `json:"path,omitempty"`
+}
+
 func newExportDiagramCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "export-diagram",
@@ -116,27 +125,21 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 	}
 
 	// When --format json, output structured JSON. (#241, #631)
-	// With --output: write files and report "path"; without: report "source".
+	// With --output: write files and report absolute "path"; without: report "source".
 	if outputFormat == "json" {
-		if outputDir != "" {
+		keys := sortedKeys(views)
+		if outputDir != "" && len(keys) > 0 {
 			if err := os.MkdirAll(outputDir, 0750); err != nil {
 				return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
 			}
 		}
-		type diagramEntry struct {
-			View   string `json:"view"`
-			Format string `json:"format"`
-			Source string `json:"source,omitempty"`
-			Path   string `json:"path,omitempty"`
-		}
-		var entries []diagramEntry
-		keys := sortedKeys(views)
+		var entries []diagramJSONEntry
 		for _, key := range keys {
 			result, fmtErr := diagram.FormatView(m, key, f)
 			if fmtErr != nil {
 				return exitWithCode(fmtErr, 1)
 			}
-			entry := diagramEntry{View: key, Format: diagramFormat}
+			entry := diagramJSONEntry{View: key, Format: diagramFormat}
 			if outputDir == "" {
 				entry.Source = result
 			} else {
@@ -144,7 +147,8 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 				if err := os.WriteFile(outPath, []byte(result), 0600); err != nil { //nolint:gosec
 					return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
 				}
-				entry.Path = outPath
+				absPath, _ := filepath.Abs(outPath)
+				entry.Path = absPath
 			}
 			entries = append(entries, entry)
 		}
@@ -196,27 +200,21 @@ func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map
 	}
 
 	// When --format json, output structured JSON. (#631)
-	// With --output: write files and report "path"; without: report "source".
+	// With --output: write files and report absolute "path"; without: report "source".
 	if outputFormat == "json" {
-		if outputDir != "" {
+		keys := sortedKeys(views)
+		if outputDir != "" && len(keys) > 0 {
 			if err := os.MkdirAll(outputDir, 0750); err != nil {
 				return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
 			}
 		}
-		type diagramEntry struct {
-			View   string `json:"view"`
-			Format string `json:"format"`
-			Source string `json:"source,omitempty"`
-			Path   string `json:"path,omitempty"`
-		}
-		var entries []diagramEntry
-		keys := sortedKeys(views)
+		var entries []diagramJSONEntry
 		for _, key := range keys {
 			result, fmtErr := renderFunc(m, key)
 			if fmtErr != nil {
 				return exitWithCode(fmtErr, 1)
 			}
-			entry := diagramEntry{View: key, Format: diagramFormat}
+			entry := diagramJSONEntry{View: key, Format: diagramFormat}
 			if outputDir == "" {
 				entry.Source = result
 			} else {
@@ -224,12 +222,13 @@ func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map
 				if diagramFormat == "html" {
 					outPath = filepath.Join(outputDir, export.SafeViewKey(key)+".html")
 				} else {
-					outPath = filepath.Join(outputDir, "architecture-"+export.SafeViewKey(key)+"."+ext)
+					outPath = filepath.Join(outputDir, export.OutputFileName(key, ext))
 				}
 				if err := os.WriteFile(outPath, []byte(result), 0600); err != nil { //nolint:gosec
 					return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
 				}
-				entry.Path = outPath
+				absPath, _ := filepath.Abs(outPath)
+				entry.Path = absPath
 			}
 			entries = append(entries, entry)
 		}
@@ -308,7 +307,7 @@ func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map
 			return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
 		}
 
-		outPath := filepath.Join(outputDir, "architecture-"+export.SafeViewKey(key)+"."+ext)
+		outPath := filepath.Join(outputDir, export.OutputFileName(key, ext))
 		if err := os.WriteFile(outPath, []byte(result), 0600); err != nil {
 			return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
 		}

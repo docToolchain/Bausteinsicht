@@ -118,7 +118,8 @@ func runExportSequence(cmd *cobra.Command, _ []string) error {
 				if err := os.WriteFile(outPath, []byte(render(v)), 0600); err != nil { //nolint:gosec
 					return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
 				}
-				e.Path = outPath
+				absPath, _ := filepath.Abs(outPath)
+				e.Path = absPath
 			}
 			entries = append(entries, e)
 		}
