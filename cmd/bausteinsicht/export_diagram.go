@@ -167,7 +167,7 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 		}
 		dsl := dslexport.Export(m)
 		if outputFormat == "json" {
-			return emitExportItems(cmd, "structurizr", outputDir, []exportItem{{"workspace", "workspace.dsl", dsl}})
+			return emitExportItems(cmd, "structurizr", outputDir, []exportItem{{viewKey: "workspace", filename: "workspace.dsl", content: dsl}})
 		}
 		if outputDir == "" {
 			_, _ = fmt.Fprint(cmd.OutOrStdout(), dsl)
@@ -228,7 +228,7 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 			if fmtErr != nil {
 				return exitWithCode(fmtErr, 1)
 			}
-			items = append(items, exportItem{key, export.SafeViewKey(key) + "." + ext, result})
+			items = append(items, exportItem{viewKey: key, filename: export.SafeViewKey(key) + "." + ext, content: result})
 		}
 		return emitExportItems(cmd, diagramFormat, outputDir, items)
 	}
@@ -297,7 +297,7 @@ func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map
 			if fmtErr != nil {
 				return exitWithCode(fmtErr, 1)
 			}
-			items = append(items, exportItem{key, fileNameFor(key), result})
+			items = append(items, exportItem{viewKey: key, filename: fileNameFor(key), content: result})
 		}
 		return emitExportItems(cmd, diagramFormat, outputDir, items)
 	}

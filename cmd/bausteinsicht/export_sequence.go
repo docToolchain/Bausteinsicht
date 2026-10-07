@@ -100,7 +100,7 @@ func runExportSequence(cmd *cobra.Command, _ []string) error {
 			if src == "" {
 				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "warning: view %q resolved to empty diagram\n", v.Key)
 			}
-			items = append(items, exportItem{v.Key, "sequence-" + export.SafeViewKey(v.Key) + "." + ext, src})
+			items = append(items, exportItem{viewKey: v.Key, filename: "sequence-" + export.SafeViewKey(v.Key) + "." + ext, content: src})
 		}
 		return emitExportItems(cmd, diagramFormat, outputDir, items)
 	}
