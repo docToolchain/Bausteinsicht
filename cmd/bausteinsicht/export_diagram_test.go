@@ -398,3 +398,23 @@ func TestExportDiagram_JSONSourceMode(t *testing.T) {
 		}
 	}
 }
+
+func TestEmitExportItems_FilenameCollision(t *testing.T) {
+	outDir := t.TempDir()
+	var outBuf bytes.Buffer
+	root := NewRootCmd()
+	root.SetOut(&outBuf)
+	items := []exportItem{
+		{viewKey: "a/b", filename: "b.puml", content: "x"},
+		{viewKey: "b", filename: "b.puml", content: "y"},
+	}
+	if err := emitExportItems(root, "plantuml", outDir, items); err == nil {
+		t.Fatal("expected collision error")
+	}
+	if _, err := os.Stat(filepath.Join(outDir, "b.puml")); err == nil {
+		t.Error("no file must be written when a collision is detected")
+	}
+	if outBuf.Len() != 0 {
+		t.Errorf("expected no stdout on error, got: %s", outBuf.String())
+	}
+}

@@ -58,6 +58,44 @@ func writeExportFile(outPath string, content []byte) (string, error) {
 	return absPath, nil
 }
 
+// exportItem is one fully rendered view awaiting output.
+type exportItem struct {
+	viewKey  string
+	filename string
+	content  string
+}
+
+// emitExportItems is the shared JSON-mode tail: it rejects items whose file
+// names collide, writes the files (when outputDir is set), logs "Exported:"
+// lines and prints the JSON array. Callers render every view first, so a render
+// error never leaves partially written output behind.
+func emitExportItems(cmd *cobra.Command, format, outputDir string, items []exportItem) error {
+	if outputDir != "" {
+		seen := make(map[string]string, len(items))
+		for _, it := range items {
+			if prev, dup := seen[it.filename]; dup {
+				return exitWithCode(fmt.Errorf("views %q and %q both map to output file %q", prev, it.viewKey, it.filename), 1)
+			}
+			seen[it.filename] = it.viewKey
+		}
+	}
+	entries := make([]exportJSONEntry, 0, len(items))
+	for _, it := range items {
+		entry, err := buildExportEntry(it.viewKey, format, it.content, outputDir, it.filename)
+		if err != nil {
+			return exitWithCode(err, 2)
+		}
+		if entry.Path != "" {
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", entry.Path)
+		}
+		entries = append(entries, entry)
+	}
+	if err := emitExportJSON(cmd, entries); err != nil {
+		return exitWithCode(err, 2)
+	}
+	return nil
+}
+
 // buildExportEntry constructs one exportJSONEntry for a rendered view.
 // In source-mode (outputDir == "") the diagram text is stored as Source.
 // In path-mode the file is written and Source is cleared; Path holds the
@@ -193,25 +231,15 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 	// With --output: write files and report absolute "path"; without: report "source".
 	if outputFormat == "json" {
 		keys := sortedKeys(views)
-		entries := make([]exportJSONEntry, 0, len(keys))
+		items := make([]exportItem, 0, len(keys))
 		for _, key := range keys {
 			result, fmtErr := diagram.FormatView(m, key, f)
 			if fmtErr != nil {
 				return exitWithCode(fmtErr, 1)
 			}
-			entry, entryErr := buildExportEntry(key, diagramFormat, result, outputDir, export.SafeViewKey(key)+"."+ext)
-			if entryErr != nil {
-				return exitWithCode(entryErr, 2)
-			}
-			if entry.Path != "" {
-				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", entry.Path)
-			}
-			entries = append(entries, entry)
+			items = append(items, exportItem{key, export.SafeViewKey(key) + "." + ext, result})
 		}
-		if err := emitExportJSON(cmd, entries); err != nil {
-			return exitWithCode(err, 2)
-		}
-		return nil
+		return emitExportItems(cmd, diagramFormat, outputDir, items)
 	}
 
 	for _, key := range sortedKeys(views) {
@@ -273,25 +301,15 @@ func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map
 	// view(s)), so viewKey is intentionally not re-checked here.
 	if outputFormat == "json" {
 		keys := sortedKeys(views)
-		entries := make([]exportJSONEntry, 0, len(keys))
+		items := make([]exportItem, 0, len(keys))
 		for _, key := range keys {
 			result, fmtErr := renderFunc(m, key)
 			if fmtErr != nil {
 				return exitWithCode(fmtErr, 1)
 			}
-			entry, entryErr := buildExportEntry(key, diagramFormat, result, outputDir, fileNameFor(key))
-			if entryErr != nil {
-				return exitWithCode(entryErr, 2)
-			}
-			if entry.Path != "" {
-				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", entry.Path)
-			}
-			entries = append(entries, entry)
+			items = append(items, exportItem{key, fileNameFor(key), result})
 		}
-		if err := emitExportJSON(cmd, entries); err != nil {
-			return exitWithCode(err, 2)
-		}
-		return nil
+		return emitExportItems(cmd, diagramFormat, outputDir, items)
 	}
 
 	// For HTML, create a single file containing all views
