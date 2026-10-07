@@ -71,8 +71,10 @@ func TestExportDiagramJSONWithOutputDir(t *testing.T) {
 	}
 }
 
-// TestExportTableJSONWithOutputDir (#631): --format json always emits rows to
-// stdout; --output additionally writes elements.json and prints "Exported:" to stderr.
+// TestExportTableJSONWithOutputDir (#631): --format json --output emits a JSON
+// envelope [{view,format,path}] to stdout (consistent with export-diagram/sequence)
+// and writes the actual rows to elements.json on disk.
+// Without --output: raw rows JSON to stdout (natural content for table data).
 func TestExportTableJSONWithOutputDir(t *testing.T) {
 	bin := buildBinary(t)
 	dir := t.TempDir()
@@ -87,29 +89,41 @@ func TestExportTableJSONWithOutputDir(t *testing.T) {
 		t.Fatalf("exit %d: %s", code, stdout)
 	}
 
-	// stdout must always be raw rows JSON regardless of --output
-	var rows []interface{}
-	if err := json.Unmarshal([]byte(strings.TrimSpace(stdout)), &rows); err != nil {
-		t.Fatalf("expected rows JSON on stdout, got: %v\noutput:\n%s", err, stdout)
+	// stdout = JSON envelope with path
+	var entries []map[string]interface{}
+	if err := json.Unmarshal([]byte(strings.TrimSpace(stdout)), &entries); err != nil {
+		t.Fatalf("expected JSON envelope on stdout: %v\noutput:\n%s", err, stdout)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry in envelope, got %d", len(entries))
+	}
+	p, ok := entries[0]["path"].(string)
+	if !ok || p == "" {
+		t.Errorf("expected non-empty 'path' field, got: %v", entries[0])
+	}
+	if !filepath.IsAbs(p) {
+		t.Errorf("expected absolute path, got: %q", p)
+	}
+	if _, hasSource := entries[0]["source"]; hasSource {
+		t.Error("expected no 'source' field when --output is set")
 	}
 
-	// --output writes the same rows to elements.json on disk
-	elemPath := filepath.Join(outDir, "elements.json")
-	fileData, err := os.ReadFile(elemPath)
+	// elements.json must exist and contain valid rows JSON
+	fileData, err := os.ReadFile(p)
 	if err != nil {
-		t.Fatalf("expected elements.json at %q: %v", elemPath, err)
+		t.Fatalf("expected elements.json at %q: %v", p, err)
 	}
 	var fileRows []interface{}
 	if err := json.Unmarshal(fileData, &fileRows); err != nil {
 		t.Fatalf("invalid JSON in elements.json: %v", err)
 	}
 
-	// stderr must report absolute path
-	if !strings.Contains(stderr, outDir) {
-		t.Errorf("expected 'Exported:' with outDir in stderr, got: %s", stderr)
+	// stderr must report Exported: with absolute path
+	if !strings.Contains(stderr, p) {
+		t.Errorf("expected 'Exported: %s' in stderr, got: %s", p, stderr)
 	}
 
-	// Without --output: same rows shape on stdout, no file created
+	// Without --output: raw rows JSON to stdout
 	stdoutSrc, _, code2 := runCLISplit(t, bin, dir,
 		"export-table", "--format", "json",
 	)

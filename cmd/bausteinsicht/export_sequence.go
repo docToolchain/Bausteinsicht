@@ -97,10 +97,16 @@ func runExportSequence(cmd *cobra.Command, _ []string) error {
 		entries := make([]exportJSONEntry, 0, len(views))
 		for _, v := range views {
 			src := render(v)
+			if src == "" {
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "warning: view %q resolved to empty diagram\n", v.Key)
+			}
 			filename := "sequence-" + export.SafeViewKey(v.Key) + "." + ext
 			entry, entryErr := buildExportEntry(v.Key, diagramFormat, src, outputDir, filename)
 			if entryErr != nil {
 				return exitWithCode(entryErr, 2)
+			}
+			if entry.Path != "" {
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", entry.Path)
 			}
 			entries = append(entries, entry)
 		}

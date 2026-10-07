@@ -101,28 +101,46 @@ func runExportTable(cmd *cobra.Command, _ []string) error {
 }
 
 // exportTableJSON outputs the table data as JSON. (#239, #631)
-// Always writes rows JSON to stdout regardless of --output, so callers always
-// receive the same shape. When outputDir is set, also writes rows to
-// elements.json on disk and prints the absolute path to stderr.
+// Without outputDir: writes rows JSON to stdout (natural content for table data).
+// With outputDir: writes rows JSON to elements.json and emits a JSON envelope
+// [{view,format,path}] to stdout — consistent with export-diagram/sequence so that
+// scripts consuming --format json --output <dir> receive the same shape from all
+// export commands and can locate written files via the "path" field.
 func exportTableJSON(cmd *cobra.Command, m *model.BausteinsichtModel, viewKey string, combined bool, outputDir string) error {
 	rows, err := table.CollectRows(m, viewKey, combined)
 	if err != nil {
 		return exitWithCode(err, 1)
 	}
-	data, marshalErr := json.MarshalIndent(rows, "", "  ")
+	dataWithNewline, marshalErr := func() ([]byte, error) {
+		d, e := json.MarshalIndent(rows, "", "  ")
+		if e != nil {
+			return nil, e
+		}
+		return append(d, '\n'), nil
+	}()
 	if marshalErr != nil {
 		return exitWithCode(fmt.Errorf("marshaling JSON: %w", marshalErr), 2)
 	}
-	if _, err := cmd.OutOrStdout().Write(append(data, '\n')); err != nil {
-		return exitWithCode(fmt.Errorf("writing JSON output: %w", err), 2)
-	}
 	if outputDir == "" {
+		if _, err := cmd.OutOrStdout().Write(dataWithNewline); err != nil {
+			return exitWithCode(fmt.Errorf("writing JSON output: %w", err), 2)
+		}
 		return nil
 	}
-	absPath, writeErr := writeExportFile(filepath.Join(outputDir, "elements.json"), append(data, '\n'))
+	viewLabel := viewKey
+	if combined {
+		viewLabel = "combined"
+	} else if viewKey == "" {
+		viewLabel = "all"
+	}
+	absPath, writeErr := writeExportFile(filepath.Join(outputDir, "elements.json"), dataWithNewline)
 	if writeErr != nil {
 		return exitWithCode(writeErr, 2)
 	}
 	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", absPath)
+	entry := exportJSONEntry{View: viewLabel, Format: "json", Path: absPath}
+	if err := emitExportJSON(cmd, []exportJSONEntry{entry}); err != nil {
+		return exitWithCode(err, 2)
+	}
 	return nil
 }

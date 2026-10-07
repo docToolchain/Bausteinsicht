@@ -130,6 +130,9 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 			if entryErr != nil {
 				return exitWithCode(entryErr, 2)
 			}
+			if entry.Path != "" {
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", entry.Path)
+			}
 			if err := emitExportJSON(cmd, []exportJSONEntry{entry}); err != nil {
 				return exitWithCode(err, 2)
 			}
@@ -198,6 +201,9 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 			if entryErr != nil {
 				return exitWithCode(entryErr, 2)
 			}
+			if entry.Path != "" {
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", entry.Path)
+			}
 			entries = append(entries, entry)
 		}
 		if err := emitExportJSON(cmd, entries); err != nil {
@@ -258,8 +264,10 @@ func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map
 
 	// When --format json, output structured JSON. (#631)
 	// With --output: write files and report absolute "path"; without: report "source".
-	// Uses fileNameFor so JSON and non-JSON paths always produce identical filenames
-	// for the same format — no drift between modes.
+	// Uses fileNameFor so JSON and non-JSON paths produce identical filenames per
+	// format: DOT/D2 get "architecture-<key>.{dot,d2}", HTML/plantuml/mermaid get
+	// "<key>.{html,puml,mmd}". This keeps the JSON "path" field consistent with the
+	// file that non-JSON mode would have written to the same directory.
 	// views is pre-filtered by the caller (runExportDiagram passes only the requested
 	// view(s)), so viewKey is intentionally not re-checked here.
 	if outputFormat == "json" {
@@ -273,6 +281,9 @@ func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map
 			entry, entryErr := buildExportEntry(key, diagramFormat, result, outputDir, fileNameFor(key))
 			if entryErr != nil {
 				return exitWithCode(entryErr, 2)
+			}
+			if entry.Path != "" {
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", entry.Path)
 			}
 			entries = append(entries, entry)
 		}

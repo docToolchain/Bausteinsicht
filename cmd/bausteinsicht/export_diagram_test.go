@@ -268,6 +268,15 @@ func TestExportDiagram_JSONWithOutput_DOT(t *testing.T) {
 	entries := runExportDiagramJSON(t,
 		"--model", modelPath, "--diagram-format", "dot", "--output", outDir, "--format", "json")
 	assertJSONPathEntries(t, entries, "dot")
+	// DOT files must keep the "architecture-" prefix to match non-JSON mode.
+	for i, e := range entries {
+		p := e["path"].(string)
+		view := e["view"].(string)
+		expected := "architecture-" + view + ".dot"
+		if filepath.Base(p) != expected {
+			t.Errorf("entry[%d]: expected filename %q, got %q", i, expected, filepath.Base(p))
+		}
+	}
 }
 
 func TestExportDiagram_JSONWithOutput_HTML(t *testing.T) {
@@ -284,6 +293,15 @@ func TestExportDiagram_JSONWithOutput_D2(t *testing.T) {
 	entries := runExportDiagramJSON(t,
 		"--model", modelPath, "--diagram-format", "d2", "--output", outDir, "--format", "json")
 	assertJSONPathEntries(t, entries, "d2")
+	// D2 files must keep the "architecture-" prefix to match non-JSON mode.
+	for i, e := range entries {
+		p := e["path"].(string)
+		view := e["view"].(string)
+		expected := "architecture-" + view + ".d2"
+		if filepath.Base(p) != expected {
+			t.Errorf("entry[%d]: expected filename %q, got %q", i, expected, filepath.Base(p))
+		}
+	}
 }
 
 // TestExportDiagram_JSONWithOutput_Structurizr covers the structurizr JSON path
