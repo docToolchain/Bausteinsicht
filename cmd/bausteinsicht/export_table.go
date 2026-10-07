@@ -104,11 +104,9 @@ func runExportTable(cmd *cobra.Command, _ []string) error {
 }
 
 // exportTableJSON outputs the table data as JSON. (#239, #631)
-// Without outputDir: writes rows JSON to stdout (natural content for table data).
-// With outputDir: writes rows JSON to elements.json and emits a JSON envelope
-// [{view,format,path}] to stdout — consistent with export-diagram/sequence so that
-// scripts consuming --format json --output <dir> receive the same shape from all
-// export commands and can locate written files via the "path" field.
+// stdout always carries the rows array (the established contract). With
+// outputDir the same rows are additionally written to a file and its absolute
+// path is reported on stderr.
 func exportTableJSON(cmd *cobra.Command, m *model.BausteinsichtModel, viewKey string, combined bool, outputDir string) error {
 	rows, err := table.CollectRows(m, viewKey, combined)
 	if err != nil {
@@ -119,23 +117,19 @@ func exportTableJSON(cmd *cobra.Command, m *model.BausteinsichtModel, viewKey st
 		return exitWithCode(fmt.Errorf("marshaling JSON: %w", err), 2)
 	}
 	dataWithNewline := append(data, '\n')
+	if _, err := cmd.OutOrStdout().Write(dataWithNewline); err != nil {
+		return exitWithCode(fmt.Errorf("writing JSON output: %w", err), 2)
+	}
 	if outputDir == "" {
-		if _, err := cmd.OutOrStdout().Write(dataWithNewline); err != nil {
-			return exitWithCode(fmt.Errorf("writing JSON output: %w", err), 2)
-		}
 		return nil
 	}
 	// File names mirror the non-JSON convention (elements.<ext>,
 	// <view>-elements.<ext>, all-views-elements.<ext>) so modes never collide.
-	viewLabel := viewKey
 	filename := "all-views-elements.json"
 	switch {
 	case combined:
-		viewLabel = "combined"
 		filename = "elements.json"
-	case viewKey == "":
-		viewLabel = "all"
-	default:
+	case viewKey != "":
 		filename = export.SafeViewKey(viewKey) + "-elements.json"
 	}
 	absPath, writeErr := writeExportFile(filepath.Join(outputDir, filename), dataWithNewline)
@@ -143,9 +137,5 @@ func exportTableJSON(cmd *cobra.Command, m *model.BausteinsichtModel, viewKey st
 		return exitWithCode(writeErr, 2)
 	}
 	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", absPath)
-	entry := exportJSONEntry{View: viewLabel, Format: "table", Path: absPath}
-	if err := emitExportJSON(cmd, []exportJSONEntry{entry}); err != nil {
-		return exitWithCode(err, 2)
-	}
 	return nil
 }

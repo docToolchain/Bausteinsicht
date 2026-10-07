@@ -151,17 +151,16 @@ func TestExportTable_InvalidFormat(t *testing.T) {
 	}
 }
 
-func TestExportTableJSON_PathAndSourceModes(t *testing.T) {
+func TestExportTableJSON_RowsOnStdoutAndFileWithOutput(t *testing.T) {
 	modelPath := writeExportTableModel(t)
 	cases := []struct {
 		name     string
 		args     []string
-		wantView string
 		wantFile string
 	}{
-		{"all", nil, "all", "all-views-elements.json"},
-		{"combined", []string{"--combined"}, "combined", "elements.json"},
-		{"view", []string{"--view", "containers"}, "containers", "containers-elements.json"},
+		{"all", nil, "all-views-elements.json"},
+		{"combined", []string{"--combined"}, "elements.json"},
+		{"view", []string{"--view", "containers"}, "containers-elements.json"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -174,37 +173,23 @@ func TestExportTableJSON_PathAndSourceModes(t *testing.T) {
 			if err := root.Execute(); err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			var entries []map[string]interface{}
-			if err := json.Unmarshal(outBuf.Bytes(), &entries); err != nil {
-				t.Fatalf("invalid envelope: %v\n%s", err, outBuf.String())
+			var rows []map[string]interface{}
+			if err := json.Unmarshal(outBuf.Bytes(), &rows); err != nil {
+				t.Fatalf("stdout must be the rows array: %v\n%s", err, outBuf.String())
 			}
-			if len(entries) != 1 || entries[0]["view"] != tc.wantView || entries[0]["format"] != "table" {
-				t.Fatalf("unexpected envelope: %v", entries)
+			if len(rows) == 0 || rows[0]["id"] == nil {
+				t.Fatalf("expected element rows on stdout, got: %v", rows)
 			}
-			p, _ := entries[0]["path"].(string)
-			if filepath.Base(p) != tc.wantFile {
-				t.Errorf("expected file %s, got %s", tc.wantFile, p)
-			}
+			p := filepath.Join(outDir, tc.wantFile)
 			data, err := os.ReadFile(p)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatalf("expected file %s: %v", p, err)
 			}
-			var rows []interface{}
-			if err := json.Unmarshal(data, &rows); err != nil {
-				t.Errorf("file is not a JSON rows array: %v", err)
+			if !bytes.Equal(data, outBuf.Bytes()) {
+				t.Error("file content must equal stdout rows")
 			}
-
-			var srcBuf bytes.Buffer
-			root2 := NewRootCmd()
-			root2.SetOut(&srcBuf)
-			root2.SetErr(&errBuf)
-			root2.SetArgs(append([]string{"export-table", "--model", modelPath, "--format", "json"}, tc.args...))
-			if err := root2.Execute(); err != nil {
-				t.Fatalf("source mode error: %v", err)
-			}
-			var srcRows []interface{}
-			if err := json.Unmarshal(srcBuf.Bytes(), &srcRows); err != nil {
-				t.Errorf("source mode must emit rows array: %v", err)
+			if !strings.Contains(errBuf.String(), "Exported: ") || !strings.Contains(errBuf.String(), tc.wantFile) {
+				t.Errorf("expected 'Exported:' line with absolute path on stderr, got: %s", errBuf.String())
 			}
 		})
 	}

@@ -68,7 +68,8 @@ type exportItem struct {
 // emitExportItems is the shared JSON-mode tail: it rejects items whose file
 // names collide, writes the files (when outputDir is set), logs "Exported:"
 // lines and prints the JSON array. Callers render every view first, so a render
-// error never leaves partially written output behind.
+// error leaves no files behind; a write error part-way through can still leave
+// the files written so far on disk.
 func emitExportItems(cmd *cobra.Command, format, outputDir string, items []exportItem) error {
 	if outputDir != "" {
 		seen := make(map[string]string, len(items))
@@ -166,17 +167,7 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 		}
 		dsl := dslexport.Export(m)
 		if outputFormat == "json" {
-			entry, entryErr := buildExportEntry("workspace", "structurizr", dsl, outputDir, "workspace.dsl")
-			if entryErr != nil {
-				return exitWithCode(entryErr, 2)
-			}
-			if entry.Path != "" {
-				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", entry.Path)
-			}
-			if err := emitExportJSON(cmd, []exportJSONEntry{entry}); err != nil {
-				return exitWithCode(err, 2)
-			}
-			return nil
+			return emitExportItems(cmd, "structurizr", outputDir, []exportItem{{"workspace", "workspace.dsl", dsl}})
 		}
 		if outputDir == "" {
 			_, _ = fmt.Fprint(cmd.OutOrStdout(), dsl)
