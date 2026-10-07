@@ -1,9 +1,7 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/docToolchain/Bausteinsicht/internal/diagram"
@@ -94,40 +92,37 @@ func runExportSequence(cmd *cobra.Command, _ []string) error {
 		return diagram.RenderSequencePlantUML(v, flat)
 	}
 
-	// JSON output.
+	// JSON output. (#631) With --output: write files and report "path"; without: report "source".
 	if format == "json" {
-		type entry struct {
-			View   string `json:"view"`
-			Format string `json:"format"`
-			Source string `json:"source"`
-		}
-		var entries []entry
+		items := make([]exportItem, 0, len(views))
 		for _, v := range views {
-			entries = append(entries, entry{View: v.Key, Format: diagramFormat, Source: render(v)})
+			src := render(v)
+			if src == "" {
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "warning: view %q resolved to empty diagram\n", v.Key)
+			}
+			items = append(items, exportItem{viewKey: v.Key, filename: "sequence-" + export.SafeViewKey(v.Key) + "." + ext, content: src})
 		}
-		data, _ := json.MarshalIndent(entries, "", "  ")
-		_, _ = fmt.Fprintln(cmd.OutOrStdout(), string(data))
-		return nil
+		return emitExportItems(cmd, diagramFormat, outputDir, items)
 	}
 
 	// Text / file output.
 	for _, v := range views {
 		source := render(v)
+		if source == "" {
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "warning: view %q resolved to empty diagram\n", v.Key)
+		}
 
 		if outputDir == "" {
 			_, _ = fmt.Fprint(cmd.OutOrStdout(), source)
 			continue
 		}
 
-		if err := os.MkdirAll(outputDir, 0750); err != nil {
-			return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
-		}
 		filename := "sequence-" + export.SafeViewKey(v.Key) + "." + ext
-		outPath := filepath.Join(outputDir, filename)
-		if err := os.WriteFile(outPath, []byte(source), 0600); err != nil { //nolint:gosec // output files are non-sensitive documentation
-			return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
+		absPath, writeErr := writeExportFile(filepath.Join(outputDir, filename), []byte(source))
+		if writeErr != nil {
+			return exitWithCode(writeErr, 2)
 		}
-		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", outPath)
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", absPath)
 	}
 
 	return nil

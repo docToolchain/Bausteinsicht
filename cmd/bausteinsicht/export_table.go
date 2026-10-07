@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/docToolchain/Bausteinsicht/internal/export"
@@ -41,6 +40,9 @@ func runExportTable(cmd *cobra.Command, _ []string) error {
 			return exitWithCode(fmt.Errorf("--output: %w", err), 2)
 		}
 	}
+	if combined && viewKey != "" {
+		_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "warning: --view is ignored when --combined is set")
+	}
 
 	if modelPath == "" {
 		detected, err := model.AutoDetect(".")
@@ -55,9 +57,9 @@ func runExportTable(cmd *cobra.Command, _ []string) error {
 		return exitWithCode(fmt.Errorf("loading model: %w", err), 2)
 	}
 
-	// When --format json is set, output structured JSON instead of a table. (#239)
+	// When --format json is set, output structured JSON instead of a table. (#239, #631)
 	if format == "json" {
-		return exportTableJSON(cmd, m, viewKey, combined)
+		return exportTableJSON(cmd, m, viewKey, combined, outputDir)
 	}
 
 	var f table.Format
@@ -93,20 +95,19 @@ func runExportTable(cmd *cobra.Command, _ []string) error {
 		return nil
 	}
 
-	outPath := filepath.Join(outputDir, filename)
-	if err := os.MkdirAll(outputDir, 0750); err != nil {
-		return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
+	absPath, writeErr := writeExportFile(filepath.Join(outputDir, filename), []byte(result))
+	if writeErr != nil {
+		return exitWithCode(writeErr, 2)
 	}
-	if err := os.WriteFile(outPath, []byte(result), 0600); err != nil { //nolint:gosec // output files are non-sensitive documentation
-		return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
-	}
-
-	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", outPath)
+	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", absPath)
 	return nil
 }
 
-// exportTableJSON outputs the table data as JSON. (#239)
-func exportTableJSON(cmd *cobra.Command, m *model.BausteinsichtModel, viewKey string, combined bool) error {
+// exportTableJSON outputs the table data as JSON. (#239, #631)
+// stdout always carries the rows array (the established contract). With
+// outputDir the same rows are additionally written to a file and its absolute
+// path is reported on stderr.
+func exportTableJSON(cmd *cobra.Command, m *model.BausteinsichtModel, viewKey string, combined bool, outputDir string) error {
 	rows, err := table.CollectRows(m, viewKey, combined)
 	if err != nil {
 		return exitWithCode(err, 1)
@@ -115,6 +116,26 @@ func exportTableJSON(cmd *cobra.Command, m *model.BausteinsichtModel, viewKey st
 	if err != nil {
 		return exitWithCode(fmt.Errorf("marshaling JSON: %w", err), 2)
 	}
-	_, _ = fmt.Fprintln(cmd.OutOrStdout(), string(data))
+	dataWithNewline := append(data, '\n')
+	if _, err := cmd.OutOrStdout().Write(dataWithNewline); err != nil {
+		return exitWithCode(fmt.Errorf("writing JSON output: %w", err), 2)
+	}
+	if outputDir == "" {
+		return nil
+	}
+	// File names mirror the non-JSON convention (elements.<ext>,
+	// <view>-elements.<ext>, all-views-elements.<ext>) so modes never collide.
+	filename := "all-views-elements.json"
+	switch {
+	case combined:
+		filename = "elements.json"
+	case viewKey != "":
+		filename = export.SafeViewKey(viewKey) + "-elements.json"
+	}
+	absPath, writeErr := writeExportFile(filepath.Join(outputDir, filename), dataWithNewline)
+	if writeErr != nil {
+		return exitWithCode(writeErr, 2)
+	}
+	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", absPath)
 	return nil
 }

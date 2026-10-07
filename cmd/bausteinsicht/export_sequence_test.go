@@ -102,6 +102,36 @@ func TestExportSequenceCmd_JSONOutput(t *testing.T) {
 	}
 }
 
+// TestExportSequenceCmd_JSONOutput_SourceMode verifies that without --output the
+// "source" field is present and non-empty (backward-compat for source mode).
+func TestExportSequenceCmd_JSONOutput_SourceMode(t *testing.T) {
+	modelPath := writeSequenceModel(t)
+	var outBuf, errBuf bytes.Buffer
+	root := NewRootCmd()
+	root.SetOut(&outBuf)
+	root.SetErr(&errBuf)
+	root.SetArgs([]string{"export-sequence", "--model", modelPath, "--format", "json"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v\nstderr: %s", err, errBuf.String())
+	}
+	var entries []map[string]interface{}
+	if err := json.Unmarshal(outBuf.Bytes(), &entries); err != nil {
+		t.Fatalf("invalid JSON: %v\noutput:\n%s", err, outBuf.String())
+	}
+	if len(entries) == 0 {
+		t.Fatal("expected at least one entry")
+	}
+	for i, e := range entries {
+		src, ok := e["source"].(string)
+		if !ok || src == "" {
+			t.Errorf("entry[%d]: expected non-empty 'source' field without --output, got: %v", i, e)
+		}
+		if _, hasPath := e["path"]; hasPath {
+			t.Errorf("entry[%d]: expected no 'path' field when --output is not set", i)
+		}
+	}
+}
+
 func TestExportSequenceCmd_ViewFilter(t *testing.T) {
 	modelPath := writeSequenceModel(t)
 	var buf bytes.Buffer
@@ -152,6 +182,44 @@ func TestExportSequenceCmd_FileOutput(t *testing.T) {
 	}
 	if !strings.Contains(string(content), "@startuml") {
 		t.Errorf("expected PlantUML content in file:\n%s", string(content))
+	}
+}
+
+// TestExportSequenceCmd_JSONWithOutput (#631): --output + --format json must
+// write files to disk and report "path" (not "source") in the JSON array.
+func TestExportSequenceCmd_JSONWithOutput(t *testing.T) {
+	modelPath := writeSequenceModel(t)
+	outDir := t.TempDir()
+	var outBuf, errBuf bytes.Buffer
+	root := NewRootCmd()
+	root.SetOut(&outBuf)
+	root.SetErr(&errBuf)
+	root.SetArgs([]string{"export-sequence", "--model", modelPath, "--output", outDir, "--format", "json"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v\nstderr: %s", err, errBuf.String())
+	}
+	var entries []map[string]interface{}
+	if err := json.Unmarshal(outBuf.Bytes(), &entries); err != nil {
+		t.Fatalf("invalid JSON: %v\nstdout:\n%s\nstderr:\n%s", err, outBuf.String(), errBuf.String())
+	}
+	if len(entries) == 0 {
+		t.Fatal("expected at least one entry in JSON output")
+	}
+	for i, e := range entries {
+		p, ok := e["path"].(string)
+		if !ok || p == "" {
+			t.Errorf("entry[%d]: expected non-empty 'path' field, got: %v", i, e)
+			continue
+		}
+		if !filepath.IsAbs(p) {
+			t.Errorf("entry[%d]: expected absolute path, got relative: %q", i, p)
+		}
+		if _, err := os.ReadFile(p); err != nil {
+			t.Errorf("entry[%d]: expected file to exist at %q: %v", i, p, err)
+		}
+		if _, hasSource := e["source"]; hasSource {
+			t.Errorf("entry[%d]: expected no 'source' field when --output is set", i)
+		}
 	}
 }
 
