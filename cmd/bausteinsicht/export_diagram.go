@@ -217,14 +217,11 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 			continue
 		}
 
-		if err := os.MkdirAll(outputDir, 0750); err != nil {
-			return exitWithCode(fmt.Errorf("creating output directory: %w", err), 2)
+		absPath, writeErr := writeExportFile(filepath.Join(outputDir, export.SafeViewKey(key)+"."+ext), []byte(result))
+		if writeErr != nil {
+			return exitWithCode(writeErr, 2)
 		}
-		outPath := filepath.Join(outputDir, export.SafeViewKey(key)+"."+ext)
-		if err := os.WriteFile(outPath, []byte(result), 0600); err != nil { //nolint:gosec // output files are non-sensitive documentation
-			return exitWithCode(fmt.Errorf("writing output: %w", err), 2)
-		}
-		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", outPath)
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", absPath)
 	}
 
 	return nil
@@ -249,12 +246,11 @@ func handleNewFormats(cmd *cobra.Command, m *model.BausteinsichtModel, views map
 	}
 
 	// fileNameFor returns the canonical output filename for a view key.
-	// Defined once so the JSON and non-JSON paths share the same convention.
+	// All formats use SafeViewKey(key)+"."+ext for consistency with the
+	// plantuml/mermaid path — the "architecture-" prefix from OutputFileName
+	// would make JSON path fields inconsistent across formats.
 	fileNameFor := func(key string) string {
-		if diagramFormat == "html" {
-			return export.SafeViewKey(key) + ".html"
-		}
-		return export.OutputFileName(key, ext)
+		return export.SafeViewKey(key) + "." + ext
 	}
 
 	// When --format json, output structured JSON. (#631)

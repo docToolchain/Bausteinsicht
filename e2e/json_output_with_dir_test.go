@@ -71,6 +71,54 @@ func TestExportDiagramJSONWithOutputDir(t *testing.T) {
 	}
 }
 
+func TestExportTableJSONWithOutputDir(t *testing.T) {
+	bin := buildBinary(t)
+	dir := t.TempDir()
+	runCLI(t, bin, dir, "init")
+
+	outDir := filepath.Join(dir, "out-table")
+
+	stdout, _, code := runCLISplit(t, bin, dir,
+		"export-table", "--format", "json", "--output", outDir,
+	)
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, stdout)
+	}
+
+	var entries []map[string]interface{}
+	if err := json.Unmarshal([]byte(strings.TrimSpace(stdout)), &entries); err != nil {
+		t.Fatalf("invalid JSON envelope: %v\noutput:\n%s", err, stdout)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry in JSON envelope, got %d", len(entries))
+	}
+	p, ok := entries[0]["path"].(string)
+	if !ok || p == "" {
+		t.Errorf("expected non-empty 'path' field, got: %v", entries[0])
+	}
+	if !filepath.IsAbs(p) {
+		t.Errorf("expected absolute path, got relative: %q", p)
+	}
+	if _, err := os.ReadFile(p); err != nil {
+		t.Errorf("path %q in JSON but file missing: %v", p, err)
+	}
+	if _, hasSource := entries[0]["source"]; hasSource {
+		t.Error("expected no 'source' field when --output is set")
+	}
+
+	// Without --output: rows JSON emitted directly to stdout (not an envelope).
+	stdoutSrc, _, code2 := runCLISplit(t, bin, dir,
+		"export-table", "--format", "json",
+	)
+	if code2 != 0 {
+		t.Fatalf("source mode exit %d: %s", code2, stdoutSrc)
+	}
+	var rows []interface{}
+	if err := json.Unmarshal([]byte(strings.TrimSpace(stdoutSrc)), &rows); err != nil {
+		t.Fatalf("invalid JSON rows (source mode): %v\noutput:\n%s", err, stdoutSrc)
+	}
+}
+
 func TestExportDiagramJSONWithOutputDir_HTML(t *testing.T) {
 	bin := buildBinary(t)
 	dir := t.TempDir()

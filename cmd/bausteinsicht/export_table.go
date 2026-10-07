@@ -106,8 +106,9 @@ func runExportTable(cmd *cobra.Command, _ []string) error {
 }
 
 // exportTableJSON outputs the table data as JSON. (#239, #631)
-// With outputDir: writes elements.json to disk and prints absolute path to stderr.
-// Without outputDir: writes JSON to stdout.
+// Without outputDir: writes rows JSON to stdout directly.
+// With outputDir: writes rows JSON to elements.json and emits a JSON envelope
+// ([]exportJSONEntry with path) to stdout — consistent with export-diagram/sequence.
 func exportTableJSON(cmd *cobra.Command, m *model.BausteinsichtModel, viewKey string, combined bool, outputDir string) error {
 	rows, err := table.CollectRows(m, viewKey, combined)
 	if err != nil {
@@ -123,10 +124,19 @@ func exportTableJSON(cmd *cobra.Command, m *model.BausteinsichtModel, viewKey st
 		}
 		return nil
 	}
+	viewLabel := viewKey
+	if combined {
+		viewLabel = "combined"
+	} else if viewKey == "" {
+		viewLabel = "all"
+	}
 	absPath, writeErr := writeExportFile(filepath.Join(outputDir, "elements.json"), data)
 	if writeErr != nil {
 		return exitWithCode(writeErr, 2)
 	}
-	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Exported: %s\n", absPath)
+	entry := exportJSONEntry{View: viewLabel, Format: "json", Path: absPath}
+	if err := emitExportJSON(cmd, []exportJSONEntry{entry}); err != nil {
+		return exitWithCode(err, 2)
+	}
 	return nil
 }
