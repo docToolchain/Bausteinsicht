@@ -102,7 +102,7 @@ fork again
   :Analysis (read-only):\nbausteinsicht stale\nbausteinsicht health\nbausteinsicht graph\nbausteinsicht find;
   note right: Periodic architecture-quality\nchecks, independent of sync
 fork again
-  :Evolution:\nbausteinsicht snapshot save, snapshot list,\nsnapshot diff, snapshot restore, snapshot delete\nbausteinsicht diff --to-be\nbausteinsicht changelog;
+  :Evolution:\nbausteinsicht snapshot save, snapshot list,\nsnapshot diff, snapshot restore, snapshot delete\nbausteinsicht import-graph <codegraph-file>\nbausteinsicht diff --to-be\nbausteinsicht changelog;
   note right: Versioning and\nas-is/to-be comparison,\nnot part of the edit-sync cycle
 fork again
   :Export (output side):\nbausteinsicht export\nbausteinsicht export-diagram\nbausteinsicht export-table;

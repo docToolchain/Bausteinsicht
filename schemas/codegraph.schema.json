@@ -1,0 +1,80 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Bausteinsicht CodeGraph",
+  "description": "Reverse code-governance-bridge contract (#562, ADR-013): a language-neutral package-dependency graph emitted by a code-side extractor",
+  "type": "object",
+  "properties": {
+    "edges": {
+      "items": {
+        "$ref": "#/definitions/Edge"
+      },
+      "type": "array"
+    },
+    "kind": {
+      "type": "string"
+    },
+    "language": {
+      "type": "string"
+    },
+    "nodes": {
+      "items": {
+        "$ref": "#/definitions/Node"
+      },
+      "type": "array"
+    },
+    "schemaVersion": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "kind",
+    "language",
+    "nodes",
+    "edges"
+  ],
+  "additionalProperties": false,
+  "definitions": {
+    "Edge": {
+      "additionalProperties": false,
+      "properties": {
+        "examples": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "from": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        },
+        "weight": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "from",
+        "to"
+      ],
+      "type": "object"
+    },
+    "Node": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind"
+      ],
+      "type": "object"
+    }
+  }
+}

@@ -325,6 +325,12 @@
           "description": "Architecture changelog generation between two git refs",
           "technology": "Go"
         },
+        "codegraph": {
+          "kind": "container",
+          "title": "CodeGraph",
+          "description": "Reverse code-governance-bridge contract: projects a language-neutral package-dependency graph onto model elements via codeMapping to produce an asIs snapshot",
+          "technology": "Go"
+        },
         "diff": {
           "kind": "container",
           "title": "Diff",
