@@ -1,0 +1,265 @@
+<mxfile host="Electron" compressed="false" pages="3">
+  <diagram id="view-ports-and-adapters" name="Ports &amp; Adapters (rings)">
+    <mxGraphModel dx="905" dy="655" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" background="#ffffff" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <object label="&lt;b&gt;Ordering&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#BBBBBB&quot; style=&quot;font-size:11px&quot;&gt;Bounded context responsible for the order lifecycle&lt;/font&gt;" bausteinsicht_id="ordering" bausteinsicht_kind="boundedContext_boundary" tooltip="Bounded context responsible for the order lifecycle" link="data:page/id,view-ports-and-adapters" id="ports-and-adapters--ordering">
+          <mxCell parent="1" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#333333;fontColor=#333333;fontStyle=1;verticalAlign=top;container=1;collapsible=0;fontSize=14;" vertex="1">
+            <mxGeometry height="1538" width="3173.2" x="40" y="180" as="geometry"/>
+          </mxCell>
+        </object>
+        <object label="&lt;b&gt;Adapters&lt;/b&gt;" bausteinsicht_id="ordering.adapters" bausteinsicht_kind="adapterZone" id="ports-and-adapters--ordering.adapters">
+          <mxCell parent="ports-and-adapters--ordering" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=#3b5b8c;fontStyle=1;verticalAlign=top;container=1;collapsible=0;fontSize=13;" vertex="1">
+            <mxGeometry height="1440" width="2257.2" x="458" y="72" as="geometry"/>
+          </mxCell>
+        </object>
+        <object label="&lt;b&gt;Postgres Order Adapter&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#CCCCCC&quot;&gt;&lt;i&gt;[Go / pgx]&lt;/i&gt;&lt;/font&gt;" bausteinsicht_id="ordering.adapters.ordersAdapter" bausteinsicht_kind="drivenAdapter" technology="Go / pgx" id="ports-and-adapters--ordering.adapters.ordersAdapter">
+          <mxCell parent="ports-and-adapters--ordering.adapters" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;fillColor=#ffffff;strokeColor=#6c8ebf;" vertex="1">
+            <mxGeometry height="60" width="180" x="928.5999999999999" y="1354" as="geometry"/>
+          </mxCell>
+        </object>
+        <object label="&lt;b&gt;Stripe Payment Adapter&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#CCCCCC&quot;&gt;&lt;i&gt;[Go / stripe-go]&lt;/i&gt;&lt;/font&gt;" bausteinsicht_id="ordering.adapters.paymentAdapter" bausteinsicht_kind="drivenAdapter" technology="Go / stripe-go" id="ports-and-adapters--ordering.adapters.paymentAdapter">
+          <mxCell parent="ports-and-adapters--ordering.adapters" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;fillColor=#ffffff;strokeColor=#6c8ebf;" vertex="1">
+            <mxGeometry height="60" width="180" x="1148.6" y="1354" as="geometry"/>
+          </mxCell>
+        </object>
+        <object label="&lt;b&gt;Ports&lt;/b&gt;" bausteinsicht_id="ordering.adapters.ports" bausteinsicht_kind="portZone" id="ports-and-adapters--ordering.adapters.ports">
+          <mxCell parent="ports-and-adapters--ordering.adapters" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#b06a00;fontStyle=1;verticalAlign=top;container=1;collapsible=0;fontSize=13;" vertex="1">
+            <mxGeometry height="1062" width="1448" x="404.59999999999997" y="212" as="geometry"/>
+          </mxCell>
+        </object>
+        <object label="&lt;b&gt;Domain Core&lt;/b&gt;" bausteinsicht_id="ordering.adapters.ports.domain" bausteinsicht_kind="domainZone" link="data:page/id,view-domain-model" id="ports-and-adapters--ordering.adapters.ports.domain">
+          <mxCell parent="ports-and-adapters--ordering.adapters.ports" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#4a7a3a;fontStyle=1;verticalAlign=top;container=1;collapsible=0;fontSize=13;" vertex="1">
+            <mxGeometry height="664" width="865.5999999999999" x="291.2" y="222" as="geometry"/>
+          </mxCell>
+        </object>
+        <object label="&lt;b&gt;Order Application Service&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#CCCCCC&quot;&gt;&lt;i&gt;[Go]&lt;/i&gt;&lt;/font&gt;" bausteinsicht_id="ordering.adapters.ports.domain.appService" bausteinsicht_kind="applicationService" technology="Go" id="ports-and-adapters--ordering.adapters.ports.domain.appService">
+          <mxCell parent="ports-and-adapters--ordering.adapters.ports.domain" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;fontStyle=1;strokeColor=#666666;fillColor=#ffffff;" vertex="1">
+            <mxGeometry height="60" width="180" x="342.79999999999995" y="72" as="geometry"/>
+          </mxCell>
+        </object>
+        <object label="&lt;b&gt;Order&lt;/b&gt;" bausteinsicht_id="ordering.adapters.ports.domain.order" bausteinsicht_kind="aggregate" id="ports-and-adapters--ordering.adapters.ports.domain.order">
+          <mxCell parent="ports-and-adapters--ordering.adapters.ports.domain" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontStyle=1;verticalAlign=top;fontSize=12;fillColor=#ffffff;strokeColor=#82b366;" vertex="1">
+            <mxGeometry height="296" width="522" x="171.79999999999998" y="212" as="geometry"/>
+          </mxCell>
+        </object>
+        <object label="&lt;b&gt;Order Line&lt;/b&gt;" bausteinsicht_id="ordering.adapters.ports.domain.order.line" bausteinsicht_kind="entity" id="ports-and-adapters--ordering.adapters.ports.domain.order.line">
+          <mxCell parent="ports-and-adapters--ordering.adapters.ports.domain.order" style="rounded=0;whiteSpace=wrap;html=1;fontSize=11;fillColor=#ffffff;strokeColor=#82b366;" vertex="1">
+            <mxGeometry height="40" width="150" x="44.400000000000006" y="102" as="geometry"/>
+          </mxCell>
+        </object>
+        <object label="&lt;b&gt;Money&lt;/b&gt;" bausteinsicht_id="ordering.adapters.ports.domain.order.total" bausteinsicht_kind="valueObject" id="ports-and-adapters--ordering.adapters.ports.domain.order.total">
+          <mxCell parent="ports-and-adapters--ordering.adapters.ports.domain.order" style="rounded=0;dashed=1;whiteSpace=wrap;html=1;fontSize=11;fontStyle=2;strokeColor=#82b366;fillColor=#ffffff;" vertex="1">
+            <mxGeometry height="40" width="150" x="334.4" y="102" as="geometry"/>
+          </mxCell>
+        </object>
+        <object label="&lt;b&gt;Pricing Service&lt;/b&gt;" bausteinsicht_id="ordering.adapters.ports.domain.pricing" bausteinsicht_kind="domainService" id="ports-and-adapters--ordering.adapters.ports.domain.pricing">
+          <mxCell parent="ports-and-adapters--ordering.adapters.ports.domain" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;fontStyle=2;fillColor=#ffffff;strokeColor=#82b366;" vertex="1">
+            <mxGeometry height="50" width="170" x="347.79999999999995" y="588" as="geometry"/>
+          </mxCell>
+        </object>
+        <object label="&lt;b&gt;OrderRepository Port&lt;/b&gt;" bausteinsicht_id="ordering.adapters.ports.orderRepo" bausteinsicht_kind="outboundPort" id="ports-and-adapters--ordering.adapters.ports.orderRepo">
+          <mxCell parent="ports-and-adapters--ordering.adapters.ports" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fontSize=12;fillColor=#ffffff;strokeColor=#d79b00;" vertex="1">
+            <mxGeometry height="70" width="160" x="544" y="966" as="geometry"/>
+          </mxCell>
+        </object>
+        <object label="&lt;b&gt;Payment Port&lt;/b&gt;" bausteinsicht_id="ordering.adapters.ports.payment" bausteinsicht_kind="outboundPort" id="ports-and-adapters--ordering.adapters.ports.payment">
+          <mxCell parent="ports-and-adapters--ordering.adapters.ports" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fontSize=12;fillColor=#ffffff;strokeColor=#d79b00;" vertex="1">
+            <mxGeometry height="70" width="160" x="744" y="966" as="geometry"/>
+          </mxCell>
+        </object>
+        <object label="&lt;b&gt;PlaceOrder Use Case&lt;/b&gt;" bausteinsicht_id="ordering.adapters.ports.placeOrder" bausteinsicht_kind="inboundPort" id="ports-and-adapters--ordering.adapters.ports.placeOrder">
+          <mxCell parent="ports-and-adapters--ordering.adapters.ports" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fontSize=12;fillColor=#ffffff;strokeColor=#d79b00;" vertex="1">
+            <mxGeometry height="70" width="160" x="644" y="72" as="geometry"/>
+          </mxCell>
+        </object>
+        <object label="&lt;b&gt;Order REST Controller&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#CCCCCC&quot;&gt;&lt;i&gt;[Go / net/http]&lt;/i&gt;&lt;/font&gt;" bausteinsicht_id="ordering.adapters.rest" bausteinsicht_kind="drivingAdapter" technology="Go / net/http" id="ports-and-adapters--ordering.adapters.rest">
+          <mxCell parent="ports-and-adapters--ordering.adapters" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;strokeColor=#6c8ebf;fillColor=#ffffff;" vertex="1">
+            <mxGeometry height="60" width="170" x="1043.6" y="72" as="geometry"/>
+          </mxCell>
+        </object>
+        <object label="&lt;b&gt;Customer&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#BBBBBB&quot; style=&quot;font-size:11px&quot;&gt;Places orders through the web frontend&lt;/font&gt;" bausteinsicht_id="customer" bausteinsicht_kind="actor" tooltip="Places orders through the web frontend" id="ports-and-adapters--customer">
+          <mxCell parent="1" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#ffffff;strokeColor=#333333;fontSize=12;" vertex="1">
+            <mxGeometry height="80" width="40" x="1606.6" y="40" as="geometry"/>
+          </mxCell>
+        </object>
+        <object label="&lt;b&gt;Orders Database&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#CCCCCC&quot;&gt;&lt;i&gt;[PostgreSQL]&lt;/i&gt;&lt;/font&gt;" bausteinsicht_id="ordersDb" bausteinsicht_kind="datastore" technology="PostgreSQL" id="ports-and-adapters--ordersDb">
+          <mxCell parent="1" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12;" vertex="1">
+            <mxGeometry height="90" width="100" x="1461.6" y="1778" as="geometry"/>
+          </mxCell>
+        </object>
+        <object label="&lt;b&gt;Stripe&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#CCCCCC&quot;&gt;&lt;i&gt;[Stripe API]&lt;/i&gt;&lt;/font&gt;&lt;br&gt;&lt;font color=&quot;#BBBBBB&quot; style=&quot;font-size:11px&quot;&gt;Third-party payment provider&lt;/font&gt;" bausteinsicht_id="stripe" bausteinsicht_kind="externalSystem" technology="Stripe API" tooltip="Third-party payment provider" id="ports-and-adapters--stripe">
+          <mxCell parent="1" style="rounded=1;dashed=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontSize=12;" vertex="1">
+            <mxGeometry height="70" width="170" x="1621.6" y="1788" as="geometry"/>
+          </mxCell>
+        </object>
+        <mxCell id="rel-ports-and-adapters--ordering.adapters.ports.domain.appService-ports-and-adapters--ordering.adapters.ports.domain.order-3" edge="1" parent="1" source="ports-and-adapters--ordering.adapters.ports.domain.appService" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#333333;fontSize=11;" target="ports-and-adapters--ordering.adapters.ports.domain.order" value="orchestrates">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="rel-ports-and-adapters--ordering.adapters.ports.domain.appService-ports-and-adapters--ordering.adapters.ports.orderRepo-5" edge="1" parent="1" source="ports-and-adapters--ordering.adapters.ports.domain.appService" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#333333;fontSize=11;" target="ports-and-adapters--ordering.adapters.ports.orderRepo" value="persists via">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1610" y="1124"/>
+              <mxPoint x="1526.58" y="1124"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel-ports-and-adapters--ordering.adapters.ordersAdapter-ports-and-adapters--ordering.adapters.ports.orderRepo-7" edge="1" parent="1" source="ports-and-adapters--ordering.adapters.ordersAdapter" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#333333;fontSize=11;dashed=1;" target="ports-and-adapters--ordering.adapters.ports.orderRepo" value="implements">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="rel-ports-and-adapters--ordering.adapters.ordersAdapter-ports-and-adapters--ordersDb-9" edge="1" parent="1" source="ports-and-adapters--ordering.adapters.ordersAdapter" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#333333;fontSize=11;" target="ports-and-adapters--ordersDb" value="reads/writes">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="rel-ports-and-adapters--ordering.adapters.paymentAdapter-ports-and-adapters--stripe-10" edge="1" parent="1" source="ports-and-adapters--ordering.adapters.paymentAdapter" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#333333;fontSize=11;" target="ports-and-adapters--stripe" value="charges card">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="rel-ports-and-adapters--customer-ports-and-adapters--ordering.adapters.rest-0" edge="1" parent="1" source="ports-and-adapters--customer" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#333333;fontSize=11;" target="ports-and-adapters--ordering.adapters.rest" value="places order">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="rel-ports-and-adapters--ordering.adapters.rest-ports-and-adapters--ordering.adapters.ports.placeOrder-1" edge="1" parent="1" source="ports-and-adapters--ordering.adapters.rest" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#333333;fontSize=11;" target="ports-and-adapters--ordering.adapters.ports.placeOrder" value="calls">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="rel-ports-and-adapters--ordering.adapters.ports.domain.appService-ports-and-adapters--ordering.adapters.ports.placeOrder-2" edge="1" parent="1" source="ports-and-adapters--ordering.adapters.ports.domain.appService" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#333333;fontSize=11;dashed=1;" target="ports-and-adapters--ordering.adapters.ports.placeOrder" value="implements">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="rel-ports-and-adapters--ordering.adapters.ports.domain.appService-ports-and-adapters--ordering.adapters.ports.domain.pricing-4" edge="1" parent="1" source="ports-and-adapters--ordering.adapters.ports.domain.appService" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#333333;fontSize=11;" target="ports-and-adapters--ordering.adapters.ports.domain.pricing" value="prices via">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="rel-ports-and-adapters--ordering.adapters.ports.domain.appService-ports-and-adapters--ordering.adapters.ports.payment-6" edge="1" parent="1" source="ports-and-adapters--ordering.adapters.ports.domain.appService" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#333333;fontSize=11;" target="ports-and-adapters--ordering.adapters.ports.payment" value="pays via">
+          <mxGeometry relative="1" x="0.0004" as="geometry">
+            <mxPoint as="offset"/>
+            <Array as="points">
+              <mxPoint x="1640" y="1124"/>
+              <mxPoint x="1726.62" y="1124"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rel-ports-and-adapters--ordering.adapters.paymentAdapter-ports-and-adapters--ordering.adapters.ports.payment-8" edge="1" parent="1" source="ports-and-adapters--ordering.adapters.paymentAdapter" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#333333;fontSize=11;dashed=1;" target="ports-and-adapters--ordering.adapters.ports.payment" value="implements">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <object label="&amp;larr; System Context" link="data:page/id,view-context" id="nav-back-ports-and-adapters">
+          <mxCell parent="1" style="rounded=1;fillColor=#f8cecc;strokeColor=#b85450;html=1;fontSize=10;" vertex="1">
+            <mxGeometry height="30" width="140" x="20" y="20" as="geometry"/>
+          </mxCell>
+        </object>
+        <object label="&lt;b&gt;Ports &amp;amp; Adapters (rings)&lt;/b&gt;&lt;br&gt;Concentric hexagon rings: adapters → ports → domain core; driving/inbound on top, driven/outbound below; externals around the hexagon&lt;br&gt;&lt;br&gt;&lt;font point-size=&quot;9&quot;&gt;Source: examples/hexagonal-ddd/architecture.jsonc&lt;br&gt;Last synced: 2026-07-26 21:20&lt;br&gt;Generated by Bausteinsicht&lt;/font&gt;" id="metadata-ports-and-adapters">
+          <mxCell parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=none;fontColor=#333333;fontSize=10;align=left;verticalAlign=top;" vertex="1">
+            <mxGeometry height="120" width="1928" x="40" y="1948" as="geometry"/>
+          </mxCell>
+        </object>
+        <object label="&lt;b&gt;Legend&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#ffffff&quot;&gt;■&lt;/font&gt; Actor&lt;br&gt;&lt;font color=&quot;#dae8fc&quot;&gt;■&lt;/font&gt; Adapters&lt;br&gt;&lt;font color=&quot;#d5e8d4&quot;&gt;■&lt;/font&gt; Aggregate&lt;br&gt;&lt;font color=&quot;#f5f5f5&quot;&gt;■&lt;/font&gt; Application Service&lt;br&gt;&lt;font color=&quot;#ffffff&quot;&gt;■&lt;/font&gt; Bounded Context&lt;br&gt;&lt;font color=&quot;#f5f5f5&quot;&gt;■&lt;/font&gt; Data Store&lt;br&gt;&lt;font color=&quot;#d5e8d4&quot;&gt;■&lt;/font&gt; Domain Service&lt;br&gt;&lt;font color=&quot;#d5e8d4&quot;&gt;■&lt;/font&gt; Domain Core&lt;br&gt;&lt;font color=&quot;#dae8fc&quot;&gt;■&lt;/font&gt; Driven Adapter&lt;br&gt;&lt;font color=&quot;#dae8fc&quot;&gt;■&lt;/font&gt; Driving Adapter&lt;br&gt;&lt;font color=&quot;#d5e8d4&quot;&gt;■&lt;/font&gt; Entity&lt;br&gt;&lt;font color=&quot;#f5f5f5&quot;&gt;■&lt;/font&gt; External System&lt;br&gt;&lt;font color=&quot;#ffe6cc&quot;&gt;■&lt;/font&gt; Inbound Port&lt;br&gt;&lt;font color=&quot;#ffe6cc&quot;&gt;■&lt;/font&gt; Outbound Port&lt;br&gt;&lt;font color=&quot;#ffe6cc&quot;&gt;■&lt;/font&gt; Ports&lt;br&gt;&lt;font color=&quot;#d5e8d4&quot;&gt;■&lt;/font&gt; Value Object" id="legend-ports-and-adapters">
+          <mxCell parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=none;fontColor=#333333;fontSize=10;align=left;verticalAlign=top;" vertex="1">
+            <mxGeometry height="120" width="964" x="2289" y="1948" as="geometry"/>
+          </mxCell>
+        </object>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="view-domain-model" name="Domain Model">
+    <mxGraphModel grid="1" page="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" pageScale="1" pageWidth="1169" pageHeight="827" background="#ffffff" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <object label="&lt;b&gt;Domain Core&lt;/b&gt;" bausteinsicht_id="ordering.adapters.ports.domain" bausteinsicht_kind="domainZone_boundary" link="data:page/id,view-domain-model" id="domain-model--ordering.adapters.ports.domain">
+          <mxCell parent="1" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#4a7a3a;fontStyle=1;verticalAlign=top;container=1;collapsible=0;fontSize=13;" vertex="1">
+            <mxGeometry height="664" width="865.5999999999999" x="40" y="40" as="geometry"/>
+          </mxCell>
+        </object>
+        <object label="&lt;b&gt;Order Application Service&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#CCCCCC&quot;&gt;&lt;i&gt;[Go]&lt;/i&gt;&lt;/font&gt;" bausteinsicht_id="ordering.adapters.ports.domain.appService" bausteinsicht_kind="applicationService" technology="Go" id="domain-model--ordering.adapters.ports.domain.appService">
+          <mxCell parent="domain-model--ordering.adapters.ports.domain" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;fontStyle=1;strokeColor=#666666;fillColor=#ffffff;" vertex="1">
+            <mxGeometry height="60" width="180" x="342.79999999999995" y="72" as="geometry"/>
+          </mxCell>
+        </object>
+        <object label="&lt;b&gt;Order&lt;/b&gt;" bausteinsicht_id="ordering.adapters.ports.domain.order" bausteinsicht_kind="aggregate" id="domain-model--ordering.adapters.ports.domain.order">
+          <mxCell parent="domain-model--ordering.adapters.ports.domain" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fontStyle=1;verticalAlign=top;fontSize=12;fillColor=#ffffff;strokeColor=#82b366;" vertex="1">
+            <mxGeometry height="296" width="522" x="171.79999999999998" y="212" as="geometry"/>
+          </mxCell>
+        </object>
+        <object label="&lt;b&gt;Order Line&lt;/b&gt;" bausteinsicht_id="ordering.adapters.ports.domain.order.line" bausteinsicht_kind="entity" id="domain-model--ordering.adapters.ports.domain.order.line">
+          <mxCell parent="domain-model--ordering.adapters.ports.domain.order" style="rounded=0;whiteSpace=wrap;html=1;fontSize=11;fillColor=#ffffff;strokeColor=#82b366;" vertex="1">
+            <mxGeometry height="40" width="150" x="186" y="111" as="geometry"/>
+          </mxCell>
+        </object>
+        <object label="&lt;b&gt;Money&lt;/b&gt;" bausteinsicht_id="ordering.adapters.ports.domain.order.total" bausteinsicht_kind="valueObject" id="domain-model--ordering.adapters.ports.domain.order.total">
+          <mxCell parent="domain-model--ordering.adapters.ports.domain.order" style="rounded=0;dashed=1;whiteSpace=wrap;html=1;fontSize=11;fontStyle=2;fillColor=#ffffff;strokeColor=#82b366;" vertex="1">
+            <mxGeometry height="40" width="150" x="186" y="191" as="geometry"/>
+          </mxCell>
+        </object>
+        <object label="&lt;b&gt;Pricing Service&lt;/b&gt;" bausteinsicht_id="ordering.adapters.ports.domain.pricing" bausteinsicht_kind="domainService" id="domain-model--ordering.adapters.ports.domain.pricing">
+          <mxCell parent="domain-model--ordering.adapters.ports.domain" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;fontStyle=2;fillColor=#ffffff;strokeColor=#82b366;" vertex="1">
+            <mxGeometry height="50" width="170" x="347.79999999999995" y="588" as="geometry"/>
+          </mxCell>
+        </object>
+        <mxCell id="rel-domain-model--ordering.adapters.ports.domain.appService-domain-model--ordering.adapters.ports.domain.order-3" edge="1" parent="1" source="domain-model--ordering.adapters.ports.domain.appService" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#333333;fontSize=11;" target="domain-model--ordering.adapters.ports.domain.order" value="orchestrates">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="rel-domain-model--ordering.adapters.ports.domain.appService-domain-model--ordering.adapters.ports.domain.pricing-4" edge="1" parent="1" source="domain-model--ordering.adapters.ports.domain.appService" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#333333;fontSize=11;" target="domain-model--ordering.adapters.ports.domain.pricing" value="prices via">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <object label="&amp;larr; Ports &amp; Adapters (rings)" link="data:page/id,view-ports-and-adapters" id="nav-back-domain-model">
+          <mxCell parent="1" style="rounded=1;fillColor=#f8cecc;strokeColor=#b85450;html=1;fontSize=10;" vertex="1">
+            <mxGeometry height="30" width="140" x="20" y="20" as="geometry"/>
+          </mxCell>
+        </object>
+        <object label="&lt;b&gt;Domain Model&lt;/b&gt;&lt;br&gt;The domain core: application service, the Order aggregate (→ Order Line + Money), and domain services&lt;br&gt;&lt;br&gt;&lt;font point-size=&quot;9&quot;&gt;Source: examples/hexagonal-ddd/architecture.jsonc&lt;br&gt;Last synced: 2026-07-26 21:20&lt;br&gt;Generated by Bausteinsicht&lt;/font&gt;" id="metadata-domain-model">
+          <mxCell parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=none;fontColor=#333333;fontSize=10;align=left;verticalAlign=top;" vertex="1">
+            <mxGeometry height="120" width="543" x="40" y="784" as="geometry"/>
+          </mxCell>
+        </object>
+        <object label="&lt;b&gt;Legend&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#d5e8d4&quot;&gt;■&lt;/font&gt; Aggregate&lt;br&gt;&lt;font color=&quot;#f5f5f5&quot;&gt;■&lt;/font&gt; Application Service&lt;br&gt;&lt;font color=&quot;#d5e8d4&quot;&gt;■&lt;/font&gt; Domain Service&lt;br&gt;&lt;font color=&quot;#d5e8d4&quot;&gt;■&lt;/font&gt; Domain Core&lt;br&gt;&lt;font color=&quot;#d5e8d4&quot;&gt;■&lt;/font&gt; Entity&lt;br&gt;&lt;font color=&quot;#d5e8d4&quot;&gt;■&lt;/font&gt; Value Object" id="legend-domain-model">
+          <mxCell parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=none;fontColor=#333333;fontSize=10;align=left;verticalAlign=top;" vertex="1">
+            <mxGeometry height="120" width="272" x="674" y="784" as="geometry"/>
+          </mxCell>
+        </object>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="view-context" name="System Context">
+    <mxGraphModel grid="1" page="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" pageScale="1" pageWidth="1169" pageHeight="827" background="#ffffff" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <object label="&lt;b&gt;Customer&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#BBBBBB&quot; style=&quot;font-size:11px&quot;&gt;Places orders through the web frontend&lt;/font&gt;" bausteinsicht_id="customer" bausteinsicht_kind="actor" tooltip="Places orders through the web frontend" id="context--customer">
+          <mxCell parent="1" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#ffffff;strokeColor=#333333;fontSize=12;" vertex="1">
+            <mxGeometry height="80" width="40" x="140" y="40" as="geometry"/>
+          </mxCell>
+        </object>
+        <object label="&lt;b&gt;Ordering&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#BBBBBB&quot; style=&quot;font-size:11px&quot;&gt;Bounded context responsible for the order lifecycle&lt;/font&gt;" bausteinsicht_id="ordering" bausteinsicht_kind="boundedContext" tooltip="Bounded context responsible for the order lifecycle" link="data:page/id,view-ports-and-adapters" id="context--ordering">
+          <mxCell parent="1" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#333333;fontStyle=1;verticalAlign=top;fontSize=13;" vertex="1">
+            <mxGeometry height="140" width="240" x="40" y="180" as="geometry"/>
+          </mxCell>
+        </object>
+        <object label="&lt;b&gt;Orders Database&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#CCCCCC&quot;&gt;&lt;i&gt;[PostgreSQL]&lt;/i&gt;&lt;/font&gt;" bausteinsicht_id="ordersDb" bausteinsicht_kind="datastore" technology="PostgreSQL" id="context--ordersDb">
+          <mxCell parent="1" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12;" vertex="1">
+            <mxGeometry height="90" width="100" x="110" y="380" as="geometry"/>
+          </mxCell>
+        </object>
+        <object label="&lt;b&gt;Stripe&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#CCCCCC&quot;&gt;&lt;i&gt;[Stripe API]&lt;/i&gt;&lt;/font&gt;&lt;br&gt;&lt;font color=&quot;#BBBBBB&quot; style=&quot;font-size:11px&quot;&gt;Third-party payment provider&lt;/font&gt;" bausteinsicht_id="stripe" bausteinsicht_kind="externalSystem" technology="Stripe API" tooltip="Third-party payment provider" id="context--stripe">
+          <mxCell parent="1" style="rounded=1;dashed=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontSize=12;" vertex="1">
+            <mxGeometry height="70" width="170" x="75" y="530" as="geometry"/>
+          </mxCell>
+        </object>
+        <mxCell id="rel-context--ordering-context--ordersDb-9" edge="1" parent="1" source="context--ordering" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#333333;fontSize=11;" target="context--ordersDb" value="reads/writes">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="rel-context--ordering-context--stripe-10" edge="1" parent="1" source="context--ordering" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#333333;fontSize=11;" target="context--stripe" value="charges card">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="rel-context--customer-context--ordering-0" edge="1" parent="1" source="context--customer" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#333333;fontSize=11;" target="context--ordering" value="places order">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <object label="&lt;b&gt;System Context&lt;/b&gt;&lt;br&gt;The Ordering context and the actors/systems around it&lt;br&gt;&lt;br&gt;&lt;font point-size=&quot;9&quot;&gt;Source: examples/hexagonal-ddd/architecture.jsonc&lt;br&gt;Last synced: 2026-07-26 21:20&lt;br&gt;Generated by Bausteinsicht&lt;/font&gt;" id="metadata-context">
+          <mxCell parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=none;fontColor=#333333;fontSize=10;align=left;verticalAlign=top;" vertex="1">
+            <mxGeometry height="120" width="360" x="40" y="680" as="geometry"/>
+          </mxCell>
+        </object>
+        <object label="&lt;b&gt;Legend&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#ffffff&quot;&gt;■&lt;/font&gt; Actor&lt;br&gt;&lt;font color=&quot;#ffffff&quot;&gt;■&lt;/font&gt; Bounded Context&lt;br&gt;&lt;font color=&quot;#f5f5f5&quot;&gt;■&lt;/font&gt; Data Store&lt;br&gt;&lt;font color=&quot;#f5f5f5&quot;&gt;■&lt;/font&gt; External System" id="legend-context">
+          <mxCell parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=none;fontColor=#333333;fontSize=10;align=left;verticalAlign=top;" vertex="1">
+            <mxGeometry height="120" width="180" x="460" y="680" as="geometry"/>
+          </mxCell>
+        </object>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

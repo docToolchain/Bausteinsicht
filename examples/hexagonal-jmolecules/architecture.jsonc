@@ -1,0 +1,107 @@
+{
+  "$schema": "https://raw.githubusercontent.com/docToolchain/Bausteinsicht/main/schema/bausteinsicht.schema.json",
+
+  // ---------------------------------------------------------------------------
+  // MINIMAL example — "Option A": didactic hexagonal terms as element KINDS,
+  // mapped 1:1 onto the technology-neutral xMolecules / jMolecules stereotype
+  // vocabulary via `metadata.jmolecules`.
+  //
+  //   * kind                 -> the term you READ and DRAW (Cockburn's
+  //                             driving / inbound / outbound / driven)
+  //   * metadata.jmolecules  -> the SAME building block in xMolecules speak
+  //                             (Primary/Secondary Port/Adapter, AggregateRoot),
+  //                             machine-readable → the anchor for ArchUnit.
+  //
+  // The mapping is deterministic from `kind` (see README table) — a generator
+  // would apply it automatically. It is spelled out inline here only for clarity;
+  // in a real model you'd set metadata.jmolecules only to OVERRIDE the default.
+  //
+  // The slice below is one straight path through the hexagon:
+  //   driving adapter -> inbound port -> application -> aggregate
+  //                                                  -> outbound port -> driven adapter -> external system
+  // ---------------------------------------------------------------------------
+  "specification": {
+    "elements": {
+      "drivingAdapter":     { "notation": "Driving Adapter",     "description": "Primary/left-side adapter calling INTO the application (REST, CLI, UI)" },
+      "inboundPort":        { "notation": "Inbound Port",        "description": "Use-case interface the application offers to driving adapters" },
+      "applicationService": { "notation": "Application Service", "description": "Orchestrates use cases; implements inbound ports, depends on outbound ports" },
+      "aggregate":          { "notation": "Aggregate",           "description": "DDD aggregate — consistency boundary" },
+      "outboundPort":       { "notation": "Outbound Port",       "description": "Interface the application requires from infrastructure" },
+      "drivenAdapter":      { "notation": "Driven Adapter",      "description": "Secondary/right-side adapter implementing an outbound port" },
+      "externalSystem":     { "notation": "External System",     "description": "A third-party system outside your control" }
+    },
+
+    "relationships": {
+      "drives":     { "notation": "drives" },
+      "implements": { "notation": "implements", "dashed": true },
+      "uses":       { "notation": "uses" }
+    }
+  },
+
+  "model": {
+    // --- driving side ---
+    "web": {
+      "kind": "drivingAdapter",
+      "title": "Web Controller",
+      "technology": "REST",
+      "metadata": { "jmolecules": "PrimaryAdapter" }
+    },
+    "placeOrder": {
+      "kind": "inboundPort",
+      "title": "PlaceOrder Use Case",
+      "metadata": { "jmolecules": "PrimaryPort" }
+    },
+
+    // --- application core ---
+    "orders": {
+      "kind": "applicationService",
+      "title": "Order Service",
+      "metadata": { "jmolecules": "Application" }
+    },
+
+    // --- domain core ---
+    "order": {
+      "kind": "aggregate",
+      "title": "Order",
+      "metadata": { "jmolecules": "AggregateRoot" }
+    },
+
+    // --- driven side ---
+    "paymentPort": {
+      "kind": "outboundPort",
+      "title": "Payment Port",
+      "metadata": { "jmolecules": "SecondaryPort" }
+    },
+    "stripeAdapter": {
+      "kind": "drivenAdapter",
+      "title": "Stripe Adapter",
+      "technology": "stripe-go",
+      "metadata": { "jmolecules": "SecondaryAdapter" }
+    },
+
+    // --- infrastructure outside the hexagon ---
+    "stripe": {
+      "kind": "externalSystem",
+      "title": "Stripe",
+      "technology": "Stripe API"
+    }
+  },
+
+  "relationships": [
+    { "from": "web",           "to": "placeOrder",  "label": "calls",        "kind": "drives" },
+    { "from": "orders",        "to": "placeOrder",  "label": "implements",   "kind": "implements" },
+    { "from": "orders",        "to": "order",       "label": "orchestrates", "kind": "uses" },
+    { "from": "orders",        "to": "paymentPort", "label": "pays via",     "kind": "uses" },
+    { "from": "stripeAdapter", "to": "paymentPort", "label": "implements",   "kind": "implements" },
+    { "from": "stripeAdapter", "to": "stripe",      "label": "charges card", "kind": "uses" }
+  ],
+
+  "views": {
+    "hexagon": {
+      "title": "Ports & Adapters (one slice)",
+      "include": ["web", "placeOrder", "orders", "order", "paymentPort", "stripeAdapter", "stripe"],
+      "layout": "layered",
+      "description": "A single path through the hexagon, each element tagged with its xMolecules stereotype"
+    }
+  }
+}

@@ -1,0 +1,121 @@
+:jbake-title: ADR-013: Nested (Concentric-Container) Layout Mode
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: ADR
+:jbake-order: 13
+
+= ADR-013: Nested (Concentric-Container) Layout Mode
+
+== Status
+
+Accepted.
+
+Extends link:ADR-005-Auto-Layout-Engine.html[ADR-005] (Auto-Layout Engine).
+ADR-005 established a per-view, pluggable layout engine with the modes `layered`, `grid` and `none`; this ADR adds a fourth mode and does not change that decision.
+
+== Context
+
+ADR-005's layout modes flatten a view: every element is placed as a sibling under the (optional) scope boundary, grouped by kind (`layered`) or alphabetically (`grid`).
+That is correct for most views, but it cannot express *containment* — a model where elements are nested inside one another (`a ⊃ b ⊃ c`) renders as a flat set of boxes, losing the nesting the model already encodes.
+
+Some architectural notations are fundamentally about concentric containment rather than rows.
+The motivating case is a Hexagonal Architecture (Ports & Adapters) view, where the reader expects concentric rings — an outer adapter zone containing a ports zone containing a domain core — not three separate rows.
+The model can already express this as nested container elements; what was missing was a layout that *preserves* that nesting in the generated draw.io.
+
+Requirements, on top of ADR-005's existing constraints (deterministic, no external layout library, arbitrary user-defined kinds):
+
+. Reproduce the model's container nesting as real draw.io cell containment (a child cell parented to its container cell, not to the scope boundary).
+. Size each container to fit its content, computed bottom-up (innermost first).
+. Keep it opt-in per view, so existing views are unaffected.
+
+== Evaluated Options
+
+=== Option A: dedicated `nested` layout mode driven by model containment
+
+A new `layout: "nested"` value. The layout engine walks each container's children recursively, places inner containers centred inside their parent, sizes every container bottom-up from its content, and — after placement — re-parents each cell to its immediate container and writes the computed container geometry.
+Vertical placement within a ring is driven by an element's `metadata.side` (`top` / `bottom`).
+
+=== Option B: tag-driven post-processing of the layered layout
+
+Keep the flat `layered` output, then group boxes visually by a "zone" tag (e.g. draw the adapter/port/domain tags as nested frames around the already-placed boxes).
+
+Reads styling tags rather than the model's structure, so the rings are a cosmetic overlay that can disagree with the actual element hierarchy; it also does not produce real cell containment.
+
+=== Option C: no auto-layout — ship a static illustration
+
+Document the rings with a hand-drawn reference image and leave the live view on `layered`.
+Zero engine change, but the diagram is not generated from the model and drifts from it.
+
+== Weighted Pugh Matrix
+
+Rating scale: -1 = worse than reference, 0 = same, +1 = better.
+Reference option: *C (static illustration)* — the no-engine-change baseline.
+
+[cols="4,1,1,1,1",options="header"]
+|===
+| Criterion | Weight | A: `nested` mode | B: tag overlay | C: static (Ref)
+
+| Fidelity to the model's real containment
+| 5
+| +1
+| 0
+| 0
+
+| Generated from the model (no drift, no manual arrangement)
+| 4
+| +1
+| +1
+| -1
+
+| Determinism (same model → same layout)
+| 3
+| +1
+| +1
+| 0
+
+| No external layout dependency (ADR-005 constraint)
+| 3
+| 0
+| 0
+| 0
+
+| Implementation effort
+| 3
+| -1
+| 0
+| +1
+
+| *Weighted total*
+| —
+| *+9*
+| *+7*
+| *-1*
+|===
+
+Option B scores close to A but produces only a cosmetic overlay that is not backed by real cell containment and keys off styling tags rather than the model's structure; A is chosen because the rings *are* the model's nesting.
+
+== Decision
+
+Adopt *Option A*: add a `nested` per-view layout mode that renders the model's container nesting as concentric containers.
+
+* `computeNestedLayout` (`internal/sync/layout.go`) places children inside-out and sizes each container bottom-up; `metadata.side` orders elements top/bottom within a ring.
+* Forward sync re-parents each element to its immediate container and writes the computed container geometry (`layoutResult.ParentOf` / `ContainerSizes`).
+* The resolved element set is closed under the ancestor containers within the scope, so a view that includes a deep leaf without its intermediate containers still renders (and is not silently dropped).
+* Validation accepts `nested` as a view `layout` value alongside `layered` / `grid` / `none`.
+
+== Consequences
+
+Positive::
+* A nested model renders as concentric rings straight from `sync`, with no manual arrangement — e.g. the Ports & Adapters view of `examples/hexagonal-ddd`.
+* The rings reflect the model's actual element hierarchy, not a styling convention, so they cannot silently disagree with it.
+* Opt-in: existing views on other modes are unchanged.
+
+Negative / trade-offs::
+* Containment is guaranteed only on a *fresh* page — the first sync of a view, or after `sync --relayout`. Elements added incrementally to an existing nested page take the shared cursor-based placement path (ADR-005's "existing page" trigger) and are parented flat under the scope until the next full relayout. Making the incremental path nest-aware is a possible future refinement.
+* The nesting must be expressed as container elements in the model; a flat, tag-only model still works with `layered` / `grid` but does not produce rings.
+
+== Related
+
+* link:ADR-005-Auto-Layout-Engine.html[ADR-005] — the layout engine this mode extends.
+* Specification: `src/docs/spec/05_sync_specification.adoc` (Layout Modes) is the living catalogue of modes.
+* Example: `examples/hexagonal-ddd/` — the Ports & Adapters view uses this mode.

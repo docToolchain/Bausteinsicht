@@ -280,6 +280,49 @@ func TestConstraints_UnsetSelectorNeverMatches(t *testing.T) {
 	}
 }
 
+// ─── no-outgoing-dependency ──────────────────────────────────────────────────
+
+func TestNoOutgoingDependency_NoViolation(t *testing.T) {
+	// A "container" acting as a pure interface: it is only ever a target.
+	m := makeModel(
+		map[string]model.Element{
+			"port": {Kind: "container"},
+			"impl": {Kind: "component"},
+		},
+		[]model.Relationship{{From: "impl", To: "port"}},
+		[]model.Constraint{{
+			ID: "c1", Rule: "no-outgoing-dependency",
+			FromKind: "container",
+		}},
+	)
+	r := constraints.Evaluate(m)
+	if r.Total != 0 {
+		t.Errorf("expected 0 violations, got %d: %v", r.Total, r.Violations)
+	}
+}
+
+func TestNoOutgoingDependency_Violation(t *testing.T) {
+	// The "container" port has an outgoing edge — that breaks the interface rule.
+	m := makeModel(
+		map[string]model.Element{
+			"port": {Kind: "container"},
+			"dep":  {Kind: "component"},
+		},
+		[]model.Relationship{{From: "port", To: "dep"}},
+		[]model.Constraint{{
+			ID: "c1", Rule: "no-outgoing-dependency",
+			FromKind: "container", Description: "ports are interfaces",
+		}},
+	)
+	r := constraints.Evaluate(m)
+	if r.Total != 1 {
+		t.Errorf("expected 1 violation, got %d", r.Total)
+	}
+	if len(r.Violations[0].Elements) != 1 {
+		t.Errorf("expected 1 offending edge, got %d", len(r.Violations[0].Elements))
+	}
+}
+
 // ─── required-field ──────────────────────────────────────────────────────────
 
 func TestRequiredField_MissingDescription(t *testing.T) {

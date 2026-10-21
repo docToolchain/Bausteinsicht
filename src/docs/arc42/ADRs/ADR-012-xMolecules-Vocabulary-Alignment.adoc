@@ -1,0 +1,143 @@
+:jbake-title: ADR-012: xMolecules Vocabulary Alignment
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: ADR
+:jbake-order: 12
+
+= ADR-012: Architecture Vocabulary Alignment with xMolecules
+:repo-issues: https://github.com/docToolchain/Bausteinsicht/issues
+
+== Status
+
+Accepted.
+
+Realised in the `examples/hexagonal-jmolecules/` example; the broader initiative it serves is tracked in the plan `docs/features/plans/570-feat-ddd-hex-xmolecules.md` and in {repo-issues}/570[#570].
+The code-level rule integration that builds on this vocabulary is the ArchUnit Rule Integration ADR (planned).
+
+== Context
+
+Bausteinsicht has no built-in Hexagonal/DDD semantics — a model defines its own element `kind` vocabulary.
+The example models (`examples/hexagonal-ddd/`) coined didactic kinds from Cockburn's Ports & Adapters terminology: `drivingAdapter`, `inboundPort`, `applicationService`, `aggregate`, `entity`, `valueObject`, `domainService`, `outboundPort`, `drivenAdapter`.
+
+We want the model to align with the language-neutral https://xmolecules.org/[xMolecules] vocabulary — the umbrella whose members realise the same concepts in code (jMolecules/Java+Kotlin, nMolecules/.NET, phpMolecules/PHP).
+Alignment gives the model a recognised, cross-language mapping and is the anchor for the planned code-level rule integration (ArchUnit) — see the ArchUnit Rule Integration ADR (planned) and {repo-issues}/562[#562].
+
+The xMolecules stereotypes are close to a 1:1 rename of the current kinds:
+
+[cols="1,1",options="header"]
+|===
+| Bausteinsicht `kind` (didactic) | xMolecules stereotype
+
+| `drivingAdapter`     | `PrimaryAdapter`
+| `inboundPort`        | `PrimaryPort`
+| `applicationService` | `Application`
+| `outboundPort`       | `SecondaryPort`
+| `drivenAdapter`      | `SecondaryAdapter`
+| `aggregate`          | `AggregateRoot`
+| `entity`             | `Entity`
+| `valueObject`        | `ValueObject`
+| `domainService`      | `Service`
+|===
+
+The full, canonical table lives with the runnable artifact: `examples/hexagonal-jmolecules/README.adoc`.
+
+=== Forces
+
+Non-breaking change wanted:: `template.drawio` looks up styles by `kind` (`bausteinsicht_template`), and the constraints reference kinds via `from-kind`/`to-kind`.
+Renaming kinds touches all three (model, template, constraints).
+
+Didactic value:: Cockburn's driving/inbound/outbound/driven wording is widely taught; jMolecules adopted primary/secondary.
+The two are synonyms, and showing both has teaching value.
+
+Language neutrality:: Bausteinsicht is language-agnostic.
+Using jMolecules' exact names as `kind` subtly implies a Java binding, which the tool does not have.
+
+Tool anchor:: Whatever we choose must give a future ArchUnit generator a stable stereotype per element (see the ArchUnit Rule Integration ADR, planned).
+
+== Evaluated Options
+
+=== Option A: keep didactic kinds, map via `metadata.jmolecules`
+
+The `kind` keeps the didactic term; the xMolecules stereotype is carried in `metadata.jmolecules`.
+
+[source,jsonc]
+----
+"placeOrder": {
+  "kind": "inboundPort",
+  "metadata": { "jmolecules": "PrimaryPort" }
+}
+----
+
+The mapping is deterministic from `kind` (the table above), so a generator applies it automatically; `metadata.jmolecules` is only required to *override* the default for a specific element (e.g. marking one `outboundPort` as a `Repository`).
+
+=== Option B: rename kinds to the xMolecules terms
+
+`kind` becomes `primaryAdapter`, `primaryPort`, `application`, `secondaryPort`, `secondaryAdapter`, `aggregateRoot`, … — the model speaks jMolecules natively.
+
+== Weighted Pugh Matrix
+
+Rating scale: -1 = worse than reference, 0 = same, +1 = better.
+Reference option: *B (native rename)* — the obvious "just use the jMolecules names" baseline.
+
+[cols="4,1,1,1",options="header"]
+|===
+| Criterion | Weight | A: kinds + metadata | B: native rename (Ref)
+
+| Migration cost / non-breaking (template + constraints untouched)
+| 3
+| +1
+| 0
+
+| Didactic value (keeps driving/inbound *and* shows the stereotype)
+| 3
+| +1
+| 0
+
+| Language-neutral framing (does not imply a Java binding)
+| 2
+| +1
+| 0
+
+| Directness of code→stereotype mapping (no metadata indirection)
+| 2
+| -1
+| 0
+
+| Per-element stereotype override without changing `kind`
+| 1
+| +1
+| 0
+
+| *Weighted total*
+| —
+| *+7*
+| *0*
+|===
+
+The single honest penalty for A is one level of indirection (`kind` → stereotype via the table) instead of the `kind` *being* the stereotype.
+It is outweighed by keeping the change non-breaking, dual-vocabulary and language-neutral.
+
+== Decision
+
+Adopt *Option A*: keep the didactic Ports & Adapters terms as element `kind`, and map each element onto its xMolecules stereotype via `metadata.jmolecules`, defaulting deterministically from `kind` and overridable per element.
+
+== Consequences
+
+Positive::
+* Non-breaking — `template.drawio` and the existing constraints are unchanged.
+* Teaches both vocabularies; stays language-neutral (kinds are not Java-specific).
+* Gives the ArchUnit Rule Integration ADR (planned) a clean stereotype anchor: the generator reads `kind` for the default stereotype and `metadata.jmolecules` for overrides.
+* Per-element overrides (e.g. `Repository`) need no new kind.
+
+Negative / trade-offs::
+* One indirection: the `kind` → stereotype table must live somewhere canonical (it does — `examples/hexagonal-jmolecules/README.adoc`).
+* Readers might conflate the didactic kind names with the jMolecules names; mitigated by the mapping table and the example README.
+
+== Related
+
+* Code-Level Architecture-Rule Integration (ArchUnit) — _planned, ADR number assigned when it is written_.
+Currently drafted as `ADR-XXX-ArchUnit-Rule-Integration.adoc` on the `feature/archunit` branch; it stays unnumbered until merged (planned ADRs are not pre-assigned numbers).
+* Plan: `docs/features/plans/570-feat-ddd-hex-xmolecules.md` — the umbrella vision and the model/code seam.
+* Examples: `examples/hexagonal-ddd/` (full), `examples/hexagonal-jmolecules/` (minimal, demonstrates this decision).
+* Umbrella issue: {repo-issues}/570[#570] — Model DDD / Hexagonal Architecture with xMolecules-aligned vocabulary.
+* ArchUnit bridge issue: {repo-issues}/562[#562] — Generate & synchronise code-level architecture rules (ArchUnit) from the model.
