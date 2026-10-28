@@ -396,6 +396,12 @@ Feature: Connector to scope element
     When the user runs "bausteinsicht sync"
     Then a connector is drawn from "api" to the scope boundary of the view
     And the connector is correctly attached
+
+  Scenario: Endpoint lifted onto the scope boundary is not drawn
+    Given a view with scope "system" that includes "system.api" but not "system.lib"
+    And a model relationship from "system.api" to "system.lib.core"
+    When the user runs "bausteinsicht sync"
+    Then no connector is drawn between "system.api" and the "system" boundary
 ----
 
 ==== AC-9.5: Tag-based and element-ID-based constraint targeting (#542)

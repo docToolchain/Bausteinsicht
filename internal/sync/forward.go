@@ -451,7 +451,19 @@ func liftModelRelationshipEndpoints(rel model.Relationship, elemSet map[string]b
 	if scopeID != "" && isScopeExternalConnector(from, to, scopeID) {
 		return "", "", false
 	}
+	if liftedOntoScope(rel.From, from, scopeID) || liftedOntoScope(rel.To, to, scopeID) {
+		return "", "", false
+	}
 	return from, to, true
+}
+
+// liftedOntoScope reports whether lifting moved endpoint orig onto the view's
+// scope boundary. The boundary encloses every element on the page, so a
+// connector to it carries no information; the relationship belongs to a view
+// that shows both endpoints. A relationship that targets the scope element in
+// the model (orig == scopeID) is kept (#217).
+func liftedOntoScope(orig, lifted, scopeID string) bool {
+	return scopeID != "" && lifted == scopeID && orig != scopeID
 }
 
 // createConnectorIfAbsent creates the connector for a (possibly lifted)
@@ -736,6 +748,9 @@ func liftRelationshipEndpoints(ch RelationshipChange, elemFilter map[string]bool
 	}
 	// Skip connectors between scope boundary and externals.
 	if scopeID != "" && isScopeExternalConnector(from, to, scopeID) {
+		return "", "", false
+	}
+	if liftedOntoScope(ch.From, from, scopeID) || liftedOntoScope(ch.To, to, scopeID) {
 		return "", "", false
 	}
 	return from, to, true
