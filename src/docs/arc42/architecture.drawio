@@ -4,7 +4,7 @@
       <root>
         <mxCell id="0"/>
         <mxCell id="1" parent="0"/>
-        <object label="" bausteinsicht_id="bausteinsicht" bausteinsicht_kind="system" tooltip="Architecture-as-code tool with draw.io as visual frontend and bidirectional synchronization" link="data:page/id,view-containers-evolution" id="context--bausteinsicht">
+        <object label="" bausteinsicht_id="bausteinsicht" bausteinsicht_kind="system" tooltip="Architecture-as-code tool with draw.io as visual frontend and bidirectional synchronization" link="data:page/id,view-containers-analysis" id="context--bausteinsicht">
           <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1168BD;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;movable=0;resizable=0;rotatable=0;deletable=0;editable=0;locked=1;connectable=0;" vertex="1">
             <mxGeometry height="120" width="180" x="366" y="440" as="geometry"/>
           </mxCell>
@@ -89,7 +89,7 @@
       <root>
         <mxCell id="0"/>
         <mxCell id="1" parent="0"/>
-        <object label="&lt;b&gt;Bausteinsicht&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#BBBBBB&quot; style=&quot;font-size:11px&quot;&gt;Architecture-as-code tool with draw.io as visual frontend and bidirectional synchronization&lt;/font&gt;" bausteinsicht_id="bausteinsicht" bausteinsicht_kind="system_boundary" tooltip="Architecture-as-code tool with draw.io as visual frontend and bidirectional synchronization" link="data:page/id,view-containers-evolution" id="containers--bausteinsicht">
+        <object label="&lt;b&gt;Bausteinsicht&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#BBBBBB&quot; style=&quot;font-size:11px&quot;&gt;Architecture-as-code tool with draw.io as visual frontend and bidirectional synchronization&lt;/font&gt;" bausteinsicht_id="bausteinsicht" bausteinsicht_kind="system_boundary" tooltip="Architecture-as-code tool with draw.io as visual frontend and bidirectional synchronization" link="data:page/id,view-containers-analysis" id="containers--bausteinsicht">
           <mxCell parent="1" style="swimlane;startSize=60;fillColor=#E8E8E8;strokeColor=#0B4884;fontColor=#0B4884;fontStyle=1;rounded=1;arcSize=5;whiteSpace=wrap;html=1;container=1;collapsible=0;fontSize=14;" vertex="1">
             <mxGeometry x="200" y="230" width="2060" height="1540" as="geometry"/>
           </mxCell>
@@ -212,7 +212,7 @@
           <mxGeometry height="50" width="110" y="75" as="geometry"/>
         </mxCell>
         <mxCell id="rel-containers--ide-containers--bausteinsicht.model-3" edge="1" parent="1" source="containers--ide" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="containers--bausteinsicht.model" value="JSON Schema validation">
-          <mxGeometry relative="1" as="geometry"></mxGeometry>
+          <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <mxCell id="rel-containers--bausteinsicht.cli-containers--bausteinsicht.watcher-8" edge="1" parent="1" source="containers--bausteinsicht.cli" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="containers--bausteinsicht.watcher" value="starts watch mode">
           <mxGeometry x="0.7917" relative="1" as="geometry">
@@ -223,7 +223,7 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="rel-containers--developer-containers--bausteinsicht.cli-0" edge="1" parent="1" source="containers--developer" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="containers--bausteinsicht.cli" value="runs commands">
-          <mxGeometry relative="1" as="geometry"></mxGeometry>
+          <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <mxCell id="rel-containers--developer-containers--drawio_app-2" edge="1" parent="1" source="containers--developer" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0;exitY=0.3;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="containers--drawio_app" value="edits diagrams">
           <mxGeometry x="-0.8321" relative="1" as="geometry">
@@ -240,7 +240,7 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="rel-containers--drawio_app-containers--bausteinsicht.drawio-4" edge="1" parent="1" source="containers--drawio_app" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="containers--bausteinsicht.drawio" value="modifies .drawio file">
-          <mxGeometry relative="1" as="geometry"></mxGeometry>
+          <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <mxCell id="rel-containers--bausteinsicht.cli-containers--bausteinsicht.model-5" edge="1" parent="1" source="containers--bausteinsicht.cli" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="containers--bausteinsicht.model" value="loads/saves JSONC">
           <mxGeometry x="-0.4417" relative="1" as="geometry">
@@ -250,7 +250,7 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="rel-containers--bausteinsicht.watcher-containers--bausteinsicht.sync-27" edge="1" parent="1" source="containers--bausteinsicht.watcher" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="containers--bausteinsicht.sync" value="triggers on file change">
-          <mxGeometry relative="1" as="geometry"></mxGeometry>
+          <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <mxCell id="rel-containers--bausteinsicht.sync-containers--bausteinsicht.drawio-15" edge="1" parent="1" source="containers--bausteinsicht.sync" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0.2;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="containers--bausteinsicht.drawio" value="creates/updates elements">
           <mxGeometry x="-0.9128" relative="1" as="geometry">
@@ -494,7 +494,7 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="rel-containers--bausteinsicht.watcher-containers--bausteinsicht.sync-34" value="triggers on file change" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="containers--bausteinsicht.watcher" target="containers--bausteinsicht.sync" parent="1">
-          <mxGeometry relative="1" as="geometry"></mxGeometry>
+          <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <object id="containers--bausteinsicht.changelog" bausteinsicht_id="bausteinsicht.changelog" bausteinsicht_kind="container" technology="Go" tooltip="Architecture changelog generation between two git refs">
           <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1" parent="containers--bausteinsicht">
@@ -771,7 +771,7 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="rel-containers--bausteinsicht.table-containers--bausteinsicht.diagram-57" value="optionally uses diagrams" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="containers--bausteinsicht.table" target="containers--bausteinsicht.diagram" parent="1">
-          <mxGeometry relative="1" as="geometry"></mxGeometry>
+          <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <mxCell id="rel-containers--bausteinsicht.cli-containers--bausteinsicht.template-26" value="generates draw.io templates" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="containers--bausteinsicht.cli" target="containers--bausteinsicht.template" parent="1">
           <mxGeometry x="0.9390" relative="1" as="geometry">
@@ -782,7 +782,7 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="rel-containers--bausteinsicht.changelog-containers--bausteinsicht.diff-61" value="computes as-is/to-be delta per ref" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="containers--bausteinsicht.changelog" target="containers--bausteinsicht.diff" parent="1">
-          <mxGeometry relative="1" as="geometry"></mxGeometry>
+          <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <mxCell id="rel-containers--bausteinsicht.cli-containers--bausteinsicht.changelog-17" value="triggers changelog generation" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="containers--bausteinsicht.cli" target="containers--bausteinsicht.changelog" parent="1">
           <mxGeometry x="0.9774" relative="1" as="geometry">
@@ -833,7 +833,7 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="rel-containers--bausteinsicht.stale-containers--bausteinsicht.overlay-72" value="reuses heatmap color scale" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="containers--bausteinsicht.stale" target="containers--bausteinsicht.overlay" parent="1">
-          <mxGeometry relative="1" as="geometry"></mxGeometry>
+          <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <mxCell id="rel-containers--bausteinsicht.diagram-containers--bausteinsicht.model-47" value="reads model for export" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0.65;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="containers--bausteinsicht.diagram" target="containers--bausteinsicht.model" parent="1">
           <mxGeometry x="-0.8965" relative="1" as="geometry">
@@ -932,7 +932,7 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="rel-containers--bausteinsicht.watcher-containers--bausteinsicht.sync-45" value="triggers on file change" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="containers--bausteinsicht.watcher" target="containers--bausteinsicht.sync" parent="1">
-          <mxGeometry relative="1" as="geometry"></mxGeometry>
+          <mxGeometry relative="1" as="geometry"/>
         </mxCell>
       </root>
     </mxGraphModel>
@@ -1057,7 +1057,7 @@
           <mxGeometry height="70" width="180" y="50" as="geometry"/>
         </mxCell>
         <mxCell id="rel-drawio-components--drawio_app-drawio-components--bausteinsicht.drawio.document-4" edge="1" parent="1" source="drawio-components--drawio_app" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="drawio-components--bausteinsicht.drawio.document" value="modifies .drawio file">
-          <mxGeometry relative="1" as="geometry"></mxGeometry>
+          <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <mxCell id="rel-drawio-components--bausteinsicht.sync-drawio-components--bausteinsicht.drawio.element-15" edge="1" parent="1" source="drawio-components--bausteinsicht.sync" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=1;entryY=0.7;entryDx=0;entryDy=0;" target="drawio-components--bausteinsicht.drawio.element" value="creates/updates elements">
           <mxGeometry relative="1" as="geometry">
@@ -1067,7 +1067,7 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="rel-drawio-components--bausteinsicht.sync-drawio-components--bausteinsicht.drawio.connector-16" edge="1" parent="1" source="drawio-components--bausteinsicht.sync" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="drawio-components--bausteinsicht.drawio.connector" value="creates/updates connectors">
-          <mxGeometry relative="1" as="geometry"></mxGeometry>
+          <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <object label="&amp;larr; Container View" link="data:page/id,view-containers" id="nav-back-drawio-components">
           <mxCell parent="1" style="rounded=1;fillColor=#f8cecc;strokeColor=#b85450;html=1;fontSize=10;" vertex="1">
@@ -1092,7 +1092,7 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="rel-drawio-components--bausteinsicht.sync-drawio-components--bausteinsicht.drawio.connector-23" value="creates/updates connectors" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="drawio-components--bausteinsicht.sync" target="drawio-components--bausteinsicht.drawio.connector" parent="1">
-          <mxGeometry relative="1" as="geometry"></mxGeometry>
+          <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <mxCell id="rel-drawio-components--bausteinsicht.drawio.connector-drawio-components--bausteinsicht.drawio.document-39" value="modifies pages" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" source="drawio-components--bausteinsicht.drawio.connector" target="drawio-components--bausteinsicht.drawio.document" parent="1">
           <mxGeometry relative="1" as="geometry">
@@ -1109,7 +1109,7 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="rel-drawio-components--bausteinsicht.drawio.element-drawio-components--bausteinsicht.drawio.template-37" value="looks up styles" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" source="drawio-components--bausteinsicht.drawio.element" target="drawio-components--bausteinsicht.drawio.template" parent="1">
-          <mxGeometry relative="1" as="geometry"></mxGeometry>
+          <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <mxCell id="rel-drawio-components--bausteinsicht.drawio.element-drawio-components--bausteinsicht.drawio.label-36" value="generates labels" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=1;exitY=0.3;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" source="drawio-components--bausteinsicht.drawio.element" target="drawio-components--bausteinsicht.drawio.label" parent="1">
           <mxGeometry relative="1" as="geometry">
@@ -1119,7 +1119,7 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="rel-drawio-components--bausteinsicht.drawio.element-drawio-components--bausteinsicht.drawio.document-38" value="modifies pages" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="drawio-components--bausteinsicht.drawio.element" target="drawio-components--bausteinsicht.drawio.document" parent="1">
-          <mxGeometry relative="1" as="geometry"></mxGeometry>
+          <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <mxCell id="rel-drawio-components--bausteinsicht.sync-drawio-components--bausteinsicht.drawio.element-33" value="creates/updates elements" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=1;entryY=0.7;entryDx=0;entryDy=0;" edge="1" source="drawio-components--bausteinsicht.sync" target="drawio-components--bausteinsicht.drawio.element" parent="1">
           <mxGeometry relative="1" as="geometry">
@@ -1129,7 +1129,7 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="rel-drawio-components--bausteinsicht.sync-drawio-components--bausteinsicht.drawio.connector-34" value="creates/updates connectors" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="drawio-components--bausteinsicht.sync" target="drawio-components--bausteinsicht.drawio.connector" parent="1">
-          <mxGeometry relative="1" as="geometry"></mxGeometry>
+          <mxGeometry relative="1" as="geometry"/>
         </mxCell>
       </root>
     </mxGraphModel>
@@ -1483,7 +1483,7 @@
           <mxGeometry height="70" width="180" y="50" as="geometry"/>
         </mxCell>
         <mxCell id="rel-sync-components--bausteinsicht.cli-sync-components--bausteinsicht.watcher-8" edge="1" parent="1" source="sync-components--bausteinsicht.cli" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="sync-components--bausteinsicht.watcher" value="starts watch mode">
-          <mxGeometry relative="1" as="geometry"></mxGeometry>
+          <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <mxCell id="rel-sync-components--bausteinsicht.cli-sync-components--bausteinsicht.sync.engine-7" edge="1" parent="1" source="sync-components--bausteinsicht.cli" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="sync-components--bausteinsicht.sync.engine" value="triggers sync">
           <mxGeometry relative="1" as="geometry">
@@ -1501,10 +1501,10 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="rel-sync-components--bausteinsicht.sync.forward-sync-components--bausteinsicht.drawio-15" edge="1" parent="1" source="sync-components--bausteinsicht.sync.forward" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="sync-components--bausteinsicht.drawio" value="creates/updates elements">
-          <mxGeometry relative="1" as="geometry"></mxGeometry>
+          <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <mxCell id="rel-sync-components--bausteinsicht.sync.reverse-sync-components--bausteinsicht.model-17" edge="1" parent="1" source="sync-components--bausteinsicht.sync.reverse" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="sync-components--bausteinsicht.model" value="comment-preserving updates">
-          <mxGeometry relative="1" as="geometry"></mxGeometry>
+          <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <object label="&amp;larr; Container View" link="data:page/id,view-containers" id="nav-back-sync-components">
           <mxCell parent="1" style="rounded=1;fillColor=#f8cecc;strokeColor=#b85450;html=1;fontSize=10;" vertex="1">
@@ -1522,13 +1522,13 @@
           </mxCell>
         </object>
         <mxCell id="rel-sync-components--bausteinsicht.sync.reverse-sync-components--bausteinsicht.model-24" value="comment-preserving updates" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="sync-components--bausteinsicht.sync.reverse" target="sync-components--bausteinsicht.model" parent="1">
-          <mxGeometry relative="1" as="geometry"></mxGeometry>
+          <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <mxCell id="rel-sync-components--bausteinsicht.sync.forward-sync-components--bausteinsicht.drawio-22" value="creates/updates elements" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="sync-components--bausteinsicht.sync.forward" target="sync-components--bausteinsicht.drawio" parent="1">
-          <mxGeometry relative="1" as="geometry"></mxGeometry>
+          <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <mxCell id="rel-sync-components--bausteinsicht.sync.engine-sync-components--bausteinsicht.sync.state-31" value="loads/saves state" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="sync-components--bausteinsicht.sync.engine" target="sync-components--bausteinsicht.sync.state" parent="1">
-          <mxGeometry x="0.6267" relative="1" as="geometry"></mxGeometry>
+          <mxGeometry x="0.6267" relative="1" as="geometry"/>
         </mxCell>
         <mxCell id="rel-sync-components--bausteinsicht.sync.engine-sync-components--bausteinsicht.sync.diff-28" value="detects changes" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="sync-components--bausteinsicht.sync.engine" target="sync-components--bausteinsicht.sync.diff" parent="1">
           <mxGeometry x="0.8564" relative="1" as="geometry">
@@ -1563,13 +1563,13 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="rel-sync-components--bausteinsicht.watcher-sync-components--bausteinsicht.sync.engine-45" value="triggers on file change" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="sync-components--bausteinsicht.watcher" target="sync-components--bausteinsicht.sync.engine" parent="1">
-          <mxGeometry x="-0.5625" relative="1" as="geometry"></mxGeometry>
+          <mxGeometry x="-0.5625" relative="1" as="geometry"/>
         </mxCell>
         <mxCell id="rel-sync-components--bausteinsicht.sync.forward-sync-components--bausteinsicht.drawio-33" value="creates/updates elements" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="sync-components--bausteinsicht.sync.forward" target="sync-components--bausteinsicht.drawio" parent="1">
-          <mxGeometry relative="1" as="geometry"></mxGeometry>
+          <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <mxCell id="rel-sync-components--bausteinsicht.sync.reverse-sync-components--bausteinsicht.model-35" value="comment-preserving updates" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="sync-components--bausteinsicht.sync.reverse" target="sync-components--bausteinsicht.model" parent="1">
-          <mxGeometry relative="1" as="geometry"></mxGeometry>
+          <mxGeometry relative="1" as="geometry"/>
         </mxCell>
       </root>
     </mxGraphModel>
@@ -1677,12 +1677,12 @@
         <mxCell id="1" parent="0"/>
         <object label="&lt;b&gt;Search&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#CCCCCC&quot;&gt;&lt;i&gt;[Go]&lt;/i&gt;&lt;/font&gt;&lt;br&gt;&lt;font color=&quot;#BBBBBB&quot; style=&quot;font-size:11px&quot;&gt;Element and relationship search with filtering and pattern …&lt;/font&gt;" id="search-components--bausteinsicht.search" bausteinsicht_id="bausteinsicht.search" bausteinsicht_kind="container_boundary" technology="Go" tooltip="Element and relationship search with filtering and pattern matching" link="data:page/id,view-search-components">
           <mxCell style="swimlane;startSize=60;fillColor=#F0F4FA;strokeColor=#3C7FC0;fontColor=#3C7FC0;fontStyle=1;rounded=1;arcSize=5;whiteSpace=wrap;html=1;container=1;collapsible=0;fontSize=14;" vertex="1" parent="1">
-            <mxGeometry x="40" y="80" width="540" height="160" as="geometry"/>
+            <mxGeometry x="40" y="90" width="860" height="250" as="geometry"/>
           </mxCell>
         </object>
         <object label="" id="search-components--bausteinsicht.cli" bausteinsicht_id="bausteinsicht.cli" bausteinsicht_kind="container" technology="Go / Cobra" tooltip="Command-line interface providing validate, sync, export, and watch commands" link="data:page/id,view-cli-components">
           <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;strokeColor=#3C7FC0;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1" parent="1">
-            <mxGeometry x="40" y="300" width="180" height="120" as="geometry"/>
+            <mxGeometry x="1000" y="90" width="180" height="120" as="geometry"/>
           </mxCell>
         </object>
         <mxCell id="search-components--bausteinsicht.cli-title" value="CLI" style="text;html=1;fontSize=14;fontStyle=1;fontColor=#ffffff;fillColor=none;strokeColor=none;align=center;verticalAlign=middle;movable=1;resizable=1;deletable=1;editable=1;rotatable=1;locked=0;connectable=1;container=0;pointerEvents=0;overflow=hidden;" vertex="1" connectable="0" parent="search-components--bausteinsicht.cli">
@@ -1696,7 +1696,7 @@
         </mxCell>
         <object label="" id="search-components--bausteinsicht.model" bausteinsicht_id="bausteinsicht.model" bausteinsicht_kind="container" technology="Go" tooltip="JSONC architecture model management — loading, validation, and mutation" link="data:page/id,view-model-components">
           <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;strokeColor=#3C7FC0;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1" parent="1">
-            <mxGeometry x="400" y="300" width="180" height="120" as="geometry"/>
+            <mxGeometry x="1000" y="300" width="180" height="120" as="geometry"/>
           </mxCell>
         </object>
         <mxCell id="search-components--bausteinsicht.model-title" value="Model" style="text;html=1;fontSize=14;fontStyle=1;fontColor=#ffffff;fillColor=none;strokeColor=none;align=center;verticalAlign=middle;movable=1;resizable=1;deletable=1;editable=1;rotatable=1;locked=0;connectable=1;container=0;pointerEvents=0;overflow=hidden;" vertex="1" connectable="0" parent="search-components--bausteinsicht.model">
@@ -1708,7 +1708,7 @@
         <mxCell id="search-components--bausteinsicht.model-desc" value="JSONC architecture model management — loading, validation, and mutation" style="text;html=1;whiteSpace=wrap;fontSize=10;fontColor=#BBBBBB;fillColor=none;strokeColor=none;align=center;verticalAlign=middle;movable=1;resizable=1;deletable=1;editable=1;rotatable=1;locked=0;connectable=1;container=0;pointerEvents=0;overflow=hidden;" vertex="1" connectable="0" parent="search-components--bausteinsicht.model">
           <mxGeometry x="0" y="50" width="180" height="70" as="geometry"/>
         </mxCell>
-        <mxCell id="rel-search-components--bausteinsicht.cli-search-components--bausteinsicht.model-5" value="loads/saves JSONC" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;" edge="1" source="search-components--bausteinsicht.cli" target="search-components--bausteinsicht.model" parent="1">
+        <mxCell id="rel-search-components--bausteinsicht.cli-search-components--bausteinsicht.model-5" value="loads/saves JSONC" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="search-components--bausteinsicht.cli" target="search-components--bausteinsicht.model" parent="1">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <object label="&amp;larr; Container View" id="nav-back-search-components" link="data:page/id,view-containers">
@@ -1716,16 +1716,64 @@
             <mxGeometry x="20" y="20" width="140" height="30" as="geometry"/>
           </mxCell>
         </object>
-        <object label="&lt;b&gt;Search Package Components&lt;/b&gt;&lt;br&gt;Element and relationship search with pattern matching and filtering&lt;br&gt;&lt;br&gt;&lt;font point-size=&quot;9&quot;&gt;Repo: github.com/docToolchain/Bauteinsicht&lt;br&gt;Source: src/docs/arc42/architecture.jsonc&lt;br&gt;Last synced: 2026-08-14 12:28&lt;br&gt;Author: Bausteinsicht contributors&lt;br&gt;Generated by Bausteinsicht&lt;/font&gt;" id="metadata-search-components">
+        <object label="&lt;b&gt;Search Package Components&lt;/b&gt;&lt;br&gt;Element and relationship search with pattern matching and filtering&lt;br&gt;&lt;br&gt;&lt;font point-size=&quot;9&quot;&gt;Repo: github.com/docToolchain/Bauteinsicht&lt;br&gt;Source: src/docs/arc42/architecture.jsonc&lt;br&gt;Last synced: 2026-10-28 09:13&lt;br&gt;Author: Bausteinsicht contributors&lt;br&gt;Generated by Bausteinsicht&lt;/font&gt;" id="metadata-search-components">
           <mxCell style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=none;fontColor=#333333;fontSize=10;align=left;verticalAlign=top;" vertex="1" parent="1">
-            <mxGeometry x="40" y="480" width="360" height="120" as="geometry"/>
+            <mxGeometry x="40" y="390" width="360" height="120" as="geometry"/>
           </mxCell>
         </object>
-        <object label="&lt;b&gt;Legend&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#438DD5&quot;&gt;■&lt;/font&gt; Container" id="legend-search-components">
+        <object label="&lt;b&gt;Legend&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#85BBF0&quot;&gt;■&lt;/font&gt; Component&lt;br&gt;&lt;font color=&quot;#438DD5&quot;&gt;■&lt;/font&gt; Container" id="legend-search-components">
           <mxCell style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=none;fontColor=#333333;fontSize=10;align=left;verticalAlign=top;" vertex="1" parent="1">
-            <mxGeometry x="460" y="480" width="180" height="120" as="geometry"/>
+            <mxGeometry x="460" y="390" width="180" height="120" as="geometry"/>
           </mxCell>
         </object>
+        <object id="search-components--bausteinsicht.search.engine" bausteinsicht_id="bausteinsicht.search.engine" bausteinsicht_kind="component" technology="Go" tooltip="Run(): tokenises the query, matches elements, relationships and views (AND), ranks by score">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#85BBF0;fontColor=#000000;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#78A8D8;" vertex="1" parent="search-components--bausteinsicht.search">
+            <mxGeometry x="340" y="90" width="180" height="120" as="geometry"/>
+          </mxCell>
+        </object>
+        <mxCell id="search-components--bausteinsicht.search.engine-title" value="Search Engine" style="text;html=1;fontSize=14;fontStyle=1;fontColor=#000000;fillColor=none;strokeColor=none;align=center;verticalAlign=middle;movable=1;resizable=1;deletable=1;editable=1;rotatable=1;locked=0;connectable=1;container=0;pointerEvents=0;overflow=hidden;" vertex="1" connectable="0" parent="search-components--bausteinsicht.search.engine">
+          <mxGeometry x="0" y="0" width="180" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="search-components--bausteinsicht.search.engine-tech" value="[Go]" style="text;html=1;fontSize=11;fontStyle=2;fontColor=#666666;fillColor=none;strokeColor=none;align=center;verticalAlign=middle;movable=1;resizable=1;deletable=1;editable=1;rotatable=1;locked=0;connectable=1;container=0;pointerEvents=0;overflow=hidden;" vertex="1" connectable="0" parent="search-components--bausteinsicht.search.engine">
+          <mxGeometry x="0" y="30" width="180" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="search-components--bausteinsicht.search.engine-desc" value="Run(): tokenises the query, matches elements, relationships and views (AND), ranks by score" style="text;html=1;whiteSpace=wrap;fontSize=10;fontColor=#555555;fillColor=none;strokeColor=none;align=center;verticalAlign=middle;movable=1;resizable=1;deletable=1;editable=1;rotatable=1;locked=0;connectable=1;container=0;pointerEvents=0;overflow=hidden;" vertex="1" connectable="0" parent="search-components--bausteinsicht.search.engine">
+          <mxGeometry x="0" y="50" width="180" height="70" as="geometry"/>
+        </mxCell>
+        <object id="search-components--bausteinsicht.search.results" bausteinsicht_id="bausteinsicht.search.results" bausteinsicht_kind="component" technology="Go" tooltip="Options, Result and Response DTOs that form the JSON output of the find command">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#85BBF0;fontColor=#000000;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#78A8D8;" vertex="1" parent="search-components--bausteinsicht.search">
+            <mxGeometry x="40" y="90" width="180" height="120" as="geometry"/>
+          </mxCell>
+        </object>
+        <mxCell id="search-components--bausteinsicht.search.results-title" value="Result Types" style="text;html=1;fontSize=14;fontStyle=1;fontColor=#000000;fillColor=none;strokeColor=none;align=center;verticalAlign=middle;movable=1;resizable=1;deletable=1;editable=1;rotatable=1;locked=0;connectable=1;container=0;pointerEvents=0;overflow=hidden;" vertex="1" connectable="0" parent="search-components--bausteinsicht.search.results">
+          <mxGeometry x="0" y="0" width="180" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="search-components--bausteinsicht.search.results-tech" value="[Go]" style="text;html=1;fontSize=11;fontStyle=2;fontColor=#666666;fillColor=none;strokeColor=none;align=center;verticalAlign=middle;movable=1;resizable=1;deletable=1;editable=1;rotatable=1;locked=0;connectable=1;container=0;pointerEvents=0;overflow=hidden;" vertex="1" connectable="0" parent="search-components--bausteinsicht.search.results">
+          <mxGeometry x="0" y="30" width="180" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="search-components--bausteinsicht.search.results-desc" value="Options, Result and Response DTOs that form the JSON output of the find command" style="text;html=1;whiteSpace=wrap;fontSize=10;fontColor=#555555;fillColor=none;strokeColor=none;align=center;verticalAlign=middle;movable=1;resizable=1;deletable=1;editable=1;rotatable=1;locked=0;connectable=1;container=0;pointerEvents=0;overflow=hidden;" vertex="1" connectable="0" parent="search-components--bausteinsicht.search.results">
+          <mxGeometry x="0" y="50" width="180" height="70" as="geometry"/>
+        </mxCell>
+        <object id="search-components--bausteinsicht.search.scorer" bausteinsicht_id="bausteinsicht.search.scorer" bausteinsicht_kind="component" technology="Go" tooltip="Field-weighted relevance scoring per object type (ID, title, description, technology, kind, tags, endpoints)">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#85BBF0;fontColor=#000000;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#78A8D8;" vertex="1" parent="search-components--bausteinsicht.search">
+            <mxGeometry x="640" y="90" width="180" height="120" as="geometry"/>
+          </mxCell>
+        </object>
+        <mxCell id="search-components--bausteinsicht.search.scorer-title" value="Scorer" style="text;html=1;fontSize=14;fontStyle=1;fontColor=#000000;fillColor=none;strokeColor=none;align=center;verticalAlign=middle;movable=1;resizable=1;deletable=1;editable=1;rotatable=1;locked=0;connectable=1;container=0;pointerEvents=0;overflow=hidden;" vertex="1" connectable="0" parent="search-components--bausteinsicht.search.scorer">
+          <mxGeometry x="0" y="0" width="180" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="search-components--bausteinsicht.search.scorer-tech" value="[Go]" style="text;html=1;fontSize=11;fontStyle=2;fontColor=#666666;fillColor=none;strokeColor=none;align=center;verticalAlign=middle;movable=1;resizable=1;deletable=1;editable=1;rotatable=1;locked=0;connectable=1;container=0;pointerEvents=0;overflow=hidden;" vertex="1" connectable="0" parent="search-components--bausteinsicht.search.scorer">
+          <mxGeometry x="0" y="30" width="180" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="search-components--bausteinsicht.search.scorer-desc" value="Field-weighted relevance scoring per object type (ID, title, description, technology, kind, tags, endpoints)" style="text;html=1;whiteSpace=wrap;fontSize=10;fontColor=#555555;fillColor=none;strokeColor=none;align=center;verticalAlign=middle;movable=1;resizable=1;deletable=1;editable=1;rotatable=1;locked=0;connectable=1;container=0;pointerEvents=0;overflow=hidden;" vertex="1" connectable="0" parent="search-components--bausteinsicht.search.scorer">
+          <mxGeometry x="0" y="50" width="180" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="rel-search-components--bausteinsicht.search.engine-search-components--bausteinsicht.search.results-77" value="builds ranked response" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="search-components--bausteinsicht.search.engine" target="search-components--bausteinsicht.search.results" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="rel-search-components--bausteinsicht.search.engine-search-components--bausteinsicht.search.scorer-76" value="scores candidates" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="search-components--bausteinsicht.search.engine" target="search-components--bausteinsicht.search.scorer" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
       </root>
     </mxGraphModel>
   </diagram>
@@ -1796,7 +1844,7 @@
           <mxGeometry x="0" y="50" width="180" height="70" as="geometry"/>
         </mxCell>
         <mxCell id="rel-importer-components--bausteinsicht.importer.structurizr-importer-components--bausteinsicht.model-40" value="creates elements" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="importer-components--bausteinsicht.importer.structurizr" target="importer-components--bausteinsicht.model" parent="1">
-          <mxGeometry relative="1" as="geometry"></mxGeometry>
+          <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <mxCell id="rel-importer-components--bausteinsicht.importer.likec4-importer-components--bausteinsicht.model-41" value="creates elements" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="importer-components--bausteinsicht.importer.likec4" target="importer-components--bausteinsicht.model" parent="1">
           <mxGeometry relative="1" as="geometry">
@@ -1806,7 +1854,7 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="rel-importer-components--bausteinsicht.cli-importer-components--bausteinsicht.model-5" value="loads/saves JSONC" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="importer-components--bausteinsicht.cli" target="importer-components--bausteinsicht.model" parent="1">
-          <mxGeometry relative="1" as="geometry"></mxGeometry>
+          <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <object label="&amp;larr; Container View" id="nav-back-importer-components" link="data:page/id,view-containers">
           <mxCell style="rounded=1;fillColor=#f8cecc;strokeColor=#b85450;html=1;fontSize=10;" vertex="1" parent="1">
@@ -1824,7 +1872,7 @@
           </mxCell>
         </object>
         <mxCell id="rel-importer-components--bausteinsicht.importer.structurizr-importer-components--bausteinsicht.model-51" value="creates elements" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="importer-components--bausteinsicht.importer.structurizr" target="importer-components--bausteinsicht.model" parent="1">
-          <mxGeometry relative="1" as="geometry"></mxGeometry>
+          <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <mxCell id="rel-importer-components--bausteinsicht.importer.likec4-importer-components--bausteinsicht.model-52" value="creates elements" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="importer-components--bausteinsicht.importer.likec4" target="importer-components--bausteinsicht.model" parent="1">
           <mxGeometry relative="1" as="geometry">
@@ -2105,7 +2153,7 @@
       <root>
         <mxCell id="0"/>
         <mxCell id="1" parent="0"/>
-        <object label="&lt;b&gt;Bausteinsicht&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#BBBBBB&quot; style=&quot;font-size:11px&quot;&gt;Architecture-as-code tool with draw.io as visual frontend a…&lt;/font&gt;" id="containers-sync--bausteinsicht" bausteinsicht_id="bausteinsicht" bausteinsicht_kind="system_boundary" tooltip="Architecture-as-code tool with draw.io as visual frontend and bidirectional synchronization" link="data:page/id,view-containers-evolution">
+        <object label="&lt;b&gt;Bausteinsicht&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#BBBBBB&quot; style=&quot;font-size:11px&quot;&gt;Architecture-as-code tool with draw.io as visual frontend a…&lt;/font&gt;" id="containers-sync--bausteinsicht" bausteinsicht_id="bausteinsicht" bausteinsicht_kind="system_boundary" tooltip="Architecture-as-code tool with draw.io as visual frontend and bidirectional synchronization" link="data:page/id,view-containers-analysis">
           <mxCell style="swimlane;startSize=60;fillColor=#E8E8E8;strokeColor=#0B4884;fontColor=#0B4884;fontStyle=1;rounded=1;arcSize=5;whiteSpace=wrap;html=1;container=1;collapsible=0;fontSize=14;" vertex="1" parent="1">
             <mxGeometry x="40" y="160" width="1220" height="820" as="geometry"/>
           </mxCell>
@@ -2210,10 +2258,10 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="rel-containers-sync--bausteinsicht.cli-containers-sync--bausteinsicht.watcher-8" value="starts watch mode" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="containers-sync--bausteinsicht.cli" target="containers-sync--bausteinsicht.watcher" parent="1">
-          <mxGeometry relative="1" as="geometry"></mxGeometry>
+          <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <mxCell id="rel-containers-sync--bausteinsicht.cli-containers-sync--bausteinsicht-9" value="exports Mermaid diagrams" style="edgeStyle=none;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.2317;entryDx=0;entryDy=0;" edge="1" source="containers-sync--bausteinsicht.cli" target="containers-sync--bausteinsicht" parent="1">
-          <mxGeometry relative="1" as="geometry"></mxGeometry>
+          <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <mxCell id="rel-containers-sync--bausteinsicht.cli-containers-sync--bausteinsicht.template-26" value="generates draw.io templates" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="containers-sync--bausteinsicht.cli" target="containers-sync--bausteinsicht.template" parent="1">
           <mxGeometry x="0.4681" relative="1" as="geometry">
@@ -2224,7 +2272,7 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="rel-containers-sync--bausteinsicht.sync-containers-sync--bausteinsicht.drawio-33" value="creates/updates elements" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0.3;exitY=1;exitDx=0;exitDy=0;entryX=0.3;entryY=0;entryDx=0;entryDy=0;" edge="1" source="containers-sync--bausteinsicht.sync" target="containers-sync--bausteinsicht.drawio" parent="1">
-          <mxGeometry relative="1" as="geometry"></mxGeometry>
+          <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <mxCell id="rel-containers-sync--bausteinsicht.sync-containers-sync--bausteinsicht.model-35" value="comment-preserving updates" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0.8;exitY=1;exitDx=0;exitDy=0;entryX=0.2;entryY=0;entryDx=0;entryDy=0;" edge="1" source="containers-sync--bausteinsicht.sync" target="containers-sync--bausteinsicht.model" parent="1">
           <mxGeometry x="-0.1185" relative="1" as="geometry">
@@ -2235,13 +2283,13 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="rel-containers-sync--bausteinsicht.watcher-containers-sync--bausteinsicht.sync-45" value="triggers on file change" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="containers-sync--bausteinsicht.watcher" target="containers-sync--bausteinsicht.sync" parent="1">
-          <mxGeometry relative="1" as="geometry"></mxGeometry>
+          <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <mxCell id="rel-containers-sync--bausteinsicht-containers-sync--bausteinsicht.drawio-46" value="reads diagram pages" style="edgeStyle=none;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0;exitY=0.8293;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="containers-sync--bausteinsicht" target="containers-sync--bausteinsicht.drawio" parent="1">
-          <mxGeometry relative="1" as="geometry"></mxGeometry>
+          <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <mxCell id="rel-containers-sync--bausteinsicht-containers-sync--bausteinsicht.model-47" value="reads model for export" style="edgeStyle=none;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=1;exitY=0.8293;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="containers-sync--bausteinsicht" target="containers-sync--bausteinsicht.model" parent="1">
-          <mxGeometry relative="1" as="geometry"></mxGeometry>
+          <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <mxCell id="rel-containers-sync--bausteinsicht.template-containers-sync--bausteinsicht.drawio-73" value="generates template shapes/styles" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0.35;exitY=1;exitDx=0;exitDy=0;entryX=0.65;entryY=0;entryDx=0;entryDy=0;" edge="1" source="containers-sync--bausteinsicht.template" target="containers-sync--bausteinsicht.drawio" parent="1">
           <mxGeometry x="0.1050" relative="1" as="geometry">
@@ -2252,7 +2300,7 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="rel-containers-sync--bausteinsicht.template-containers-sync--bausteinsicht.model-74" value="reads element kind specification" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0.7;exitY=1;exitDx=0;exitDy=0;entryX=0.7;entryY=0;entryDx=0;entryDy=0;" edge="1" source="containers-sync--bausteinsicht.template" target="containers-sync--bausteinsicht.model" parent="1">
-          <mxGeometry relative="1" as="geometry"></mxGeometry>
+          <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <object label="&amp;larr; System Context" id="nav-back-containers-sync" link="data:page/id,view-context">
           <mxCell style="rounded=1;fillColor=#f8cecc;strokeColor=#b85450;html=1;fontSize=10;" vertex="1" parent="1">
@@ -2277,7 +2325,7 @@
       <root>
         <mxCell id="0"/>
         <mxCell id="1" parent="0"/>
-        <object label="&lt;b&gt;Bausteinsicht&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#BBBBBB&quot; style=&quot;font-size:11px&quot;&gt;Architecture-as-code tool with draw.io as visual frontend a…&lt;/font&gt;" id="containers-analysis--bausteinsicht" bausteinsicht_id="bausteinsicht" bausteinsicht_kind="system_boundary" tooltip="Architecture-as-code tool with draw.io as visual frontend and bidirectional synchronization" link="data:page/id,view-containers-evolution">
+        <object label="&lt;b&gt;Bausteinsicht&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#BBBBBB&quot; style=&quot;font-size:11px&quot;&gt;Architecture-as-code tool with draw.io as visual frontend a…&lt;/font&gt;" id="containers-analysis--bausteinsicht" bausteinsicht_id="bausteinsicht" bausteinsicht_kind="system_boundary" tooltip="Architecture-as-code tool with draw.io as visual frontend and bidirectional synchronization" link="data:page/id,view-containers-analysis">
           <mxCell style="swimlane;startSize=60;fillColor=#E8E8E8;strokeColor=#0B4884;fontColor=#0B4884;fontStyle=1;rounded=1;arcSize=5;whiteSpace=wrap;html=1;container=1;collapsible=0;fontSize=14;" vertex="1" parent="1">
             <mxGeometry x="40" y="80" width="1360" height="980" as="geometry"/>
           </mxCell>
@@ -2402,7 +2450,7 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="rel-containers-analysis--bausteinsicht.cli-containers-analysis--bausteinsicht-7" value="triggers sync" style="edgeStyle=none;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.1531;entryDx=0;entryDy=0;" edge="1" source="containers-analysis--bausteinsicht.cli" target="containers-analysis--bausteinsicht" parent="1">
-          <mxGeometry relative="1" as="geometry"></mxGeometry>
+          <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <mxCell id="rel-containers-analysis--bausteinsicht.cli-containers-analysis--bausteinsicht.search-14" value="searches elements" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="containers-analysis--bausteinsicht.cli" target="containers-analysis--bausteinsicht.search" parent="1">
           <mxGeometry x="0.9020" relative="1" as="geometry">
@@ -2453,7 +2501,7 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="rel-containers-analysis--bausteinsicht-containers-analysis--bausteinsicht.model-35" value="comment-preserving updates" style="edgeStyle=none;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=1;exitY=0.898;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="containers-analysis--bausteinsicht" target="containers-analysis--bausteinsicht.model" parent="1">
-          <mxGeometry relative="1" as="geometry"></mxGeometry>
+          <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <mxCell id="rel-containers-analysis--bausteinsicht.search-containers-analysis--bausteinsicht.model-54" value="searches elements" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0.65;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="containers-analysis--bausteinsicht.search" target="containers-analysis--bausteinsicht.model" parent="1">
           <mxGeometry x="-0.9414" relative="1" as="geometry">
@@ -2503,7 +2551,7 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="rel-containers-analysis--bausteinsicht.stale-containers-analysis--bausteinsicht.overlay-72" value="reuses heatmap color scale" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="containers-analysis--bausteinsicht.stale" target="containers-analysis--bausteinsicht.overlay" parent="1">
-          <mxGeometry relative="1" as="geometry"></mxGeometry>
+          <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <object label="&amp;larr; System Context" id="nav-back-containers-analysis" link="data:page/id,view-context">
           <mxCell style="rounded=1;fillColor=#f8cecc;strokeColor=#b85450;html=1;fontSize=10;" vertex="1" parent="1">
@@ -2528,7 +2576,7 @@
       <root>
         <mxCell id="0"/>
         <mxCell id="1" parent="0"/>
-        <object label="&lt;b&gt;Bausteinsicht&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#BBBBBB&quot; style=&quot;font-size:11px&quot;&gt;Architecture-as-code tool with draw.io as visual frontend a…&lt;/font&gt;" id="containers-io--bausteinsicht" bausteinsicht_id="bausteinsicht" bausteinsicht_kind="system_boundary" tooltip="Architecture-as-code tool with draw.io as visual frontend and bidirectional synchronization" link="data:page/id,view-containers-evolution">
+        <object label="&lt;b&gt;Bausteinsicht&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#BBBBBB&quot; style=&quot;font-size:11px&quot;&gt;Architecture-as-code tool with draw.io as visual frontend a…&lt;/font&gt;" id="containers-io--bausteinsicht" bausteinsicht_id="bausteinsicht" bausteinsicht_kind="system_boundary" tooltip="Architecture-as-code tool with draw.io as visual frontend and bidirectional synchronization" link="data:page/id,view-containers-analysis">
           <mxCell style="swimlane;startSize=60;fillColor=#E8E8E8;strokeColor=#0B4884;fontColor=#0B4884;fontStyle=1;rounded=1;arcSize=5;whiteSpace=wrap;html=1;container=1;collapsible=0;fontSize=14;" vertex="1" parent="1">
             <mxGeometry x="40" y="80" width="1360" height="980" as="geometry"/>
           </mxCell>
@@ -2653,7 +2701,7 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="rel-containers-io--bausteinsicht.cli-containers-io--bausteinsicht-7" value="triggers sync" style="edgeStyle=none;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.1531;entryDx=0;entryDy=0;" edge="1" source="containers-io--bausteinsicht.cli" target="containers-io--bausteinsicht" parent="1">
-          <mxGeometry relative="1" as="geometry"></mxGeometry>
+          <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <mxCell id="rel-containers-io--bausteinsicht.cli-containers-io--bausteinsicht.diagram-9" value="exports Mermaid diagrams" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="containers-io--bausteinsicht.cli" target="containers-io--bausteinsicht.diagram" parent="1">
           <mxGeometry x="0.9558" relative="1" as="geometry">
@@ -2704,7 +2752,7 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="rel-containers-io--bausteinsicht-containers-io--bausteinsicht.model-35" value="comment-preserving updates" style="edgeStyle=none;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=1;exitY=0.898;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="containers-io--bausteinsicht" target="containers-io--bausteinsicht.model" parent="1">
-          <mxGeometry relative="1" as="geometry"></mxGeometry>
+          <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <mxCell id="rel-containers-io--bausteinsicht.export-containers-io--bausteinsicht-46" value="reads diagram pages" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0.2;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5102;entryDx=0;entryDy=0;" edge="1" source="containers-io--bausteinsicht.export" target="containers-io--bausteinsicht" parent="1">
           <mxGeometry x="-0.6429" relative="1" as="geometry">
@@ -2746,7 +2794,7 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="rel-containers-io--bausteinsicht.table-containers-io--bausteinsicht.diagram-57" value="optionally uses diagrams" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="containers-io--bausteinsicht.table" target="containers-io--bausteinsicht.diagram" parent="1">
-          <mxGeometry relative="1" as="geometry"></mxGeometry>
+          <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <mxCell id="rel-containers-io--bausteinsicht.lsp-containers-io--bausteinsicht.model-60" value="indexes for completion" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0.65;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="containers-io--bausteinsicht.lsp" target="containers-io--bausteinsicht.model" parent="1">
           <mxGeometry x="-0.9414" relative="1" as="geometry">
@@ -2779,7 +2827,7 @@
       <root>
         <mxCell id="0"/>
         <mxCell id="1" parent="0"/>
-        <object label="&lt;b&gt;Bausteinsicht&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#BBBBBB&quot; style=&quot;font-size:11px&quot;&gt;Architecture-as-code tool with draw.io as visual frontend a…&lt;/font&gt;" id="containers-evolution--bausteinsicht" bausteinsicht_id="bausteinsicht" bausteinsicht_kind="system_boundary" tooltip="Architecture-as-code tool with draw.io as visual frontend and bidirectional synchronization" link="data:page/id,view-containers-evolution">
+        <object label="&lt;b&gt;Bausteinsicht&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#BBBBBB&quot; style=&quot;font-size:11px&quot;&gt;Architecture-as-code tool with draw.io as visual frontend a…&lt;/font&gt;" id="containers-evolution--bausteinsicht" bausteinsicht_id="bausteinsicht" bausteinsicht_kind="system_boundary" tooltip="Architecture-as-code tool with draw.io as visual frontend and bidirectional synchronization" link="data:page/id,view-containers-analysis">
           <mxCell style="swimlane;startSize=60;fillColor=#E8E8E8;strokeColor=#0B4884;fontColor=#0B4884;fontStyle=1;rounded=1;arcSize=5;whiteSpace=wrap;html=1;container=1;collapsible=0;fontSize=14;" vertex="1" parent="1">
             <mxGeometry x="40" y="80" width="1360" height="980" as="geometry"/>
           </mxCell>
@@ -2904,7 +2952,7 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="rel-containers-evolution--bausteinsicht.cli-containers-evolution--bausteinsicht-7" value="triggers sync" style="edgeStyle=none;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.1531;entryDx=0;entryDy=0;" edge="1" source="containers-evolution--bausteinsicht.cli" target="containers-evolution--bausteinsicht" parent="1">
-          <mxGeometry relative="1" as="geometry"></mxGeometry>
+          <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <mxCell id="rel-containers-evolution--bausteinsicht.cli-containers-evolution--bausteinsicht.changelog-17" value="triggers changelog generation" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="containers-evolution--bausteinsicht.cli" target="containers-evolution--bausteinsicht.changelog" parent="1">
           <mxGeometry x="0.9390" relative="1" as="geometry">
@@ -2955,10 +3003,10 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="rel-containers-evolution--bausteinsicht-containers-evolution--bausteinsicht.model-35" value="comment-preserving updates" style="edgeStyle=none;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=1;exitY=0.898;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="containers-evolution--bausteinsicht" target="containers-evolution--bausteinsicht.model" parent="1">
-          <mxGeometry relative="1" as="geometry"></mxGeometry>
+          <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <mxCell id="rel-containers-evolution--bausteinsicht.changelog-containers-evolution--bausteinsicht.diff-61" value="computes as-is/to-be delta per ref" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="containers-evolution--bausteinsicht.changelog" target="containers-evolution--bausteinsicht.diff" parent="1">
-          <mxGeometry relative="1" as="geometry"></mxGeometry>
+          <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <mxCell id="rel-containers-evolution--bausteinsicht.changelog-containers-evolution--bausteinsicht.model-62" value="loads model at each git ref" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0.65;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="containers-evolution--bausteinsicht.changelog" target="containers-evolution--bausteinsicht.model" parent="1">
           <mxGeometry x="-0.9079" relative="1" as="geometry">

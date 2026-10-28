@@ -216,7 +216,27 @@
           "kind": "container",
           "title": "Search",
           "description": "Element and relationship search with filtering and pattern matching",
-          "technology": "Go"
+          "technology": "Go",
+          "children": {
+            "engine": {
+              "kind": "component",
+              "title": "Search Engine",
+              "description": "Run(): tokenises the query, matches elements, relationships and views (AND), ranks by score",
+              "technology": "Go"
+            },
+            "scorer": {
+              "kind": "component",
+              "title": "Scorer",
+              "description": "Field-weighted relevance scoring per object type (ID, title, description, technology, kind, tags, endpoints)",
+              "technology": "Go"
+            },
+            "results": {
+              "kind": "component",
+              "title": "Result Types",
+              "description": "Options, Result and Response DTOs that form the JSON output of the find command",
+              "technology": "Go"
+            }
+          }
         },
         "table": {
           "kind": "container",
@@ -874,6 +894,18 @@
       "to": "bausteinsicht.model",
       "label": "merges multiple models",
       "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.search.engine",
+      "to": "bausteinsicht.search.scorer",
+      "label": "scores candidates",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.search.engine",
+      "to": "bausteinsicht.search.results",
+      "label": "builds ranked response",
+      "kind": "uses"
     }
   ],
   "views": {
@@ -1024,7 +1056,7 @@
       "title": "Search Package Components",
       "scope": "bausteinsicht.search",
       "include": [
-        "bausteinsicht.search",
+        "bausteinsicht.search.*",
         "bausteinsicht.model",
         "bausteinsicht.cli"
       ],

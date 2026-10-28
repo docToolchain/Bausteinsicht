@@ -12,9 +12,19 @@
 | Go
 | JSONC architecture model management — loading, validation, and mutation
 
-| Search
-| container
+| Search Engine
+| component
 | Go
-| Element and relationship search with filtering and pattern matching
+| Run(): tokenises the query, matches elements, relationships and views (AND), ranks by score
+
+| Result Types
+| component
+| Go
+| Options, Result and Response DTOs that form the JSON output of the find command
+
+| Scorer
+| component
+| Go
+| Field-weighted relevance scoring per object type (ID, title, description, technology, kind, tags, endpoints)
 
 |===
