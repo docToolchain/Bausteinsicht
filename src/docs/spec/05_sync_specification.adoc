@@ -328,7 +328,8 @@ This also removes lifted connectors left behind when a relationship is deleted o
 User-drawn connectors carry other cell IDs and are never removed by this step.
 
 Connector cell IDs carry the relationship's index in the `relationships` array, so inserting or removing a relationship renames every following connector, and a new lower-index relationship can take over a lifted pair.
-Before changes are applied, an expected connector that is missing on the page takes over a no-longer-expected managed connector with the same source and target: the cell gets the new ID and the current label and keeps its waypoints and label position.
+Before changes are applied, an expected connector that is missing on the page takes over a no-longer-expected managed connector with the same source and target: the cell gets the new ID, the current label and the dashed style of its relationship kind, and keeps its waypoints and label position.
+Model-side label and kind changes are applied to view connectors through their page-scoped cell IDs.
 
 === Placement Strategy for New Elements
 

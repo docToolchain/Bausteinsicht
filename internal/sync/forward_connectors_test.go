@@ -246,3 +246,101 @@ func TestSync_NewLiftedRelationshipKeepsExistingConnector(t *testing.T) {
 		})
 	}
 }
+
+// connectorAttr returns attribute attr of the connector cell id on page.
+func connectorAttr(page *drawio.Page, id, attr string) string {
+	for _, c := range page.FindAllConnectors() {
+		if c.SelectAttrValue("id", "") == id {
+			return c.SelectAttrValue(attr, "")
+		}
+	}
+	return "<missing>"
+}
+
+// TestSync_ModelLabelChangeReachesViewConnector: a Modified relationship
+// change looked the connector up by unscoped endpoints, so on view pages
+// (rel-<view>--… IDs) a model label edit never reached the diagram.
+func TestSync_ModelLabelChangeReachesViewConnector(t *testing.T) {
+	m1 := liftingModel(model.Relationship{From: "shop.web", To: "shop.lib", Label: "old"})
+	m2 := liftingModel(model.Relationship{From: "shop.web", To: "shop.lib", Label: "new"})
+
+	page := syncTwice(t, m1, m2)
+
+	if got := connectorAttr(page, "rel-containers--shop.web-containers--shop.lib-0", "value"); got != "new" {
+		t.Fatalf("connector label = %q, want %q", got, "new")
+	}
+}
+
+// TestSync_IndexShiftOntoPresentIDRelabels: inserting a relationship before
+// two parallel ones moves A onto B's old ID. That cell is still expected,
+// so it is not re-keyed; it must still get A's label, otherwise reverse
+// sync reads B's label back into relationship A on the next run.
+func TestSync_IndexShiftOntoPresentIDRelabels(t *testing.T) {
+	x := model.Relationship{From: "shop.lib", To: "shop.web", Label: "X"}
+	a := model.Relationship{From: "shop.web", To: "shop.lib", Label: "A"}
+	b := model.Relationship{From: "shop.web", To: "shop.lib", Label: "B"}
+	m2 := liftingModel(x, x, a, b)
+
+	ts := minimalTemplates(t)
+	doc := shopContainersDoc()
+	m1 := liftingModel(x, a, b)
+	Run(m1, doc, emptyState(), ts, nil)
+	Run(m2, doc, buildTestState(t, m1, doc), ts, nil)
+	Run(m2, doc, buildTestState(t, m2, doc), ts, nil)
+	page := requirePage(t, doc, "view-containers")
+
+	if got := connectorAttr(page, "rel-containers--shop.web-containers--shop.lib-2", "value"); got != "A" {
+		t.Errorf("connector -2 label = %q, want A", got)
+	}
+	if m2.Relationships[2].Label != "A" {
+		t.Errorf("model relationship 2 label overwritten to %q", m2.Relationships[2].Label)
+	}
+}
+
+// TestSync_RekeyAppliesDashedOfNewRelationship: a re-keyed cell takes over
+// the dashed/solid style of the relationship it now stands for (#518).
+func TestSync_RekeyAppliesDashedOfNewRelationship(t *testing.T) {
+	solid := model.Relationship{From: "shop.web", To: "shop.lib.core", Label: "calls core"}
+	async := model.Relationship{From: "shop.web", To: "shop.lib.util", Label: "events", Kind: "async"}
+	notify := model.Relationship{From: "shop.lib", To: "shop.web", Label: "notifies"}
+	m1 := liftingModel(notify, solid)
+	m2 := liftingModel(async, notify) // solid removed, async takes the pair at index 0
+	for _, m := range []*model.BausteinsichtModel{m1, m2} {
+		m.Specification.Relationships = map[string]model.RelationshipKind{"async": {Notation: "async", Dashed: true}}
+	}
+
+	page := syncTwiceWithWaypoint(t, m1, m2, "rel-containers--shop.web-containers--shop.lib-1")
+
+	id := "rel-containers--shop.web-containers--shop.lib-0"
+	if !hasWaypoint(page, id) || !strings.Contains(connectorAttr(page, id, "style"), "dashed=1") {
+		t.Fatalf("re-keyed connector should keep its waypoint and become dashed, style %q", connectorAttr(page, id, "style"))
+	}
+}
+
+// TestRekeyStaleConnectors_MatchesByOldIndex: parallel stale cells are
+// matched to the new IDs in old-index order, not document order, so each
+// keeps its own routing.
+func TestRekeyStaleConnectors_MatchesByOldIndex(t *testing.T) {
+	ts := minimalTemplates(t)
+	doc := shopContainersDoc()
+	m := liftingModel()
+	Run(m, doc, emptyState(), ts, nil)
+	page := requirePage(t, doc, "view-containers")
+	for _, idx := range []int{5, 4} { // document order: 5 before 4
+		page.CreateConnector(drawio.ConnectorData{
+			SourceRef: "containers--shop.web", TargetRef: "containers--shop.lib", Index: idx, Label: "old",
+		}, "")
+	}
+	conns := []viewConnector{
+		{from: "shop.web", to: "shop.lib", index: 0, label: "A"},
+		{from: "shop.web", to: "shop.lib", index: 1, label: "B"},
+	}
+
+	rekeyStaleConnectors(page, "containers", conns)
+
+	// Old index 4 (A's predecessor) must become 0, old 5 must become 1.
+	ids := page.FindAllConnectors()
+	if ids[len(ids)-2].SelectAttrValue("id", "") != "rel-containers--shop.web-containers--shop.lib-1" {
+		t.Errorf("cell with old index 5 should become index 1, got %s", ids[len(ids)-2].SelectAttrValue("id", ""))
+	}
+}

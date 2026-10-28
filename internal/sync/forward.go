@@ -404,10 +404,9 @@ func connectorStyle(baseStyle, kind string, spec *model.Specification) string {
 // newly populated elements are rendered (#231). It returns the expected set
 // so stale connectors can be reconciled against it.
 func populateConnectors(in forwardRenderInputs, viewID string, scopeID string, elemSet map[string]bool) []viewConnector {
-	dashedForPair := computeDashedPairs(in.model, elemSet, scopeID)
 	conns := expectedViewConnectors(in.model, elemSet, scopeID)
 	for _, vc := range conns {
-		createConnectorIfAbsent(in, viewID, vc.from, vc.to, vc.index, vc.label, dashedForPair[vc.from+"->"+vc.to])
+		createConnectorIfAbsent(in, viewID, vc.from, vc.to, vc.index, vc.label, vc.dashed)
 	}
 	return conns
 }
@@ -710,6 +709,10 @@ func applyRelationshipUpsert(in forwardRenderInputs, ch RelationshipChange, pass
 		lifted := RelationshipChange{From: from, To: to, Index: ch.Index, Type: ch.Type, NewValue: ch.NewValue, Kind: ch.Kind}
 		applyRelAdded(lifted, viewID, page, in.templates, spec, in.result)
 	case Modified:
+		// View connectors carry page-scoped cell IDs (rel-<view>--…); with
+		// unscoped endpoints the lookup missed and model edits never
+		// reached view pages (#655).
+		from, to = scopedCellID(viewID, from), scopedCellID(viewID, to)
 		page.UpdateConnectorLabel(from, to, ch.Index, ch.NewValue)
 		// Recompute style from the template base rather than patching the
 		// existing style, so a kind change that flips dashed on or off is

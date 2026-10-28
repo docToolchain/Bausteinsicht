@@ -1,6 +1,7 @@
 package sync
 
 import (
+	"sort"
 	"strings"
 
 	"github.com/beevik/etree"
@@ -15,6 +16,7 @@ type viewConnector struct {
 	from, to string
 	index    int
 	label    string
+	dashed   bool // any relationship rendered by this connector is dashed (#518)
 }
 
 // expectedViewConnectors returns the connectors a view page should carry for
@@ -24,6 +26,7 @@ type viewConnector struct {
 // (#142, #197). Every sync derives the same set, independent of which
 // relationships changed, so the page converges on it.
 func expectedViewConnectors(m *model.BausteinsichtModel, elemSet map[string]bool, scopeID string) []viewConnector {
+	dashedForPair := computeDashedPairs(m, elemSet, scopeID)
 	var direct, lifted []viewConnector
 	directPairs := make(map[string]bool)
 	for i, rel := range m.Relationships {
@@ -31,7 +34,7 @@ func expectedViewConnectors(m *model.BausteinsichtModel, elemSet map[string]bool
 		if !ok {
 			continue
 		}
-		vc := viewConnector{from: from, to: to, index: i, label: rel.Label}
+		vc := viewConnector{from: from, to: to, index: i, label: rel.Label, dashed: dashedForPair[from+"->"+to]}
 		if from == rel.From && to == rel.To {
 			direct = append(direct, vc)
 			directPairs[from+"->"+to] = true
@@ -95,7 +98,8 @@ func reconcileViewConnectors(page *drawio.Page, viewID string, expected map[stri
 // would be deleted and a new one created, losing the user's waypoints and
 // label position. For each expected connector missing on the page, a
 // managed connector with the same source and target whose ID is no longer
-// expected is renamed and relabelled instead. Returns how many it re-keyed.
+// expected is renamed, relabelled and restyled (dashed) instead. Returns
+// how many it re-keyed.
 func rekeyStaleConnectors(page *drawio.Page, viewID string, conns []viewConnector) int {
 	expected := expectedConnectorIDs(viewID, conns)
 	prefix := "rel-" + viewID + "--"
@@ -110,6 +114,14 @@ func rekeyStaleConnectors(page *drawio.Page, viewID string, conns []viewConnecto
 		}
 	}
 
+	// Match parallel stale cells in old-index order so each relationship
+	// keeps the routing of its predecessor, independent of document order.
+	for _, cells := range stale {
+		sort.SliceStable(cells, func(i, j int) bool {
+			return parseConnectorIndex(cells[i].SelectAttrValue("id", "")) < parseConnectorIndex(cells[j].SelectAttrValue("id", ""))
+		})
+	}
+
 	rekeyed := 0
 	for _, vc := range conns {
 		src, tgt := scopedCellID(viewID, vc.from), scopedCellID(viewID, vc.to)
@@ -122,6 +134,11 @@ func rekeyStaleConnectors(page *drawio.Page, viewID string, conns []viewConnecto
 		stale[src+"->"+tgt] = cells[1:]
 		setAttrOn(cell, "id", id)
 		setAttrOn(cell, "value", vc.label)
+		dashed := "dashed=0;"
+		if vc.dashed {
+			dashed = "dashed=1;"
+		}
+		setAttrOn(cell, "style", mergeStyles(cell.SelectAttrValue("style", ""), dashed))
 		present[id] = true
 		rekeyed++
 	}
