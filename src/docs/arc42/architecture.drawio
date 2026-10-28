@@ -300,7 +300,7 @@
           </mxCell>
         </object>
         <object id="containers--bausteinsicht.constraints" bausteinsicht_id="bausteinsicht.constraints" bausteinsicht_kind="container" technology="Go" tooltip="Validation constraints for model linting and consistency checking">
-          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;" vertex="1" parent="containers--bausteinsicht">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1" parent="containers--bausteinsicht">
             <mxGeometry x="260" y="590" width="180" height="120" as="geometry"/>
           </mxCell>
         </object>
@@ -314,7 +314,7 @@
           <mxGeometry x="0" y="50" width="180" height="70" as="geometry"/>
         </mxCell>
         <object id="containers--bausteinsicht.exporter" bausteinsicht_id="bausteinsicht.exporter" bausteinsicht_kind="container" technology="Go" tooltip="Architecture export to Structurizr DSL and other formats" link="data:page/id,view-exporter-components">
-          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;dashed=1;strokeColor=#FF0000;" vertex="1" parent="containers--bausteinsicht">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1" parent="containers--bausteinsicht">
             <mxGeometry x="550" y="860" width="180" height="120" as="geometry"/>
           </mxCell>
         </object>
@@ -328,7 +328,7 @@
           <mxGeometry x="0" y="50" width="180" height="70" as="geometry"/>
         </mxCell>
         <object id="containers--bausteinsicht.importer" bausteinsicht_id="bausteinsicht.importer" bausteinsicht_kind="container" technology="Go" tooltip="Import architecture from Structurizr DSL, LikeC4, and XMI/Enterprise Architect formats" link="data:page/id,view-importer-components">
-          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;dashed=1;strokeColor=#FF0000;" vertex="1" parent="containers--bausteinsicht">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1" parent="containers--bausteinsicht">
             <mxGeometry x="840" y="860" width="180" height="120" as="geometry"/>
           </mxCell>
         </object>
@@ -342,7 +342,7 @@
           <mxGeometry x="0" y="50" width="180" height="70" as="geometry"/>
         </mxCell>
         <object id="containers--bausteinsicht.lsp" bausteinsicht_id="bausteinsicht.lsp" bausteinsicht_kind="container" technology="Go" tooltip="Language Server Protocol implementation for VS Code and other editors">
-          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;" vertex="1" parent="containers--bausteinsicht">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1" parent="containers--bausteinsicht">
             <mxGeometry x="1130" y="860" width="180" height="120" as="geometry"/>
           </mxCell>
         </object>
@@ -356,7 +356,7 @@
           <mxGeometry x="0" y="50" width="180" height="70" as="geometry"/>
         </mxCell>
         <object id="containers--bausteinsicht.diagram" bausteinsicht_id="bausteinsicht.diagram" bausteinsicht_kind="container" technology="Go" tooltip="Text-based diagram export to Mermaid C4 and PlantUML formats with markdown wrapping" link="data:page/id,view-diagram-components">
-          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;" vertex="1" parent="containers--bausteinsicht">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1" parent="containers--bausteinsicht">
             <mxGeometry x="1710" y="860" width="180" height="120" as="geometry"/>
           </mxCell>
         </object>
@@ -370,7 +370,7 @@
           <mxGeometry x="0" y="50" width="180" height="70" as="geometry"/>
         </mxCell>
         <object id="containers--bausteinsicht.search" bausteinsicht_id="bausteinsicht.search" bausteinsicht_kind="container" technology="Go" tooltip="Element and relationship search with filtering and pattern matching" link="data:page/id,view-search-components">
-          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;" vertex="1" parent="containers--bausteinsicht">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1" parent="containers--bausteinsicht">
             <mxGeometry x="1130" y="590" width="180" height="120" as="geometry"/>
           </mxCell>
         </object>
@@ -384,7 +384,7 @@
           <mxGeometry x="0" y="50" width="180" height="70" as="geometry"/>
         </mxCell>
         <object id="containers--bausteinsicht.table" bausteinsicht_id="bausteinsicht.table" bausteinsicht_kind="container" technology="Go" tooltip="Export architecture to CSV and Markdown table formats">
-          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;" vertex="1" parent="containers--bausteinsicht">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1" parent="containers--bausteinsicht">
             <mxGeometry x="1420" y="860" width="180" height="120" as="geometry"/>
           </mxCell>
         </object>
@@ -497,7 +497,7 @@
           <mxGeometry relative="1" as="geometry"></mxGeometry>
         </mxCell>
         <object id="containers--bausteinsicht.changelog" bausteinsicht_id="bausteinsicht.changelog" bausteinsicht_kind="container" technology="Go" tooltip="Architecture changelog generation between two git refs">
-          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;" vertex="1" parent="containers--bausteinsicht">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1" parent="containers--bausteinsicht">
             <mxGeometry x="1420" y="1130" width="180" height="120" as="geometry"/>
           </mxCell>
         </object>
@@ -511,7 +511,7 @@
           <mxGeometry x="0" y="50" width="180" height="70" as="geometry"/>
         </mxCell>
         <object id="containers--bausteinsicht.overlay" bausteinsicht_id="bausteinsicht.overlay" bausteinsicht_kind="container" technology="Go" tooltip="Metric heatmap overlay application and removal on draw.io diagrams">
-          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;" vertex="1" parent="containers--bausteinsicht">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1" parent="containers--bausteinsicht">
             <mxGeometry x="1710" y="590" width="180" height="120" as="geometry"/>
           </mxCell>
         </object>
@@ -525,7 +525,7 @@
           <mxGeometry x="0" y="50" width="180" height="70" as="geometry"/>
         </mxCell>
         <object id="containers--bausteinsicht.snapshot" bausteinsicht_id="bausteinsicht.snapshot" bausteinsicht_kind="container" technology="Go" tooltip="Versioned architecture snapshot storage and restore">
-          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;" vertex="1" parent="containers--bausteinsicht">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1" parent="containers--bausteinsicht">
             <mxGeometry x="550" y="1130" width="180" height="120" as="geometry"/>
           </mxCell>
         </object>
@@ -539,7 +539,7 @@
           <mxGeometry x="0" y="50" width="180" height="70" as="geometry"/>
         </mxCell>
         <object id="containers--bausteinsicht.template" bausteinsicht_id="bausteinsicht.template" bausteinsicht_kind="container" technology="Go" tooltip="draw.io template generation from element specification (shapes, layout)">
-          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;" vertex="1" parent="containers--bausteinsicht">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1" parent="containers--bausteinsicht">
             <mxGeometry x="840" y="320" width="180" height="120" as="geometry"/>
           </mxCell>
         </object>
@@ -553,7 +553,7 @@
           <mxGeometry x="0" y="50" width="180" height="70" as="geometry"/>
         </mxCell>
         <object id="containers--bausteinsicht.workspace" bausteinsicht_id="bausteinsicht.workspace" bausteinsicht_kind="container" technology="Go" tooltip="Multi-model workspace configuration loading and merging">
-          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;" vertex="1" parent="containers--bausteinsicht">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1" parent="containers--bausteinsicht">
             <mxGeometry x="840" y="1130" width="180" height="120" as="geometry"/>
           </mxCell>
         </object>
@@ -567,7 +567,7 @@
           <mxGeometry x="0" y="50" width="180" height="70" as="geometry"/>
         </mxCell>
         <object id="containers--bausteinsicht.diff" bausteinsicht_id="bausteinsicht.diff" bausteinsicht_kind="container" technology="Go" tooltip="As-is vs. to-be architecture comparison">
-          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;" vertex="1" parent="containers--bausteinsicht">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1" parent="containers--bausteinsicht">
             <mxGeometry x="1710" y="1130" width="180" height="120" as="geometry"/>
           </mxCell>
         </object>
@@ -581,7 +581,7 @@
           <mxGeometry x="0" y="50" width="180" height="70" as="geometry"/>
         </mxCell>
         <object id="containers--bausteinsicht.schema" bausteinsicht_id="bausteinsicht.schema" bausteinsicht_kind="container" technology="Go" tooltip="JSON Schema generation from Go model types for IDE autocompletion">
-          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;" vertex="1" parent="containers--bausteinsicht">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1" parent="containers--bausteinsicht">
             <mxGeometry x="1130" y="1130" width="180" height="120" as="geometry"/>
           </mxCell>
         </object>
@@ -595,7 +595,7 @@
           <mxGeometry x="0" y="50" width="180" height="70" as="geometry"/>
         </mxCell>
         <object id="containers--bausteinsicht.health" bausteinsicht_id="bausteinsicht.health" bausteinsicht_kind="container" technology="Go" tooltip="Architecture health scoring — completeness, conformance, and complexity">
-          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;" vertex="1" parent="containers--bausteinsicht">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1" parent="containers--bausteinsicht">
             <mxGeometry x="840" y="590" width="180" height="120" as="geometry"/>
           </mxCell>
         </object>
@@ -609,7 +609,7 @@
           <mxGeometry x="0" y="50" width="180" height="70" as="geometry"/>
         </mxCell>
         <object id="containers--bausteinsicht.layout" bausteinsicht_id="bausteinsicht.layout" bausteinsicht_kind="container" technology="Go" tooltip="Auto-layout algorithms for positioning elements in draw.io diagrams">
-          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;" vertex="1" parent="containers--bausteinsicht">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1" parent="containers--bausteinsicht">
             <mxGeometry x="260" y="1130" width="180" height="120" as="geometry"/>
           </mxCell>
         </object>
@@ -623,7 +623,7 @@
           <mxGeometry x="0" y="50" width="180" height="70" as="geometry"/>
         </mxCell>
         <object id="containers--bausteinsicht.stale" bausteinsicht_id="bausteinsicht.stale" bausteinsicht_kind="container" technology="Go" tooltip="Detects unused or forgotten architecture elements via git history and ADR/status metadata">
-          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;" vertex="1" parent="containers--bausteinsicht">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1" parent="containers--bausteinsicht">
             <mxGeometry x="1420" y="590" width="180" height="120" as="geometry"/>
           </mxCell>
         </object>
@@ -637,7 +637,7 @@
           <mxGeometry x="0" y="50" width="180" height="70" as="geometry"/>
         </mxCell>
         <object id="containers--bausteinsicht.graph" bausteinsicht_id="bausteinsicht.graph" bausteinsicht_kind="container" technology="Go" tooltip="Relationship graph analysis — cycle detection and dependency depth">
-          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;" vertex="1" parent="containers--bausteinsicht">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;" vertex="1" parent="containers--bausteinsicht">
             <mxGeometry x="550" y="590" width="180" height="120" as="geometry"/>
           </mxCell>
         </object>
@@ -1834,7 +1834,7 @@
           </mxGeometry>
         </mxCell>
         <object id="importer-components--bausteinsicht.importer.xmi" bausteinsicht_id="bausteinsicht.importer.xmi" bausteinsicht_kind="component" technology="Go" tooltip="XMI/Enterprise Architect parsing and model conversion. Buffers the whole file in memory and converts Windows-1252 to UTF-8 before parsing (peak RSS ~2x file size); a 200MB read cap is enforced.">
-          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#85BBF0;fontColor=#000000;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#FF0000;dashed=1;" vertex="1" parent="importer-components--bausteinsicht.importer">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#85BBF0;fontColor=#000000;arcSize=5;fontSize=13;align=center;verticalAlign=middle;spacing=4;container=1;strokeColor=#78A8D8;" vertex="1" parent="importer-components--bausteinsicht.importer">
             <mxGeometry x="560" y="90" width="180" height="120" as="geometry"/>
           </mxCell>
         </object>
