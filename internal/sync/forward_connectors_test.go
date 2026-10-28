@@ -164,3 +164,85 @@ func TestSync_UserDrawnConnectorIsKept(t *testing.T) {
 		t.Fatalf("user-drawn connector must not be removed, removed %d", removed)
 	}
 }
+
+// addWaypoint gives the connector cell id a manual waypoint, as a user does
+// when routing an edge in draw.io.
+func addWaypoint(t *testing.T, page *drawio.Page, id string) {
+	t.Helper()
+	for _, c := range page.FindAllConnectors() {
+		if c.SelectAttrValue("id", "") != id {
+			continue
+		}
+		pts := c.SelectElement("mxGeometry").CreateElement("Array")
+		pts.CreateAttr("as", "points")
+		pt := pts.CreateElement("mxPoint")
+		pt.CreateAttr("x", "123")
+		pt.CreateAttr("y", "456")
+		return
+	}
+	t.Fatalf("connector %s not found", id)
+}
+
+func hasWaypoint(page *drawio.Page, id string) bool {
+	for _, c := range page.FindAllConnectors() {
+		if c.SelectAttrValue("id", "") == id {
+			return c.FindElement("mxGeometry/Array/mxPoint[@x='123']") != nil
+		}
+	}
+	return false
+}
+
+// syncTwiceWithWaypoint syncs m1, routes the connector firstID by hand,
+// then syncs m2 and returns the page.
+func syncTwiceWithWaypoint(t *testing.T, m1, m2 *model.BausteinsichtModel, firstID string) *drawio.Page {
+	t.Helper()
+	ts := minimalTemplates(t)
+	doc := shopContainersDoc()
+	Run(m1, doc, emptyState(), ts, nil)
+	page := requirePage(t, doc, "view-containers")
+	addWaypoint(t, page, firstID)
+	Run(m2, doc, buildTestState(t, m1, doc), ts, nil)
+	return page
+}
+
+// TestSync_IndexShiftKeepsConnectorRouting: connector IDs carry the
+// relationship's array index, so inserting a relationship earlier in the
+// array renamed every following connector. They were recreated without
+// their waypoints; now the existing cell is re-keyed and keeps its routing.
+func TestSync_IndexShiftKeepsConnectorRouting(t *testing.T) {
+	direct := model.Relationship{From: "shop.web", To: "shop.lib", Label: "uses"}
+	inserted := model.Relationship{From: "shop.lib", To: "shop.web", Label: "notifies"}
+
+	page := syncTwiceWithWaypoint(t, liftingModel(direct), liftingModel(inserted, direct),
+		"rel-containers--shop.web-containers--shop.lib-0")
+
+	id := "rel-containers--shop.web-containers--shop.lib-1"
+	if !hasWaypoint(page, id) {
+		t.Fatalf("connector %s should keep its waypoint after the index shift; connectors: %v",
+			id, connectorsBetween(page, "containers--shop.web", "containers--shop.lib"))
+	}
+}
+
+// TestSync_NewLiftedRelationshipKeepsExistingConnector: adding a component
+// relationship that lifts onto an already drawn pair (cross-container edge
+// on a container view) created a second connector without waypoints next
+// to the routed one. The pair keeps exactly one connector, with its routing.
+func TestSync_NewLiftedRelationshipKeepsExistingConnector(t *testing.T) {
+	notify := model.Relationship{From: "shop.lib", To: "shop.web", Label: "notifies"}
+	old := model.Relationship{From: "shop.web", To: "shop.lib.core", Label: "calls core"}
+	added := model.Relationship{From: "shop.web", To: "shop.lib.util", Label: "calls util"}
+
+	for name, m2 := range map[string]*model.BausteinsichtModel{
+		"appended": liftingModel(notify, old, added),
+		"inserted": liftingModel(added, notify, old), // added becomes the pair's lowest index
+	} {
+		t.Run(name, func(t *testing.T) {
+			page := syncTwiceWithWaypoint(t, liftingModel(notify, old), m2,
+				"rel-containers--shop.web-containers--shop.lib-1")
+			got := connectorsBetween(page, "containers--shop.web", "containers--shop.lib")
+			if len(got) != 1 || !hasWaypoint(page, got[0]) {
+				t.Fatalf("want 1 routed connector web→lib, got %v", got)
+			}
+		})
+	}
+}

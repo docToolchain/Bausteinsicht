@@ -3,6 +3,8 @@ package sync
 import (
 	"strings"
 
+	"github.com/beevik/etree"
+
 	"github.com/docToolchain/Bausteinsicht/internal/drawio"
 	"github.com/docToolchain/Bausteinsicht/internal/model"
 )
@@ -83,4 +85,45 @@ func reconcileViewConnectors(page *drawio.Page, viewID string, expected map[stri
 		removed++
 	}
 	return removed
+}
+
+// rekeyStaleConnectors gives existing connectors the cell ID of their
+// relationship's current index before changes are applied. Connector IDs
+// carry the index into the relationships array, so inserting or removing a
+// relationship renames every following connector, and a new lower-index
+// relationship can take over a lifted pair. Without re-keying, the old cell
+// would be deleted and a new one created, losing the user's waypoints and
+// label position. For each expected connector missing on the page, a
+// managed connector with the same source and target whose ID is no longer
+// expected is renamed and relabelled instead. Returns how many it re-keyed.
+func rekeyStaleConnectors(page *drawio.Page, viewID string, conns []viewConnector) int {
+	expected := expectedConnectorIDs(viewID, conns)
+	prefix := "rel-" + viewID + "--"
+	stale := make(map[string][]*etree.Element) // "src->tgt" → stale cells
+	present := make(map[string]bool)
+	for _, cell := range page.FindAllConnectors() {
+		id := cell.SelectAttrValue("id", "")
+		present[id] = true
+		if strings.HasPrefix(id, prefix) && !expected[id] {
+			pair := cell.SelectAttrValue("source", "") + "->" + cell.SelectAttrValue("target", "")
+			stale[pair] = append(stale[pair], cell)
+		}
+	}
+
+	rekeyed := 0
+	for _, vc := range conns {
+		src, tgt := scopedCellID(viewID, vc.from), scopedCellID(viewID, vc.to)
+		id := drawio.ConnectorID(src, tgt, vc.index)
+		cells := stale[src+"->"+tgt]
+		if present[id] || len(cells) == 0 {
+			continue
+		}
+		cell := cells[0]
+		stale[src+"->"+tgt] = cells[1:]
+		setAttrOn(cell, "id", id)
+		setAttrOn(cell, "value", vc.label)
+		present[id] = true
+		rekeyed++
+	}
+	return rekeyed
 }

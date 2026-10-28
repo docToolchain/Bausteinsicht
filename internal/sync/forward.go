@@ -237,6 +237,10 @@ func applyForwardToView(in forwardRenderInputs, opts *ForwardOptions, viewID str
 	// this handles elements newly included via view changes (#231).
 	populateNewPage(in, viewID, scopeID, elemSet)
 
+	// Re-key existing connectors whose relationship index shifted, so
+	// applying changes finds them instead of creating unrouted copies.
+	rekeyStaleConnectors(page, viewID, expectedViewConnectors(m, elemSet, scopeID))
+
 	applyChangesToPage(in, elemSet, viewID, scopeID)
 
 	// Populate connectors for relationships whose endpoints are both
