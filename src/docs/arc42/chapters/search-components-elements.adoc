@@ -2,16 +2,6 @@
 |===
 | Element | Kind | Technology | Description
 
-| CLI
-| container
-| Go / Cobra
-| Command-line interface providing validate, sync, export, and watch commands
-
-| Model
-| container
-| Go
-| JSONC architecture model management — loading, validation, and mutation
-
 | Search Engine
 | component
 | Go

@@ -1,17 +1,12 @@
 @startuml
 !include <C4/C4_Component>
 
-Container(bausteinsicht_cli, "CLI", "Go / Cobra", "Command-line interface providing validate, sync, export, and watch commands")
-Container(bausteinsicht_model, "Model", "Go", "JSONC architecture model management — loading, validation, and mutation")
 Container_Boundary(bausteinsicht_search, "Search") {
   Component(bausteinsicht_search_engine, "Search Engine", "Go", "Run(): tokenises the query, matches elements, relationships and views (AND), ranks by score")
   Component(bausteinsicht_search_results, "Result Types", "Go", "Options, Result and Response DTOs that form the JSON output of the find command")
   Component(bausteinsicht_search_scorer, "Scorer", "Go", "Field-weighted relevance scoring per object type (ID, title, description, technology, kind, tags, endpoints)")
 }
 
-Rel(bausteinsicht_cli, bausteinsicht_model, "loads/saves JSONC")
-Rel(bausteinsicht_cli, bausteinsicht_search, "searches elements")
-Rel(bausteinsicht_search, bausteinsicht_model, "searches elements")
 Rel(bausteinsicht_search_engine, bausteinsicht_search_scorer, "scores candidates")
 Rel(bausteinsicht_search_engine, bausteinsicht_search_results, "builds ranked response")
 @enduml

@@ -1055,9 +1055,7 @@
       "title": "Search Package Components",
       "scope": "bausteinsicht.search",
       "include": [
-        "bausteinsicht.search.*",
-        "bausteinsicht.model",
-        "bausteinsicht.cli"
+        "bausteinsicht.search.*"
       ],
       "description": "Element and relationship search with pattern matching and filtering"
     },
