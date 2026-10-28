@@ -22,6 +22,12 @@ func connectorID(from, to string, index int) string {
 	return fmt.Sprintf("rel-%s-%s-%d", from, to, index)
 }
 
+// ConnectorID returns the canonical cell ID Bausteinsicht gives the connector
+// for the relationship at index between the cells from and to.
+func ConnectorID(from, to string, index int) string {
+	return connectorID(from, to, index)
+}
+
 // CreateConnector creates an edge mxCell connecting From to To.
 // Connectors always use parent="1" regardless of container nesting.
 func (p *Page) CreateConnector(data ConnectorData, style string) {

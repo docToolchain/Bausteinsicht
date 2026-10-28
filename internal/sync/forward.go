@@ -242,7 +242,11 @@ func applyForwardToView(in forwardRenderInputs, opts *ForwardOptions, viewID str
 	// Populate connectors for relationships whose endpoints are both
 	// on the page but whose connector doesn't exist yet. This handles
 	// relationships involving newly populated elements (#231).
-	populateConnectors(in, viewID, scopeID, elemSet)
+	conns := populateConnectors(in, viewID, scopeID, elemSet)
+
+	// Remove managed connectors outside the expected set, e.g. lifted
+	// connectors left behind by an index shift or a deleted relationship.
+	in.result.ConnectorsDeleted += reconcileViewConnectors(page, viewID, expectedConnectorIDs(viewID, conns))
 
 	// Reconciliation: remove elements on the page that are no longer
 	// in the resolved view (e.g., after exclude list changes). #102
@@ -390,25 +394,18 @@ func connectorStyle(baseStyle, kind string, spec *model.Specification) string {
 	return mergeStyles(baseStyle, "dashed=1;")
 }
 
-// populateConnectors creates connectors for all model relationships whose
-// (possibly lifted) endpoints are both on the page but no connector exists yet.
-// This ensures relationships involving newly populated elements are rendered (#231).
-func populateConnectors(in forwardRenderInputs, viewID string, scopeID string, elemSet map[string]bool) {
-	m := in.model
-	dashedForPair := computeDashedPairs(m, elemSet, scopeID)
-
-	liftedSeen := make(map[string]bool)
-	for i, rel := range m.Relationships {
-		from, to, ok := liftModelRelationshipEndpoints(rel, elemSet, scopeID)
-		if !ok {
-			continue
-		}
-		isLifted := from != rel.From || to != rel.To
-		if isDuplicateLiftedRelationship(from, to, isLifted, liftedSeen) {
-			continue
-		}
-		createConnectorIfAbsent(in, viewID, from, to, i, rel.Label, dashedForPair[from+"->"+to])
+// populateConnectors creates the expected connectors (see
+// expectedViewConnectors) whose (possibly lifted) endpoints are both on the
+// page but no connector exists yet. This ensures relationships involving
+// newly populated elements are rendered (#231). It returns the expected set
+// so stale connectors can be reconciled against it.
+func populateConnectors(in forwardRenderInputs, viewID string, scopeID string, elemSet map[string]bool) []viewConnector {
+	dashedForPair := computeDashedPairs(in.model, elemSet, scopeID)
+	conns := expectedViewConnectors(in.model, elemSet, scopeID)
+	for _, vc := range conns {
+		createConnectorIfAbsent(in, viewID, vc.from, vc.to, vc.index, vc.label, dashedForPair[vc.from+"->"+vc.to])
 	}
+	return conns
 }
 
 // computeDashedPairs precomputes, per lifted (from,to) pair, whether ANY
