@@ -3,7 +3,6 @@
 
 Container(bausteinsicht_cli, "CLI", "Go / Cobra", "Command-line interface providing validate, sync, export, and watch commands")
 Container(bausteinsicht_sync, "Sync Engine", "Go", "Bidirectional synchronization engine between JSONC model and draw.io diagrams")
-System_Ext(ide, "IDE", "IDE with JSON Schema support for JSONC editing with autocompletion")
 Container_Boundary(bausteinsicht_model, "Model") {
   Component(bausteinsicht_model_loader, "Loader", "Go", "JSONC read/write with comment stripping and trailing comma handling")
   Component(bausteinsicht_model_patch, "Patch", "Go", "Comment-preserving JSONC mutations for reverse sync")
@@ -12,7 +11,6 @@ Container_Boundary(bausteinsicht_model, "Model") {
   Component(bausteinsicht_model_validate, "Validate", "Go", "Model validation rules for elements, relationships, and views")
 }
 
-Rel(ide, bausteinsicht_model, "JSON Schema validation")
 Rel(bausteinsicht_cli, bausteinsicht_model_loader, "loads/saves JSONC")
 Rel(bausteinsicht_cli, bausteinsicht_model_validate, "validates model")
 Rel(bausteinsicht_cli, bausteinsicht_sync, "triggers sync")
