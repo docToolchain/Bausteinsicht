@@ -320,6 +320,17 @@ Relationships are processed in two passes to ensure correct deduplication (#197)
 
 This ensures that when a direct relationship (e.g., `api->db`) and a lifted relationship (e.g., `api.catalog->db` lifted to `api->db`) map to the same pair, only one connector is created with the direct relationship's label (#142, #197).
 
+==== Connector Reconciliation
+
+Every forward sync derives the full set of connectors a view page should carry from the model, using the rules above: all direct relationships, plus the lowest-index lifted relationship for each pair not covered by a direct one.
+Missing connectors from this set are created; connectors Bausteinsicht created earlier (cell IDs `rel-<view>--…`) that are not in the set are removed.
+This also removes lifted connectors left behind when a relationship is deleted or its index in the `relationships` array shifts: their cell ID carries the lifted endpoints and the old index, so a lookup by the model endpoints misses them.
+User-drawn connectors carry other cell IDs and are never removed by this step.
+
+Connector cell IDs carry the relationship's index in the `relationships` array, so inserting or removing a relationship renames every following connector, and a new lower-index relationship can take over a lifted pair.
+Before changes are applied, an expected connector that is missing on the page takes over a no-longer-expected managed connector with the same source and target: the cell gets the new ID, the current label and the dashed style of its relationship kind, and keeps its waypoints and label position.
+Model-side label and kind changes are applied to view connectors through their page-scoped cell IDs.
+
 === Placement Strategy for New Elements
 
 New elements from forward sync are placed using a simple side-by-side algorithm:
