@@ -382,6 +382,14 @@ Feature: Lifted connector deduplication
     When the user runs "bausteinsicht sync"
     Then only one lifted connector is drawn from "a" to "b"
     And the connector is not duplicated
+
+  Scenario: Index shift does not leave a stale lifted connector
+    Given a view that lifts "a.child -> b" to "a -> b"
+    And the user has synced once
+    When the user inserts another relationship before "a.child -> b" in the model
+    And the user runs "bausteinsicht sync"
+    Then exactly one connector is drawn from "a" to "b"
+    And it carries the relationship's current index
 ----
 
 ==== AC-9.4: Connector to scope element (#217)
