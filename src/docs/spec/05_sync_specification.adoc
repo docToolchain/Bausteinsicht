@@ -309,6 +309,13 @@ For example, if the model has a relationship `shop.api -> db` but only `shop` an
 True self-loops (where `from == to` in the model) are rendered as connectors.
 However, when lifting causes both endpoints to collapse to the same element (e.g., `shop.api -> shop.db` lifted to `shop -> shop`), the resulting self-reference is skipped because it does not represent a meaningful relationship at the view's abstraction level (#111, #212).
 
+==== Lifting onto the Scope Boundary
+
+On a view with a `scope`, the scope element is drawn as the boundary around all other elements.
+If lifting moves an endpoint onto that boundary (e.g., `shop.web -> shop.lib.core` on a view that includes `shop.web` but not `shop.lib`), the connector is skipped: the boundary encloses the whole page, so the edge says nothing, and the relationship is shown on a view that includes both endpoints.
+Such a relationship also does not count as visible on that view (see reverse-sync deletion detection, #167).
+A relationship that targets the scope element in the model (`shop.web -> shop`) is still drawn to the boundary (AC-9.4, #217).
+
 ==== Two-Pass Deduplication
 
 Relationships are processed in two passes to ensure correct deduplication (#197):

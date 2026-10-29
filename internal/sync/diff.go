@@ -130,6 +130,7 @@ func computeVisibleRelationships(m *model.BausteinsichtModel) map[string]bool {
 	// Resolve each view's element set.
 	type viewSet struct {
 		elems map[string]bool
+		scope string
 	}
 	var views []viewSet
 	for _, view := range m.Views {
@@ -145,7 +146,7 @@ func computeVisibleRelationships(m *model.BausteinsichtModel) map[string]bool {
 		if view.Scope != "" {
 			elemSet[view.Scope] = true
 		}
-		views = append(views, viewSet{elems: elemSet})
+		views = append(views, viewSet{elems: elemSet, scope: view.Scope})
 	}
 
 	visible := make(map[string]bool)
@@ -153,6 +154,11 @@ func computeVisibleRelationships(m *model.BausteinsichtModel) map[string]bool {
 		for _, vs := range views {
 			from := liftEndpoint(r.From, vs.elems)
 			to := liftEndpoint(r.To, vs.elems)
+			// Lifting onto the view's own scope boundary renders no
+			// connector (see liftedOntoScope), so it does not count.
+			if liftedOntoScope(r.From, from, vs.scope) || liftedOntoScope(r.To, to, vs.scope) {
+				continue
+			}
 			if from != "" && to != "" && from != to {
 				visible[relKey(r.From, r.To, i)] = true
 				break // found on at least one view
