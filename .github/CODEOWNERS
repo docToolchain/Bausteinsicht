@@ -1,0 +1,4 @@
+# Every file in the repository is owned by the Bausteinsicht reviewer team.
+# For non-draft pull requests, GitHub automatically requests this team
+# when the team is visible and has write access.
+* @docToolchain/reviewer_bausteinsicht
