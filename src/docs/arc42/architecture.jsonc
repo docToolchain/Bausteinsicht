@@ -526,7 +526,7 @@
     {
       "from": "bausteinsicht.cli",
       "to": "bausteinsicht.search",
-      "label": "searches elements",
+      "label": "searches elements, relationships and views",
       "kind": "uses"
     },
     {
@@ -766,7 +766,7 @@
     {
       "from": "bausteinsicht.search",
       "to": "bausteinsicht.model",
-      "label": "searches elements",
+      "label": "reads elements, relationships and views",
       "kind": "uses"
     },
     {
@@ -1912,7 +1912,7 @@
           "index": 9,
           "from": "bausteinsicht.search",
           "to": "architect",
-          "label": "matching elements",
+          "label": "matching elements, relationships and views",
           "type": "return"
         },
         {

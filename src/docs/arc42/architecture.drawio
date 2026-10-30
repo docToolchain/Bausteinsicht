@@ -453,7 +453,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="rel-containers--bausteinsicht.cli-containers--bausteinsicht.search-14" value="searches elements" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="containers--bausteinsicht.cli" target="containers--bausteinsicht.search" parent="1">
+        <mxCell id="rel-containers--bausteinsicht.cli-containers--bausteinsicht.search-14" value="searches elements, relationships and views" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="containers--bausteinsicht.cli" target="containers--bausteinsicht.search" parent="1">
           <mxGeometry x="0.9638" relative="1" as="geometry">
             <Array as="points">
               <mxPoint x="420" y="795"/>
@@ -792,7 +792,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="rel-containers--bausteinsicht.search-containers--bausteinsicht.model-54" value="searches elements" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0.65;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="containers--bausteinsicht.search" target="containers--bausteinsicht.model" parent="1">
+        <mxCell id="rel-containers--bausteinsicht.search-containers--bausteinsicht.model-54" value="reads elements, relationships and views" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0.65;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="containers--bausteinsicht.search" target="containers--bausteinsicht.model" parent="1">
           <mxGeometry x="-0.9625" relative="1" as="geometry">
             <Array as="points">
               <mxPoint x="1447" y="965"/>
@@ -2407,7 +2407,7 @@
         <mxCell id="rel-containers-analysis--bausteinsicht.cli-containers-analysis--bausteinsicht-7" value="triggers sync" style="edgeStyle=none;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.1531;entryDx=0;entryDy=0;" edge="1" source="containers-analysis--bausteinsicht.cli" target="containers-analysis--bausteinsicht" parent="1">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <mxCell id="rel-containers-analysis--bausteinsicht.cli-containers-analysis--bausteinsicht.search-14" value="searches elements" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="containers-analysis--bausteinsicht.cli" target="containers-analysis--bausteinsicht.search" parent="1">
+        <mxCell id="rel-containers-analysis--bausteinsicht.cli-containers-analysis--bausteinsicht.search-14" value="searches elements, relationships and views" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="containers-analysis--bausteinsicht.cli" target="containers-analysis--bausteinsicht.search" parent="1">
           <mxGeometry x="0.9020" relative="1" as="geometry">
             <Array as="points">
               <mxPoint x="240" y="645"/>
@@ -2458,7 +2458,7 @@
         <mxCell id="rel-containers-analysis--bausteinsicht-containers-analysis--bausteinsicht.model-35" value="comment-preserving updates" style="edgeStyle=none;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=1;exitY=0.898;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="containers-analysis--bausteinsicht" target="containers-analysis--bausteinsicht.model" parent="1">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <mxCell id="rel-containers-analysis--bausteinsicht.search-containers-analysis--bausteinsicht.model-54" value="searches elements" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0.65;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="containers-analysis--bausteinsicht.search" target="containers-analysis--bausteinsicht.model" parent="1">
+        <mxCell id="rel-containers-analysis--bausteinsicht.search-containers-analysis--bausteinsicht.model-54" value="reads elements, relationships and views" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#707070;fontColor=#707070;fontSize=11;strokeWidth=1.5;exitX=0.65;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="containers-analysis--bausteinsicht.search" target="containers-analysis--bausteinsicht.model" parent="1">
           <mxGeometry x="-0.9414" relative="1" as="geometry">
             <Array as="points">
               <mxPoint x="397" y="815"/>
