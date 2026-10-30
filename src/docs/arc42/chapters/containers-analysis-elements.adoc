@@ -35,7 +35,7 @@
 | Search
 | container
 | Go
-| Element and relationship search with filtering and pattern matching
+| Case-insensitive substring search over elements, relationships and views, with a type filter
 
 | Stale
 | container

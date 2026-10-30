@@ -1,8 +1,8 @@
 {
-  "checksum": "sha256:f42ec60c43471ba757117d4d26ff1e18d1a477485e1eb442bc05ac9903ca2bb3",
-  "timestamp": "2026-08-14T10:28:26Z",
-  "model_hash": "sha256:5cd9d914fb7edef9e549edbdcb1c4609f2baab7d4e75cbc10ae4c4669a918ac2",
-  "drawio_hash": "sha256:44bc4b66915a685afe78a81de84211f9a0655c11093402d2760b1e2d04da7fe0",
+  "checksum": "sha256:170275138ae5c5befa5cc653525d26f4c79dd452617e551113dc16c6840869a9",
+  "timestamp": "2026-10-28T12:38:03Z",
+  "model_hash": "sha256:29362f8f2a4e796ca7e830b5fce52a681f7353397e4427b4baddccbf77790587",
+  "drawio_hash": "sha256:e7cdf2972f89159fa164e0d2d47fb9d18c76aae34cb3888f12e69189d23b8fab",
   "elements": {
     "architect": {
       "title": "Software Architect",
@@ -253,6 +253,24 @@
       "description": "Element and relationship search with filtering and pattern matching",
       "technology": "Go",
       "kind": "container"
+    },
+    "bausteinsicht.search.engine": {
+      "title": "Search Engine",
+      "description": "Run(): tokenises the query, matches elements, relationships and views (AND), ranks by score",
+      "technology": "Go",
+      "kind": "component"
+    },
+    "bausteinsicht.search.results": {
+      "title": "Result Types",
+      "description": "Options, Result and Response DTOs that form the JSON output of the find command",
+      "technology": "Go",
+      "kind": "component"
+    },
+    "bausteinsicht.search.scorer": {
+      "title": "Scorer",
+      "description": "Field-weighted relevance scoring per object type (ID, title, description, technology, kind, tags, endpoints)",
+      "technology": "Go",
+      "kind": "component"
     },
     "bausteinsicht.snapshot": {
       "title": "Snapshot",
@@ -890,6 +908,20 @@
       "index": 75,
       "label": "merges multiple models",
       "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.search.engine",
+      "to": "bausteinsicht.search.scorer",
+      "index": 76,
+      "label": "scores candidates",
+      "kind": "uses"
+    },
+    {
+      "from": "bausteinsicht.search.engine",
+      "to": "bausteinsicht.search.results",
+      "index": 77,
+      "label": "builds ranked response",
+      "kind": "uses"
     }
   ],
   "rendered_elements": {
@@ -934,6 +966,9 @@
     "bausteinsicht.overlay": true,
     "bausteinsicht.schema": true,
     "bausteinsicht.search": true,
+    "bausteinsicht.search.engine": true,
+    "bausteinsicht.search.results": true,
+    "bausteinsicht.search.scorer": true,
     "bausteinsicht.snapshot": true,
     "bausteinsicht.stale": true,
     "bausteinsicht.sync": true,
