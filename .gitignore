@@ -62,3 +62,6 @@ internal/importer/xmi/testdata/BigData.xmi
 # .serena/.gitignore (which excludes /cache and /project.local.yml) plus the
 # shared .serena/project.yml config.
 .playwright-mcp/
+
+# local scratch (not committed)
+.tmp/
