@@ -3,7 +3,7 @@
 
 Container_Boundary(bausteinsicht_search, "Search") {
   Component(bausteinsicht_search_engine, "Search Engine", "Go", "Run(): tokenises the query, matches elements, relationships and views (AND), ranks by score")
-  Component(bausteinsicht_search_results, "Result Types", "Go", "Options, Result and Response DTOs that form the JSON output of the find command")
+  Component(bausteinsicht_search_results, "Result Types", "Go", "Response and Result DTOs that the find command serialises as JSON, plus the Options that configure search.Run")
   Component(bausteinsicht_search_scorer, "Scorer", "Go", "Field-weighted relevance scoring per object type (ID, title, description, technology, kind, tags, endpoints)")
 }
 

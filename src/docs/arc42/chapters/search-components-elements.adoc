@@ -10,7 +10,7 @@
 | Result Types
 | component
 | Go
-| Options, Result and Response DTOs that form the JSON output of the find command
+| Response and Result DTOs that the find command serialises as JSON, plus the Options that configure search.Run
 
 | Scorer
 | component

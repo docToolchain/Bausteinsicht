@@ -8,7 +8,7 @@ System_Boundary(bausteinsicht, "Bausteinsicht") {
   Container(bausteinsicht_health, "Health", "Go", "Architecture health scoring — completeness, conformance, and complexity")
   Container(bausteinsicht_model, "Model", "Go", "JSONC architecture model management — loading, validation, and mutation")
   Container(bausteinsicht_overlay, "Overlay", "Go", "Metric heatmap overlay application and removal on draw.io diagrams")
-  Container(bausteinsicht_search, "Search", "Go", "Element and relationship search with filtering and pattern matching")
+  Container(bausteinsicht_search, "Search", "Go", "Case-insensitive substring search over elements, relationships and views, with a type filter")
   Container(bausteinsicht_stale, "Stale", "Go", "Detects unused or forgotten architecture elements via git history and ADR/status metadata")
 }
 

@@ -215,7 +215,7 @@
         "search": {
           "kind": "container",
           "title": "Search",
-          "description": "Element and relationship search with filtering and pattern matching",
+          "description": "Case-insensitive substring search over elements, relationships and views, with a type filter",
           "technology": "Go",
           "children": {
             "engine": {
@@ -233,7 +233,7 @@
             "results": {
               "kind": "component",
               "title": "Result Types",
-              "description": "Options, Result and Response DTOs that form the JSON output of the find command",
+              "description": "Response and Result DTOs that the find command serialises as JSON, plus the Options that configure search.Run",
               "technology": "Go"
             }
           }
@@ -1057,7 +1057,7 @@
       "include": [
         "bausteinsicht.search.*"
       ],
-      "description": "Element and relationship search with pattern matching and filtering"
+      "description": "Case-insensitive substring search over elements, relationships and views, with a type filter"
     },
     "cli-components": {
       "title": "CLI Package Components",
@@ -1900,13 +1900,13 @@
           "index": 7,
           "from": "architect",
           "to": "bausteinsicht.cli.analysis",
-          "label": "bausteinsicht find \"cache*\""
+          "label": "bausteinsicht find \"cache\""
         },
         {
           "index": 8,
           "from": "bausteinsicht.cli.analysis",
           "to": "bausteinsicht.search",
-          "label": "search(model, pattern) across elements/relationships/views"
+          "label": "search(model, query) across elements/relationships/views"
         },
         {
           "index": 9,
