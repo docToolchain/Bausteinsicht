@@ -37,9 +37,4 @@
 | Go
 | Bidirectional synchronization engine between JSONC model and draw.io diagrams
 
-| IDE
-| external_system
-| 
-| IDE with JSON Schema support for JSONC editing with autocompletion
-
 |===

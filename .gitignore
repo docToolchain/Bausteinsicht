@@ -64,4 +64,4 @@ internal/importer/xmi/testdata/BigData.xmi
 .playwright-mcp/
 
 # local scratch (not committed)
-.tmp/
+/.tmp/
