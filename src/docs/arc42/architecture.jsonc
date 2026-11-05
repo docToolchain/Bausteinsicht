@@ -772,7 +772,7 @@
     {
       "from": "bausteinsicht.search",
       "to": "bausteinsicht.model.resolve",
-      "label": "resolves patterns",
+      "label": "flattens model elements",
       "kind": "uses"
     },
     {
