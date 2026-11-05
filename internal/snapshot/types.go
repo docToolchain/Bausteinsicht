@@ -2,10 +2,17 @@ package snapshot
 
 import (
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/docToolchain/Bausteinsicht/internal/model"
 )
+
+// idCounter is a process-global, monotonically increasing counter appended as a
+// suffix to each snapshot ID. It guarantees in-process uniqueness even when the
+// wall clock does not advance between two generations (same clock tick under
+// concurrency, or a coarse-resolution clock such as on Windows).
+var idCounter atomic.Uint64
 
 // Snapshot represents a point-in-time capture of the architecture model
 type Snapshot struct {
@@ -42,10 +49,23 @@ func NewSnapshot(message string, model *model.BausteinsichtModel) *Snapshot {
 	return snapshot
 }
 
-// generateSnapshotID creates a timestamp-based snapshot ID with nanosecond precision
+// generateSnapshotID creates a snapshot ID that is guaranteed unique even when
+// the wall clock does not advance between calls. The human-readable,
+// time-sortable timestamp (down to nanoseconds) stays as the prefix so that
+// listings and format expectations are preserved; a monotonic process-global
+// counter is appended as a suffix to break ties within the same clock tick.
 func generateSnapshotID() string {
-	now := time.Now().UTC()
-	return now.Format("snapshot-2006-01-02T15-04-05") + fmt.Sprintf(".%09dZ", now.Nanosecond())
+	return snapshotID(time.Now().UTC(), idCounter.Add(1))
+}
+
+// snapshotID formats a snapshot ID from a timestamp and a monotonic sequence
+// number. The sequence is what guarantees uniqueness within a single clock
+// tick; the timestamp only makes the ID human-readable and time-sortable. It
+// is split out from generateSnapshotID so a test can pin the clock and prove
+// the sequence — not the clock's resolution — breaks ties.
+func snapshotID(now time.Time, seq uint64) string {
+	return now.Format("snapshot-2006-01-02T15-04-05") +
+		fmt.Sprintf(".%09dZ-%06d", now.Nanosecond(), seq)
 }
 
 // ToMetadata converts a snapshot to its metadata representation
