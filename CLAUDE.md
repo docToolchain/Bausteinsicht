@@ -130,6 +130,13 @@ e2e/                   # Automated end-to-end pipeline tests (Go); testdata/ hol
 ### Bug Fixes (TDD)
 When fixing a bug, write a test that reproduces it first — confirm it actually fails against the unfixed code — before writing the fix. Only then implement the change to make it pass. Don't implement the fix and backfill the test afterward. This applies specifically to bug fixes, not necessarily to every feature addition or refactor.
 
+### Testing Conventions
+Lessons codified after the #647/#649 reviews so they don't recur:
+- **No pad / tautological tests.** A test must protect real behavior or logic. Don't assert that Go can assign struct fields or that a zero value is zero — a pure-data struct (no methods, no logic) needs no unit test. If the coverage gate trips on such a file, document the exclusion rationale (see Quality Gate Override Policy); never write alibi tests. This is why #647 dropped `internal/importer/types_test.go`.
+- **Reference production values, don't copy them.** To reach an unexported identifier from an external `_test` package, expose it via `export_test.go` (`const SnapshotDirName = snapshotDir`) instead of re-declaring the literal. A hand-maintained copy with a "keep in sync by hand" comment silently drifts.
+- **Comments state what the code proves, not the process that produced it.** Avoid "requested in review" or "tracked separately" — in a year the context is gone. Describe the invariant the test guards.
+- **When a fix is narrower than the reported problem, say so — and prefer fail-closed.** If a fix covers only part of an issue, either finish it (e.g. `os.O_EXCL` on write so a colliding ID errors instead of silently overwriting, rather than hoping IDs never collide) or record the remaining scope in the commit/issue and open a tracked follow-up. Don't leave an issue looking fully resolved when it isn't (#648).
+
 ### Ticket Start
 When starting work on a ticket:
 1. Run `/doc-check start #<issue>` — identifies which spec/architecture docs need updating and applies them before implementation begins (docs-first approach)
