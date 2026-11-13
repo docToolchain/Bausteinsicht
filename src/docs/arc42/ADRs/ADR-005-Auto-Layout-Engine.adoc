@@ -10,6 +10,8 @@
 
 Accepted
 
+Extended by link:ADR-013-Nested-Layout-Mode.html[ADR-013] (adds the `nested` concentric-container layout mode). The decision below is unchanged; ADR-013 records a later, additive layout mode and does not supersede it.
+
 == Context
 
 When Bausteinsicht creates a new draw.io page during forward sync, all elements are placed in a single horizontal row with non-deterministic ordering (Go map iteration order).

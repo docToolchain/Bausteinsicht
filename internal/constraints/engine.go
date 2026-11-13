@@ -39,6 +39,8 @@ func evaluate(c model.Constraint, m *model.BausteinsichtModel) ([]Violation, err
 		return noRelationship(c, m), nil
 	case "allowed-relationship":
 		return allowedRelationship(c, m), nil
+	case "no-outgoing-dependency":
+		return noOutgoingDependency(c, m), nil
 	case "required-field":
 		return requiredField(c, m), nil
 	case "max-depth":

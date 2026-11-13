@@ -1,0 +1,220 @@
+{
+  "$schema": "https://raw.githubusercontent.com/docToolchain/Bausteinsicht/main/schema/bausteinsicht.schema.json",
+
+  // ---------------------------------------------------------------------------
+  // Starter model: Hexagonal Architecture (Ports & Adapters) + tactical DDD.
+  //
+  // The four hexagonal zones are modelled as NESTED CONTAINERS
+  //   ordering ⊃ adapters ⊃ ports ⊃ domain(core)
+  // so the "nested" layout renders them as real concentric hexagon rings.
+  // Conventions used here:
+  //   * element KINDS carry the structural role (drivingAdapter, inboundPort,
+  //     applicationService, aggregate, entity, valueObject, domainService,
+  //     outboundPort, drivenAdapter, + the zone containers adapterZone/portZone/
+  //     domainZone).
+  //   * TAGS carry the "zone" for coloring & the domain-model view filter.
+  //   * metadata.side ("top"/"bottom") drives vertical placement in the rings
+  //     view: driving/inbound → top, driven/outbound → bottom.
+  // ---------------------------------------------------------------------------
+  "specification": {
+    "elements": {
+      "actor": {
+        "notation": "Actor",
+        "description": "A person or role driving the system"
+      },
+      "boundedContext": {
+        "notation": "Bounded Context",
+        "description": "A DDD bounded context — owns its own model and language",
+        "container": true
+      },
+      "adapterZone": {
+        "notation": "Adapters",
+        "description": "Outer ring: the adapter zone (outside the hexagon)",
+        "container": true
+      },
+      "portZone": {
+        "notation": "Ports",
+        "description": "Middle ring: the ports (the hexagon's edge)",
+        "container": true
+      },
+      "domainZone": {
+        "notation": "Domain Core",
+        "description": "Inner ring: the DDD domain core",
+        "container": true
+      },
+      "drivingAdapter": {
+        "notation": "Driving Adapter",
+        "description": "Primary/left-side adapter that calls INTO the application (REST, CLI, UI)"
+      },
+      "inboundPort": {
+        "notation": "Inbound Port",
+        "description": "Use-case interface the application offers to driving adapters"
+      },
+      "applicationService": {
+        "notation": "Application Service",
+        "description": "Orchestrates use cases; implements inbound ports, depends on outbound ports"
+      },
+      "aggregate": {
+        "notation": "Aggregate",
+        "description": "DDD aggregate — consistency boundary around one or more entities",
+        "container": true
+      },
+      "entity": {
+        "notation": "Entity",
+        "description": "DDD entity with identity and lifecycle"
+      },
+      "valueObject": {
+        "notation": "Value Object",
+        "description": "Immutable DDD value object without identity"
+      },
+      "domainService": {
+        "notation": "Domain Service",
+        "description": "Stateless domain logic that doesn't belong to a single entity"
+      },
+      "outboundPort": {
+        "notation": "Outbound Port",
+        "description": "Interface the application requires from infrastructure (repository, gateway)"
+      },
+      "drivenAdapter": {
+        "notation": "Driven Adapter",
+        "description": "Secondary/right-side adapter implementing an outbound port (DB, payment gateway)"
+      },
+      "datastore": {
+        "notation": "Data Store",
+        "description": "A database or persistent store outside the hexagon"
+      },
+      "externalSystem": {
+        "notation": "External System",
+        "description": "A third-party system outside your control"
+      }
+    },
+
+    "relationships": {
+      "drives": { "notation": "drives" },
+      "implements": { "notation": "implements", "dashed": true },
+      "uses": { "notation": "uses" }
+    },
+
+    "tags": [
+      { "id": "adapter",     "description": "Adapter zone",        "style": { "fillColor": "#ffffff", "strokeColor": "#6c8ebf" } },
+      { "id": "port",        "description": "Port (hexagon edge)", "style": { "fillColor": "#ffffff", "strokeColor": "#d79b00" } },
+      { "id": "application", "description": "Application layer",    "style": { "fillColor": "#ffffff", "strokeColor": "#666666" } },
+      { "id": "domain",      "description": "Domain core",         "style": { "fillColor": "#ffffff", "strokeColor": "#82b366" } }
+    ]
+  },
+
+  // ---------------------------------------------------------------------------
+  // Model — the ordering context, zones nested as concentric rings.
+  // ---------------------------------------------------------------------------
+  "model": {
+    "customer": { "kind": "actor", "title": "Customer", "description": "Places orders through the web frontend" },
+
+    "ordering": {
+      "kind": "boundedContext", "title": "Ordering",
+      "description": "Bounded context responsible for the order lifecycle",
+      "children": {
+        "adapters": {
+          "kind": "adapterZone", "title": "Adapters",
+          "children": {
+            "rest":           { "kind": "drivingAdapter", "title": "Order REST Controller", "technology": "Go / net/http", "tags": ["adapter"], "metadata": { "side": "top" } },
+            "ordersAdapter":  { "kind": "drivenAdapter",  "title": "Postgres Order Adapter", "technology": "Go / pgx",     "tags": ["adapter"], "metadata": { "side": "bottom" } },
+            "paymentAdapter": { "kind": "drivenAdapter",  "title": "Stripe Payment Adapter", "technology": "Go / stripe-go", "tags": ["adapter"], "metadata": { "side": "bottom" } },
+
+            "ports": {
+              "kind": "portZone", "title": "Ports",
+              "children": {
+                "placeOrder": { "kind": "inboundPort",  "title": "PlaceOrder Use Case",   "tags": ["port"], "metadata": { "side": "top" } },
+                "orderRepo":  { "kind": "outboundPort", "title": "OrderRepository Port",  "tags": ["port"], "metadata": { "side": "bottom" } },
+                "payment":    { "kind": "outboundPort", "title": "Payment Port",          "tags": ["port"], "metadata": { "side": "bottom" } },
+
+                "domain": {
+                  "kind": "domainZone", "title": "Domain Core",
+                  "children": {
+                    "appService": { "kind": "applicationService", "title": "Order Application Service", "technology": "Go", "tags": ["application"], "metadata": { "side": "top" } },
+                    "pricing":    { "kind": "domainService",      "title": "Pricing Service",           "tags": ["domain"], "metadata": { "side": "bottom" } },
+                    "order": {
+                      "kind": "aggregate", "title": "Order", "tags": ["domain"], "metadata": { "side": "bottom" },
+                      "children": {
+                        "line":  { "kind": "entity",      "title": "Order Line", "tags": ["domain"], "metadata": { "side": "top" } },
+                        "total": { "kind": "valueObject", "title": "Money",      "tags": ["domain"], "metadata": { "side": "bottom" } }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "ordersDb": { "kind": "datastore",      "title": "Orders Database", "technology": "PostgreSQL" },
+    "stripe":   { "kind": "externalSystem", "title": "Stripe", "technology": "Stripe API", "description": "Third-party payment provider" }
+  },
+
+  // ---------------------------------------------------------------------------
+  // Relationships — dependency directions encode the hexagonal rule.
+  // ---------------------------------------------------------------------------
+  "relationships": [
+    { "from": "customer",                                  "to": "ordering.adapters.rest",              "label": "places order", "kind": "drives" },
+    { "from": "ordering.adapters.rest",                    "to": "ordering.adapters.ports.placeOrder",  "label": "calls",        "kind": "uses" },
+
+    { "from": "ordering.adapters.ports.domain.appService", "to": "ordering.adapters.ports.placeOrder",  "label": "implements",   "kind": "implements" },
+    { "from": "ordering.adapters.ports.domain.appService", "to": "ordering.adapters.ports.domain.order","label": "orchestrates", "kind": "uses" },
+    { "from": "ordering.adapters.ports.domain.appService", "to": "ordering.adapters.ports.domain.pricing","label": "prices via", "kind": "uses" },
+    { "from": "ordering.adapters.ports.domain.appService", "to": "ordering.adapters.ports.orderRepo",   "label": "persists via", "kind": "uses" },
+    { "from": "ordering.adapters.ports.domain.appService", "to": "ordering.adapters.ports.payment",     "label": "pays via",     "kind": "uses" },
+
+    { "from": "ordering.adapters.ordersAdapter",           "to": "ordering.adapters.ports.orderRepo",   "label": "implements",   "kind": "implements" },
+    { "from": "ordering.adapters.paymentAdapter",          "to": "ordering.adapters.ports.payment",     "label": "implements",   "kind": "implements" },
+
+    { "from": "ordering.adapters.ordersAdapter",           "to": "ordersDb", "label": "reads/writes",  "kind": "uses", "cardinality": "1:N" },
+    { "from": "ordering.adapters.paymentAdapter",          "to": "stripe",   "label": "charges card",  "kind": "uses", "dataFlow": "request/response" }
+  ],
+
+  // ---------------------------------------------------------------------------
+  // Views — one draw.io page each.
+  //   context           : the bounded context as a black box + its neighbours
+  //   ports-and-adapters : the concentric hexagon rings (nested layout)
+  //   domain-model       : only the DDD tactical building blocks (filter-tags)
+  // ---------------------------------------------------------------------------
+  "views": {
+    "context": {
+      "title": "System Context",
+      "include": ["customer", "ordering", "ordersDb", "stripe"],
+      "layout": "layered",
+      "description": "The Ordering context and the actors/systems around it"
+    },
+    "ports-and-adapters": {
+      "title": "Ports & Adapters (rings)",
+      "scope": "ordering",
+      "include": ["customer", "ordering.**", "ordersDb", "stripe"],
+      "layout": "nested",
+      "description": "Concentric hexagon rings: adapters → ports → domain core; driving/inbound on top, driven/outbound below; externals around the hexagon"
+    },
+    "domain-model": {
+      "title": "Domain Model",
+      "scope": "ordering.adapters.ports.domain",
+      "include": ["ordering.adapters.ports.domain.**"],
+      "layout": "nested",
+      "description": "The domain core: application service, the Order aggregate (→ Order Line + Money), and domain services"
+    }
+  },
+
+  // ---------------------------------------------------------------------------
+  // Constraints — architectural fitness functions (kind-based; unchanged by the
+  // container restructure). All pass on this model.
+  // ---------------------------------------------------------------------------
+  "constraints": [
+    { "id": "HEX-001", "rule": "no-outgoing-dependency", "from-kind": "inboundPort",  "description": "Inbound ports are interfaces and must not depend on anything" },
+    { "id": "HEX-002", "rule": "no-outgoing-dependency", "from-kind": "outboundPort", "description": "Outbound ports are interfaces and must not depend on anything" },
+
+    { "id": "HEX-003", "rule": "allowed-relationship", "to-kind": "datastore",      "from-kinds": ["drivenAdapter"], "description": "Only driven adapters may access a data store" },
+    { "id": "HEX-004", "rule": "allowed-relationship", "to-kind": "externalSystem", "from-kinds": ["drivenAdapter"], "description": "Only driven adapters may talk to external systems" },
+
+    { "id": "HEX-005", "rule": "allowed-relationship", "to-kind": "inboundPort",  "from-kinds": ["drivingAdapter", "applicationService"], "description": "Only driving adapters or the implementing app service may use an inbound port" },
+    { "id": "HEX-006", "rule": "allowed-relationship", "to-kind": "outboundPort", "from-kinds": ["applicationService", "drivenAdapter"],    "description": "Only the app service (uses) or driven adapters (implements) may relate to an outbound port" },
+
+    { "id": "HEX-007", "rule": "no-circular-dependency", "description": "The dependency graph must be acyclic (dependencies point inward)" }
+  ]
+}
