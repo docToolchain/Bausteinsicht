@@ -1,7 +1,7 @@
 = Bausteinsicht
 
 // Pronunciation hint: the only place in this README that spells out how to say the name.
-*Bausteinsicht* /ˈbaʊ̯ʃtaɪ̯nˌzɪçt/ — say _"BOW-shtine-zisht"_ (_bow_ as in _now_). It's German for arc42's _building block view_. link:src/docs/audio/bausteinsicht.mp3[▶ Listen]
+*Bausteinsicht* [ˈbaʊ̯ʃtaɪ̯nˌzɪçt] — say _"BOW-shtine-zisht"_ (_bow_ as in _now_). It's German for arc42's _building block view_. https://doctoolchain.org/Bausteinsicht/#pronunciation[▶ Listen]
 
 image:https://sonarcloud.io/api/project_badges/measure?project=docToolchain_Bausteinsicht&metric=alert_status[Quality Gate Status,link=https://sonarcloud.io/summary/new_code?id=docToolchain_Bausteinsicht]
 image:https://sonarcloud.io/api/project_badges/measure?project=docToolchain_Bausteinsicht&metric=coverage&token=squ_0000000000000000000000000000000000000000[Coverage,link=https://sonarcloud.io/component_measures?id=docToolchain_Bausteinsicht&metric=coverage]

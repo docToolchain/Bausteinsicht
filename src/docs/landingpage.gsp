@@ -5,11 +5,10 @@
             <h1 style="font-size: 2.5rem; font-weight: 700;">Bausteinsicht</h1>
             <!-- Pronunciation hint: the only place on this page that spells out how to say the name. -->
             <p id="pronunciation" style="font-size: 1rem; opacity: 0.9; margin-bottom: 1rem;">
-                <strong>Bausteinsicht</strong> /ˈbaʊ̯ʃtaɪ̯nˌzɪçt/ — say <em>"BOW-shtine-zisht"</em> (<em>bow</em> as in <em>now</em>).
+                <strong lang="de">Bausteinsicht</strong> <span lang="de-fonipa">[ˈbaʊ̯ʃtaɪ̯nˌzɪçt]</span> — say <em>"BOW-shtine-zisht"</em> (<em>bow</em> as in <em>now</em>).
                 It's German for arc42's <em>building block view</em>.
-                <a href="audio/bausteinsicht.mp3" style="color: white; text-decoration: underline;">&#9654; Listen</a>
                 <br>
-                <audio controls preload="none" src="audio/bausteinsicht.mp3" style="margin-top: 0.5rem; height: 2rem;">
+                <audio controls preload="none" src="audio/bausteinsicht.mp3" aria-label="Listen: Bausteinsicht spoken in German, 5 seconds" style="margin-top: 0.5rem; height: 2rem;">
                     Your browser cannot play audio. <a href="audio/bausteinsicht.mp3">Download the MP3</a>.
                 </audio>
             </p>
