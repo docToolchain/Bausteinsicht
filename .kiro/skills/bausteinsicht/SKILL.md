@@ -59,6 +59,26 @@ bausteinsicht add relationship --from <element.path> --to <element.path> [--labe
 - `--kind` must be defined in `specification.relationships` (if provided)
 - Duplicate relationships (same from/to/kind) are rejected
 
+### Renaming, Updating and Removing
+
+```bash
+# Rename an element; rewrites relationships, views, dynamic view steps and constraints that name it
+bausteinsicht rename --id <element.path> --to <new-key> [--dry-run] --format json
+
+# Change fields of an element
+bausteinsicht update element --id <element.path> [--title "<t>"] [--technology "<t>"] [--description "<d>"] [--kind <kind>]
+
+# Remove an element (fails while it is referenced; --cascade drops the references too)
+bausteinsicht remove element --id <element.path> [--cascade]
+bausteinsicht remove relationship --from <element.path> --to <element.path> [--label "<label>"]
+```
+
+**Rules:**
+- `--to` of `rename` is the new last path segment (no dots)
+- Use `--dry-run --format json` first to see every location that would change
+- The model is validated before saving; a change that would make it invalid is refused
+- The file is rewritten as a whole, so comments in it are not kept
+
 ### Synchronization
 
 ```bash
