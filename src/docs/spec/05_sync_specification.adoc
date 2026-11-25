@@ -269,6 +269,8 @@ Elements that have a detail view (a view whose `scope` matches the element) rece
 On any view page where the element appears, the `link` attribute is set to `data:page/id,view-<viewID>`.
 Clicking the element in draw.io navigates to its detail view (#198).
 
+*Several views with the same scope.* If more than one view has the element as its `scope`, the link goes to the view that shows the most elements below the scope (normally the overview that includes the whole subtree). If several views show the same number, the one with the smallest view key wins. The choice depends only on the model, never on map iteration order, so repeated syncs write the same link (#661).
+
 [[drill-down-link-priority]]
 ==== User-Defined Links and Drill-Down Priority
 
@@ -288,7 +290,7 @@ Elements that carry a `link` but have no matching scoped view retain the user-de
 ==== Back-Navigation Button
 
 Detail views (views with a `scope`) get a back-navigation button that links to the parent view.
-The parent view is identified as any view whose resolved element set includes the scope element.
+The parent view is identified as a view whose resolved element set includes the scope element; if several qualify, the one with the smallest view key is used, so the button is the same on every sync (#661).
 
 The button is an `<object>` with:
 
