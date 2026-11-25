@@ -166,6 +166,9 @@ func applyForwardToPage(in forwardRenderInputs, elemFilter map[string]bool) {
 
 	// Synchronize documentation-link icons (element Link/Decisions/DocLinks) with the model. (#543)
 	synchronizeDocLinkIcons(page, in.model)
+
+	// Show each relationship's technology on its connector. (#642)
+	synchronizeConnectorTechnology(page, "", legacyConnectors(in.model.Relationships))
 }
 
 // applyForwardPerView iterates over model views and applies changes per page.

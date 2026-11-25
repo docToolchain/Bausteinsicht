@@ -8,6 +8,7 @@ import (
 	"github.com/beevik/etree"
 
 	"github.com/docToolchain/Bausteinsicht/internal/drawio"
+	"github.com/docToolchain/Bausteinsicht/internal/model"
 )
 
 // techLabelSuffix ends the cell ID of a connector's technology label:
@@ -51,11 +52,18 @@ func synchronizeConnectorTechnology(page *drawio.Page, viewID string, conns []vi
 		parent[connID+techLabelSuffix] = connID
 	}
 
-	prefix := "rel-" + viewID + "--"
+	// Connector IDs on a view page start with "rel-<view>--"; without views the
+	// IDs are unscoped and start with "rel-". Only edge-label cells count, so
+	// the sub-cell of an element that happens to be called "rel-…" is not ours.
+	prefix := "rel-"
+	if viewID != "" {
+		prefix += viewID + "--"
+	}
 	existing := make(map[string]*etree.Element)
 	for _, cell := range root.SelectElements("mxCell") {
 		id := cell.SelectAttrValue("id", "")
-		if !strings.HasPrefix(id, prefix) || !strings.HasSuffix(id, techLabelSuffix) {
+		if !strings.HasPrefix(id, prefix) || !strings.HasSuffix(id, techLabelSuffix) ||
+			!strings.HasPrefix(cell.SelectAttrValue("style", ""), "edgeLabel;") {
 			continue
 		}
 		if _, keep := wanted[id]; keep {
@@ -96,4 +104,14 @@ func createTechLabel(root *etree.Element, id, connectorID, value string) {
 	offset := geom.CreateElement("mxPoint")
 	offset.CreateAttr("y", "14")
 	offset.CreateAttr("as", "offset")
+}
+
+// legacyConnectors lists the connectors of the no-views mode: one per model
+// relationship, with unscoped cell IDs.
+func legacyConnectors(relationships []model.Relationship) []viewConnector {
+	conns := make([]viewConnector, len(relationships))
+	for i, r := range relationships {
+		conns[i] = viewConnector{from: r.From, to: r.To, index: i, label: r.Label, technology: r.Technology}
+	}
+	return conns
 }

@@ -159,3 +159,54 @@ func TestSync_TechnologyLabelFollowsARekeyedConnector(t *testing.T) {
 		}
 	}
 }
+
+// Without views the diagram has one page and unscoped cell IDs; the technology
+// label must be shown there as well.
+func TestSync_TechnologyLabelWithoutViews(t *testing.T) {
+	ts := minimalTemplates(t)
+	doc := drawio.NewDocument()
+	page := doc.AddPage("page1", "Page 1")
+	m := techSyncModel("HTTPS/JSON")
+	m.Views = nil
+
+	Run(m, doc, emptyState(), ts, nil)
+
+	connectors := page.FindAllConnectors()
+	if len(connectors) != 1 {
+		t.Fatalf("want 1 connector, got %d", len(connectors))
+	}
+	labels := techLabels(page)
+	label, ok := labels[connectors[0].SelectAttrValue("id", "")+"-tech"]
+	if !ok || label.SelectAttrValue("value", "") != "[HTTPS/JSON]" {
+		t.Fatalf("expected the technology label on the only page, got %v", labels)
+	}
+
+	m.Relationships[0].Technology = ""
+	Run(m, doc, stateOf(techSyncModel("HTTPS/JSON")), ts, nil)
+	if got := techLabels(page); len(got) != 0 {
+		t.Errorf("label must go when the technology is removed: %v", got)
+	}
+}
+
+// Only cells that are technology labels are reconciled: another cell whose ID
+// happens to look the same (an element called "rel-x" has the sub-cell
+// "rel-x-tech") must be left alone.
+func TestSync_TechnologyLabelCleanupLeavesOtherCellsAlone(t *testing.T) {
+	ts := minimalTemplates(t)
+	doc := drawio.NewDocument()
+	page := doc.AddPage("page1", "Page 1")
+	foreign := page.Root().CreateElement("mxCell")
+	foreign.CreateAttr("id", "rel-x-tech")
+	foreign.CreateAttr("value", "[Go]")
+	foreign.CreateAttr("style", "text;html=1;")
+	foreign.CreateAttr("vertex", "1")
+	foreign.CreateAttr("parent", "1")
+
+	m := techSyncModel("")
+	m.Views = nil
+	Run(m, doc, emptyState(), ts, nil)
+
+	if page.Root().FindElement("mxCell[@id='rel-x-tech']") == nil {
+		t.Error("a cell that is not a technology label was removed")
+	}
+}
