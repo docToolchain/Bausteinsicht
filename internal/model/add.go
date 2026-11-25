@@ -2,7 +2,6 @@ package model
 
 import (
 	"fmt"
-	"sort"
 )
 
 // AddView creates a new view or merges fields into an existing view.
@@ -57,21 +56,17 @@ func (m *BausteinsichtModel) AddView(key string, view View) error {
 		if view.Layout != "" {
 			existingView.Layout = view.Layout
 		}
-		// Merge include lists (deduplicate, sort for deterministic output)
-		if len(view.Include) > 0 {
-			includedSet := make(map[string]bool)
-			for _, elem := range existingView.Include {
-				includedSet[elem] = true
+		// Merge include lists: keep the existing order, append new entries
+		// (deduplicated), so a saved model is not reordered.
+		seen := make(map[string]bool, len(existingView.Include)+len(view.Include))
+		for _, elem := range existingView.Include {
+			seen[elem] = true
+		}
+		for _, elem := range view.Include {
+			if !seen[elem] {
+				seen[elem] = true
+				existingView.Include = append(existingView.Include, elem)
 			}
-			for _, elem := range view.Include {
-				includedSet[elem] = true
-			}
-			merged := make([]string, 0, len(includedSet))
-			for elem := range includedSet {
-				merged = append(merged, elem)
-			}
-			sort.Strings(merged)
-			existingView.Include = merged
 		}
 		m.Views[key] = existingView
 	} else {

@@ -84,14 +84,11 @@ func runAddRelationship(cmd *cobra.Command, args []string) error {
 
 	// Save using comment-preserving array append. (#122)
 	relJSON := marshalRelationshipJSON(rel)
-	err = model.PatchInsert(modelPath, func(data []byte) ([]byte, error) {
+	// Falls back to a full save, announced on stderr, if patching fails.
+	if err := savePatched(cmd.ErrOrStderr(), modelPath, m, func(data []byte) ([]byte, error) {
 		return model.AppendArrayEntry(data, []string{"relationships"}, relJSON)
-	})
-	if err != nil {
-		// Fall back to full save if patching fails.
-		if err := model.Save(modelPath, m); err != nil {
-			return exitWithCode(fmt.Errorf("saving model: %w", err), 2)
-		}
+	}); err != nil {
+		return exitWithCode(fmt.Errorf("saving model: %w", err), 2)
 	}
 
 	if format == "json" {

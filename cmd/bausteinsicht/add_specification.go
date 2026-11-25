@@ -59,8 +59,11 @@ func runAddSpecificationElement(cmd *cobra.Command, args []string) error {
 		return exitWithCode(fmt.Errorf("adding element: %w", err), 1)
 	}
 
-	// Save model
-	if err := model.Save(modelPath, m); err != nil {
+	// Save model: insert only the new kind, keep the rest of the file as is (#635).
+	elementKind := m.Specification.Elements[key]
+	if err := savePatched(cmd.ErrOrStderr(), modelPath, m, func(data []byte) ([]byte, error) {
+		return insertSpecificationKind(data, "elements", key, elementKind)
+	}); err != nil {
 		return exitWithCode(fmt.Errorf("saving model: %w", err), 2)
 	}
 
@@ -131,8 +134,11 @@ func runAddSpecificationRelationship(cmd *cobra.Command, args []string) error {
 		return exitWithCode(fmt.Errorf("adding relationship: %w", err), 1)
 	}
 
-	// Save model
-	if err := model.Save(modelPath, m); err != nil {
+	// Save model: insert only the new kind, keep the rest of the file as is (#635).
+	relationshipKind := m.Specification.Relationships[key]
+	if err := savePatched(cmd.ErrOrStderr(), modelPath, m, func(data []byte) ([]byte, error) {
+		return insertSpecificationKind(data, "relationships", key, relationshipKind)
+	}); err != nil {
 		return exitWithCode(fmt.Errorf("saving model: %w", err), 2)
 	}
 
@@ -192,4 +198,23 @@ func loadModelForSpecificationCmd(cmd *cobra.Command, key string) (*model.Bauste
 	}
 
 	return m, modelPath, nil
+}
+
+// insertSpecificationKind inserts one entry into specification.<section>
+// ("elements" or "relationships") of the raw model text. If the section does
+// not exist yet, it is created with that single entry.
+func insertSpecificationKind(data []byte, section, key string, kind any) ([]byte, error) {
+	sectionPath := []string{"specification", section}
+	if model.HasPath(data, sectionPath) {
+		entry, err := marshalEntryJSON(kind, 3)
+		if err != nil {
+			return nil, err
+		}
+		return model.InsertObjectEntry(data, sectionPath, key, entry)
+	}
+	entry, err := marshalEntryJSON(map[string]any{key: kind}, 2)
+	if err != nil {
+		return nil, err
+	}
+	return model.InsertObjectEntry(data, []string{"specification"}, section, entry)
 }

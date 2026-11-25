@@ -349,3 +349,44 @@ func TestPatchValue_WithBlockComments(t *testing.T) {
 		t.Errorf("expected block comment to be preserved, got:\n%s", got)
 	}
 }
+
+func TestHasPath(t *testing.T) {
+	data := []byte(`{"a": {"b": 1}, "c": []}`)
+	if !HasPath(data, []string{"a", "b"}) {
+		t.Error(`HasPath(a.b) = false, want true`)
+	}
+	if HasPath(data, []string{"a", "x"}) {
+		t.Error(`HasPath(a.x) = true, want false`)
+	}
+}
+
+func TestUpsertObjectField(t *testing.T) {
+	t.Run("replaces an existing value in place", func(t *testing.T) {
+		data := []byte("{\n  // keep\n  \"v\": { \"title\": \"Old\", \"x\": 1 }\n}\n")
+		got, err := UpsertObjectField(data, []string{"v"}, "title", `"New"`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := "{\n  // keep\n  \"v\": { \"title\": \"New\", \"x\": 1 }\n}\n"
+		if string(got) != want {
+			t.Errorf("got:\n%s\nwant:\n%s", got, want)
+		}
+	})
+
+	t.Run("inserts a missing key and keeps the comment", func(t *testing.T) {
+		data := []byte("{\n  \"v\": {\n    // keep\n    \"title\": \"T\"\n  }\n}\n")
+		got, err := UpsertObjectField(data, []string{"v"}, "scope", `"s"`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(got), "// keep") || !strings.Contains(string(got), `"scope": "s"`) {
+			t.Errorf("unexpected result:\n%s", got)
+		}
+	})
+
+	t.Run("fails if the object does not exist", func(t *testing.T) {
+		if _, err := UpsertObjectField([]byte(`{}`), []string{"missing"}, "k", `1`); err == nil {
+			t.Error("expected an error for a missing object")
+		}
+	})
+}

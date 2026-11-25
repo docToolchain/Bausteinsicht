@@ -287,3 +287,29 @@ func TestAddSpecificationRelationship_Duplicate(t *testing.T) {
 		t.Error("expected error for duplicate relationship")
 	}
 }
+
+// AddView keeps the order of an existing include list and appends new entries,
+// so that saving the model does not reorder what the user wrote (#635).
+func TestAddView_MergeKeepsIncludeOrder(t *testing.T) {
+	m := &BausteinsichtModel{
+		Model: map[string]Element{
+			"a": {Kind: "system", Title: "A"},
+			"b": {Kind: "system", Title: "B"},
+			"c": {Kind: "system", Title: "C"},
+		},
+		Views: map[string]View{"v": {Title: "V", Include: []string{"c", "a"}}},
+	}
+	if err := m.AddView("v", View{Include: []string{"a", "b"}}); err != nil {
+		t.Fatal(err)
+	}
+	got := m.Views["v"].Include
+	want := []string{"c", "a", "b"}
+	if len(got) != len(want) {
+		t.Fatalf("include = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("include = %v, want %v", got, want)
+		}
+	}
+}
