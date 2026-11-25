@@ -178,16 +178,53 @@ func applyForwardPerView(in forwardRenderInputs, opts *ForwardOptions) {
 }
 
 // buildDrillDownLinks maps elementID → "data:page/id,view-<viewID>" for
-// every element that is the scope of some view. An element gets a link when
-// a view's scope matches that element.
+// every element that is the scope of some view. If several views share a
+// scope, the link goes to the one that shows most of the scope's subtree (the
+// overview), and to the smallest view key on a tie, so that the choice does
+// not change from one sync to the next (#661).
 func buildDrillDownLinks(m *model.BausteinsichtModel) map[string]string {
-	drillDownLinks := make(map[string]string)
-	for vID, v := range m.Views {
-		if v.Scope != "" {
-			drillDownLinks[v.Scope] = "data:page/id,view-" + vID
+	best := make(map[string]string)   // scope → chosen view key
+	bestCount := make(map[string]int) // scope → elements of its subtree in that view
+	for _, vID := range sortedViewKeys(m) {
+		v := m.Views[vID]
+		if v.Scope == "" {
+			continue
+		}
+		count := subtreeElementsInView(m, v)
+		if _, seen := best[v.Scope]; !seen || count > bestCount[v.Scope] {
+			best[v.Scope], bestCount[v.Scope] = vID, count
 		}
 	}
+	drillDownLinks := make(map[string]string, len(best))
+	for scope, vID := range best {
+		drillDownLinks[scope] = "data:page/id,view-" + vID
+	}
 	return drillDownLinks
+}
+
+// subtreeElementsInView counts the elements below v's scope that v shows.
+func subtreeElementsInView(m *model.BausteinsichtModel, v model.View) int {
+	resolved, err := model.ResolveView(m, &v)
+	if err != nil {
+		return 0
+	}
+	count := 0
+	for _, id := range resolved {
+		if strings.HasPrefix(id, v.Scope+".") {
+			count++
+		}
+	}
+	return count
+}
+
+// sortedViewKeys returns the view keys in alphabetical order.
+func sortedViewKeys(m *model.BausteinsichtModel) []string {
+	keys := make([]string, 0, len(m.Views))
+	for k := range m.Views {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 // applyForwardToView runs the full forward-sync pipeline for a single view's
@@ -1468,9 +1505,12 @@ func backNavButtonExists(root *etree.Element, navCellID string) bool {
 }
 
 // findParentView finds the view (other than viewID) that resolves to include
-// scopeID — the "parent" of a detail view for back-navigation purposes.
+// scopeID — the "parent" of a detail view for back-navigation purposes. If
+// several views qualify, the one with the smallest key wins, so the back link
+// is the same on every sync (#661).
 func findParentView(m *model.BausteinsichtModel, viewID, scopeID string) (parentViewID, parentTitle string) {
-	for vID, v := range m.Views {
+	for _, vID := range sortedViewKeys(m) {
+		v := m.Views[vID]
 		if vID == viewID {
 			continue
 		}
