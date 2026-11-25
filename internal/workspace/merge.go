@@ -39,7 +39,6 @@ func MergeModels(loaded []LoadedModel) (*model.BausteinsichtModel, error) {
 	}
 
 	// Merge specifications and elements in a single pass per model.
-	idMap := make(map[string]string) // original ID → prefixed ID
 	for _, lm := range loaded {
 		for kind, def := range lm.Model.Specification.Elements {
 			if _, exists := merged.Specification.Elements[kind]; !exists {
@@ -51,12 +50,12 @@ func MergeModels(loaded []LoadedModel) (*model.BausteinsichtModel, error) {
 				merged.Specification.Relationships[kind] = def
 			}
 		}
+		// Only the top-level elements are copied: their children come along.
+		// (Copying the flattened elements as well added every nested element a
+		// second time, as a top-level entry with a dotted key.)
 		prefix := resolvePrefix(lm)
-		flatElems, _ := model.FlattenElements(lm.Model)
-		for id, elemPtr := range flatElems {
-			prefixedID := prefixElementID(id, prefix)
-			idMap[id] = prefixedID
-			merged.Model[prefixedID] = *elemPtr
+		for id, elem := range lm.Model.Model {
+			merged.Model[prefixElementID(id, prefix)] = elem
 		}
 	}
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/docToolchain/Bausteinsicht/internal/model"
 	"github.com/docToolchain/Bausteinsicht/internal/workspace"
@@ -54,7 +55,7 @@ func runWorkspaceMerge(cmd *cobra.Command, configPath, outputPath string) error 
 		return exitWithCode(fmt.Errorf("loading models: %w", err), 2)
 	}
 
-	merged, err := workspace.MergeModels(loaded)
+	merged, err := workspace.MergeWorkspace(cfg, loaded)
 	if err != nil {
 		return exitWithCode(fmt.Errorf("merging models: %w", err), 2)
 	}
@@ -122,6 +123,10 @@ func runWorkspaceValidate(cmd *cobra.Command, configPath string) error {
 			}
 		}
 	}
+
+	// What the individual models cannot see: IDs, prefixes, cross-model
+	// relationships and workspace views (#227).
+	validationErrs = append(validationErrs, workspace.ValidateWorkspace(cfg, loaded)...)
 
 	if len(validationErrs) > 0 {
 		format, _ := cmd.Flags().GetString(flagFormat)
@@ -194,6 +199,12 @@ func runWorkspaceList(cmd *cobra.Command, configPath string) error {
 		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "  %d. ID: %s, Path: %s", i+1, ref.ID, ref.Path)
 		if ref.Prefix != "" {
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), ", Prefix: %s", ref.Prefix)
+		}
+		if len(ref.Elements) > 0 {
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), ", Elements: %s", strings.Join(ref.Elements, " "))
+		}
+		if ref.Depth > 0 {
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), ", Depth: %d", ref.Depth)
 		}
 		_, _ = fmt.Fprint(cmd.OutOrStdout(), "\n")
 	}
