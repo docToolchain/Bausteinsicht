@@ -749,3 +749,40 @@ func TestExportAllViewsToMermaidEmpty(t *testing.T) {
 		t.Fatalf("expected 0 diagrams, got %d", len(diagrams))
 	}
 }
+
+// TestScopeElementNotEmittedTwice covers #640: a scoped view whose include
+// matches the scope element itself (e.g. include ["*"] or ["shop", "shop.*"])
+// must render the scope only as the boundary. Emitting it as a regular element
+// as well gives two declarations with the same alias, and PlantUML silently
+// drops one of them.
+func TestScopeElementNotEmittedTwice(t *testing.T) {
+	m := testModel()
+	m.Views["containers-star"] = model.View{
+		Title:   "Containers (*)",
+		Scope:   "shop",
+		Include: []string{"*"},
+	}
+	m.Views["containers-explicit"] = model.View{
+		Title:   "Containers (explicit scope)",
+		Scope:   "shop",
+		Include: []string{"user", "shop", "shop.*", "payment"},
+	}
+
+	declaration := regexp.MustCompile(`(?m)^\s*(?:System|System_Ext|System_Boundary|Container|Container_Boundary)\(shop,`)
+	for _, view := range []string{"containers-star", "containers-explicit"} {
+		for name, f := range map[string]Format{"plantuml": PlantUML, "mermaid": Mermaid} {
+			t.Run(view+"/"+name, func(t *testing.T) {
+				result, err := FormatView(m, view, f)
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				if n := len(declaration.FindAllString(result, -1)); n != 1 {
+					t.Errorf("alias %q declared %d times, want exactly 1 (the boundary):\n%s", "shop", n, result)
+				}
+				if !strings.Contains(result, "System_Boundary(shop,") {
+					t.Errorf("expected the scope as System_Boundary:\n%s", result)
+				}
+			})
+		}
+	}
+}
