@@ -23,6 +23,7 @@ func newExportTableCmd() *cobra.Command {
 	cmd.Flags().String("table-format", "adoc", "Table format: adoc or md")
 	cmd.Flags().String("output", "", "Output directory (default: stdout)")
 	cmd.Flags().Bool("combined", false, "Export all elements across all views (deduplicated)")
+	addNoValidateFlag(cmd)
 
 	return cmd
 }
@@ -55,6 +56,9 @@ func runExportTable(cmd *cobra.Command, _ []string) error {
 	m, err := model.Load(modelPath)
 	if err != nil {
 		return exitWithCode(fmt.Errorf("loading model: %w", err), 2)
+	}
+	if err := validateForExport(cmd, m); err != nil {
+		return err
 	}
 
 	// When --format json is set, output structured JSON instead of a table. (#239, #631)

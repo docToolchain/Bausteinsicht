@@ -126,6 +126,7 @@ func newExportDiagramCmd() *cobra.Command {
 	cmd.Flags().String("view", "", "Export only this view (by key)")
 	cmd.Flags().String("diagram-format", "plantuml", "Diagram format: plantuml, mermaid, dot, d2, html, or structurizr")
 	cmd.Flags().String("output", "", "Output directory (default: stdout)")
+	addNoValidateFlag(cmd)
 
 	return cmd
 }
@@ -153,6 +154,9 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 	m, err := model.Load(modelPath)
 	if err != nil {
 		return exitWithCode(fmt.Errorf("loading model: %w", err), 2)
+	}
+	if err := validateForExport(cmd, m); err != nil {
+		return err
 	}
 
 	// Read outputFormat early: needed by both the structurizr block below and
