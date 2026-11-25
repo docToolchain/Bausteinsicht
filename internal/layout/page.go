@@ -123,7 +123,7 @@ func layoutPage(page *drawio.Page, opts Options) (positioned, pinned int) {
 	place(top, true)
 
 	for _, n := range byID {
-		if !(n.pinned && opts.PreservePinned) {
+		if !n.pinned || !opts.PreservePinned {
 			writeGeometry(n)
 		}
 	}
