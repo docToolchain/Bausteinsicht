@@ -8,21 +8,13 @@ import (
 	"testing"
 )
 
+// A relationship to an element that does not exist: invalid for 'validate',
+// but harmless for the text exporters when --no-validate is given.
 const invalidExportModel = `{
-  "specification": {
-    "elements": { "system": { "notation": "Software System" } }
-  },
-  "model": {
-    "shop":    { "kind": "system", "title": "Shop" },
-    "payment": { "kind": "system", "title": "Payment" }
-  },
-  "relationships": [],
-  "views": { "context": { "title": "Context", "include": ["shop", "payment"] } },
-  "dynamicViews": [
-    { "key": "checkout", "title": "Checkout", "steps": [
-      { "index": 1, "from": "shop", "to": "billing", "label": "charge" }
-    ] }
-  ]
+  "specification": {"elements": {"system": {"notation": "System"}}},
+  "model": {"shop": {"kind": "system", "title": "Shop"}},
+  "relationships": [{"from": "shop", "to": "missing", "label": "calls"}],
+  "views": {"context": {"title": "Context", "include": ["shop"]}}
 }`
 
 func writeInvalidExportModel(t *testing.T) string {
@@ -55,7 +47,7 @@ func TestExportCommands_AbortOnValidationErrors(t *testing.T) {
 			if !errors.As(err, &ee) || ee.code != 1 {
 				t.Errorf("expected exit code 1, got %v", err)
 			}
-			if !strings.Contains(out, `"billing" does not resolve`) {
+			if !strings.Contains(out, `"missing"`) {
 				t.Errorf("validation error missing from output:\n%s", out)
 			}
 			if !strings.Contains(err.Error(), "--no-validate") {
