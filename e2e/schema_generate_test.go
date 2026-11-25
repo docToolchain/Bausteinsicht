@@ -54,3 +54,27 @@ func keysOf(m map[string]interface{}) []string {
 	}
 	return keys
 }
+
+// TestSchemaGenerateCreatesOutputDirectory covers #639: outside the
+// Bausteinsicht repository (e.g. in a project created with `init`) the default
+// output directory "schemas/" does not exist, and neither does the parent of a
+// custom --output path. The command must create it instead of failing.
+func TestSchemaGenerateCreatesOutputDirectory(t *testing.T) {
+	bin := buildBinary(t)
+
+	t.Run("default output in an empty directory", func(t *testing.T) {
+		dir := t.TempDir()
+		runCLI(t, bin, dir, "schema", "generate")
+		if _, err := os.Stat(filepath.Join(dir, "schemas", "bausteinsicht.schema.json")); err != nil {
+			t.Fatalf("default schema file not written: %v", err)
+		}
+	})
+
+	t.Run("custom output with missing parent directories", func(t *testing.T) {
+		dir := t.TempDir()
+		runCLI(t, bin, dir, "schema", "generate", "--output", "some/dir/file.json")
+		if _, err := os.Stat(filepath.Join(dir, "some", "dir", "file.json")); err != nil {
+			t.Fatalf("schema file not written below a new directory: %v", err)
+		}
+	})
+}
