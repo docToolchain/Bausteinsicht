@@ -51,14 +51,22 @@ func runAddViewJSON(t *testing.T, bin, dir string, args ...string) addViewResult
 	return res
 }
 
-func TestAddViewJSONReportsResultingView(t *testing.T) {
-	bin := buildBinary(t)
+// newAddViewModelDir returns a fresh directory with the test model, so that
+// every subtest is independent of the others and can be run on its own.
+func newAddViewModelDir(t *testing.T) string {
+	t.Helper()
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "architecture.jsonc"), []byte(addViewJSONModel), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	return dir
+}
+
+func TestAddViewJSONReportsResultingView(t *testing.T) {
+	bin := buildBinary(t)
 
 	t.Run("extending an existing view reports the full view", func(t *testing.T) {
+		dir := newAddViewModelDir(t)
 		got := runAddViewJSON(t, bin, dir, "context", "--include", "payment")
 		want := addViewResult{
 			ViewKey: "context",
@@ -73,6 +81,8 @@ func TestAddViewJSONReportsResultingView(t *testing.T) {
 	})
 
 	t.Run("an include that is already present is not reported as added", func(t *testing.T) {
+		dir := newAddViewModelDir(t)
+		runAddViewJSON(t, bin, dir, "context", "--include", "payment")
 		got := runAddViewJSON(t, bin, dir, "context", "--include", "payment")
 		if len(got.Added) != 0 {
 			t.Errorf("added = %v, want none", got.Added)
@@ -83,6 +93,7 @@ func TestAddViewJSONReportsResultingView(t *testing.T) {
 	})
 
 	t.Run("creating a view reports created", func(t *testing.T) {
+		dir := newAddViewModelDir(t)
 		got := runAddViewJSON(t, bin, dir, "pay", "--title", "Payment view", "--include", "payment")
 		want := addViewResult{
 			ViewKey: "pay",
