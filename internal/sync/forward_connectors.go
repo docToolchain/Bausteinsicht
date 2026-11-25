@@ -16,7 +16,10 @@ type viewConnector struct {
 	from, to string
 	index    int
 	label    string
-	dashed   bool // any relationship rendered by this connector is dashed (#518)
+	// technology of the relationship that gives the connector its label,
+	// shown as a second label "[technology]" (#642).
+	technology string
+	dashed     bool // any relationship rendered by this connector is dashed (#518)
 }
 
 // expectedViewConnectors returns the connectors a view page should carry for
@@ -34,7 +37,7 @@ func expectedViewConnectors(m *model.BausteinsichtModel, elemSet map[string]bool
 		if !ok {
 			continue
 		}
-		vc := viewConnector{from: from, to: to, index: i, label: rel.Label, dashed: dashedForPair[from+"->"+to]}
+		vc := viewConnector{from: from, to: to, index: i, label: rel.Label, technology: rel.Technology, dashed: dashedForPair[from+"->"+to]}
 		if from == rel.From && to == rel.To {
 			direct = append(direct, vc)
 			directPairs[from+"->"+to] = true

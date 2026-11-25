@@ -166,6 +166,9 @@ func applyForwardToPage(in forwardRenderInputs, elemFilter map[string]bool) {
 
 	// Synchronize documentation-link icons (element Link/Decisions/DocLinks) with the model. (#543)
 	synchronizeDocLinkIcons(page, in.model)
+
+	// Show each relationship's technology on its connector. (#642)
+	synchronizeConnectorTechnology(page, "", legacyConnectors(in.model.Relationships))
 }
 
 // applyForwardPerView iterates over model views and applies changes per page.
@@ -288,6 +291,9 @@ func applyForwardToView(in forwardRenderInputs, opts *ForwardOptions, viewID str
 	// Remove managed connectors outside the expected set, e.g. lifted
 	// connectors left behind by an index shift or a deleted relationship.
 	in.result.ConnectorsDeleted += reconcileViewConnectors(page, viewID, expectedConnectorIDs(viewID, conns))
+
+	// Show each relationship's technology as a second label on its connector.
+	synchronizeConnectorTechnology(page, viewID, conns)
 
 	// Reconciliation: remove elements on the page that are no longer
 	// in the resolved view (e.g., after exclude list changes). #102

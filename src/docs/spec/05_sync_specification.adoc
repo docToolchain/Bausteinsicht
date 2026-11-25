@@ -336,6 +336,12 @@ Missing connectors from this set are created; connectors Bausteinsicht created e
 This also removes lifted connectors left behind when a relationship is deleted or its index in the `relationships` array shifts: their cell ID carries the lifted endpoints and the old index, so a lookup by the model endpoints misses them.
 User-drawn connectors carry other cell IDs and are never removed by this step.
 
+==== Relationship Technology Label
+
+A relationship's `technology` is shown on its connector as a second label `[technology]` (#642). The label is a child cell of the connector: `<mxCell id="<connector cell ID>-tech" vertex="1" connectable="0" parent="<connector cell ID>" style="edgeLabel;…">` with a relative geometry that places it below the connector's own label. The connector's `value` stays the plain relationship `label`, so reverse sync reads only the label and the technology never turns into a label change.
+
+Like the doc-link icons, the labels are not part of the sync state. Every forward sync reconciles them from the model: a label is created or updated for each connector whose relationship has a technology (for a lifted connector, the technology of the relationship that gives the connector its label), and labels without a technology, without a connector, or whose connector was removed or re-keyed are deleted or re-attached. The model is authoritative: a label deleted or edited in draw.io comes back on the next sync, and the technology can only be changed in the model. Without views (single-page mode) the same applies to the one page, with unscoped connector IDs. The label is positioned independently of the connector's own label: sync only creates it, updates its text and keeps it attached, and never changes the position of an existing label, so a user can move it in draw.io.
+
 Connector cell IDs carry the relationship's index in the `relationships` array, so inserting or removing a relationship renames every following connector, and a new lower-index relationship can take over a lifted pair.
 Before changes are applied, an expected connector that is missing on the page takes over a no-longer-expected managed connector with the same source and target: the cell gets the new ID, the current label and the dashed style of its relationship kind, and keeps its waypoints and label position.
 Model-side label and kind changes are applied to view connectors through their page-scoped cell IDs.
