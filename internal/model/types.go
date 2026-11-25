@@ -121,6 +121,14 @@ const (
 	StepSync   StepType = "sync"
 	StepAsync  StepType = "async"
 	StepReturn StepType = "return"
+
+	// Block steps open (alt, opt, group), continue (else) or close (end) a
+	// frame around the steps between them. They carry only a label.
+	StepAlt   StepType = "alt"
+	StepElse  StepType = "else"
+	StepOpt   StepType = "opt"
+	StepGroup StepType = "group"
+	StepEnd   StepType = "end"
 )
 
 // SequenceStep is one message/call in a dynamic view.

@@ -171,6 +171,27 @@ The architecture model has four sections:
   - `exclude`: Elements to hide
 - **Relationships** are automatically shown when both `from` and `to` elements are visible in a view.
 
+## Dynamic views (sequence diagrams)
+
+Runtime scenarios go into the top-level `dynamicViews` array and are exported with `bausteinsicht export-sequence` (PlantUML or Mermaid). Each step has a unique `index` (it only orders the steps; numbering is added by `autonumber`), a `from`/`to` element ID, a `label` and an optional `type` (`sync` default, `async`, `return`). Elements of an `actor` kind are drawn as actors.
+
+Alternatives and optional parts use block steps, which need no `from`/`to`: `alt` / `else` / `opt` / `group` open or continue a block and `end` closes it.
+
+```jsonc
+"dynamicViews": [
+  { "key": "checkout", "title": "Checkout", "steps": [
+    { "index": 1, "from": "customer", "to": "shop", "label": "submit \"order\"" },
+    { "index": 2, "type": "alt", "label": "card accepted" },
+    { "index": 3, "from": "shop", "to": "customer", "label": "receipt", "type": "return" },
+    { "index": 4, "type": "else", "label": "card declined" },
+    { "index": 5, "from": "shop", "to": "customer", "label": "error", "type": "return" },
+    { "index": 6, "type": "end" }
+  ] }
+]
+```
+
+Run `bausteinsicht validate` afterwards: it checks that `from`/`to` exist and that every block is closed.
+
 ## Typical Workflows
 
 ### Create a new architecture model
