@@ -75,11 +75,12 @@ func RenderD2(m *model.BausteinsichtModel, viewKey string) (string, error) {
 	for _, r := range rels {
 		fromID := sanitizeD2ID(r.From)
 		toID := sanitizeD2ID(r.To)
+		label := r.displayLabel()
 		switch {
 		case r.Dashed:
-			fmt.Fprintf(&b, "%s -> %s: %s {\n  style.stroke-dash: 3\n}\n", fromID, toID, escapeD2String(r.Label))
-		case r.Label != "":
-			fmt.Fprintf(&b, "%s -> %s: %s\n", fromID, toID, escapeD2String(r.Label))
+			fmt.Fprintf(&b, "%s -> %s: %s {\n  style.stroke-dash: 3\n}\n", fromID, toID, escapeD2String(label))
+		case label != "":
+			fmt.Fprintf(&b, "%s -> %s: %s\n", fromID, toID, escapeD2String(label))
 		default:
 			fmt.Fprintf(&b, "%s -> %s\n", fromID, toID)
 		}

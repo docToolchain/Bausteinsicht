@@ -97,6 +97,7 @@ func RenderHTML(m *model.BausteinsichtModel, viewKey string) (string, error) {
 	edges := make([]HTMLEdge, len(rels))
 	for i, r := range rels {
 		edges[i] = HTMLEdge(r)
+		edges[i].Label = r.displayLabel() // the viewer shows one label per edge
 	}
 
 	// Create diagram data

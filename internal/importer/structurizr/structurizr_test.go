@@ -368,3 +368,31 @@ func TestImport_PathTraversalDeepEscape(t *testing.T) {
 		t.Errorf("expected path traversal rejection warning for deep escape, got warnings: %v", result.Warnings)
 	}
 }
+
+// The optional fourth token of a Structurizr relationship is its technology
+// (source -> destination "description" "technology"); it must survive the
+// import so that export and import round-trip (#642).
+func TestImport_RelationshipTechnology(t *testing.T) {
+	const src = `workspace {
+  model {
+    shop = softwareSystem "Shop"
+    payment = softwareSystem "Payment"
+    shop -> payment "charges" "HTTPS/JSON"
+    payment -> shop "notifies"
+  }
+}`
+	result, err := structurizr.ImportSource(src)
+	if err != nil {
+		t.Fatalf("ImportSource failed: %v", err)
+	}
+	got := map[string]string{}
+	for _, r := range result.Model.Relationships {
+		got[r.From+">"+r.To] = r.Label + "|" + r.Technology
+	}
+	if got["shop>payment"] != "charges|HTTPS/JSON" {
+		t.Errorf("shop>payment = %q, want %q", got["shop>payment"], "charges|HTTPS/JSON")
+	}
+	if got["payment>shop"] != "notifies|" {
+		t.Errorf("payment>shop = %q, want %q", got["payment>shop"], "notifies|")
+	}
+}

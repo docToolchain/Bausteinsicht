@@ -176,10 +176,24 @@ func partitionElements(resolved []string, flat map[string]*model.Element, scope 
 }
 
 type relEntry struct {
-	From   string `json:"from"`
-	To     string `json:"to"`
-	Label  string `json:"label,omitempty"`
-	Dashed bool   `json:"dashed,omitempty"`
+	From       string `json:"from"`
+	To         string `json:"to"`
+	Label      string `json:"label,omitempty"`
+	Dashed     bool   `json:"dashed,omitempty"`
+	Technology string `json:"technology,omitempty"`
+}
+
+// displayLabel is the label for renderers that have no separate technology
+// slot: "label [technology]", or just one of the two.
+func (r relEntry) displayLabel() string {
+	switch {
+	case r.Technology == "":
+		return r.Label
+	case r.Label == "":
+		return "[" + r.Technology + "]"
+	default:
+		return r.Label + " [" + r.Technology + "]"
+	}
 }
 
 // filterRelationships lifts relationship endpoints to visible elements,
@@ -206,7 +220,7 @@ func filterRelationships(rels []model.Relationship, elemSet map[string]bool, spe
 			continue
 		}
 		seenAt[key] = len(result)
-		result = append(result, relEntry{from, to, r.Label, dashed})
+		result = append(result, relEntry{From: from, To: to, Label: r.Label, Dashed: dashed, Technology: r.Technology})
 	}
 	return result
 }
@@ -377,7 +391,14 @@ func writeScopeSection(b *strings.Builder, view model.View, bnd boundary, inside
 
 func writePlantUML(b *strings.Builder, view model.View, level string, inside, outside []elemEntry, rels []relEntry, bnd boundary) {
 	b.WriteString("@startuml\n")
-	fmt.Fprintf(b, "!include <C4/C4_%s>\n\n", level)
+	fmt.Fprintf(b, "!include <C4/C4_%s>\n", level)
+	// The view title and, unless the view opts out, the legend that tells the
+	// C4 shapes apart (#642).
+	fmt.Fprintf(b, "title %s\n", view.Title)
+	if view.Legend == nil || *view.Legend {
+		b.WriteString("LAYOUT_WITH_LEGEND()\n")
+	}
+	b.WriteString("\n")
 
 	// External elements (outside scope boundary).
 	for _, e := range outside {
@@ -405,11 +426,19 @@ func writePlantUMLRelationships(b *strings.Builder, rels []relEntry) {
 	}
 	for _, r := range rels {
 		if r.Dashed {
-			fmt.Fprintf(b, "%s ..> %s : \"%s\"\n", sanitizeID(r.From), sanitizeID(r.To), escapeQuotes(r.Label))
+			fmt.Fprintf(b, "%s ..> %s : \"%s\"\n", sanitizeID(r.From), sanitizeID(r.To), escapeQuotes(r.displayLabel()))
 		} else {
-			fmt.Fprintf(b, "Rel(%s, %s, \"%s\")\n", sanitizeID(r.From), sanitizeID(r.To), escapeQuotes(r.Label))
+			fmt.Fprintf(b, "Rel(%s, %s, \"%s\"%s)\n", sanitizeID(r.From), sanitizeID(r.To), escapeQuotes(r.Label), relTechnologyArg(r))
 		}
 	}
+}
+
+// relTechnologyArg is the optional fourth argument of the C4 Rel() macro.
+func relTechnologyArg(r relEntry) string {
+	if r.Technology == "" {
+		return ""
+	}
+	return fmt.Sprintf(", \"%s\"", escapeQuotes(r.Technology))
 }
 
 // --- Mermaid ---
@@ -435,7 +464,7 @@ func writeMermaid(b *strings.Builder, view model.View, level string, inside, out
 		b.WriteString("\n")
 	}
 	for _, r := range rels {
-		fmt.Fprintf(b, "    Rel(%s, %s, \"%s\")\n", sanitizeID(r.From), sanitizeID(r.To), escapeQuotes(r.Label))
+		fmt.Fprintf(b, "    Rel(%s, %s, \"%s\"%s)\n", sanitizeID(r.From), sanitizeID(r.To), escapeQuotes(r.Label), relTechnologyArg(r))
 	}
 }
 

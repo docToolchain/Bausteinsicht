@@ -350,3 +350,25 @@ func TestExportValidationDetectsInvalidElements(t *testing.T) {
 		t.Error("export should produce valid DSL even with invalid element references")
 	}
 }
+
+// A relationship technology is the fourth token of a Structurizr relationship:
+// source -> destination "description" "technology" (#642).
+func TestExport_RelationshipTechnology(t *testing.T) {
+	m := &model.BausteinsichtModel{
+		Specification: model.Specification{Elements: map[string]model.ElementKind{"system": {Notation: "System"}}},
+		Model: map[string]model.Element{
+			"shop":    {Kind: "system", Title: "Shop"},
+			"payment": {Kind: "system", Title: "Payment"},
+		},
+		Relationships: []model.Relationship{
+			{From: "shop", To: "payment", Label: "charges", Technology: "HTTPS/JSON"},
+			{From: "payment", To: "shop", Technology: "AMQP"},
+		},
+	}
+	dsl := structurizr.Export(m)
+	for _, want := range []string{`shop -> payment "charges" "HTTPS/JSON"`, `payment -> shop "" "AMQP"`} {
+		if !strings.Contains(dsl, want) {
+			t.Errorf("missing %q in:\n%s", want, dsl)
+		}
+	}
+}

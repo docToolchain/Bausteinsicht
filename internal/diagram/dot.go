@@ -70,8 +70,8 @@ func RenderDOT(m *model.BausteinsichtModel, viewKey string) (string, error) {
 			fromID := sanitizeID(r.From)
 			toID := sanitizeID(r.To)
 			var attrs []string
-			if r.Label != "" {
-				attrs = append(attrs, fmt.Sprintf("label=\"%s\"", escapeQuotes(r.Label)))
+			if label := r.displayLabel(); label != "" {
+				attrs = append(attrs, fmt.Sprintf("label=\"%s\"", escapeQuotes(label)))
 			}
 			if r.Dashed {
 				attrs = append(attrs, `style="dashed"`)
