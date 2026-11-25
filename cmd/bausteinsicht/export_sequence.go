@@ -49,9 +49,6 @@ func runExportSequence(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return exitWithCode(fmt.Errorf("loading model: %w", err), 2)
 	}
-	if err := validateForExport(cmd, m); err != nil {
-		return err
-	}
 
 	var ext string
 	switch diagramFormat {

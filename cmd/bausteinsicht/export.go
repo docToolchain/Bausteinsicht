@@ -75,9 +75,6 @@ func runExport(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return exitWithCode(fmt.Errorf("loading model: %w", err), 2)
 	}
-	if err := validateForExport(cmd, m); err != nil {
-		return err
-	}
 
 	if len(m.Views) == 0 {
 		return exitWithCode(fmt.Errorf("no views to export"), 2)

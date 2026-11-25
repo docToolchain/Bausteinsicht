@@ -155,9 +155,6 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return exitWithCode(fmt.Errorf("loading model: %w", err), 2)
 	}
-	if err := validateForExport(cmd, m); err != nil {
-		return err
-	}
 
 	// Read outputFormat early: needed by both the structurizr block below and
 	// the generic plantuml/mermaid/dot/d2/html paths further down.
