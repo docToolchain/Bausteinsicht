@@ -106,6 +106,23 @@ func PatchValue(data []byte, path []string, newValue string) ([]byte, error) {
 	return result, nil
 }
 
+// HasPath reports whether the JSONC data contains a value at path.
+func HasPath(data []byte, path []string) bool {
+	_, _, err := findValueRange(data, path)
+	return err == nil
+}
+
+// UpsertObjectField sets key in the object at objectPath to valueJSON: an
+// existing value is replaced in place, a missing key is inserted as a new
+// entry. Comments and formatting around it are preserved.
+func UpsertObjectField(data []byte, objectPath []string, key, valueJSON string) ([]byte, error) {
+	fieldPath := append(append([]string{}, objectPath...), key)
+	if HasPath(data, fieldPath) {
+		return PatchValue(data, fieldPath, valueJSON)
+	}
+	return InsertObjectEntry(data, objectPath, key, valueJSON)
+}
+
 // findValueRange locates the byte range [start, end) of the JSON value at
 // the given path within JSONC data. It handles single-line comments and
 // string escaping.

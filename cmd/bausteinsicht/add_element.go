@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/docToolchain/Bausteinsicht/internal/model"
@@ -127,7 +128,7 @@ func runAddElement(cmd *cobra.Command, args []string) error {
 	}
 
 	// Save model — use comment-preserving insertion. (#122)
-	if err := saveAddedElement(modelPath, m, fullID, parent, id, elem); err != nil {
+	if err := saveAddedElement(cmd.ErrOrStderr(), modelPath, m, fullID, parent, id, elem); err != nil {
 		return exitWithCode(fmt.Errorf("saving model: %w", err), 2)
 	}
 
@@ -228,8 +229,8 @@ func splitDotPath(path string) []string {
 }
 
 // saveAddedElement saves a newly added element using comment-preserving
-// insertion. Falls back to model.Save if patching fails. (#122)
-func saveAddedElement(modelPath string, m *model.BausteinsichtModel, fullID, parent, id string, elem model.Element) error {
+// insertion. (#122)
+func saveAddedElement(w io.Writer, modelPath string, m *model.BausteinsichtModel, fullID, parent, id string, elem model.Element) error {
 	// Compute indent depth: "model" is depth 1, each dot-path segment adds 2
 	// (one for the parent element, one for "children").
 	depth := 2 // "model" → "X" is at depth 2
@@ -249,14 +250,10 @@ func saveAddedElement(modelPath string, m *model.BausteinsichtModel, fullID, par
 		objectPath = []string{"model"}
 	}
 
-	err := model.PatchInsert(modelPath, func(data []byte) ([]byte, error) {
+	// Falls back to a full save, announced on w, if patching fails.
+	return savePatched(w, modelPath, m, func(data []byte) ([]byte, error) {
 		return model.InsertObjectEntry(data, objectPath, id, elemJSON)
 	})
-	if err != nil {
-		// Fall back to full save if patching fails.
-		return model.Save(modelPath, m)
-	}
-	return nil
 }
 
 // marshalElementJSON builds a formatted JSON object for an element.

@@ -79,8 +79,13 @@ func runAddView(cmd *cobra.Command, args []string) error {
 		return exitWithCode(fmt.Errorf("adding view: %w", err), 1)
 	}
 
-	// Save model
-	if err := model.Save(modelPath, m); err != nil {
+	// Save model: insert the new view or update the existing one in place, so
+	// comments and formatting of the rest of the file stay as they are (#635).
+	added := newIncludes(prior.Include, includes)
+	patch := func(data []byte) ([]byte, error) {
+		return patchView(data, viewKey, viewExists, m.Views[viewKey], view, added)
+	}
+	if err := savePatched(cmd.ErrOrStderr(), modelPath, m, patch); err != nil {
 		return exitWithCode(fmt.Errorf("saving model: %w", err), 2)
 	}
 
@@ -97,7 +102,7 @@ func runAddView(cmd *cobra.Command, args []string) error {
 			Scope:       final.Scope,
 			Description: final.Description,
 			Include:     nonNil(final.Include),
-			Added:       newIncludes(prior.Include, includes),
+			Added:       added,
 		}
 		jsonBytes, err := json.MarshalIndent(result, "", "  ")
 		if err != nil {
@@ -156,4 +161,58 @@ func nonNil(s []string) []string {
 		return []string{}
 	}
 	return s
+}
+
+// patchView applies "add view" to the raw model text: a new view is inserted
+// into "views"; for an existing view the fields given on the command line are
+// replaced and the new include entries are appended, nothing else is touched.
+func patchView(data []byte, key string, exists bool, final, requested model.View, added []string) ([]byte, error) {
+	viewsPath := []string{"views"}
+	if !exists {
+		entry, err := marshalEntryJSON(final, 2)
+		if err != nil {
+			return nil, err
+		}
+		return model.InsertObjectEntry(data, viewsPath, key, entry)
+	}
+
+	viewPath := append(append([]string{}, viewsPath...), key)
+	var err error
+	for _, f := range []struct{ name, value string }{
+		{"title", requested.Title},
+		{"scope", requested.Scope},
+		{"description", requested.Description},
+	} {
+		if f.value == "" {
+			continue
+		}
+		quoted, qerr := marshalEntryJSON(f.value, 0)
+		if qerr != nil {
+			return nil, qerr
+		}
+		if data, err = model.UpsertObjectField(data, viewPath, f.name, quoted); err != nil {
+			return nil, err
+		}
+	}
+	if len(added) == 0 {
+		return data, nil
+	}
+	includePath := append(append([]string{}, viewPath...), "include")
+	if !model.HasPath(data, includePath) {
+		list, lerr := marshalEntryJSON(added, 0)
+		if lerr != nil {
+			return nil, lerr
+		}
+		return model.InsertObjectEntry(data, viewPath, "include", list)
+	}
+	for _, id := range added {
+		quoted, qerr := marshalEntryJSON(id, 0)
+		if qerr != nil {
+			return nil, qerr
+		}
+		if data, err = model.AppendArrayEntry(data, includePath, quoted); err != nil {
+			return nil, err
+		}
+	}
+	return data, nil
 }
