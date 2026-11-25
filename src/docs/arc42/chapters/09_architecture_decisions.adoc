@@ -63,4 +63,9 @@ All ADRs are located in `src/docs/arc42/ADRs/`.
 | Drill-Down Navigation
 | Accepted
 | Page-based drill-down (one draw.io page per view + cross-page links + back button) over single-page semantic zoom. Uses native draw.io pages; keeps bidirectional sync simple.
+
+| link:../ADRs/ADR-012-Multi-Model-Composition.adoc[ADR-012]
+| Multi-Model Composition and Remote Sources
+| Proposed
+| Compose system-of-systems views by extending the existing workspace (local-first, then opt-in pinned remote sources with a lock file), not by changing the model format (`$ref`, `imports`). Analysis result for #227; awaiting a maintainer decision.
 |===

@@ -1,0 +1,176 @@
+:jbake-title: ADR-012: Multi-Model Composition and Remote Sources
+:jbake-type: page_toc
+:jbake-status: published
+:jbake-menu: ADR
+:jbake-order: 12
+
+= ADR-012: Multi-Model Composition and Remote Sources
+
+== Status
+
+Proposed (analysis result for #227; needs a maintainer decision)
+
+== Context
+
+In larger organisations every team owns its own architecture model, and a system-of-systems (landscape) view has to show elements of other teams' models without copying them, keep them up to date, and let each team own its file (#227).
+
+Bausteinsicht can already combine models: `bausteinsicht workspace` reads a workspace configuration (`internal/workspace`), loads the referenced models from local paths, prefixes the element IDs of each model (`ModelRef.Prefix`, default the model ID) so they cannot collide, adds `crossModelRelationships` and `views` that select elements from several models, and writes one merged model (`workspace merge`). What is missing is the part that #227 is about: models that live in **other repositories**, and a way to get them reproducibly and safely.
+
+=== Forces
+
+* **Simplicity.** The model format (ADR-001) is plain JSONC with a JSON Schema; every loader change affects every command, the LSP server and LLM agents that write the format.
+* **Incremental adoption.** A model that does not use composition must load exactly as before.
+* **Security.** Fetching a URL during `validate`, `sync` or `export` in CI is an SSRF and supply-chain risk (see the threat model, T-2 path containment, and the SHA-256 checksums of the sync state). Fetching must be opt-in, explicit and verifiable.
+* **Reproducibility.** A build must give the same result next week; upstream models change.
+* **Offline use.** Local and cached models must work without a network.
+* **Hard to reverse.** A new key in the model format is a long-term commitment; a new workspace option is cheaper to change.
+
+== Evaluated Options
+
+=== Option A: Status quo (reference)
+
+Local-path workspace as it exists today. Other repositories are brought in with git submodules, a checkout step in CI or a vendored copy, and the workspace points at that local path.
+
+*Pros:* no new code, no network access in the tool, reproducible through the pinned submodule commit.
+*Cons:* the pinning and updating are outside Bausteinsicht; no integrity check on the model files; no way to take only part of a remote model; each team must know the checkout convention.
+
+=== Option B: `imports` section in the model file
+
+An `imports` map in the model (LikeC4-style), `{ "team_a": { "source": "..." } }`, resolved by the loader; references like `team_a:system_a.api` in relationships and views.
+
+*Pros:* one self-contained file; the dependency is visible next to the elements that use it.
+*Cons:* the loader (`model.Load`) gets network and file-system access for every command; new reference syntax everywhere IDs are accepted (relationships, views, dynamic views, constraints, LSP, schema); a format change that is hard to take back.
+
+=== Option C: Overload `$ref` / `$include` inside the model
+
+Use JSON-Schema-like `$ref` (or a custom `$include`) as an element value, as sketched in the issue.
+
+*Pros:* familiar looking.
+*Cons:* `$ref` is a schema-composition construct with no standard for data files, so IDE support would promise something the tooling does not do (the research comment on #227 reaches the same conclusion); element values would stop being plain elements, which breaks the schema, the LSP and the sync engine; same loader and security cost as B.
+
+=== Option D: Extend the workspace with pinned sources (phased)
+
+Keep composition in the workspace configuration and give a model reference an optional `source` next to `path`:
+
+* **Phase 1 (local, no network).** Make the existing workspace more useful for the system-of-systems case: take part of a model (a top-level element as a black box, or selected elements and depth) instead of the whole model, validate `crossModelRelationships` against the loaded models and report dangling ones, and document the submodule/checkout pattern of Option A as the supported way to use other repositories.
+* **Phase 2 (remote, opt-in).** A model reference may name a git or HTTPS source pinned to a tag or commit. A separate command (for example `workspace fetch`) downloads it into a local cache and writes `bausteinsicht.lock` with the SHA-256 of each file; all other commands read only the cache and verify the hash. Remote sources are off unless the workspace configuration lists an allowlist of hosts.
+
+*Pros:* the model format and `model.Load` stay unchanged; network access exists only in one explicit command; incremental by construction (no workspace, no change); the lock file gives reproducible and offline builds; builds on code that exists.
+*Cons:* two files instead of one for a landscape (workspace configuration plus the team models); Phase 2 needs a real security design (below) before it is built.
+
+== Weighted Pugh Matrix
+
+Rating scale: -1 = worse than reference, 0 = same as reference, +1 = better than reference.
+Reference: Option A (status quo).
+
+[cols="3,1,1,1,1,1"]
+|===
+| Criterion | Weight | A: Status quo (Ref) | B: `imports` in model | C: `$ref` / `$include` | D: Workspace + pinned sources
+
+| Reaches models in other repositories without a manual checkout
+| 3
+| 0
+| +1
+| +1
+| +1
+
+| Simplicity of the mechanism
+| 2
+| 0
+| -1
+| -1
+| -1
+
+| No change for models that do not use it
+| 3
+| 0
+| 0
+| -1
+| 0
+
+| Security in CI (network only when explicitly asked)
+| 3
+| 0
+| -1
+| -1
+| 0
+
+| Reproducible and offline-capable
+| 2
+| 0
+| 0
+| 0
+| 0
+
+| Tooling compatibility (JSON Schema, IDE, LSP, LLM agents)
+| 2
+| 0
+| 0
+| -1
+| 0
+
+| Cost of being wrong (reversibility)
+| 2
+| 0
+| -1
+| -1
+| 0
+
+| *Weighted total*
+| —
+| *0*
+| *-4*
+| *-9*
+| *+1*
+|===
+
+Option D wins only narrowly over the status quo, which is the honest result: for teams that can check out the other repositories, Option A is already almost enough. What D adds is pinning with integrity checks and partial imports, without touching the model format.
+
+== Decision (proposed)
+
+**Adopt Option D, in two phases, and do not change the model format.**
+
+. **Phase 1 first and on its own.** Partial/black-box imports in the workspace, validation of cross-model relationships, and documentation of the checkout pattern. No network code.
+. **Phase 2 only after** a STRIDE entry for remote fetching in arc42 chapter 8 and a SEC finding in the security review exist, and the points below are specified.
+
+=== Security model for Phase 2
+
+* Remote sources are **disabled by default**; the workspace configuration must list allowed hosts.
+* HTTPS only; no automatic redirects (or re-validation of every redirect target); block private, link-local and loopback addresses, including the cloud metadata address `169.254.169.254`, and connect to the address that was validated (DNS rebinding).
+* Authentication only through environment variables (for example a token per host), never stored in the configuration or the lock file.
+* The lock file records a SHA-256 per fetched file; every read verifies it, a mismatch is an error, and updating is an explicit `workspace fetch --update`.
+* The path containment rules (`validatePathContainment`) apply to the cache directory and to `path` inside a fetched repository.
+
+=== Caching and lock file
+
+Go-modules style: `bausteinsicht.lock` next to the workspace configuration, cache in a project-local directory that is git-ignored. With lock file and cache present, everything works offline; without the cache a build fails with a message that names `workspace fetch`, instead of fetching silently.
+
+=== CLI
+
+No new top-level command. `workspace fetch` (Phase 2) is the only one that touches the network; `workspace validate` also reports dangling cross-model relationships (Phase 1).
+
+== Consequences
+
+=== Positive
+
+* Model format, JSON Schema and LSP stay as they are; models without a workspace are unaffected.
+* Network access is confined to one command and guarded by an allowlist and hashes.
+* Phase 1 is useful without any remote feature.
+
+=== Negative
+
+* A landscape needs the workspace configuration in addition to the models; there is no single-file landscape.
+* Phase 2 is real work (fetcher, cache, lock, tests) and has to be reviewed from a security point of view before it ships.
+
+=== Open Questions for the Maintainers
+
+* Is a separate workspace configuration acceptable as the long-term home of composition, or is a single-file `imports` (Option B) wanted despite its cost?
+* Which hosts matter in practice (GitHub only, or also self-hosted Git)? That decides between a git-based and a plain HTTPS fetcher in Phase 2.
+* Should the included models be allowed to bring their own `specification` (element kinds) into the merge, or must the landscape define the kinds? Today the first definition wins.
+
+== References
+
+* #227 (analysis issue and the research and triage comments)
+* `internal/workspace/` and `bausteinsicht workspace` in the CLI specification
+* ADR-001 (DSL format), ADR-011 (patch-save, for the cost of format changes)
+* LikeC4 multi-project imports, Structurizr workspace extension and Terraform module sources (research comment on #227)
