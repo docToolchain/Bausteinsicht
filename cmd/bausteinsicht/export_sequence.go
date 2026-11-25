@@ -88,9 +88,9 @@ func runExportSequence(cmd *cobra.Command, _ []string) error {
 
 	render := func(v model.DynamicView) string {
 		if diagramFormat == "mermaid" {
-			return diagram.RenderSequenceMermaid(v, flat)
+			return diagram.RenderSequenceMermaid(v, flat, &m.Specification)
 		}
-		return diagram.RenderSequencePlantUML(v, flat)
+		return diagram.RenderSequencePlantUML(v, flat, &m.Specification)
 	}
 
 	// JSON output. (#631) With --output: write files and report "path"; without: report "source".

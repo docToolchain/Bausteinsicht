@@ -532,24 +532,35 @@ Each entry describes a sequence diagram for one runtime scenario.
 
 | `from`
 | string
-| yes
-| Sender element ID (must exist in the flat model)
+| yes (message steps)
+| Sender element ID (must exist in the flat model). Not used by block steps.
 
 | `to`
 | string
-| yes
-| Receiver element ID (must exist in the flat model)
+| yes (message steps)
+| Receiver element ID (must exist in the flat model). Not used by block steps.
 
 | `label`
 | string
 | yes
-| Message label displayed on the arrow
+| Message label displayed on the arrow; for `alt`, `else`, `opt` and `group` the title of the block
 
 | `type`
 | string
 | no
-| Arrow style: `sync` (default), `async`, or `return`
+| Arrow style: `sync` (default), `async`, or `return`. Or a block step: `alt`, `else`, `opt`, `group`, `end` (see below).
 |===
+
+**Block steps** frame the steps between them, for alternatives or optional parts of a scenario (for example "card accepted" / "card declined"). `alt`, `opt` and `group` open a block, `end` closes it, and `else` starts the next branch of the enclosing `alt`. Blocks can be nested and are evaluated in `index` order. They need no `from`/`to`. The validator reports a block that is never closed, an `end` without an open block, and an `else` that is not directly inside an `alt`.
+
+[source,jsonc]
+----
+{ "index": 2, "type": "alt",  "label": "card accepted" },
+{ "index": 3, "from": "shop", "to": "customer", "label": "receipt", "type": "return" },
+{ "index": 4, "type": "else", "label": "card declined" },
+{ "index": 5, "from": "shop", "to": "customer", "label": "error", "type": "return" },
+{ "index": 6, "type": "end" }
+----
 
 ==== JSONC Comment Support
 
@@ -988,6 +999,11 @@ const (
     StepSync   StepType = "sync"
     StepAsync  StepType = "async"
     StepReturn StepType = "return"
+    StepAlt    StepType = "alt"
+    StepElse   StepType = "else"
+    StepOpt    StepType = "opt"
+    StepGroup  StepType = "group"
+    StepEnd    StepType = "end"
 )
 
 // Constraint defines an architectural rule enforced via `bausteinsicht lint`.

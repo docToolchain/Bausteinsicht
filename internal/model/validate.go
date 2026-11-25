@@ -330,52 +330,123 @@ var validStepTypes = map[StepType]bool{
 	StepSync:   true,
 	StepAsync:  true,
 	StepReturn: true,
+	StepAlt:    true,
+	StepElse:   true,
+	StepOpt:    true,
+	StepGroup:  true,
+	StepEnd:    true,
 	"":         true, // omitted → default sync
+}
+
+// isBlockStep reports whether a step frames other steps (alt, else, opt, group,
+// end) instead of sending a message. Block steps have no from/to.
+func isBlockStep(t StepType) bool {
+	switch t {
+	case StepAlt, StepElse, StepOpt, StepGroup, StepEnd:
+		return true
+	}
+	return false
 }
 
 func validateDynamicViews(m *BausteinsichtModel) []ValidationError {
 	var errs []ValidationError
 	for vi, dv := range m.DynamicViews {
-		path := fmt.Sprintf("dynamicViews[%d]", vi)
-		if dv.Key == "" {
-			errs = append(errs, ValidationError{Path: path, Message: "missing required field \"key\""})
+		errs = append(errs, validateDynamicView(m, dv, fmt.Sprintf("dynamicViews[%d]", vi))...)
+	}
+	return errs
+}
+
+func validateDynamicView(m *BausteinsichtModel, dv DynamicView, path string) []ValidationError {
+	var errs []ValidationError
+	if dv.Key == "" {
+		errs = append(errs, ValidationError{Path: path, Message: "missing required field \"key\""})
+	}
+	if dv.Title == "" {
+		errs = append(errs, ValidationError{Path: path, Message: "missing required field \"title\""})
+	}
+	if len(dv.Steps) == 0 {
+		return append(errs, ValidationError{Path: path, Message: "dynamic view must have at least one step"})
+	}
+	seenIndex := make(map[int]bool)
+	for si, step := range dv.Steps {
+		spath := fmt.Sprintf("%s.steps[%d]", path, si)
+		errs = append(errs, validateStep(m, step, spath)...)
+		if seenIndex[step.Index] {
+			errs = append(errs, ValidationError{
+				Path:    spath,
+				Message: fmt.Sprintf("duplicate step index %d", step.Index),
+			})
 		}
-		if dv.Title == "" {
-			errs = append(errs, ValidationError{Path: path, Message: "missing required field \"title\""})
-		}
-		if len(dv.Steps) == 0 {
-			errs = append(errs, ValidationError{Path: path, Message: "dynamic view must have at least one step"})
-			continue
-		}
-		seenIndex := make(map[int]bool)
-		for si, step := range dv.Steps {
-			spath := fmt.Sprintf("%s.steps[%d]", path, si)
-			if _, err := lookupElement(m, step.From); err != nil {
+		seenIndex[step.Index] = true
+	}
+	return append(errs, validateStepBlocks(dv.Steps, path)...)
+}
+
+// validateStep checks one step: its type and, for message steps, that from and
+// to resolve to elements.
+func validateStep(m *BausteinsichtModel, step SequenceStep, spath string) []ValidationError {
+	var errs []ValidationError
+	if !validStepTypes[step.Type] {
+		return append(errs, ValidationError{
+			Path:    spath,
+			Message: fmt.Sprintf("invalid type %q (must be \"sync\", \"async\", \"return\", or a block: \"alt\", \"else\", \"opt\", \"group\", \"end\")", step.Type),
+		})
+	}
+	if isBlockStep(step.Type) {
+		return errs
+	}
+	if _, err := lookupElement(m, step.From); err != nil {
+		errs = append(errs, ValidationError{
+			Path:    spath,
+			Message: fmt.Sprintf("from %q does not resolve to an existing element", step.From),
+		})
+	}
+	if _, err := lookupElement(m, step.To); err != nil {
+		errs = append(errs, ValidationError{
+			Path:    spath,
+			Message: fmt.Sprintf("to %q does not resolve to an existing element", step.To),
+		})
+	}
+	return errs
+}
+
+// validateStepBlocks checks, in step-index order, that every alt/opt/group is
+// closed by an end, that every end closes a block, and that else sits directly
+// inside an alt.
+func validateStepBlocks(steps []SequenceStep, path string) []ValidationError {
+	ordered := make([]SequenceStep, len(steps))
+	copy(ordered, steps)
+	sort.SliceStable(ordered, func(i, j int) bool { return ordered[i].Index < ordered[j].Index })
+
+	var errs []ValidationError
+	var open []SequenceStep
+	for _, step := range ordered {
+		switch step.Type {
+		case StepAlt, StepOpt, StepGroup:
+			open = append(open, step)
+		case StepElse:
+			if len(open) == 0 || open[len(open)-1].Type != StepAlt {
 				errs = append(errs, ValidationError{
-					Path:    spath,
-					Message: fmt.Sprintf("from %q does not resolve to an existing element", step.From),
+					Path:    path,
+					Message: fmt.Sprintf("step index %d: \"else\" is only allowed directly inside an \"alt\"", step.Index),
 				})
 			}
-			if _, err := lookupElement(m, step.To); err != nil {
+		case StepEnd:
+			if len(open) == 0 {
 				errs = append(errs, ValidationError{
-					Path:    spath,
-					Message: fmt.Sprintf("to %q does not resolve to an existing element", step.To),
+					Path:    path,
+					Message: fmt.Sprintf("step index %d: \"end\" without an open block", step.Index),
 				})
+				continue
 			}
-			if !validStepTypes[step.Type] {
-				errs = append(errs, ValidationError{
-					Path:    spath,
-					Message: fmt.Sprintf("invalid type %q (must be \"sync\", \"async\", or \"return\")", step.Type),
-				})
-			}
-			if seenIndex[step.Index] {
-				errs = append(errs, ValidationError{
-					Path:    spath,
-					Message: fmt.Sprintf("duplicate step index %d", step.Index),
-				})
-			}
-			seenIndex[step.Index] = true
+			open = open[:len(open)-1]
 		}
+	}
+	for _, step := range open {
+		errs = append(errs, ValidationError{
+			Path:    path,
+			Message: fmt.Sprintf("\"%s\" opened at step index %d is never closed (add an \"end\" step)", step.Type, step.Index),
+		})
 	}
 	return errs
 }
