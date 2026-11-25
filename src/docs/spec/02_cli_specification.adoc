@@ -603,14 +603,29 @@ View 'containers' added to model
   Title: Updated Containers
 
 # JSON output
-$ bausteinsicht add view context --title "System Context" --format json
+$ bausteinsicht add view context --title "System Context" --include system --format json
 {
   "view_key": "context",
+  "created": true,
   "title": "System Context",
   "scope": "",
-  "include": ["system", "external_system", "user"]
+  "include": ["system"],
+  "added": ["system"]
+}
+
+# JSON output when merging into an existing view: the view after the change
+$ bausteinsicht add view context --include user --format json
+{
+  "view_key": "context",
+  "created": false,
+  "title": "System Context",
+  "scope": "",
+  "include": ["system", "user"],
+  "added": ["user"]
 }
 ----
+
+The JSON result always describes the view as it is after the change, not just the arguments of this call: `title`, `scope` and `include` are the resulting values (`description` is added when set), `created` tells whether the view is new, and `added` lists the `--include` entries that were not in the view before (an empty array if none).
 
 ==== `bausteinsicht add specification`
 

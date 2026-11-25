@@ -57,7 +57,7 @@ func runAddView(cmd *cobra.Command, args []string) error {
 	}
 
 	// Check if this is a new view or update
-	_, viewExists := m.Views[viewKey]
+	prior, viewExists := m.Views[viewKey]
 	if !viewExists && title == "" {
 		return exitWithCode(
 			fmt.Errorf("title is required for new views"),
@@ -86,11 +86,18 @@ func runAddView(cmd *cobra.Command, args []string) error {
 
 	// Output result
 	if format == "json" {
-		result := map[string]interface{}{
-			"view_key": viewKey,
-			"title":    title,
-			"scope":    scope,
-			"include":  includes,
+		// Report the view as it is after the change, not just this call's
+		// arguments, so a merge into an existing view does not look like it
+		// cleared the title or replaced the include list (#641).
+		final := m.Views[viewKey]
+		result := addViewResult{
+			ViewKey:     viewKey,
+			Created:     !viewExists,
+			Title:       final.Title,
+			Scope:       final.Scope,
+			Description: final.Description,
+			Include:     nonNil(final.Include),
+			Added:       newIncludes(prior.Include, includes),
 		}
 		jsonBytes, err := json.MarshalIndent(result, "", "  ")
 		if err != nil {
@@ -111,4 +118,42 @@ func runAddView(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+// addViewResult is the JSON result of "add view": the view after the change
+// plus what this call changed.
+type addViewResult struct {
+	ViewKey     string   `json:"view_key"`
+	Created     bool     `json:"created"`
+	Title       string   `json:"title"`
+	Scope       string   `json:"scope"`
+	Description string   `json:"description,omitempty"`
+	Include     []string `json:"include"`
+	Added       []string `json:"added"`
+}
+
+// newIncludes returns the entries of requested that are not yet in existing,
+// without duplicates and in the order requested. It never returns nil, so the
+// JSON output has an empty array instead of null.
+func newIncludes(existing, requested []string) []string {
+	have := make(map[string]bool, len(existing)+len(requested))
+	for _, id := range existing {
+		have[id] = true
+	}
+	added := []string{}
+	for _, id := range requested {
+		if id == "" || have[id] {
+			continue
+		}
+		have[id] = true
+		added = append(added, id)
+	}
+	return added
+}
+
+func nonNil(s []string) []string {
+	if s == nil {
+		return []string{}
+	}
+	return s
 }
