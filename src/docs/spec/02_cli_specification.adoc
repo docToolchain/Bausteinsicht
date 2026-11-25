@@ -1428,7 +1428,7 @@ Generates a draw.io template with a styled shape for each element kind in the sp
 
 ==== `bausteinsicht layout`
 
-Computes a hierarchical layout for the diagram and writes the element positions back to the draw.io file.
+Computes a layered layout for every page of the draw.io diagram and writes the element positions back to the draw.io file.
 
 **Flags:**
 
@@ -1438,8 +1438,18 @@ Computes a hierarchical layout for the diagram and writes the element positions 
 
 | `--algorithm` | Layout algorithm (currently only `hierarchical`). | No | `hierarchical`
 | `--rank-dir` | Ranking direction: `TB` (top-to-bottom) or `LR` (left-to-right). | No | `TB`
-| `--preserve-pinned` | Do not move elements marked `bausteinsicht-pinned=true`. | No | `true`
+| `--preserve-pinned` | Do not move elements marked `bausteinsicht-pinned=true` (and what is nested inside them). | No | `true`
+| `--view` | Lay out only the page of this view. | No | (every page)
 |===
+
+**Behavior (#654):**
+
+* **Per page.** Every page is laid out on its own, from the elements and connectors that are on that page. The model is not read, so a view only shows the structure that the view shows. A connector into an element inside a boundary counts as a connector to the boundary on the outer level.
+* **Sizes are kept.** An element keeps its width and height (template size, person shape, ...). Only a boundary or container is resized: to fit the elements inside it, but not smaller than 300x200.
+* **Nested elements.** Elements inside a boundary or container are laid out inside it and get coordinates relative to it, as draw.io expects, so they stay within the boundary.
+* **Deterministic.** Elements are ordered by ID and crossings are reduced by a fixed barycenter sweep, so running the command twice, or on a copy of the file with the cells in another order, gives the same positions. A cycle is drawn as a chain that starts at the smallest ID.
+* **Connectors.** Stored waypoints of connectors on a laid out page are removed, because they belong to the old positions; draw.io routes the connectors again.
+* Exit codes: `1` unknown `--view` or invalid `--rank-dir`; `2` the diagram next to the model cannot be read or written.
 
 ==== `bausteinsicht overlay`
 
