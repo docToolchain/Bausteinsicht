@@ -50,6 +50,22 @@ See link:01_use_cases.html[Use Cases] for the functional overview of all CLI com
 | Add element or relationship types to the specification (LLM-friendly)
 | Implemented
 
+| `bausteinsicht rename`
+| Rename an element and rewrite every reference to it (LLM-friendly)
+| Implemented
+
+| `bausteinsicht update element`
+| Change the title, technology, description or kind of an element (LLM-friendly)
+| Implemented
+
+| `bausteinsicht remove element`
+| Remove an element and its children, optionally with the references to it
+| Implemented
+
+| `bausteinsicht remove relationship`
+| Remove a relationship
+| Implemented
+
 | `bausteinsicht export`
 | Export diagram views to PNG or SVG using the draw.io CLI
 | Implemented
@@ -749,6 +765,71 @@ $ bausteinsicht add specification relationship async_call \
   "dashed": false
 }
 ----
+
+==== `bausteinsicht rename`
+
+Renames an element and rewrites every reference to it, so that IDs no longer have to be changed by hand in six places (#634).
+
+**Flags:**
+
+[cols="2,3,1,1"]
+|===
+| Flag | Description | Required | Default
+
+| `--id`
+| Element to rename, in dot notation (e.g. `shop` or `shop.web`).
+| Yes
+| --
+
+| `--to`
+| New key of the element: its new last path segment, without dots (`--id shop.web --to frontend` gives `shop.frontend`).
+| Yes
+| --
+
+| `--dry-run`
+| Show what would change without saving.
+| No
+| `false`
+|===
+
+**Behavior:**
+
+* Moves the element, with its children, to the new key.
+* Rewrites every reference to the element and to its children: relationship `from`/`to`, view `scope`, `include` and `exclude` (including patterns such as `shop.*`), message steps of dynamic views, and `from`/`to` selectors of constraints.
+* Lists every rewritten location (`path`, `from`, `to`); with `--format json` as `{ "dry_run": false, "changes": [ ... ] }`.
+* Validates the model before saving: if the change would introduce validation errors, they are printed and nothing is saved. Errors that were already in the model do not block the command.
+* The file is rewritten as a whole; comments and formatting are not preserved (`note: model rewritten, comments and formatting were not preserved` on stderr).
+* The draw.io file is not touched. After the rename, `sync` treats the old ID as deleted and the new one as added, so the position of the element on the draw.io pages is lost.
+
+**Exit codes:** `0` -- renamed (or dry run); `1` -- element not found, new key invalid or already taken, or the change would make the model invalid; `2` -- model file not found or I/O error.
+
+==== `bausteinsicht update element`
+
+Changes fields of an existing element.
+
+**Flags:** `--id` (required, dot notation); at least one of `--title`, `--technology`, `--description`, `--kind` (the kind must be defined in `specification.elements`; an empty value for `--technology` or `--description` clears the field); `--dry-run`.
+
+**Behavior:** Only the fields that are given are changed; fields that already have the requested value are not reported. Validation, JSON output, saving and exit codes work as for `rename`.
+
+==== `bausteinsicht remove element`
+
+Removes an element and its children.
+
+**Flags:** `--id` (required, dot notation), `--cascade`, `--dry-run`.
+
+**Behavior:**
+
+* If relationships, view `include`/`exclude` entries or dynamic view steps still reference the element, the command fails and lists them. With `--cascade` it drops them: the relationships, the view entries and the message steps; a dynamic view that is left without a message step is removed as well. Everything that is dropped is listed.
+* A view whose `scope` is the element, or a constraint whose `from`/`to` names it, always blocks the removal (even with `--cascade`): change the view or the constraint first.
+* Validation, JSON output, saving and exit codes work as for `rename`.
+
+==== `bausteinsicht remove relationship`
+
+Removes a relationship.
+
+**Flags:** `--from` and `--to` (required, dot notation), `--label` (only remove the relationship with this label; default: the first relationship between the two elements), `--dry-run`.
+
+**Behavior:** Fails with exit code `1` if no such relationship exists. Validation, JSON output, saving and exit codes work as for `rename`.
 
 ==== `bausteinsicht export`
 
