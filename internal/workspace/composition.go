@@ -153,9 +153,14 @@ func ValidateWorkspace(cfg *Config, loaded []LoadedModel) []error {
 	}
 
 	mergedFlat := map[string]*model.Element{}
-	if merged, err := MergeModels(loaded); err == nil {
-		mergedFlat, _ = model.FlattenElements(merged)
+	if len(loaded) > 0 {
+		if merged, err := MergeModels(loaded); err != nil {
+			problems = append(problems, err)
+		} else {
+			mergedFlat, _ = model.FlattenElements(merged)
+		}
 	}
+	problems = append(problems, duplicateConstraintIDs(loaded)...)
 	seenRel := make(map[string]bool)
 	for _, cr := range cfg.CrossRels {
 		if seenRel[cr.ID] {
@@ -178,6 +183,26 @@ func ValidateWorkspace(cfg *Config, loaded []LoadedModel) []error {
 		for _, modelID := range cfg.Views[key].IncludeFrom {
 			if !seenID[modelID] {
 				problems = append(problems, fmt.Errorf("view %q: include-from refers to unknown model %q", key, modelID))
+			}
+		}
+	}
+	return problems
+}
+
+// duplicateConstraintIDs reports constraint IDs that more than one model
+// defines: after the merge, lint results could not be told apart.
+func duplicateConstraintIDs(loaded []LoadedModel) []error {
+	owner := make(map[string]string)
+	reported := make(map[string]bool)
+	var problems []error
+	for _, lm := range loaded {
+		for _, c := range lm.Model.Constraints {
+			if first, ok := owner[c.ID]; ok && first != lm.Ref.ID && !reported[c.ID] {
+				reported[c.ID] = true
+				problems = append(problems, fmt.Errorf("constraint ID %q is defined by more than one model (%s, %s)", c.ID, first, lm.Ref.ID))
+			}
+			if _, ok := owner[c.ID]; !ok {
+				owner[c.ID] = lm.Ref.ID
 			}
 		}
 	}

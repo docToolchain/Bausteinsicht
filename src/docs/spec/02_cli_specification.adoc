@@ -1551,13 +1551,15 @@ Works with multi-model workspaces that combine several architecture models.
 | Relationships between models. `from` and `to` have the form `<model id>:<element id>` (for example `team_a:shop.api`); they are translated to the merged IDs. `id` must be unique; `label`, `kind` and `description` are copied to the relationship.
 
 | `views`
-| Workspace views that select elements from several models (`include-from` lists model IDs).
+| Workspace views that select elements from several models (`include-from` lists model IDs). `validate` checks that they name known models; `merge` does **not** apply them yet, so they do not appear in the merged model. The merged model contains the views of the fully imported models, prefixed (`<prefix>_<view key>`).
 |===
 
 **Behavior (#227):**
 
 * `merge` combines the models into one: elements get the prefix, each nested element appears once below its parent, and the cross-model relationships are added. A cross-model relationship whose model or element does not exist makes `merge` fail (exit `2`) and nothing is written.
 * `validate` checks every model and then the workspace: duplicate model IDs or prefixes, cross-model relationships that point at models or elements that do not exist (or repeat an ID), and workspace views that name an unknown model. It reports every problem and exits `2` if there is one.
+* Constraints of a model are merged too; their `from` and `to` (element IDs) get the model's prefix, so they keep matching the prefixed elements. Selectors by kind or tag are unchanged.
+* Prefix and element (or view key) are joined with `_`, so different pairs can give the same merged ID (prefix `a` with element `b_c`, and prefix `a_b` with element `c`). `merge` fails on such a collision instead of replacing one element with the other, and `validate` reports it. `validate` also reports constraint IDs that more than one model defines.
 * Only local paths are supported. Models in other repositories are used by checking them out (for example as a git submodule) and pointing `path` at the checkout; see ADR-012 for the proposed remote sources.
 
 ==== `bausteinsicht schema`

@@ -134,6 +134,48 @@ func TestWorkspaceComposition(t *testing.T) {
 		}
 	})
 
+	t.Run("constraints of a team still apply to its elements after the merge", func(t *testing.T) {
+		const constrained = `{
+  "specification": {
+    "elements": { "system": { "notation": "System", "container": true }, "container": { "notation": "Container" } },
+    "relationships": { "uses": { "notation": "uses" } }
+  },
+  "model": { "shop": { "kind": "system", "title": "Shop", "children": {
+    "web": { "kind": "container", "title": "Web" }, "db": { "kind": "container", "title": "DB" } } } },
+  "relationships": [ { "from": "shop.web", "to": "shop.db", "kind": "uses" } ],
+  "views": {},
+  "constraints": [ { "id": "no-direct-db", "description": "the web tier must not use the db", "rule": "no-relationship", "from": "shop.web", "to": "shop.db" } ]
+}
+`
+		dir := t.TempDir()
+		for name, content := range map[string]string{
+			"a.jsonc":        constrained,
+			"workspace.json": `{ "workspace": { "name": "w" }, "models": [ { "id": "team_a", "path": "a.jsonc" } ] }`,
+		} {
+			if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		out := filepath.Join(dir, "merged.jsonc")
+		runCLI(t, bin, dir, "workspace", "merge", filepath.Join(dir, "workspace.json"), out)
+
+		lintOut, code := runCLIAllowFail(t, bin, dir, "lint", "--model", out)
+		if code == 0 || !strings.Contains(lintOut, "no-direct-db") {
+			t.Errorf("the constraint must still catch the relationship after the merge: exit %d\n%s", code, lintOut)
+		}
+	})
+
+	t.Run("colliding merged IDs fail validate and merge", func(t *testing.T) {
+		dir, cfg := writeWorkspace(t, `{
+  "workspace": { "name": "landscape" },
+  "models": [ { "id": "m1", "path": "a.jsonc", "prefix": "x" }, { "id": "m2", "path": "a.jsonc", "prefix": "x" } ]
+}`)
+		out, code := runCLIAllowFail(t, bin, dir, "workspace", "validate", cfg)
+		if code == 0 || !strings.Contains(out, "more than one model") {
+			t.Errorf("validate: exit %d\n%s", code, out)
+		}
+	})
+
 	t.Run("a selection of an unknown element is reported", func(t *testing.T) {
 		dir, cfg := writeWorkspace(t, `{
   "workspace": { "name": "landscape" },
