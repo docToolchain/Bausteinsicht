@@ -21,6 +21,14 @@ type ModelRef struct {
 	ID     string `json:"id"`
 	Path   string `json:"path"`
 	Prefix string `json:"prefix,omitempty"`
+	// Elements selects top-level elements of the model to import (each with its
+	// children, cut off at Depth). Empty means all top-level elements.
+	Elements []string `json:"elements,omitempty"`
+	// Depth limits how many levels of the selected elements are imported:
+	// 1 is the element alone (a black box), 2 adds its children, and so on.
+	// 0 means no limit. A model with Elements or Depth set is imported
+	// partially: its views, dynamic views and constraints are not imported.
+	Depth int `json:"depth,omitempty"`
 }
 
 // CrossModelRelationship connects elements across different models

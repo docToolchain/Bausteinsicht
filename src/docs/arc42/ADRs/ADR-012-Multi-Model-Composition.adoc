@@ -14,7 +14,9 @@ Proposed (analysis result for #227; needs a maintainer decision)
 
 In larger organisations every team owns its own architecture model, and a system-of-systems (landscape) view has to show elements of other teams' models without copying them, keep them up to date, and let each team own its file (#227).
 
-Bausteinsicht can already combine models: `bausteinsicht workspace` reads a workspace configuration (`internal/workspace`), loads the referenced models from local paths, prefixes the element IDs of each model (`ModelRef.Prefix`, default the model ID) so they cannot collide, adds `crossModelRelationships` and `views` that select elements from several models, and writes one merged model (`workspace merge`). What is missing is the part that #227 is about: models that live in **other repositories**, and a way to get them reproducibly and safely.
+Bausteinsicht can already combine models: `bausteinsicht workspace` reads a workspace configuration (`internal/workspace`), loads the referenced models from local paths, prefixes the element IDs of each model (`ModelRef.Prefix`, default the model ID) so they cannot collide, and writes one merged model (`workspace merge`). The configuration also has fields for `crossModelRelationships` and workspace `views`.
+
+*Correction (found while implementing Phase 1):* when this ADR was first written, `crossModelRelationships` were only read and counted by `workspace list`; `workspace merge` ignored them, and it added every nested element a second time as a top-level entry with a dotted key. Both are fixed together with Phase 1 (see below). What is still missing is the part that #227 is about: models that live in **other repositories**, and a way to get them reproducibly and safely.
 
 === Forces
 
@@ -130,7 +132,7 @@ Option D wins only narrowly over the status quo, which is the honest result: for
 
 **Adopt Option D, in two phases, and do not change the model format.**
 
-. **Phase 1 first and on its own.** Partial/black-box imports in the workspace, validation of cross-model relationships, and documentation of the checkout pattern. No network code.
+. **Phase 1 first and on its own.** Partial/black-box imports in the workspace, validation of cross-model relationships, and documentation of the checkout pattern. No network code. *Implemented* (#227): `elements`/`depth` per model, cross-model relationships applied by `workspace merge`, `workspace validate` for IDs, prefixes, relationships and views, and the workspace configuration documented in the CLI specification.
 . **Phase 2 only after** a STRIDE entry for remote fetching in arc42 chapter 8 and a SEC finding in the security review exist, and the points below are specified.
 
 === Security model for Phase 2

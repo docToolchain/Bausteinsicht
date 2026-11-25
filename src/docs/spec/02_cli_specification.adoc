@@ -1510,8 +1510,55 @@ Works with multi-model workspaces that combine several architecture models.
 
 | `list <config-file>` | List the models in a workspace configuration.
 | `merge <config-file> <output-file>` | Merge the configured models into one unified model.
-| `validate <config-file>` | Validate a workspace configuration.
+| `validate <config-file>` | Validate a workspace configuration: every model, and what the models cannot check alone (see below).
 |===
+
+**Workspace configuration** (JSON, paths relative to the configuration file):
+
+[source,jsonc]
+----
+{
+  "workspace": { "name": "landscape" },
+  "models": [
+    // import the whole model of team A
+    { "id": "team_a", "path": "../team-a/architecture.jsonc" },
+    // import only the element "billing" of team B, as a black box
+    { "id": "team_b", "path": "../team-b/architecture.jsonc", "prefix": "b", "elements": ["billing"], "depth": 1 }
+  ],
+  "crossModelRelationships": [
+    { "id": "pay", "from": "team_a:shop.api", "to": "team_b:billing", "label": "charges via", "kind": "uses" }
+  ]
+}
+----
+
+[cols="2,4"]
+|===
+| Field | Meaning
+
+| `models[].id`
+| Name of the model; used in cross-model relationships. Must be unique.
+
+| `models[].prefix`
+| Prefix for the element IDs of this model in the merged model (`<prefix>_<element>`); default: the `id`. Must be unique.
+
+| `models[].elements`
+| Optional. Top-level elements to import, each with its children (default: all). Only top-level IDs, without dots.
+
+| `models[].depth`
+| Optional. How many levels of the imported elements to keep: `1` is the element alone (a black box), `2` adds its children; `0` or omitted means all. A model with `elements` or `depth` is imported partially: relationships between the elements that are kept stay; its views, dynamic views and constraints are not imported.
+
+| `crossModelRelationships[]`
+| Relationships between models. `from` and `to` have the form `<model id>:<element id>` (for example `team_a:shop.api`); they are translated to the merged IDs. `id` must be unique; `label`, `kind` and `description` are copied to the relationship.
+
+| `views`
+| Workspace views that select elements from several models (`include-from` lists model IDs).
+|===
+
+**Behavior (#227):**
+
+* `merge` combines the models into one: elements get the prefix, each nested element appears once below its parent, and the cross-model relationships are added. A cross-model relationship whose model or element does not exist makes `merge` fail (exit `2`) and nothing is written.
+* `validate` checks every model and then the workspace: duplicate model IDs or prefixes, cross-model relationships that point at models or elements that do not exist (or repeat an ID), and workspace views that name an unknown model. It reports every problem and exits `2` if there is one.
+* Only local paths are supported. Models in other repositories are used by checking them out (for example as a git submodule) and pointing `path` at the checkout; see ADR-012 for the proposed remote sources.
 
 ==== `bausteinsicht schema`
 

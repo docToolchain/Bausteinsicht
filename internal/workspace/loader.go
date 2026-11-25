@@ -41,6 +41,11 @@ func LoadModels(cfg *Config, basePath string) ([]LoadedModel, error) {
 			return nil, fmt.Errorf("loading model %s (%s): %w", ref.ID, ref.Path, err)
 		}
 
+		m, err = ApplySelection(m, ref)
+		if err != nil {
+			return nil, fmt.Errorf("model %s (%s): %w", ref.ID, ref.Path, err)
+		}
+
 		loaded = append(loaded, LoadedModel{
 			Ref:   ref,
 			Model: m,
