@@ -154,10 +154,14 @@ func detectLevel(resolved []string, flat map[string]*model.Element, scope string
 	return "Context"
 }
 
+// partitionElements splits the resolved elements into those inside the scope
+// boundary and the external ones. The scope element itself is neither: it is
+// rendered as the boundary, and emitting it again as a regular element would
+// declare the same alias twice (#640).
 func partitionElements(resolved []string, flat map[string]*model.Element, scope string, spec *model.Specification) (inside, outside []elemEntry) {
 	for _, id := range resolved {
 		elem := flat[id]
-		if elem == nil {
+		if elem == nil || (scope != "" && id == scope) {
 			continue
 		}
 		macro, _ := C4Macro(spec, elem.Kind)
