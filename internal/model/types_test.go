@@ -67,6 +67,66 @@ func TestJSONRoundTrip(t *testing.T) {
 	}
 }
 
+// TestElement_CodeMapping_JSONRoundTrip verifies codeMapping round-trips
+// through JSON. Shape is flat (Element -> one CodeMapping), matching the
+// validated Variant C prototype contract, not a per-backend map — see #562,
+// ADR-013, and https://github.com/docToolchain/bausteinsicht-archunit.
+func TestElement_CodeMapping_JSONRoundTrip(t *testing.T) {
+	original := Element{
+		Kind:        "container",
+		Title:       "Order API",
+		CodeMapping: &CodeMapping{Packages: []string{"com.acme.backend.orders"}},
+	}
+
+	data, err := json.Marshal(original)
+	if err != nil {
+		t.Fatalf("marshal failed: %v", err)
+	}
+
+	var restored Element
+	if err := json.Unmarshal(data, &restored); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+
+	if !reflect.DeepEqual(original, restored) {
+		t.Errorf("round-trip mismatch:\noriginal: %+v\nrestored: %+v", original, restored)
+	}
+}
+
+// TestElement_CodeMapping_MatchesArchUnitPrototypeContract pins the exact
+// JSON shape read by the running bausteinsicht-archunit Variant C prototype
+// (adapter/src/test/resources/architecture.jsonc there), so a future change
+// here doesn't silently break that external, already-validated adapter.
+func TestElement_CodeMapping_MatchesArchUnitPrototypeContract(t *testing.T) {
+	raw := `{"kind":"component","title":"API","codeMapping":{"packages":["com.acme.backend.api"]}}`
+
+	var elem Element
+	if err := json.Unmarshal([]byte(raw), &elem); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+
+	if elem.CodeMapping == nil {
+		t.Fatal("expected CodeMapping to be set")
+	}
+	want := []string{"com.acme.backend.api"}
+	if !reflect.DeepEqual(elem.CodeMapping.Packages, want) {
+		t.Errorf("Packages = %v, want %v", elem.CodeMapping.Packages, want)
+	}
+}
+
+// TestElement_CodeMapping_OmittedWhenAbsent ensures elements without a
+// codeMapping don't grow a stray "codeMapping": null/{} in the serialized
+// JSONC, keeping existing models byte-for-byte unaffected by this addition.
+func TestElement_CodeMapping_OmittedWhenAbsent(t *testing.T) {
+	data, err := json.Marshal(Element{Kind: "actor", Title: "Customer"})
+	if err != nil {
+		t.Fatalf("marshal failed: %v", err)
+	}
+	if strings.Contains(string(data), "codeMapping") {
+		t.Errorf("expected no codeMapping key when unset, got: %s", data)
+	}
+}
+
 func TestDeserializeSampleModel(t *testing.T) {
 	raw, err := os.ReadFile("../../templates/sample-model.jsonc")
 	if err != nil {
