@@ -14,7 +14,9 @@ func newLayoutCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "layout",
 		Short: "Auto-layout elements in draw.io diagram",
-		Long: `Computes hierarchical layout for diagram elements and writes positions back to draw.io.
+		Long: `Computes a layered layout for every page of the draw.io diagram and writes the positions back.
+Each page is laid out on its own, from the elements and connectors on that page; elements keep their size,
+elements inside a container or boundary get coordinates relative to it, and the order is the same on every run.
 Pinned elements (with bausteinsicht-pinned=true) are preserved by default.`,
 		RunE: runLayout,
 	}
@@ -22,6 +24,7 @@ Pinned elements (with bausteinsicht-pinned=true) are preserved by default.`,
 	cmd.Flags().String("algorithm", "hierarchical", "Layout algorithm: hierarchical (currently only option)")
 	cmd.Flags().String("rank-dir", "TB", "Ranking direction: TB (top-to-bottom) or LR (left-to-right)")
 	cmd.Flags().Bool("preserve-pinned", true, "Don't move pinned elements (bausteinsicht-pinned=true)")
+	cmd.Flags().String("view", "", "Lay out only this view (page); default: every page")
 
 	return cmd
 }
@@ -36,21 +39,9 @@ func runLayout(cmd *cobra.Command, _ []string) error {
 		modelPath = detected
 	}
 
-	// Load model
-	m, err := model.Load(modelPath)
-	if err != nil {
-		return exitWithCode(fmt.Errorf("loading model: %w", err), 2)
-	}
-
-	// Validate model
-	if errs := model.Validate(m); len(errs) > 0 {
-		return exitWithCode(fmt.Errorf("model validation failed: %v", errs), 2)
-	}
-
-	// Derive draw.io path from model path
-	dir := filepath.Dir(modelPath)
-	drawioPath := filepath.Join(dir, "architecture.drawio")
-
+	// The diagram sits next to the model; the layout itself works on the pages
+	// of the diagram and does not need the model.
+	drawioPath := filepath.Join(filepath.Dir(modelPath), "architecture.drawio")
 	doc, err := drawio.LoadDocument(drawioPath)
 	if err != nil {
 		return exitWithCode(fmt.Errorf("loading diagram: %w", err), 2)
@@ -58,21 +49,19 @@ func runLayout(cmd *cobra.Command, _ []string) error {
 
 	rankDir, _ := cmd.Flags().GetString("rank-dir")
 	preservePinned, _ := cmd.Flags().GetBool("preserve-pinned")
+	view, _ := cmd.Flags().GetString("view")
 
-	// Compute hierarchical layout
-	h := layout.NewHierarchicalLayout(m, rankDir)
-	result := h.Compute()
-
-	// Apply layout to diagram
-	if err := layout.Apply(doc, result, preservePinned); err != nil {
-		return exitWithCode(fmt.Errorf("applying layout: %w", err), 2)
+	report, err := layout.LayoutDocument(doc, layout.Options{RankDir: rankDir, PreservePinned: preservePinned, View: view})
+	if err != nil {
+		return exitWithCode(fmt.Errorf("applying layout: %w", err), 1)
 	}
 
-	// Save diagram
 	if err := drawio.SaveDocument(drawioPath, doc); err != nil {
 		return exitWithCode(fmt.Errorf("saving diagram: %w", err), 2)
 	}
 
 	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Layout applied (hierarchical): %s\n", drawioPath)
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "  %d page(s), %d element(s) positioned, %d pinned element(s) left in place\n",
+		report.Pages, report.Elements, report.Pinned)
 	return nil
 }
