@@ -289,6 +289,9 @@ func applyForwardToView(in forwardRenderInputs, opts *ForwardOptions, viewID str
 	// connectors left behind by an index shift or a deleted relationship.
 	in.result.ConnectorsDeleted += reconcileViewConnectors(page, viewID, expectedConnectorIDs(viewID, conns))
 
+	// Show each relationship's technology as a second label on its connector.
+	synchronizeConnectorTechnology(page, viewID, conns)
+
 	// Reconciliation: remove elements on the page that are no longer
 	// in the resolved view (e.g., after exclude list changes). #102
 	reconcileViewPage(page, elemSet, in.flat, scopeID, viewID, in.result)

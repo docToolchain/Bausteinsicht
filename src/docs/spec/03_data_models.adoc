@@ -399,7 +399,7 @@ The transitions themselves are not enforced — `status` is a plain string — b
 | `technology`
 | string
 | no
-| Protocol or technology of the relationship, e.g. `HTTPS/JSON`. Shown on the arrow: as the technology argument of `Rel()` in C4 PlantUML/Mermaid, as `label [technology]` in DOT, D2 and HTML, and as the fourth token of a relationship in the Structurizr DSL (also read by the Structurizr import) (#642). Not yet shown in the draw.io diagram.
+| Protocol or technology of the relationship, e.g. `HTTPS/JSON`. Shown on the arrow: as the technology argument of `Rel()` in C4 PlantUML/Mermaid, as `label [technology]` in DOT, D2 and HTML, and as the fourth token of a relationship in the Structurizr DSL (also read by the Structurizr import), and as a second label `[technology]` on the connector in the draw.io diagram (#642).
 
 | `decisions`
 | string[]
