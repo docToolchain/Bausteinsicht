@@ -25,6 +25,7 @@ func newExportCmd() *cobra.Command {
 	cmd.Flags().Bool("embed-diagram", false, "Embed draw.io XML source in output")
 	cmd.Flags().Float64("scale", 1.0, "Export scale factor (e.g. 2.0 for retina, 3.0 for print); scale > 1 requires hardware GPU")
 	cmd.Flags().String("drawio-path", "", "Path to the draw.io CLI binary (overrides "+export.DrawioPathEnvVar+" and auto-detection)")
+	addNoValidateFlag(cmd)
 	return cmd
 }
 

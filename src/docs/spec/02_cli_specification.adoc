@@ -782,6 +782,11 @@ Exports draw.io diagram views to image files (PNG or SVG) using the draw.io CLI.
 | Explicit path to the draw.io CLI binary. Overrides `BAUSTEINSICHT_DRAWIO_PATH` and auto-detection. Exits with code 2 if the path does not exist.
 | No
 | (auto-detected)
+
+| `--no-validate`
+| Export even if the model has validation errors. By default the export aborts with the same errors as `validate` and exit code `1` (#636).
+| No
+| `false`
 |===
 
 **draw.io binary resolution** (highest precedence first):
@@ -864,6 +869,11 @@ Exports element attributes as an AsciiDoc or Markdown table per view or as a com
 | Export a single combined table with elements from all views, deduplicated.
 | No
 | `false`
+
+| `--no-validate`
+| Export even if the model has validation errors. By default the export aborts with the same errors as `validate` and exit code `1` (#636).
+| No
+| `false`
 |===
 
 **Behavior:**
@@ -935,6 +945,11 @@ Exports views as text diagrams in one of several formats (C4-PlantUML, Mermaid, 
 | Output directory for exported files. When omitted, the diagram is written to **stdout**.
 | No
 | (stdout)
+
+| `--no-validate`
+| Export even if the model has validation errors. By default the export aborts with the same errors as `validate` and exit code `1` (#636).
+| No
+| `false`
 |===
 
 **Behavior:**
@@ -1035,6 +1050,11 @@ Dynamic views describe the runtime behaviour of the system as ordered message se
 | Output format: `text` or `json`.
 | No
 | `text`
+
+| `--no-validate`
+| Export even if the model has validation errors. By default the export aborts with the same errors as `validate` and exit code `1` (#636).
+| No
+| `false`
 |===
 
 **Behavior:**

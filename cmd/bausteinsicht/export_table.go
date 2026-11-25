@@ -23,6 +23,7 @@ func newExportTableCmd() *cobra.Command {
 	cmd.Flags().String("table-format", "adoc", "Table format: adoc or md")
 	cmd.Flags().String("output", "", "Output directory (default: stdout)")
 	cmd.Flags().Bool("combined", false, "Export all elements across all views (deduplicated)")
+	addNoValidateFlag(cmd)
 
 	return cmd
 }

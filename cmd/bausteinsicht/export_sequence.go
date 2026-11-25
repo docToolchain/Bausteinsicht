@@ -20,6 +20,7 @@ func newExportSequenceCmd() *cobra.Command {
 	cmd.Flags().String("view", "", "Export only this dynamic view (by key)")
 	cmd.Flags().String("diagram-format", "plantuml", "Diagram format: plantuml or mermaid")
 	cmd.Flags().String("output", "", "Output directory (default: stdout)")
+	addNoValidateFlag(cmd)
 	return cmd
 }
 

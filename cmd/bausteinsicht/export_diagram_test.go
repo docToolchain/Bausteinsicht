@@ -19,7 +19,8 @@ const exportDiagramTestModel = `{
       "container": {"notation": "Container"},
       "actor": {"notation": "Actor"},
       "external_system": {"notation": "External System"}
-    }
+    },
+    "relationships": {"uses": {"notation": "uses"}}
   },
   "model": {
     "user": {"kind": "actor", "title": "User", "description": "End user"},

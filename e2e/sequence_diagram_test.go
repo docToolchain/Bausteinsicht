@@ -29,8 +29,8 @@ func TestSequenceDiagram(t *testing.T) {
 			Key:   "checkout-flow",
 			Title: "Checkout Flow",
 			Steps: []model.SequenceStep{
-				{From: "customer", To: "onlineshop.frontend", Label: "place order"},
-				{From: "onlineshop.frontend", To: "onlineshop.api", Label: "POST /orders"},
+				{Index: 1, From: "customer", To: "onlineshop.frontend", Label: "place order"},
+				{Index: 2, From: "onlineshop.frontend", To: "onlineshop.api", Label: "POST /orders"},
 			},
 		},
 	}

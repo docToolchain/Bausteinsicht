@@ -126,6 +126,7 @@ func newExportDiagramCmd() *cobra.Command {
 	cmd.Flags().String("view", "", "Export only this view (by key)")
 	cmd.Flags().String("diagram-format", "plantuml", "Diagram format: plantuml, mermaid, dot, d2, html, or structurizr")
 	cmd.Flags().String("output", "", "Output directory (default: stdout)")
+	addNoValidateFlag(cmd)
 
 	return cmd
 }
