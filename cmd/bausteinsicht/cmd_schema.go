@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/docToolchain/Bausteinsicht/internal/model"
 	"github.com/docToolchain/Bausteinsicht/internal/schema"
@@ -25,11 +26,11 @@ func newSchemaGenerateCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "generate",
 		Short: "Generate JSON Schema from Go types",
-		Long:  "Generate the JSON Schema from model type definitions and save to schemas/bausteinsicht.schema.json.",
+		Long:  "Generate the JSON Schema from model type definitions and save to schemas/bausteinsicht.schema.json (relative to the current directory). Missing parent directories of the output file are created.",
 		RunE:  runSchemaGenerate,
 	}
 
-	cmd.Flags().String("output", "schemas/bausteinsicht.schema.json", "Output file for the schema")
+	cmd.Flags().String("output", "schemas/bausteinsicht.schema.json", "Output file for the schema (parent directories are created)")
 
 	return cmd
 }
@@ -52,6 +53,12 @@ func runSchemaGenerate(cmd *cobra.Command, _ []string) error {
 	jsonBytes, err := schemaObj.ToJSON()
 	if err != nil {
 		return fmt.Errorf("failed to convert schema to JSON: %w", err)
+	}
+
+	// The default "schemas/" directory does not exist outside this repository,
+	// and neither does the parent of a custom --output path (#639).
+	if err := os.MkdirAll(filepath.Dir(outputFile), 0750); err != nil {
+		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 
 	// Write to file

@@ -1385,7 +1385,7 @@ Manages the JSON Schema for Bausteinsicht models.
 |===
 | Subcommand | Description
 
-| `generate` | Generate the JSON Schema from the Go model types (`--output`, default `schemas/bausteinsicht.schema.json`).
+| `generate` | Generate the JSON Schema from the Go model types (`--output`, default `schemas/bausteinsicht.schema.json`, relative to the current directory). Missing parent directories of the output file are created.
 |===
 
 **Behavior:** the schema is generated from `internal/model` types, so it stays in sync with the model definitions.
