@@ -329,3 +329,36 @@ func TestAddRelationshipWithDescription(t *testing.T) {
 		t.Errorf("expected description 'Payment processing delegation', got %q", r.Description)
 	}
 }
+
+// --technology is stored on the relationship, written to the file and part of
+// the JSON result (#642).
+func TestAddRelationshipTechnology(t *testing.T) {
+	dir := t.TempDir()
+	modelPath := writeRelTestModel(t, dir)
+
+	out := captureJSON(t, "add", "relationship",
+		"--model", modelPath,
+		"--from", "webshop.api",
+		"--to", "webshop.db",
+		"--label", "reads from",
+		"--technology", "JDBC",
+		"--format", "json",
+	)
+	var result struct {
+		Technology string `json:"technology"`
+	}
+	if err := json.Unmarshal(out, &result); err != nil {
+		t.Fatalf("invalid JSON: %v\n%s", err, out)
+	}
+	if result.Technology != "JDBC" {
+		t.Errorf("JSON result technology = %q, want JDBC", result.Technology)
+	}
+
+	m, err := model.Load(modelPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(m.Relationships) != 1 || m.Relationships[0].Technology != "JDBC" {
+		t.Errorf("technology not stored: %+v", m.Relationships)
+	}
+}

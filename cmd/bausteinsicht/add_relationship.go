@@ -20,6 +20,7 @@ func newAddRelationshipCmd() *cobra.Command {
 	cmd.Flags().String("to", "", "Target element (dot-notation path, e.g. webshop.db)")
 	cmd.Flags().String("label", "", "Relationship label")
 	cmd.Flags().String("kind", "", "Relationship kind (must be defined in specification)")
+	cmd.Flags().String("technology", "", "Protocol or technology shown on the arrow, e.g. HTTPS/JSON")
 	cmd.Flags().String("description", "", "Relationship description")
 
 	_ = cmd.MarkFlagRequired("from")
@@ -35,6 +36,7 @@ func runAddRelationship(cmd *cobra.Command, args []string) error {
 	to, _ := cmd.Flags().GetString("to")
 	label, _ := cmd.Flags().GetString("label")
 	kind, _ := cmd.Flags().GetString("kind")
+	technology, _ := cmd.Flags().GetString("technology")
 	description, _ := cmd.Flags().GetString("description")
 
 	if modelPath == "" {
@@ -77,6 +79,7 @@ func runAddRelationship(cmd *cobra.Command, args []string) error {
 		From:        from,
 		To:          to,
 		Label:       label,
+		Technology:  technology,
 		Kind:        kind,
 		Description: description,
 	}
@@ -106,6 +109,9 @@ func marshalRelationshipJSON(rel model.Relationship) string {
 	}
 	if rel.Label != "" {
 		parts = append(parts, fmt.Sprintf(`"label": %q`, rel.Label))
+	}
+	if rel.Technology != "" {
+		parts = append(parts, fmt.Sprintf(`"technology": %q`, rel.Technology))
 	}
 	if rel.Kind != "" {
 		parts = append(parts, fmt.Sprintf(`"kind": %q`, rel.Kind))
@@ -139,12 +145,14 @@ func printRelationshipJSON(r model.Relationship) error {
 		From        string `json:"from"`
 		To          string `json:"to"`
 		Label       string `json:"label,omitempty"`
+		Technology  string `json:"technology,omitempty"`
 		Kind        string `json:"kind,omitempty"`
 		Description string `json:"description,omitempty"`
 	}{
 		From:        r.From,
 		To:          r.To,
 		Label:       r.Label,
+		Technology:  r.Technology,
 		Kind:        r.Kind,
 		Description: r.Description,
 	}

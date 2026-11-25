@@ -396,6 +396,11 @@ The transitions themselves are not enforced — `status` is a plain string — b
 | no
 | Detailed description
 
+| `technology`
+| string
+| no
+| Protocol or technology of the relationship, e.g. `HTTPS/JSON`. Shown on the arrow: as the technology argument of `Rel()` in C4 PlantUML/Mermaid, as `label [technology]` in DOT, D2 and HTML, and as the fourth token of a relationship in the Structurizr DSL (also read by the Structurizr import) (#642). Not yet shown in the draw.io diagram.
+
 | `decisions`
 | string[]
 | no
@@ -457,6 +462,11 @@ The transitions themselves are not enforced — `status` is a plain string — b
 | string
 | no
 | Auto-layout mode for new pages: `"layered"` (default), `"grid"`, or `"none"`. Layered groups elements by kind tier; grid places alphabetically in a grid; none uses a horizontal row.
+
+| `legend`
+| boolean
+| no
+| C4 PlantUML only: set to `false` to leave out the legend (`LAYOUT_WITH_LEGEND()`) that `export-diagram` otherwise emits for every view (#642). Default: legend shown.
 
 | `docLinks`
 | DocLink[]
@@ -956,6 +966,7 @@ type Relationship struct {
     From        string   `json:"from"`
     To          string   `json:"to"`
     Label       string   `json:"label,omitempty"`
+    Technology  string   `json:"technology,omitempty"`  // protocol/technology on the arrow (#642)
     Kind        string   `json:"kind,omitempty"`
     Description string   `json:"description,omitempty"`
     Decisions   []string `json:"decisions,omitempty"`   // linked ADR IDs
@@ -973,6 +984,7 @@ type View struct {
     ExcludeTags []string `json:"exclude-tags,omitempty"` // exclude elements with ANY of these tags
     Description string   `json:"description,omitempty"`
     Layout      string   `json:"layout,omitempty"`   // layered (default)|grid|none
+    Legend      *bool    `json:"legend,omitempty"`   // C4 PlantUML legend, shown unless false (#642)
     DocLinks    []DocLink `json:"docLinks,omitempty"` // view-level documentation links (#543)
 }
 

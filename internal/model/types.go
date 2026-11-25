@@ -312,6 +312,7 @@ type Relationship struct {
 	From        string   `json:"from"`
 	To          string   `json:"to"`
 	Label       string   `json:"label,omitempty"`
+	Technology  string   `json:"technology,omitempty"` // protocol or technology shown on the arrow, e.g. "HTTPS/JSON" (#642)
 	Kind        string   `json:"kind,omitempty"`
 	Description string   `json:"description,omitempty"`
 	Decisions   []string `json:"decisions,omitempty"`
@@ -328,5 +329,6 @@ type View struct {
 	ExcludeTags []string  `json:"exclude-tags,omitempty"` // Exclude elements with ANY of these tags
 	Description string    `json:"description,omitempty"`
 	Layout      string    `json:"layout,omitempty"`
+	Legend      *bool     `json:"legend,omitempty"`   // C4 PlantUML legend; shown unless false (#642)
 	DocLinks    []DocLink `json:"docLinks,omitempty"` // view-level documentation links, rendered as a clickable icon row on the page (#543)
 }

@@ -440,6 +440,9 @@
         "label": {
           "type": "string"
         },
+        "technology": {
+          "type": "string"
+        },
         "to": {
           "type": "string"
         }
@@ -587,6 +590,9 @@
         },
         "layout": {
           "type": "string"
+        },
+        "legend": {
+          "type": "boolean"
         },
         "scope": {
           "type": "string"

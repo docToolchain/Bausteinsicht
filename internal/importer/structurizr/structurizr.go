@@ -81,10 +81,11 @@ var structurizrKindMap = map[string]kindDef{
 }
 
 type pendingRel struct {
-	from  string
-	to    string
-	label string
-	line  int
+	from       string
+	to         string
+	label      string
+	technology string
+	line       int
 }
 
 type importState struct {
@@ -178,11 +179,14 @@ func (is *importState) addPendingRel(s dsl.Stmt, parentVar string) {
 	if from == "" {
 		from = parentVar
 	}
-	label := ""
+	label, technology := "", ""
 	if len(s.Args) > 0 {
 		label = s.Args[0]
 	}
-	is.pendingRels = append(is.pendingRels, pendingRel{from: from, to: s.RelTo, label: label, line: s.Line})
+	if len(s.Args) > 1 {
+		technology = s.Args[1]
+	}
+	is.pendingRels = append(is.pendingRels, pendingRel{from: from, to: s.RelTo, label: label, technology: technology, line: s.Line})
 }
 
 // resolveElementKey returns s's variable name, or a slugified fallback
@@ -384,7 +388,7 @@ func (is *importState) buildRelationships() []model.Relationship {
 			is.warnings = append(is.warnings, fmt.Sprintf("line %d: relationship skipped (unresolved variable)", pr.line))
 			continue
 		}
-		rels = append(rels, model.Relationship{From: fromPath, To: toPath, Label: pr.label})
+		rels = append(rels, model.Relationship{From: fromPath, To: toPath, Label: pr.label, Technology: pr.technology})
 	}
 	return rels
 }

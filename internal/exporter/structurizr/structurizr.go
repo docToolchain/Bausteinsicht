@@ -43,7 +43,9 @@ func Export(m *model.BausteinsichtModel) string {
 		for _, r := range m.Relationships {
 			fromVar := varMap[r.From]
 			toVar := varMap[r.To]
-			if r.Label != "" {
+			if r.Technology != "" { // Structurizr: source -> destination "description" "technology"
+				fmt.Fprintf(&b, "        %s -> %s \"%s\" \"%s\"\n", fromVar, toVar, escDQ(r.Label), escDQ(r.Technology))
+			} else if r.Label != "" {
 				fmt.Fprintf(&b, "        %s -> %s \"%s\"\n", fromVar, toVar, escDQ(r.Label))
 			} else {
 				fmt.Fprintf(&b, "        %s -> %s\n", fromVar, toVar)
