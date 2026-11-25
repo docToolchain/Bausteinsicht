@@ -166,13 +166,28 @@ func TestWorkspaceComposition(t *testing.T) {
 	})
 
 	t.Run("colliding merged IDs fail validate and merge", func(t *testing.T) {
-		dir, cfg := writeWorkspace(t, `{
-  "workspace": { "name": "landscape" },
-  "models": [ { "id": "m1", "path": "a.jsonc", "prefix": "x" }, { "id": "m2", "path": "a.jsonc", "prefix": "x" } ]
-}`)
-		out, code := runCLIAllowFail(t, bin, dir, "workspace", "validate", cfg)
-		if code == 0 || !strings.Contains(out, "more than one model") {
-			t.Errorf("validate: exit %d\n%s", code, out)
+		// prefix "a" + element "b_c" and prefix "a_b" + element "c" are both "a_b_c".
+		const spec = `"specification": { "elements": { "system": { "notation": "System" } } }, "relationships": [], "views": {}`
+		dir := t.TempDir()
+		for name, content := range map[string]string{
+			"one.jsonc": `{ ` + spec + `, "model": { "b_c": { "kind": "system", "title": "One" } } }`,
+			"two.jsonc": `{ ` + spec + `, "model": { "c": { "kind": "system", "title": "Two" } } }`,
+			"workspace.json": `{ "workspace": { "name": "w" }, "models": [
+  { "id": "m1", "path": "one.jsonc", "prefix": "a" }, { "id": "m2", "path": "two.jsonc", "prefix": "a_b" } ] }`,
+		} {
+			if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		cfg := filepath.Join(dir, "workspace.json")
+		for _, args := range [][]string{{"workspace", "validate", cfg}, {"workspace", "merge", cfg, filepath.Join(dir, "out.json")}} {
+			out, code := runCLIAllowFail(t, bin, dir, args...)
+			if code == 0 || !strings.Contains(out, `"a_b_c"`) {
+				t.Errorf("%s: exit %d, want a failure that names a_b_c\n%s", args[1], code, out)
+			}
+		}
+		if _, err := os.Stat(filepath.Join(dir, "out.json")); err == nil {
+			t.Error("merge wrote a file although the IDs collide")
 		}
 	})
 

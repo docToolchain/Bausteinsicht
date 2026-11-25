@@ -196,6 +196,8 @@ func TestValidateWorkspace(t *testing.T) {
 		cfg.Models[1].ID = "team_a"
 		cfg.Models[1].Prefix = "team_a"
 		loaded[1].Ref = cfg.Models[1]
+		// Different view keys, so that the shared prefix alone does not make the merge fail.
+		loaded[1].Model.Views = map[string]model.View{"billing-overview": {Title: "Billing", Include: []string{"*"}}}
 		cfg.CrossRels = []CrossModelRelationship{
 			{ID: "dup", From: "team_a:shop", To: "team_a:ghost"},
 			{ID: "dup", From: "team_a:shop", To: "team_a:shop.api"},
@@ -282,5 +284,30 @@ func TestValidateWorkspace_ReportsDuplicateConstraintIDs(t *testing.T) {
 	text := strings.Join(problems(ValidateWorkspace(cfg, loaded)), "\n")
 	if !strings.Contains(text, `constraint ID "no-cycles" is defined by more than one model`) {
 		t.Errorf("missing duplicate constraint ID problem:\n%s", text)
+	}
+}
+
+// If the models cannot be merged, the endpoints of cross-model relationships
+// are not reported as missing: only the collision is.
+func TestValidateWorkspace_CollisionDoesNotMakeEveryEndpointMissing(t *testing.T) {
+	a := &model.BausteinsichtModel{Model: map[string]model.Element{"b_c": {Kind: "system", Title: "one"}, "shop": {Kind: "system", Title: "Shop"}}}
+	b := &model.BausteinsichtModel{Model: map[string]model.Element{"c": {Kind: "system", Title: "two"}}}
+	loaded := []LoadedModel{
+		{Ref: ModelRef{ID: "m1", Prefix: "a"}, Model: a},
+		{Ref: ModelRef{ID: "m2", Prefix: "a_b"}, Model: b},
+	}
+	cfg := &Config{
+		Models:    []ModelRef{loaded[0].Ref, loaded[1].Ref},
+		CrossRels: []CrossModelRelationship{{ID: "r", From: "m1:shop", To: "m2:c"}, {ID: "bad", From: "m1:shop", To: "nope:c"}},
+	}
+	text := strings.Join(problems(ValidateWorkspace(cfg, loaded)), "\n")
+	if !strings.Contains(text, `"a_b_c"`) {
+		t.Errorf("the collision must be reported:\n%s", text)
+	}
+	if strings.Contains(text, "not found in model") {
+		t.Errorf("existing elements must not be reported as missing:\n%s", text)
+	}
+	if !strings.Contains(text, `unknown model "nope"`) {
+		t.Errorf("an unknown model is still reported:\n%s", text)
 	}
 }

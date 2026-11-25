@@ -40,7 +40,8 @@ func MergeWorkspace(cfg *Config, loaded []LoadedModel) (*model.BausteinsichtMode
 }
 
 // resolveEndpoint translates "<model ID>:<element ID>" to the element's ID in
-// the merged model and checks that the element exists.
+// the merged model and checks that the element exists (unless mergedFlat is
+// nil, in which case only the model is checked).
 func resolveEndpoint(endpoint string, loaded []LoadedModel, mergedFlat map[string]*model.Element) (string, error) {
 	modelID, elemID, ok := strings.Cut(endpoint, ":")
 	if !ok || modelID == "" || elemID == "" {
@@ -51,7 +52,7 @@ func resolveEndpoint(endpoint string, loaded []LoadedModel, mergedFlat map[strin
 			continue
 		}
 		merged := prefixElementID(elemID, resolvePrefix(lm))
-		if mergedFlat[merged] == nil {
+		if mergedFlat != nil && mergedFlat[merged] == nil {
 			return "", fmt.Errorf("element %q not found in model %q", elemID, modelID)
 		}
 		return merged, nil
@@ -152,7 +153,10 @@ func ValidateWorkspace(cfg *Config, loaded []LoadedModel) []error {
 		problems = append(problems, fmt.Errorf("prefix %q is used by more than one model", p))
 	}
 
-	mergedFlat := map[string]*model.Element{}
+	// If the models cannot be merged, report that and check only the model part
+	// of the cross-model endpoints; looking elements up in a merged model that
+	// does not exist would report every endpoint as missing.
+	var mergedFlat map[string]*model.Element
 	if len(loaded) > 0 {
 		if merged, err := MergeModels(loaded); err != nil {
 			problems = append(problems, err)
