@@ -261,3 +261,70 @@ func TestWorkspaceSpecificationConflicts(t *testing.T) {
 		}
 	})
 }
+
+// TestWorkspaceViews covers the workspace views of #227: a view that selects
+// elements across models is applied by "workspace merge", reported by
+// "workspace validate" when it is wrong, and drawn by "sync".
+func TestWorkspaceViews(t *testing.T) {
+	bin := buildBinary(t)
+	write := func(views string) (dir, cfg string) {
+		return writeWorkspace(t, `{
+  "workspace": { "name": "landscape" },
+  "models": [ { "id": "team_a", "path": "a.jsonc", "prefix": "a" }, { "id": "team_b", "path": "b.jsonc", "prefix": "b" } ],
+  "views": `+views+`
+}`)
+	}
+
+	t.Run("merge applies the view and the merged model syncs to a page with both teams", func(t *testing.T) {
+		dir, cfg := write(`{ "landscape": { "title": "Landscape", "description": "all systems", "include-from": ["team_a", "team_b"], "include-kinds": ["system"] } }`)
+		out := filepath.Join(dir, "merged.jsonc")
+		runCLI(t, bin, dir, "workspace", "validate", cfg)
+		runCLI(t, bin, dir, "workspace", "merge", cfg, out)
+
+		merged := readMerged(t, out)
+		raw, ok := merged.Views["landscape"]
+		if !ok {
+			t.Fatalf("the workspace view is not in the merged model: %v", keysOfRaw(merged.Views))
+		}
+		for _, id := range []string{`"a_shop"`, `"a_admin"`, `"b_billing"`} {
+			if !strings.Contains(string(raw), id) {
+				t.Errorf("view lacks %s: %s", id, raw)
+			}
+		}
+		if strings.Contains(string(raw), "handler") {
+			t.Errorf("include-kinds system must not select the containers: %s", raw)
+		}
+		if _, ok := merged.Views["a_overview"]; !ok {
+			t.Error("the prefixed view of team a was lost")
+		}
+
+		runCLI(t, bin, dir, "--model", out, "validate")
+		runCLI(t, bin, dir, "--model", out, "sync")
+		drawio, err := os.ReadFile(filepath.Join(dir, "architecture.drawio"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, want := range []string{`name="Landscape"`, `bausteinsicht_id="a_shop"`, `bausteinsicht_id="b_billing"`} {
+			if !strings.Contains(string(drawio), want) {
+				t.Errorf("draw.io file lacks %s", want)
+			}
+		}
+	})
+
+	t.Run("a wrong view fails validate and merge and writes nothing", func(t *testing.T) {
+		dir, cfg := write(`{ "bad": { "title": "Bad", "include-kinds": ["queue"] }, "gone": { "title": "Gone", "include-from": ["team_z"] }, "a_overview": { "title": "Clash" } }`)
+		outFile := filepath.Join(dir, "merged.jsonc")
+		out, code := runCLIAllowFail(t, bin, dir, "workspace", "validate", cfg)
+		for _, want := range []string{`view "bad": unknown element kind "queue"`, `view "gone": include-from refers to unknown model "team_z"`, `merged view ID "a_overview"`} {
+			if code == 0 || !strings.Contains(out, want) {
+				t.Errorf("validate: exit %d, missing %q\n%s", code, want, out)
+			}
+		}
+		if out, code := runCLIAllowFail(t, bin, dir, "workspace", "merge", cfg, outFile); code == 0 {
+			t.Errorf("merge must fail\n%s", out)
+		}
+		if _, err := os.Stat(outFile); err == nil {
+			t.Error("merge wrote a file although a view is wrong")
+		}
+	})
+}
