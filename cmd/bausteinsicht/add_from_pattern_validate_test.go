@@ -16,6 +16,8 @@ const validatePatternModel = `{
         "elements": [ { "id": "{base}", "kind": "container", "title": "{Title}" } ], "relationships": [] },
       "badkind": { "description": "unknown kind",
         "elements": [ { "id": "{base}", "kind": "nokind", "title": "t" } ], "relationships": [] },
+      "badid": { "description": "template with an ID that breaks the rules",
+        "elements": [ { "id": "{base} api", "kind": "container", "title": "t" } ], "relationships": [] },
       "badrel": { "description": "relationship to an element that does not exist",
         "elements": [ { "id": "{base}", "kind": "container", "title": "t" } ],
         "relationships": [ { "id": "{base}-r", "from": "{base}", "to": "zzz", "kind": "uses" } ] }
@@ -28,7 +30,7 @@ const validatePatternModel = `{
 
 // runPatternAgainst writes model text to a file, runs "add add-from-pattern" and
 // returns the file path, the error and the text of the file afterwards.
-func runPatternAgainst(t *testing.T, modelText string, args ...string) (err error, after string) {
+func runPatternAgainst(t *testing.T, modelText string, args ...string) (after string, err error) {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "architecture.jsonc")
 	if werr := os.WriteFile(path, []byte(modelText), 0o600); werr != nil {
@@ -41,7 +43,7 @@ func runPatternAgainst(t *testing.T, modelText string, args ...string) (err erro
 	cmd.SetArgs(append([]string{"add", "add-from-pattern", "--model", path}, args...))
 	err = cmd.Execute()
 	data, _ := os.ReadFile(path)
-	return err, string(data) + "\n--output--\n" + out.String()
+	return string(data) + "\n--output--\n" + out.String(), err
 }
 
 // TestAddFromPatternRefusesAnInvalidID (#703): --id was not checked against the
@@ -54,7 +56,7 @@ func TestAddFromPatternRefusesAnInvalidID(t *testing.T) {
 		"prefix with a dot":  {"ok", "--id", "x", "--prefix", "p.q"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			err, after := runPatternAgainst(t, validatePatternModel, args...)
+			after, err := runPatternAgainst(t, validatePatternModel, args...)
 			if err == nil || (err != nil && exitCodeOf(t, err) != 1) || !strings.Contains(err.Error(), "invalid") {
 				t.Fatalf("the ID must be refused with exit code 1 and a message, got %v", err)
 			}
@@ -74,7 +76,7 @@ func TestAddFromPatternRefusesAnInvalidExpansion(t *testing.T) {
 		"dangling relationship": {"badrel", "zzz"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			err, after := runPatternAgainst(t, validatePatternModel, tt.pattern, "--id", "pay")
+			after, err := runPatternAgainst(t, validatePatternModel, tt.pattern, "--id", "pay")
 			if err == nil || (err != nil && exitCodeOf(t, err) != 1) {
 				t.Fatalf("the pattern must be refused with exit code 1, got %v", err)
 			}
@@ -94,11 +96,22 @@ func TestAddFromPatternIgnoresErrorsThatWereThereBefore(t *testing.T) {
 	broken := strings.Replace(validatePatternModel, `"relationships": [],
   "views": {}`, `"relationships": [ { "from": "existing", "to": "gone", "kind": "uses" } ],
   "views": {}`, 1)
-	err, after := runPatternAgainst(t, broken, "ok", "--id", "pay")
+	after, err := runPatternAgainst(t, broken, "ok", "--id", "pay")
 	if err != nil {
 		t.Fatalf("a valid pattern must not be blocked by an error that was already there: %v", err)
 	}
 	if !strings.Contains(after, `"pay"`) {
 		t.Errorf("the element must be added:\n%s", after)
+	}
+}
+
+// The IDs the pattern derives from --id must follow the ID rules too.
+func TestAddFromPatternRefusesADerivedInvalidID(t *testing.T) {
+	after, err := runPatternAgainst(t, validatePatternModel, "badid", "--id", "pay")
+	if err == nil || exitCodeOf(t, err) != 1 || !strings.Contains(err.Error(), "invalid") {
+		t.Fatalf("an invalid derived ID must be refused with exit code 1, got %v", err)
+	}
+	if !strings.HasPrefix(after, validatePatternModel) {
+		t.Errorf("the model must not change:\n%s", after)
 	}
 }
