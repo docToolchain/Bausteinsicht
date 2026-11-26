@@ -140,3 +140,54 @@ func keys[V any](m map[string]V) []string {
 	}
 	return out
 }
+
+// A child of the pattern lives below the new top-level element, so a top-level
+// element that happens to have the child's ID ("db") is no conflict. The check
+// compared the IDs of the children with the top-level elements and refused the
+// pattern.
+func TestAddFromPatternChildIDIsNoConflictWithAnUnrelatedElement(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "architecture.jsonc")
+	withDB := strings.Replace(patternModel, `"model": {}`, `"model": { "db": { "kind": "datastore", "title": "Existing DB" } }`, 1)
+	if err := os.WriteFile(path, []byte(withDB), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cmd := NewRootCmd()
+	var out strings.Builder
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{"add", "add-from-pattern", "svc", "--id", "pay", "--model", path})
+	var err error
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				err = fmt.Errorf("panic: %v", r)
+			}
+		}()
+		err = cmd.Execute()
+	}()
+	if err != nil && strings.Contains(err.Error(), "conflict") {
+		t.Fatalf("the child ID db is not a conflict with the unrelated top-level db: %v", err)
+	}
+}
+
+// A real conflict, a top-level element with the ID of a new top-level element,
+// is still refused and the model is not changed.
+func TestAddFromPatternStillRefusesARealConflict(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "architecture.jsonc")
+	withPay := strings.Replace(patternModel, `"model": {}`, `"model": { "pay": { "kind": "container", "title": "Old" } }`, 1)
+	if err := os.WriteFile(path, []byte(withPay), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cmd := NewRootCmd()
+	cmd.SetOut(&strings.Builder{})
+	cmd.SetErr(&strings.Builder{})
+	cmd.SetArgs([]string{"add", "add-from-pattern", "svc", "--id", "pay", "--model", path})
+	if err := cmd.Execute(); err == nil || !strings.Contains(err.Error(), "already exist") {
+		t.Fatalf("the conflict must be reported, got %v", err)
+	}
+	if data, _ := os.ReadFile(path); string(data) != withPay {
+		t.Error("the model must not change when the pattern is refused")
+	}
+}
