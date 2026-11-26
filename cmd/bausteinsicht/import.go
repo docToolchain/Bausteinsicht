@@ -110,6 +110,12 @@ func runImport(cmd *cobra.Command, args []string) error {
 		resultModel, warnings = r.Model, r.Warnings
 	}
 
+	// A file in another format (or without any model) imports as an empty model;
+	// writing it would overwrite the existing model with nothing (#705).
+	if flat, _ := model.FlattenElements(resultModel); len(flat) == 0 {
+		return exitWithCode(fmt.Errorf("no elements found in %s - is --from %s correct?", inputPath, from), 1)
+	}
+
 	data, err := json.MarshalIndent(resultModel, "", "  ")
 	if err != nil {
 		return exitWithCode(fmt.Errorf("encoding model: %w", err), 1)
