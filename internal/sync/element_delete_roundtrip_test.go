@@ -85,3 +85,33 @@ func TestRun_ElementDeletedInDrawioIsNotDrawnAgain(t *testing.T) {
 		state = elementDeleteState(t, m, doc)
 	}
 }
+
+// An element that a constraint names cannot be removed from the model, so it is
+// kept (the model wins). It must then be drawn again in the same run, not one
+// sync later.
+func TestRun_ElementDeletedInDrawioButKeptIsDrawnAgain(t *testing.T) {
+	m := elementDeleteModel()
+	m.Constraints = []model.Constraint{{ID: "c1", Rule: "no-relationship", From: "c", To: "a"}}
+	doc := drawio.NewDocument()
+	doc.AddPage("view-v", "V")
+	ts := minimalTemplates(t)
+
+	Run(m, doc, emptyState(), ts, map[string]bool{"view-v": true})
+	state := elementDeleteState(t, m, doc)
+	page := requirePage(t, doc, "view-v")
+	page.DeleteConnectorsFor("v--c")
+	page.DeleteElement("c")
+
+	result := Run(m, doc, state, ts, nil)
+	if _, ok := m.Model["c"]; !ok || result.Reverse.ElementsDeleted != 0 {
+		t.Fatalf("the element must stay in the model: %+v", result.Reverse)
+	}
+	if page.FindElement("c") == nil {
+		t.Fatal("the element that was kept must be drawn again in the same run")
+	}
+	state = elementDeleteState(t, m, doc)
+	result = Run(m, doc, state, ts, nil)
+	if r := result.Reverse; r.ElementsCreated+r.ElementsDeleted+r.RelationshipsCreated+r.RelationshipsDeleted != 0 {
+		t.Errorf("the next sync is not a no-op: %+v", r)
+	}
+}
