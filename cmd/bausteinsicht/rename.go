@@ -18,7 +18,7 @@ func newRenameCmd() *cobra.Command {
 			to, _ := cmd.Flags().GetString("to")
 			return runEdit(cmd, func(m *model.BausteinsichtModel) ([]model.Change, error) {
 				return m.RenameElement(id, to)
-			})
+			}, model.PatchRenameChanges)
 		},
 	}
 	cmd.Flags().String("id", "", "Element to rename (dot notation, e.g. shop.web)")

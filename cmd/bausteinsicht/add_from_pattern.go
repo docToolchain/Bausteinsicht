@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"sort"
 
 	"github.com/docToolchain/Bausteinsicht/internal/model"
@@ -92,8 +93,9 @@ func runAddFromPattern(cmd *cobra.Command, args []string) error {
 		return exitWithCode(err, 2)
 	}
 
-	// Get expanded IDs
-	elemIDs, relIDs, err := model.ExpandPatternIDs(pattern, baseID)
+	// The top-level elements, in the order of the expanded elements (#702).
+	topIDs := model.ExpandPatternTopLevelIDs(pattern, baseID)
+	_, relIDs, err := model.ExpandPatternIDs(pattern, baseID)
 	if err != nil {
 		return exitWithCode(err, 2)
 	}
@@ -103,7 +105,7 @@ func runAddFromPattern(cmd *cobra.Command, args []string) error {
 		m.Model = make(map[string]model.Element)
 	}
 	for i, elem := range elements {
-		m.Model[elemIDs[i]] = elem
+		m.Model[topIDs[i]] = elem
 	}
 
 	// Add relationships (From and To are already expanded by ExpandPattern)
@@ -114,16 +116,32 @@ func runAddFromPattern(cmd *cobra.Command, args []string) error {
 		return exitWithCode(fmt.Errorf("saving model: %w", err), 2)
 	}
 
-	// Output summary
-	fmt.Printf("✅ Pattern '%s' applied with base ID '%s':\n", patternID, baseID)
-	for i, id := range elemIDs {
-		fmt.Printf("   + %-20s [%-10s] \"%s\"\n", id, elements[i].Kind, elements[i].Title)
+	// Output summary: every created element with its full ID, children below
+	// their parent.
+	out := cmd.OutOrStdout()
+	_, _ = fmt.Fprintf(out, "✅ Pattern '%s' applied with base ID '%s':\n", patternID, baseID)
+	for i, id := range topIDs {
+		printPatternElement(out, id, elements[i])
 	}
 	for i, id := range relIDs {
-		fmt.Printf("   + %-20s %s → %s  \"%s\"\n", id, relationships[i].From, relationships[i].To, relationships[i].Label)
+		_, _ = fmt.Fprintf(out, "   + %-20s %s → %s  \"%s\"\n", id, relationships[i].From, relationships[i].To, relationships[i].Label)
 	}
 
 	return nil
+}
+
+// printPatternElement prints an element created from a pattern and, indented by
+// its depth in the ID, its children.
+func printPatternElement(out io.Writer, id string, el model.Element) {
+	_, _ = fmt.Fprintf(out, "   + %-20s [%-10s] \"%s\"\n", id, el.Kind, el.Title)
+	childKeys := make([]string, 0, len(el.Children))
+	for k := range el.Children {
+		childKeys = append(childKeys, k)
+	}
+	sort.Strings(childKeys)
+	for _, k := range childKeys {
+		printPatternElement(out, id+"."+k, el.Children[k])
+	}
 }
 
 func runListPatterns(cmd *cobra.Command) error {

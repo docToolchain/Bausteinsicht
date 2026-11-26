@@ -110,21 +110,29 @@ func toTitleCase(s string) string {
 	return string(runes)
 }
 
-// CheckPatternConflicts checks if any generated IDs already exist in the model
-func CheckPatternConflicts(m *BausteinsichtModel, pattern PatternDefinition, baseID string) ([]string, error) {
-	elemIDs, _, err := ExpandPatternIDs(pattern, baseID)
-	if err != nil {
-		return nil, err
+// ExpandPatternTopLevelIDs returns the IDs of the top-level elements of the
+// expanded pattern, in the order ExpandPattern returns the elements (#702).
+// ExpandPatternIDs lists every ID including the children, so it cannot be
+// paired with the result of ExpandPattern.
+func ExpandPatternTopLevelIDs(pattern PatternDefinition, baseID string) []string {
+	vars := map[string]string{"{base}": baseID, "{BASE}": strings.ToUpper(baseID)}
+	ids := make([]string, len(pattern.Elements))
+	for i, tmpl := range pattern.Elements {
+		ids[i] = replaceVars(tmpl.ID, vars)
 	}
+	return ids
+}
 
-	flat, _ := FlattenElements(m)
+// CheckPatternConflicts reports the top-level IDs of the expanded pattern that
+// already exist in the model. The children of the pattern live below the new
+// top-level elements, so an unrelated element with the ID of a child is no
+// conflict.
+func CheckPatternConflicts(m *BausteinsichtModel, pattern PatternDefinition, baseID string) ([]string, error) {
 	var conflicts []string
-
-	for _, id := range elemIDs {
-		if _, exists := flat[id]; exists {
+	for _, id := range ExpandPatternTopLevelIDs(pattern, baseID) {
+		if _, exists := m.Model[id]; exists {
 			conflicts = append(conflicts, id)
 		}
 	}
-
 	return conflicts, nil
 }

@@ -652,6 +652,21 @@ $ bausteinsicht add view context --include user --format json
 
 The JSON result always describes the view as it is after the change, not just the arguments of this call: `title`, `scope` and `include` are the resulting values (`description` is added when set), `created` tells whether the view is new, and `added` lists the `--include` entries that were not in the view before (an empty array if none).
 
+==== `bausteinsicht add add-from-pattern`
+
+[source,bash]
+----
+bausteinsicht add add-from-pattern <pattern-id> --id <base> [--title <title>] [--prefix <prefix>]
+bausteinsicht add pattern list
+----
+
+Expands a pattern of `specification.patterns` into elements and relationships of the model: the top-level elements of the pattern are added at the top level of the model, their `children` below them, and the pattern's relationships to the relationships.
+`{base}` is replaced by `--id` (`{BASE}` upper-cased, `{Title}` by `--title`, default the ID), and `--prefix` turns `{base}` into `<prefix>-<base>`.
+
+* Refuses the pattern (exit code `2`, nothing written) if a new **top-level** ID already exists in the model. The children live below the new elements, so an unrelated element with the ID of a child is no conflict (#702).
+* Prints every created element with its full ID, children below their parent (`pay`, `pay.db`), then the relationships.
+* Known gaps (#703): the expanded model is not validated before it is saved, and `--id` is not checked against the ID rules.
+
 ==== `bausteinsicht add specification`
 
 Adds new element or relationship types to the model's specification. Enables definition of custom architecture notations.
@@ -802,7 +817,7 @@ Renames an element and rewrites every reference to it, so that IDs no longer hav
 * Rewrites every reference to the element and to its children: relationship `from`/`to`, view `scope`, `include` and `exclude` (including patterns such as `shop.*`), message steps of dynamic views, and `from`/`to` selectors of constraints.
 * Lists every rewritten location (`path`, `from`, `to`); with `--format json` as `{ "dry_run": false, "changes": [ ... ] }`.
 * Validates the model before saving: if the change would introduce validation errors, they are printed and nothing is saved. Errors that were already in the model do not block the command.
-* The file is rewritten as a whole; comments and formatting are not preserved (`note: model rewritten, comments and formatting were not preserved` on stderr).
+* The change is written as a patch of the file text (#685): comments and formatting stay, a field is replaced in place (or inserted, or removed when it is set to an empty value), an element or relationship is removed together with the comment lines directly above it, and a rename changes the key and every reference in place. The patched text is parsed again and must hold exactly the model the command produced; only if the patch cannot be applied or that check fails is the file rewritten as a whole (`note: model rewritten, comments and formatting were not preserved` on stderr).
 * The draw.io file is not touched. After the rename, `sync` treats the old ID as deleted and the new one as added, so the position of the element on the draw.io pages is lost.
 
 **Exit codes:** `0` -- renamed (or dry run); `1` -- element not found, new key invalid or already taken, or the change would make the model invalid; `2` -- model file not found or I/O error.
