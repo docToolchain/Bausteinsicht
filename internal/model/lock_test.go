@@ -249,3 +249,64 @@ func TestLockModel_RefusesASymbolicLinkAndLeavesItsTargetAlone(t *testing.T) {
 		t.Errorf("the error must say why: %v", err)
 	}
 }
+
+func TestMustBeTheRegularFile(t *testing.T) {
+	dir := t.TempDir()
+	a, b := filepath.Join(dir, "a"), filepath.Join(dir, "b")
+	for _, p := range []string{a, b} {
+		if err := os.WriteFile(p, []byte("x"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	fa, err := os.Open(a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer fa.Close()
+
+	if err := mustBeTheRegularFile(fa, a); err != nil {
+		t.Errorf("the file and its own path must pass: %v", err)
+	}
+	if err := mustBeTheRegularFile(fa, b); err == nil {
+		t.Error("a path that names another file must be refused (swapped after the check)")
+	}
+	if err := mustBeTheRegularFile(fa, filepath.Join(dir, "missing")); err == nil {
+		t.Error("a path that no longer exists must be refused")
+	}
+	d, err := os.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+	if err := mustBeTheRegularFile(d, dir); err == nil {
+		t.Error("a directory is not a lock file")
+	}
+	closed, _ := os.Open(a)
+	_ = closed.Close()
+	if err := mustBeTheRegularFile(closed, a); err == nil {
+		t.Error("a file that cannot be examined must be refused")
+	}
+}
+
+func TestLockModel_ReportsAnErrorOfTheSystemLock(t *testing.T) {
+	old := tryLock
+	tryLock = func(*os.File) (bool, error) { return false, os.ErrPermission }
+	defer func() { tryLock = old }()
+
+	p := newLockTarget(t)
+	if unlock, err := LockModel(p); err == nil {
+		unlock()
+		t.Fatal("an error of the file lock must be reported")
+	}
+}
+
+func TestLockModel_RefusesAnythingButARegularFile(t *testing.T) {
+	p := newLockTarget(t)
+	if err := os.Mkdir(p+".lock", 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if unlock, err := LockModel(p); err == nil {
+		unlock()
+		t.Fatal("a directory at the lock path must be refused")
+	}
+}

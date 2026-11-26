@@ -10,6 +10,9 @@ import (
 	"time"
 )
 
+// tryLock is tryLockFile; a variable so that a test can make it fail.
+var tryLock = tryLockFile
+
 // lockSuffix is appended to the model path to name the lock file.
 const lockSuffix = ".lock"
 
@@ -56,7 +59,7 @@ func LockModel(path string) (unlock func(), err error) {
 
 	deadline := time.Now().Add(lockTimeout)
 	for {
-		locked, err := tryLockFile(f)
+		locked, err := tryLock(f)
 		if err != nil {
 			_ = f.Close()
 			return nil, fmt.Errorf("locking model: %w", err)
