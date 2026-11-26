@@ -661,7 +661,9 @@ Expands a pattern of `specification.patterns` into elements and relationships of
 
 * Refuses the pattern (exit code `2`, nothing written) if a new **top-level** ID already exists in the model. The children live below the new elements, so an unrelated element with the ID of a child is no conflict (#702).
 * Prints every created element with its full ID, children below their parent (`pay`, `pay.db`), then the relationships.
-* Known gaps (#703): the expanded model is not validated before it is saved, and `--id` is not checked against the ID rules.
+* `--id` (with `--prefix`) and the IDs the pattern derives from it must follow the ID rules of `add element` (exit code `1`).
+* The expanded model is validated before it is saved: a pattern that would add an element of an unknown kind, a relationship to an element that does not exist or any other new validation error is refused with exit code `1`, the new errors are listed on stderr and nothing is saved. Errors the model had before do not count (#703).
+* Known gap: patterns are only added at the top level (no `--parent`).
 
 ==== `bausteinsicht add specification`
 
