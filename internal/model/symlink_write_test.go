@@ -87,12 +87,12 @@ func TestResolveWriteTarget(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if got := ResolveWriteTarget(real); got != canonical {
-		t.Errorf("a regular file resolves to itself: %q, want %q", got, canonical)
+	if got, err := ResolveWriteTarget(real); err != nil || got != canonical {
+		t.Errorf("a regular file resolves to itself: %q, %v, want %q", got, err, canonical)
 	}
 	missing := filepath.Join(dir, "new.jsonc")
-	if got := ResolveWriteTarget(missing); got != missing {
-		t.Errorf("a file that does not exist yet is returned as it is: %q", got)
+	if got, err := ResolveWriteTarget(missing); err != nil || got != missing {
+		t.Errorf("a file that does not exist yet is returned as it is: %q, %v", got, err)
 	}
 
 	one := filepath.Join(dir, "one")
@@ -103,16 +103,16 @@ func TestResolveWriteTarget(t *testing.T) {
 	if err := os.Symlink(one, two); err != nil {
 		t.Fatal(err)
 	}
-	if got := ResolveWriteTarget(two); got != canonical {
-		t.Errorf("a chain of links resolves to the final file: %q, want %q", got, canonical)
+	if got, err := ResolveWriteTarget(two); err != nil || got != canonical {
+		t.Errorf("a chain of links resolves to the final file: %q, %v, want %q", got, err, canonical)
 	}
 
 	dangling := filepath.Join(dir, "dangling")
 	if err := os.Symlink(filepath.Join(dir, "gone"), dangling); err != nil {
 		t.Fatal(err)
 	}
-	if got := ResolveWriteTarget(dangling); got != dangling {
-		t.Errorf("a link to nothing is returned as it is: %q", got)
+	if got, err := ResolveWriteTarget(dangling); err != nil || got != dangling {
+		t.Errorf("a link to nothing is returned as it is: %q, %v", got, err)
 	}
 }
 

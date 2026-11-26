@@ -97,7 +97,10 @@ func LoadState(path string) (*SyncState, error) {
 
 // SaveState atomically writes state to path using a temp file + rename.
 func SaveState(path string, state *SyncState) error {
-	path = model.ResolveWriteTarget(path)
+	path, err := model.ResolveWriteTarget(path)
+	if err != nil {
+		return err
+	}
 	// Compute integrity checksum: marshal without checksum → hash → set checksum → marshal with checksum.
 	state.Checksum = ""
 	canonical, err := json.Marshal(state)
