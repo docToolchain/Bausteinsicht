@@ -66,6 +66,6 @@ All ADRs are located in `src/docs/arc42/ADRs/`.
 
 | link:../ADRs/ADR-012-Multi-Model-Composition.adoc[ADR-012]
 | Multi-Model Composition and Remote Sources
-| Proposed
-| Compose system-of-systems views by extending the existing workspace (local-first, then opt-in pinned remote sources with a lock file), not by changing the model format (`$ref`, `imports`). Analysis result for #227; awaiting a maintainer decision.
+| Accepted
+| Compose system-of-systems views by extending the existing workspace (local-first, then opt-in pinned remote sources with a lock file), not by changing the model format (`$ref`, `imports`). Remote sources are HTTPS single files (no `git clone`); a kind that two models define differently is a merge error. Implemented in two phases (#227).
 |===

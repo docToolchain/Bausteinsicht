@@ -8,7 +8,7 @@
 
 == Status
 
-Proposed (analysis result for #227; needs a maintainer decision)
+Accepted (2026-11-26). Proposed as the analysis result for #227; the open questions were answered by a maintainer on 2026-11-26 (see <<decisions-open-questions,Decisions on the open questions>>). Phase 1 and Phase 2 are implemented.
 
 == Context
 
@@ -128,7 +128,7 @@ Reference: Option A (status quo).
 
 Option D wins only narrowly over the status quo, which is the honest result: for teams that can check out the other repositories, Option A is already almost enough. What D adds is pinning with integrity checks and partial imports, without touching the model format.
 
-== Decision (proposed)
+== Decision
 
 **Adopt Option D, in two phases, and do not change the model format.**
 
@@ -164,13 +164,14 @@ No new top-level command. `workspace fetch` (Phase 2) is the only one that touch
 * A landscape needs the workspace configuration in addition to the models; there is no single-file landscape.
 * Phase 2 is real work (fetcher, cache, lock, tests) and has to be reviewed from a security point of view before it ships.
 
-=== Open Questions for the Maintainers
+[[decisions-open-questions]]
+=== Decisions on the open questions
 
-_Phase 2 was built before these were answered, using the following assumptions; each can still be changed:_ the workspace configuration stays the home of composition (no `imports` in the model); the fetcher is a plain HTTPS fetcher for single model files (any host on the allowlist, no `git clone`, so no dependency on a git binary and no submodule semantics); included models do not bring their own `specification` into the landscape beyond today's rule, the first definition wins.
+The questions the analysis left open were answered on 2026-11-26:
 
-* Is a separate workspace configuration acceptable as the long-term home of composition, or is a single-file `imports` (Option B) wanted despite its cost?
-* Which hosts matter in practice (GitHub only, or also self-hosted Git)? That decides between a git-based and a plain HTTPS fetcher in Phase 2.
-* Should the included models be allowed to bring their own `specification` (element kinds) into the merge, or must the landscape define the kinds? Today the first definition wins.
+. **Home of composition: the workspace configuration.** A separate workspace configuration stays the long-term place for composing models; the model format gets no `imports` (Option B is rejected). Cost accepted: two files per landscape.
+. **Fetcher: HTTPS, single model files.** Remote sources are plain HTTPS URLs of model files on hosts listed in `allowedHosts` (GitHub raw, GitLab raw or an own web server alike), pinned by tag or commit in the URL and by SHA-256 in the lock file. No `git clone` (no dependency on a git binary, no hooks or submodule semantics); a git-based fetcher would need its own security design and ADR.
+. **Specifications: a conflict is an error.** Models may bring their own element and relationship kinds into a merge, and kinds that only one model defines are added. If two models define the same kind differently (element kind: notation, `container` or `c4`; relationship kind: notation or `dashed`), `workspace merge` and `workspace validate` fail and name the kind and both models; a different description alone is not a conflict (the first one is kept). This replaces the earlier rule "the first definition wins", which let one team change the meaning of a kind for everybody without notice.
 
 == References
 

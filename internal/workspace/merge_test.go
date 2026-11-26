@@ -1,6 +1,8 @@
 package workspace
 
 import (
+	"errors"
+	"strings"
 	"testing"
 
 	"github.com/docToolchain/Bausteinsicht/internal/model"
@@ -158,5 +160,133 @@ func TestContains(t *testing.T) {
 				t.Errorf("contains(%v, %q) = %v, want %v", tt.slice, tt.item, result, tt.expected)
 			}
 		})
+	}
+}
+
+func specModel(kinds map[string]model.ElementKind, rels map[string]model.RelationshipKind) *model.BausteinsichtModel {
+	return &model.BausteinsichtModel{
+		Specification: model.Specification{Elements: kinds, Relationships: rels},
+		Model:         map[string]model.Element{"x": {Kind: "system", Title: "X"}},
+	}
+}
+
+func TestMergeModels_SpecificationConflicts(t *testing.T) {
+	a := LoadedModel{Ref: ModelRef{ID: "a"}, Model: specModel(
+		map[string]model.ElementKind{"system": {Notation: "System", Container: true, Description: "A"}, "db": {Notation: "DB"}, "ui": {Notation: "UI", C4: "Container"}},
+		map[string]model.RelationshipKind{"uses": {Notation: "uses"}, "async": {Notation: "async", Dashed: true}})}
+
+	t.Run("equal definitions merge, the first description wins", func(t *testing.T) {
+		b := LoadedModel{Ref: ModelRef{ID: "b"}, Model: specModel(
+			map[string]model.ElementKind{"system": {Notation: "System", Container: true, Description: "B"}, "cache": {Notation: "Cache"}},
+			map[string]model.RelationshipKind{"uses": {Notation: "uses"}})}
+		merged, err := MergeModels([]LoadedModel{a, b})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := merged.Specification.Elements["system"].Description; got != "A" {
+			t.Errorf("description = %q, want the first model's", got)
+		}
+		if _, ok := merged.Specification.Elements["cache"]; !ok {
+			t.Error("kinds that only the second model defines must be added")
+		}
+	})
+
+	t.Run("every conflict is reported, in a stable order", func(t *testing.T) {
+		b := LoadedModel{Ref: ModelRef{ID: "b"}, Model: specModel(
+			map[string]model.ElementKind{
+				"system": {Notation: "Software System", Container: true},
+				"db":     {Notation: "DB", Container: true},
+				"ui":     {Notation: "UI", C4: "Component"},
+			},
+			map[string]model.RelationshipKind{"uses": {Notation: "uses", Dashed: true}, "async": {Notation: "async", Dashed: true}})}
+		for i := 0; i < 5; i++ { // map iteration must not change the message
+			_, err := MergeModels([]LoadedModel{a, b})
+			if err == nil {
+				t.Fatal("conflicting kinds must fail")
+			}
+			msg := err.Error()
+			for _, want := range []string{
+				`element kind "db" is defined differently`, `element kind "system" is defined differently`, `element kind "ui" is defined differently`,
+				`relationship kind "uses" is defined differently`, `model "a"`, `model "b"`,
+			} {
+				if !strings.Contains(msg, want) {
+					t.Fatalf("message lacks %q:\n%s", want, msg)
+				}
+			}
+			if strings.Contains(msg, `relationship kind "async"`) {
+				t.Errorf("equal relationship kind reported:\n%s", msg)
+			}
+			if strings.Index(msg, `"db"`) > strings.Index(msg, `"system"`) || strings.Index(msg, `"system"`) > strings.Index(msg, `"ui"`) {
+				t.Errorf("conflicts are not sorted by kind:\n%s", msg)
+			}
+		}
+	})
+
+	t.Run("ValidateWorkspace reports the conflict", func(t *testing.T) {
+		b := LoadedModel{Ref: ModelRef{ID: "b"}, Model: specModel(map[string]model.ElementKind{"system": {Notation: "Other"}}, nil)}
+		problems := ValidateWorkspace(&Config{}, []LoadedModel{a, b})
+		if len(problems) == 0 || !strings.Contains(errors.Join(problems...).Error(), "defined differently") {
+			t.Errorf("problems = %v", problems)
+		}
+	})
+}
+
+// Merging must not change the loaded models: the dynamic-view steps of a model
+// were remapped in place, so a second merge (validate and merge both do one)
+// prefixed the endpoints twice (a_x became a_a_x).
+func TestMergeModels_DoesNotModifyLoadedModels(t *testing.T) {
+	m := specModel(map[string]model.ElementKind{"system": {Notation: "System"}}, nil)
+	m.Model = map[string]model.Element{"x": {Kind: "system", Title: "X"}, "y": {Kind: "system", Title: "Y"}}
+	m.DynamicViews = []model.DynamicView{{Key: "flow", Title: "Flow", Steps: []model.SequenceStep{{Index: 1, From: "x", To: "y", Label: "go"}}}}
+	loaded := []LoadedModel{{Ref: ModelRef{ID: "a"}, Model: m}}
+
+	first, err := MergeModels(loaded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := MergeModels(loaded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := m.DynamicViews[0].Steps[0]; got.From != "x" || got.To != "y" {
+		t.Errorf("the loaded model's step was changed to %q -> %q", got.From, got.To)
+	}
+	for name, merged := range map[string]*model.BausteinsichtModel{"first": first, "second": second} {
+		if got := merged.DynamicViews[0].Steps[0]; got.From != "a_x" || got.To != "a_y" {
+			t.Errorf("%s merge: step is %q -> %q, want a_x -> a_y", name, got.From, got.To)
+		}
+	}
+}
+
+func TestMergeModels_ConflictLeavesLoadedModelsUntouched(t *testing.T) {
+	a := specModel(map[string]model.ElementKind{"system": {Notation: "System"}}, nil)
+	b := specModel(map[string]model.ElementKind{"system": {Notation: "Other"}}, nil)
+	b.DynamicViews = []model.DynamicView{{Key: "flow", Steps: []model.SequenceStep{{Index: 1, From: "x", To: "x"}}}}
+	if _, err := MergeModels([]LoadedModel{{Ref: ModelRef{ID: "a"}, Model: a}, {Ref: ModelRef{ID: "b"}, Model: b}}); err == nil {
+		t.Fatal("the conflict must fail")
+	}
+	if got := b.DynamicViews[0].Steps[0]; got.From != "x" || got.To != "x" {
+		t.Errorf("a failed merge changed the loaded model: %q -> %q", got.From, got.To)
+	}
+}
+
+// With three models the conflicts are found model by model; the report must
+// still be sorted by kind as a whole.
+func TestMergeModels_ConflictsAcrossThreeModelsAreSortedByKind(t *testing.T) {
+	mk := func(id string, kinds map[string]model.ElementKind, rels map[string]model.RelationshipKind) LoadedModel {
+		return LoadedModel{Ref: ModelRef{ID: id}, Model: specModel(kinds, rels)}
+	}
+	a := mk("a", map[string]model.ElementKind{"alpha": {Notation: "A"}, "zeta": {Notation: "Z"}}, map[string]model.RelationshipKind{"uses": {Notation: "uses"}})
+	b := mk("b", map[string]model.ElementKind{"zeta": {Notation: "Z2"}}, map[string]model.RelationshipKind{"uses": {Notation: "calls"}})
+	c := mk("c", map[string]model.ElementKind{"alpha": {Notation: "A2"}}, nil)
+
+	_, err := MergeModels([]LoadedModel{a, b, c})
+	if err == nil {
+		t.Fatal("the conflicts must fail the merge")
+	}
+	msg := err.Error()
+	alpha, zeta, uses := strings.Index(msg, `element kind "alpha"`), strings.Index(msg, `element kind "zeta"`), strings.Index(msg, `relationship kind "uses"`)
+	if alpha < 0 || zeta < 0 || uses < 0 || alpha > zeta || zeta > uses {
+		t.Errorf("conflicts are not sorted (alpha %d, zeta %d, uses %d):\n%s", alpha, zeta, uses, msg)
 	}
 }

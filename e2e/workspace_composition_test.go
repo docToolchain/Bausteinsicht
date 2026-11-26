@@ -31,7 +31,7 @@ const teamAModel = `{
 
 const teamBModel = `{
   "specification": {
-    "elements": { "system": { "notation": "System" } },
+    "elements": { "system": { "notation": "System", "container": true } },
     "relationships": { "uses": { "notation": "uses" } }
   },
   "model": { "billing": { "kind": "system", "title": "Billing" } },
@@ -209,4 +209,55 @@ func keysOfRaw(m map[string]json.RawMessage) []string {
 		keys = append(keys, k)
 	}
 	return keys
+}
+
+// TestWorkspaceSpecificationConflicts covers the ADR-012 decision that a kind
+// defined differently by two models is an error, not a silent win of the first.
+func TestWorkspaceSpecificationConflicts(t *testing.T) {
+	bin := buildBinary(t)
+	model := func(notation, container, description string) string {
+		return `{ "specification": { "elements": { "system": { "notation": "` + notation + `", "container": ` + container + `, "description": "` + description + `" } },
+  "relationships": { "uses": { "notation": "uses", "dashed": ` + container + ` } } },
+  "model": { "x": { "kind": "system", "title": "X" } }, "views": {} }`
+	}
+	write := func(a, b string) (dir, cfg string) {
+		dir = t.TempDir()
+		for name, content := range map[string]string{
+			"a.jsonc": a, "b.jsonc": b,
+			"workspace.json": `{ "workspace": { "name": "w" }, "models": [ { "id": "team_a", "path": "a.jsonc" }, { "id": "team_b", "path": "b.jsonc" } ] }`,
+		} {
+			if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return dir, filepath.Join(dir, "workspace.json")
+	}
+
+	t.Run("different notation or container flag is a conflict", func(t *testing.T) {
+		dir, cfg := write(model("System", "true", ""), model("Software System", "false", ""))
+		out, code := runCLIAllowFail(t, bin, dir, "workspace", "validate", cfg)
+		for _, want := range []string{`element kind "system" is defined differently`, `model "team_a"`, `model "team_b"`, `relationship kind "uses" is defined differently`} {
+			if code == 0 || !strings.Contains(out, want) {
+				t.Errorf("validate: exit %d, missing %q\n%s", code, want, out)
+			}
+		}
+		merged := filepath.Join(dir, "out.json")
+		if out, code := runCLIAllowFail(t, bin, dir, "workspace", "merge", cfg, merged); code == 0 || !strings.Contains(out, "defined differently") {
+			t.Errorf("merge: exit %d\n%s", code, out)
+		}
+		if _, err := os.Stat(merged); err == nil {
+			t.Error("merge wrote an output file although the specifications conflict")
+		}
+	})
+
+	t.Run("the same definition, even with another description, merges", func(t *testing.T) {
+		dir, cfg := write(model("System", "true", "from team a"), model("System", "true", "from team b"))
+		runCLI(t, bin, dir, "workspace", "validate", cfg)
+		merged := filepath.Join(dir, "out.json")
+		runCLI(t, bin, dir, "workspace", "merge", cfg, merged)
+		data, _ := os.ReadFile(merged)
+		if !strings.Contains(string(data), "from team a") || strings.Contains(string(data), "from team b") {
+			t.Errorf("the first description must be kept:\n%s", data)
+		}
+	})
 }
