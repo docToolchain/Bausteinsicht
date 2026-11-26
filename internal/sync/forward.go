@@ -343,6 +343,11 @@ func applyViewMetadataAndLegend(in forwardRenderInputs, opts *ForwardOptions, vi
 // For existing pages, this adds elements newly included via view changes (#231).
 func populateNewPage(in forwardRenderInputs, viewID string, scopeID string, elemSet map[string]bool) {
 	toPlace := collectElementsToPlace(in.page, scopeID, elemSet)
+	// An element the user deleted everywhere in draw.io is removed from the
+	// model by reverse sync in this same run; drawing it again would leave a
+	// shape that no model element owns, and the next sync would import it as a
+	// new element (#720).
+	toPlace = withoutDeletedInDrawio(toPlace, in.cs)
 	if len(toPlace) == 0 {
 		return
 	}
@@ -353,6 +358,27 @@ func populateNewPage(in forwardRenderInputs, viewID string, scopeID string, elem
 	} else {
 		placeElementsIncrementally(in, viewID, scopeID, toPlace)
 	}
+}
+
+// withoutDeletedInDrawio drops the element IDs whose deletion in draw.io is part
+// of cs.
+func withoutDeletedInDrawio(ids []string, cs *ChangeSet) []string {
+	if cs == nil || len(cs.DrawioElementChanges) == 0 {
+		return ids
+	}
+	deleted := make(map[string]bool)
+	for _, ch := range cs.DrawioElementChanges {
+		if ch.Type == Deleted {
+			deleted[ch.ID] = true
+		}
+	}
+	kept := ids[:0:0]
+	for _, id := range ids {
+		if !deleted[id] {
+			kept = append(kept, id)
+		}
+	}
+	return kept
 }
 
 // collectElementsToPlace returns the elements of elemSet that still need to
