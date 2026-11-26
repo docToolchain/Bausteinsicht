@@ -58,6 +58,10 @@ func MergeModels(loaded []LoadedModel) (*model.BausteinsichtModel, error) {
 			merged.Model[prefixed] = elem
 		}
 	}
+	// Report conflicting kinds before anything else is remapped.
+	if err := specs.err(); err != nil {
+		return nil, err
+	}
 
 	// Merge relationships, views, dynamic views, and constraints in one pass.
 	for _, lm := range loaded {
@@ -85,6 +89,8 @@ func MergeModels(loaded []LoadedModel) (*model.BausteinsichtModel, error) {
 
 		for _, dv := range lm.Model.DynamicViews {
 			remappedDV := dv
+			// dv shares its Steps with the loaded model; remap a copy.
+			remappedDV.Steps = append([]model.SequenceStep(nil), dv.Steps...)
 			remappedDV.Key = prefix + "_" + dv.Key
 			for i := range remappedDV.Steps {
 				remappedDV.Steps[i].From = prefixElementID(remappedDV.Steps[i].From, prefix)
@@ -105,10 +111,6 @@ func MergeModels(loaded []LoadedModel) (*model.BausteinsichtModel, error) {
 			merged.Constraints = append(merged.Constraints, c)
 		}
 	}
-	if err := specs.err(); err != nil {
-		return nil, err
-	}
-
 	return merged, nil
 }
 

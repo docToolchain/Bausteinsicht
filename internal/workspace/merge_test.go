@@ -230,3 +230,42 @@ func TestMergeModels_SpecificationConflicts(t *testing.T) {
 		}
 	})
 }
+
+// Merging must not change the loaded models: the dynamic-view steps of a model
+// were remapped in place, so a second merge (validate and merge both do one)
+// prefixed the endpoints twice (a_x became a_a_x).
+func TestMergeModels_DoesNotModifyLoadedModels(t *testing.T) {
+	m := specModel(map[string]model.ElementKind{"system": {Notation: "System"}}, nil)
+	m.Model = map[string]model.Element{"x": {Kind: "system", Title: "X"}, "y": {Kind: "system", Title: "Y"}}
+	m.DynamicViews = []model.DynamicView{{Key: "flow", Title: "Flow", Steps: []model.SequenceStep{{Index: 1, From: "x", To: "y", Label: "go"}}}}
+	loaded := []LoadedModel{{Ref: ModelRef{ID: "a"}, Model: m}}
+
+	first, err := MergeModels(loaded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := MergeModels(loaded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := m.DynamicViews[0].Steps[0]; got.From != "x" || got.To != "y" {
+		t.Errorf("the loaded model's step was changed to %q -> %q", got.From, got.To)
+	}
+	for name, merged := range map[string]*model.BausteinsichtModel{"first": first, "second": second} {
+		if got := merged.DynamicViews[0].Steps[0]; got.From != "a_x" || got.To != "a_y" {
+			t.Errorf("%s merge: step is %q -> %q, want a_x -> a_y", name, got.From, got.To)
+		}
+	}
+}
+
+func TestMergeModels_ConflictLeavesLoadedModelsUntouched(t *testing.T) {
+	a := specModel(map[string]model.ElementKind{"system": {Notation: "System"}}, nil)
+	b := specModel(map[string]model.ElementKind{"system": {Notation: "Other"}}, nil)
+	b.DynamicViews = []model.DynamicView{{Key: "flow", Steps: []model.SequenceStep{{Index: 1, From: "x", To: "x"}}}}
+	if _, err := MergeModels([]LoadedModel{{Ref: ModelRef{ID: "a"}, Model: a}, {Ref: ModelRef{ID: "b"}, Model: b}}); err == nil {
+		t.Fatal("the conflict must fail")
+	}
+	if got := b.DynamicViews[0].Steps[0]; got.From != "x" || got.To != "x" {
+		t.Errorf("a failed merge changed the loaded model: %q -> %q", got.From, got.To)
+	}
+}
