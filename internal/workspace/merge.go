@@ -1,7 +1,9 @@
 package workspace
 
 import (
+	"errors"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/docToolchain/Bausteinsicht/internal/model"
@@ -38,22 +40,16 @@ func MergeModels(loaded []LoadedModel) (*model.BausteinsichtModel, error) {
 		Constraints:   []model.Constraint{},
 	}
 
-	// Merge specifications and elements in a single pass per model.
+	// Merge specifications and elements in a single pass per model. A kind that
+	// two models define differently is a conflict (ADR-012), not a silent win
+	// for the first model.
+	specs := newSpecMerge()
 	for _, lm := range loaded {
-		for kind, def := range lm.Model.Specification.Elements {
-			if _, exists := merged.Specification.Elements[kind]; !exists {
-				merged.Specification.Elements[kind] = def
-			}
-		}
-		for kind, def := range lm.Model.Specification.Relationships {
-			if _, exists := merged.Specification.Relationships[kind]; !exists {
-				merged.Specification.Relationships[kind] = def
-			}
-		}
+		specs.add(lm, merged)
+		prefix := resolvePrefix(lm)
 		// Only the top-level elements are copied: their children come along.
 		// (Copying the flattened elements as well added every nested element a
 		// second time, as a top-level entry with a dotted key.)
-		prefix := resolvePrefix(lm)
 		for id, elem := range lm.Model.Model {
 			prefixed := prefixElementID(id, prefix)
 			if _, taken := merged.Model[prefixed]; taken {
@@ -108,6 +104,9 @@ func MergeModels(loaded []LoadedModel) (*model.BausteinsichtModel, error) {
 			}
 			merged.Constraints = append(merged.Constraints, c)
 		}
+	}
+	if err := specs.err(); err != nil {
+		return nil, err
 	}
 
 	return merged, nil
@@ -204,4 +203,60 @@ func contains(slice []string, s string) bool {
 // for example ("a", "b_c") and ("a_b", "c"); one would silently replace the other.
 func collisionError(what, id string) error {
 	return fmt.Errorf("merged %s ID %q is produced by more than one model; use different prefixes", what, id)
+}
+
+// specMerge unions the element and relationship kinds of the models and records
+// the kinds that two models define differently.
+type specMerge struct {
+	elementOwner      map[string]string // kind -> ID of the model that defined it first
+	relationshipOwner map[string]string
+	conflicts         []error
+}
+
+func newSpecMerge() *specMerge {
+	return &specMerge{elementOwner: map[string]string{}, relationshipOwner: map[string]string{}}
+}
+
+// add merges the kinds of one model into merged. Two definitions of a kind are
+// the same if they agree on everything that affects rendering and validation
+// (notation, container, C4 macro / dashed); a different description is not a
+// conflict, the first one is kept.
+func (m *specMerge) add(lm LoadedModel, merged *model.BausteinsichtModel) {
+	for _, kind := range sortedKeys(lm.Model.Specification.Elements) {
+		def := lm.Model.Specification.Elements[kind]
+		have, exists := merged.Specification.Elements[kind]
+		switch {
+		case !exists:
+			merged.Specification.Elements[kind] = def
+			m.elementOwner[kind] = lm.Ref.ID
+		case have.Notation != def.Notation || have.Container != def.Container || have.C4 != def.C4:
+			m.conflicts = append(m.conflicts, fmt.Errorf(
+				"element kind %q is defined differently: model %q has notation %q, container %t, c4 %q; model %q has notation %q, container %t, c4 %q",
+				kind, m.elementOwner[kind], have.Notation, have.Container, have.C4, lm.Ref.ID, def.Notation, def.Container, def.C4))
+		}
+	}
+	for _, kind := range sortedKeys(lm.Model.Specification.Relationships) {
+		def := lm.Model.Specification.Relationships[kind]
+		have, exists := merged.Specification.Relationships[kind]
+		switch {
+		case !exists:
+			merged.Specification.Relationships[kind] = def
+			m.relationshipOwner[kind] = lm.Ref.ID
+		case have.Notation != def.Notation || have.Dashed != def.Dashed:
+			m.conflicts = append(m.conflicts, fmt.Errorf(
+				"relationship kind %q is defined differently: model %q has notation %q, dashed %t; model %q has notation %q, dashed %t",
+				kind, m.relationshipOwner[kind], have.Notation, have.Dashed, lm.Ref.ID, def.Notation, def.Dashed))
+		}
+	}
+}
+
+func (m *specMerge) err() error { return errors.Join(m.conflicts...) }
+
+func sortedKeys[V any](in map[string]V) []string {
+	keys := make([]string, 0, len(in))
+	for k := range in {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }

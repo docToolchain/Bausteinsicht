@@ -1,6 +1,8 @@
 package workspace
 
 import (
+	"errors"
+	"strings"
 	"testing"
 
 	"github.com/docToolchain/Bausteinsicht/internal/model"
@@ -159,4 +161,72 @@ func TestContains(t *testing.T) {
 			}
 		})
 	}
+}
+
+func specModel(kinds map[string]model.ElementKind, rels map[string]model.RelationshipKind) *model.BausteinsichtModel {
+	return &model.BausteinsichtModel{
+		Specification: model.Specification{Elements: kinds, Relationships: rels},
+		Model:         map[string]model.Element{"x": {Kind: "system", Title: "X"}},
+	}
+}
+
+func TestMergeModels_SpecificationConflicts(t *testing.T) {
+	a := LoadedModel{Ref: ModelRef{ID: "a"}, Model: specModel(
+		map[string]model.ElementKind{"system": {Notation: "System", Container: true, Description: "A"}, "db": {Notation: "DB"}, "ui": {Notation: "UI", C4: "Container"}},
+		map[string]model.RelationshipKind{"uses": {Notation: "uses"}, "async": {Notation: "async", Dashed: true}})}
+
+	t.Run("equal definitions merge, the first description wins", func(t *testing.T) {
+		b := LoadedModel{Ref: ModelRef{ID: "b"}, Model: specModel(
+			map[string]model.ElementKind{"system": {Notation: "System", Container: true, Description: "B"}, "cache": {Notation: "Cache"}},
+			map[string]model.RelationshipKind{"uses": {Notation: "uses"}})}
+		merged, err := MergeModels([]LoadedModel{a, b})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := merged.Specification.Elements["system"].Description; got != "A" {
+			t.Errorf("description = %q, want the first model's", got)
+		}
+		if _, ok := merged.Specification.Elements["cache"]; !ok {
+			t.Error("kinds that only the second model defines must be added")
+		}
+	})
+
+	t.Run("every conflict is reported, in a stable order", func(t *testing.T) {
+		b := LoadedModel{Ref: ModelRef{ID: "b"}, Model: specModel(
+			map[string]model.ElementKind{
+				"system": {Notation: "Software System", Container: true},
+				"db":     {Notation: "DB", Container: true},
+				"ui":     {Notation: "UI", C4: "Component"},
+			},
+			map[string]model.RelationshipKind{"uses": {Notation: "uses", Dashed: true}, "async": {Notation: "async", Dashed: true}})}
+		for i := 0; i < 5; i++ { // map iteration must not change the message
+			_, err := MergeModels([]LoadedModel{a, b})
+			if err == nil {
+				t.Fatal("conflicting kinds must fail")
+			}
+			msg := err.Error()
+			for _, want := range []string{
+				`element kind "db" is defined differently`, `element kind "system" is defined differently`, `element kind "ui" is defined differently`,
+				`relationship kind "uses" is defined differently`, `model "a"`, `model "b"`,
+			} {
+				if !strings.Contains(msg, want) {
+					t.Fatalf("message lacks %q:\n%s", want, msg)
+				}
+			}
+			if strings.Contains(msg, `relationship kind "async"`) {
+				t.Errorf("equal relationship kind reported:\n%s", msg)
+			}
+			if strings.Index(msg, `"db"`) > strings.Index(msg, `"system"`) || strings.Index(msg, `"system"`) > strings.Index(msg, `"ui"`) {
+				t.Errorf("conflicts are not sorted by kind:\n%s", msg)
+			}
+		}
+	})
+
+	t.Run("ValidateWorkspace reports the conflict", func(t *testing.T) {
+		b := LoadedModel{Ref: ModelRef{ID: "b"}, Model: specModel(map[string]model.ElementKind{"system": {Notation: "Other"}}, nil)}
+		problems := ValidateWorkspace(&Config{}, []LoadedModel{a, b})
+		if len(problems) == 0 || !strings.Contains(errors.Join(problems...).Error(), "defined differently") {
+			t.Errorf("problems = %v", problems)
+		}
+	})
 }
