@@ -38,9 +38,20 @@ func LockModel(path string) (unlock func(), err error) {
 		return nil, fmt.Errorf("locking model: %w", err)
 	}
 	lockPath := abs + lockSuffix
+	// A symbolic link at the lock path would make the PID written below replace
+	// the content of its target; refuse it before opening.
+	if info, err := os.Lstat(lockPath); err == nil && !info.Mode().IsRegular() {
+		return nil, fmt.Errorf("locking model: %s is a symbolic link or not a regular file; remove it", lockPath)
+	}
 	f, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o600) // #nosec G304 -- derived from the model path
 	if err != nil {
 		return nil, fmt.Errorf("locking model: %w", err)
+	}
+	// The path could have been swapped between the check and the open: the opened
+	// file must be the regular file the path names.
+	if err := mustBeTheRegularFile(f, lockPath); err != nil {
+		_ = f.Close()
+		return nil, err
 	}
 
 	deadline := time.Now().Add(lockTimeout)
@@ -66,6 +77,20 @@ func LockModel(path string) (unlock func(), err error) {
 		_, _ = f.WriteAt([]byte(strconv.Itoa(os.Getpid())+"\n"), 0)
 	}
 	return func() { _ = f.Close() }, nil // closing the file releases the lock
+}
+
+// mustBeTheRegularFile checks that f is a regular file and the one lockPath
+// names now (not a symbolic link that was put there after the first check).
+func mustBeTheRegularFile(f *os.File, lockPath string) error {
+	opened, err := f.Stat()
+	if err != nil {
+		return fmt.Errorf("locking model: %w", err)
+	}
+	named, err := os.Lstat(lockPath)
+	if err != nil || !opened.Mode().IsRegular() || !named.Mode().IsRegular() || !os.SameFile(opened, named) {
+		return fmt.Errorf("locking model: %s is a symbolic link or not a regular file; remove it", lockPath)
+	}
+	return nil
 }
 
 // lockOwner describes the holder of a lock file for the error message.
