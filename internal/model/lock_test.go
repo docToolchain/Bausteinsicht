@@ -32,9 +32,6 @@ func TestLockModel_CreatesAndRemovesTheLockFile(t *testing.T) {
 		t.Errorf("the lock file must name the owning process, got %q", data)
 	}
 	unlock()
-	if _, err := os.Stat(p + ".lock"); !os.IsNotExist(err) {
-		t.Errorf("the lock file must be removed on unlock: %v", err)
-	}
 	// The lock can be taken again after it was released.
 	unlock2, err := LockModel(p)
 	if err != nil {
@@ -139,21 +136,53 @@ func itoa(v int) string {
 	return string(b)
 }
 
-func TestLockModel_TakesOverAStaleLock(t *testing.T) {
+// A lock file is not proof of a dead owner: a process that is suspended for
+// longer than any age limit still holds the lock, and taking it over would let
+// two commands change the model at once (review of #712).
+func TestLockModel_AnOldLockOfALiveOwnerIsNotTakenOver(t *testing.T) {
+	oldTimeout := lockTimeout
+	lockTimeout = 200 * time.Millisecond
+	defer func() { lockTimeout = oldTimeout }()
+
 	p := newLockTarget(t)
-	if err := os.WriteFile(p+".lock", []byte("99999\n"), 0o600); err != nil {
+	holder, err := LockModel(p)
+	if err != nil {
 		t.Fatal(err)
 	}
-	old := time.Now().Add(-lockStaleAfter - time.Minute)
+	defer holder()
+	old := time.Now().Add(-24 * time.Hour)
 	if err := os.Chtimes(p+".lock", old, old); err != nil {
 		t.Fatal(err)
 	}
 
+	if unlock, err := LockModel(p); err == nil {
+		unlock()
+		t.Fatal("a lock that is still held must not be taken over because its file is old")
+	}
+}
+
+// When the owner dies, the lock is gone with it, whatever the file looks like.
+// Releasing the lock without removing the file is what a dead process leaves.
+func TestLockModel_ADeadOwnerDoesNotBlock(t *testing.T) {
+	p := newLockTarget(t)
 	unlock, err := LockModel(p)
 	if err != nil {
-		t.Fatalf("a lock whose owner died must be taken over: %v", err)
+		t.Fatal(err)
 	}
 	unlock()
+	if err := os.WriteFile(p+".lock", []byte("99999\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-24 * time.Hour)
+	if err := os.Chtimes(p+".lock", old, old); err != nil {
+		t.Fatal(err)
+	}
+
+	again, err := LockModel(p)
+	if err != nil {
+		t.Fatalf("a leftover lock file without an owner must not block: %v", err)
+	}
+	again()
 }
 
 func TestLockModel_TimesOutWithAMessageThatNamesTheFile(t *testing.T) {
