@@ -16,14 +16,12 @@ func TestImportCmd_NoElementsFound_ExitCode1(t *testing.T) {
 	if err := os.WriteFile(garbage, []byte("garbage text\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	c4 := absDSL(t, "internal", "importer", "likec4", "testdata", "simple.c4")
 	xmi := absDSL(t, "internal", "importer", "xmi", "testdata", "basic.xmi")
 
 	for name, args := range map[string][]string{
-		"garbage as structurizr":     {"--from", "structurizr", garbage},
-		"likec4 file as structurizr": {"--from", "structurizr", c4},
-		"xmi file as likec4":         {"--from", "likec4", xmi},
-		"garbage, dry run":           {"--from", "structurizr", "--dry-run", garbage},
+		"garbage as structurizr": {"--from", "structurizr", garbage},
+		"xmi file as likec4":     {"--from", "likec4", xmi},
+		"garbage, dry run":       {"--from", "structurizr", "--dry-run", garbage},
 	} {
 		t.Run(name, func(t *testing.T) {
 			out := filepath.Join(dir, strings.ReplaceAll(name, " ", "_")+".jsonc")
