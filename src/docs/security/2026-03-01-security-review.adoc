@@ -60,7 +60,7 @@
 | Fixed SEC-020 (#585): `internal/chaos.TestChaos.MakeReadOnly`/`MakeWritable` chmod'd to `0444`/`0644`, granting group/other read access on test-only files. Tightened to `0400`/`0600` (owner-only). TDD: regression test added first (commit `12c942e`), then the fix.
 
 | 2026-11-26 (remote workspace sources)
-| Added SEC-022 and threats T-7 to T-10 for `workspace fetch` (#227, ADR-012 Phase 2): the first network access in the tool. Design reviewed before the implementation; the implementation and its tests (SSRF address checks, redirect refusal, size limit, hash verification, tamper detection) are listed in the finding.
+| Added SEC-022 and threats T-7 to T-10 for `workspace fetch`; the Go toolchain was raised to 1.26.11 because the feature makes the `net/http` vulnerabilities reachable (#227, ADR-012 Phase 2): the first network access in the tool. Design reviewed before the implementation; the implementation and its tests (SSRF address checks, redirect refusal, size limit, hash verification, tamper detection) are listed in the finding.
 
 | 2026-08-13 (PATH hotspot review)
 | Fixed SEC-021 (#585): `internal/changelog/git.go` and `internal/lsp/diagnostics.go` invoked `git`/`bausteinsicht` by bare name; resolved via `exec.LookPath` instead, matching the existing `internal/stale/git.go` pattern. Added `TestValidateDocument_BinaryNotOnPath` covering the new missing-binary diagnostic.
@@ -482,6 +482,8 @@ Medium if unguarded (a malicious workspace configuration in a reviewed-by-nobody
 * The allowed host itself is trusted; a malicious but allowed host can still serve a hostile model, which is then handled like any local model (size limit, depth limit, validation).
 * Only single model files are fetched; git clone sources are not supported.
 
+**Toolchain bump caused by this feature:** until this change no code path reached `net/http`, `crypto/tls` or `crypto/x509`. With `workspace fetch`, `govulncheck` (blocking in CI) reported 11 vulnerabilities in the Go 1.25.13 standard library (GO-2026-6603, -6605, -6607, -6608, -6610, -6611, -6612, -6613, -6617, -6809, -6859), all fixed only in Go 1.26.x (the last one in 1.26.11). The `go` directive in `go.mod` was raised to 1.26.11 (README, tutorial, BENCHMARKS and the devcontainer base image follow); `govulncheck` is clean on that toolchain. Anyone building with an older Go gets the toolchain downloaded automatically (`GOTOOLCHAIN=auto`).
+
 === Not Vulnerable
 
 The following attack vectors were explicitly tested and confirmed **not exploitable**:
@@ -525,7 +527,7 @@ All dependencies at latest versions. No known CVEs. `go mod verify` — **PASS**
 | `fsnotify/fsnotify` | v1.9.0 | None
 | `spf13/pflag` | v1.0.10 | None
 | `golang.org/x/sys` | v0.41.0 | None
-| Go stdlib | 1.24.0 | None called
+| Go stdlib | 1.26.11 (was 1.25.13, 1.24.0 at the review date) | None called (verified 2026-11-26 with `govulncheck` on go1.26.11)
 |===
 
 === Automated Tool Results

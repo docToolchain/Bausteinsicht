@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -200,8 +201,10 @@ func TestSync_FetchLockAndLoad(t *testing.T) {
 	if b, _ := os.ReadFile(filepath.Join(dir, CacheDirName, ".gitignore")); string(b) != "*\n" {
 		t.Errorf("cache .gitignore = %q", b)
 	}
-	if info, _ := os.Stat(CachePath(dir, "team-b")); info == nil || info.Mode().Perm() != 0o600 {
-		t.Errorf("cache file mode = %v", info)
+	if info, _ := os.Stat(CachePath(dir, "team-b")); info == nil {
+		t.Error("cache file missing")
+	} else if runtime.GOOS != "windows" && info.Mode().Perm() != 0o600 { // POSIX permission bits only
+		t.Errorf("cache file mode = %v", info.Mode().Perm())
 	}
 
 	// Everything reads the cache; no network involved.
@@ -508,7 +511,7 @@ func TestWriteFileAtomic(t *testing.T) {
 	if b, _ := os.ReadFile(target); string(b) != "two" {
 		t.Errorf("content = %q", b)
 	}
-	if info, _ := os.Stat(target); info.Mode().Perm() != 0o600 {
+	if info, _ := os.Stat(target); runtime.GOOS != "windows" && info.Mode().Perm() != 0o600 {
 		t.Errorf("mode = %v", info.Mode().Perm())
 	}
 	if entries, _ := os.ReadDir(filepath.Dir(target)); len(entries) != 1 {

@@ -33,7 +33,7 @@ Current baseline (from `benchmarks/main.txt`):
 
 **Hardware**: Intel Pentium G4400T @ 2.9GHz (devcontainer baseline)
 
-**Go Version**: 1.25+ (from go.mod)
+**Go Version**: 1.26+ (from go.mod)
 
 ## CI Integration
 

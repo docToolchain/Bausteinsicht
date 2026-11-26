@@ -38,7 +38,7 @@ tar -xzf bausteinsicht_*_linux_amd64.tar.gz
 sudo mv bausteinsicht /usr/local/bin/
 ----
 
-**With Go** (1.25 or newer):
+**With Go** (1.26 or newer):
 
 [source,bash]
 ----
