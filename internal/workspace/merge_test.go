@@ -269,3 +269,24 @@ func TestMergeModels_ConflictLeavesLoadedModelsUntouched(t *testing.T) {
 		t.Errorf("a failed merge changed the loaded model: %q -> %q", got.From, got.To)
 	}
 }
+
+// With three models the conflicts are found model by model; the report must
+// still be sorted by kind as a whole.
+func TestMergeModels_ConflictsAcrossThreeModelsAreSortedByKind(t *testing.T) {
+	mk := func(id string, kinds map[string]model.ElementKind, rels map[string]model.RelationshipKind) LoadedModel {
+		return LoadedModel{Ref: ModelRef{ID: id}, Model: specModel(kinds, rels)}
+	}
+	a := mk("a", map[string]model.ElementKind{"alpha": {Notation: "A"}, "zeta": {Notation: "Z"}}, map[string]model.RelationshipKind{"uses": {Notation: "uses"}})
+	b := mk("b", map[string]model.ElementKind{"zeta": {Notation: "Z2"}}, map[string]model.RelationshipKind{"uses": {Notation: "calls"}})
+	c := mk("c", map[string]model.ElementKind{"alpha": {Notation: "A2"}}, nil)
+
+	_, err := MergeModels([]LoadedModel{a, b, c})
+	if err == nil {
+		t.Fatal("the conflicts must fail the merge")
+	}
+	msg := err.Error()
+	alpha, zeta, uses := strings.Index(msg, `element kind "alpha"`), strings.Index(msg, `element kind "zeta"`), strings.Index(msg, `relationship kind "uses"`)
+	if alpha < 0 || zeta < 0 || uses < 0 || alpha > zeta || zeta > uses {
+		t.Errorf("conflicts are not sorted (alpha %d, zeta %d, uses %d):\n%s", alpha, zeta, uses, msg)
+	}
+}

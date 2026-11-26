@@ -212,7 +212,14 @@ func collisionError(what, id string) error {
 type specMerge struct {
 	elementOwner      map[string]string // kind -> ID of the model that defined it first
 	relationshipOwner map[string]string
-	conflicts         []error
+	conflicts         []specConflict
+}
+
+// specConflict is one conflicting kind; key orders the report (element kinds
+// before relationship kinds, then by kind name).
+type specConflict struct {
+	key string
+	err error
 }
 
 func newSpecMerge() *specMerge {
@@ -232,9 +239,9 @@ func (m *specMerge) add(lm LoadedModel, merged *model.BausteinsichtModel) {
 			merged.Specification.Elements[kind] = def
 			m.elementOwner[kind] = lm.Ref.ID
 		case have.Notation != def.Notation || have.Container != def.Container || have.C4 != def.C4:
-			m.conflicts = append(m.conflicts, fmt.Errorf(
+			m.conflicts = append(m.conflicts, specConflict{"1 " + kind, fmt.Errorf(
 				"element kind %q is defined differently: model %q has notation %q, container %t, c4 %q; model %q has notation %q, container %t, c4 %q",
-				kind, m.elementOwner[kind], have.Notation, have.Container, have.C4, lm.Ref.ID, def.Notation, def.Container, def.C4))
+				kind, m.elementOwner[kind], have.Notation, have.Container, have.C4, lm.Ref.ID, def.Notation, def.Container, def.C4)})
 		}
 	}
 	for _, kind := range sortedKeys(lm.Model.Specification.Relationships) {
@@ -245,14 +252,23 @@ func (m *specMerge) add(lm LoadedModel, merged *model.BausteinsichtModel) {
 			merged.Specification.Relationships[kind] = def
 			m.relationshipOwner[kind] = lm.Ref.ID
 		case have.Notation != def.Notation || have.Dashed != def.Dashed:
-			m.conflicts = append(m.conflicts, fmt.Errorf(
+			m.conflicts = append(m.conflicts, specConflict{"2 " + kind, fmt.Errorf(
 				"relationship kind %q is defined differently: model %q has notation %q, dashed %t; model %q has notation %q, dashed %t",
-				kind, m.relationshipOwner[kind], have.Notation, have.Dashed, lm.Ref.ID, def.Notation, def.Dashed))
+				kind, m.relationshipOwner[kind], have.Notation, have.Dashed, lm.Ref.ID, def.Notation, def.Dashed)})
 		}
 	}
 }
 
-func (m *specMerge) err() error { return errors.Join(m.conflicts...) }
+// err returns all conflicts, sorted by kind (stable for equal kinds, so a kind
+// that two later models both change keeps the model order).
+func (m *specMerge) err() error {
+	sort.SliceStable(m.conflicts, func(i, j int) bool { return m.conflicts[i].key < m.conflicts[j].key })
+	errs := make([]error, len(m.conflicts))
+	for i, c := range m.conflicts {
+		errs[i] = c.err
+	}
+	return errors.Join(errs...)
+}
 
 func sortedKeys[V any](in map[string]V) []string {
 	keys := make([]string, 0, len(in))
