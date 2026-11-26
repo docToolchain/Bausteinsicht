@@ -648,6 +648,21 @@ $ bausteinsicht add view context --include user --format json
 
 The JSON result always describes the view as it is after the change, not just the arguments of this call: `title`, `scope` and `include` are the resulting values (`description` is added when set), `created` tells whether the view is new, and `added` lists the `--include` entries that were not in the view before (an empty array if none).
 
+==== `bausteinsicht add add-from-pattern`
+
+[source,bash]
+----
+bausteinsicht add add-from-pattern <pattern-id> --id <base> [--title <title>] [--prefix <prefix>]
+bausteinsicht add pattern list
+----
+
+Expands a pattern of `specification.patterns` into elements and relationships of the model: the top-level elements of the pattern are added at the top level of the model, their `children` below them, and the pattern's relationships to the relationships.
+`{base}` is replaced by `--id` (`{BASE}` upper-cased, `{Title}` by `--title`, default the ID), and `--prefix` turns `{base}` into `<prefix>-<base>`.
+
+* Refuses the pattern (exit code `2`, nothing written) if a new **top-level** ID already exists in the model. The children live below the new elements, so an unrelated element with the ID of a child is no conflict (#702).
+* Prints every created element with its full ID, children below their parent (`pay`, `pay.db`), then the relationships.
+* Known gaps (#703): the expanded model is not validated before it is saved, and `--id` is not checked against the ID rules.
+
 ==== `bausteinsicht add specification`
 
 Adds new element or relationship types to the model's specification. Enables definition of custom architecture notations.
