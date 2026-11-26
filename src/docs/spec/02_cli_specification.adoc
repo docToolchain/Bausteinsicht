@@ -1526,7 +1526,7 @@ Works with multi-model workspaces that combine several architecture models.
 | Subcommand | Description
 
 | `list <config-file>` | List the models in a workspace configuration.
-| `merge <config-file> <output-file>` | Merge the configured models into one unified model.
+| `merge <config-file> <output-file> [--force]` | Merge the configured models into one unified model. An existing output file is only replaced with `--force` (exit code `2` otherwise). The configuration, its `bausteinsicht.lock` and the local input models are never overwritten, not even with `--force` (exit code `2`), also when the output is reached through another path or a symbolic link (#708).
 | `validate <config-file>` | Validate a workspace configuration: every model, and what the models cannot check alone (see below).
 | `fetch <config-file> [--update]` | Download the remote models (`source`) into the local cache and write `bausteinsicht.lock`. The only subcommand that uses the network (see <<workspace-remote,Remote sources>>).
 |===
