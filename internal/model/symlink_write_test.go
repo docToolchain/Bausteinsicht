@@ -3,6 +3,7 @@ package model
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -120,8 +121,8 @@ func TestResolveWriteTarget(t *testing.T) {
 // permission to enter the directory of the target), the write must fail instead
 // of replacing the link by a regular file and reporting success (review of #723).
 func TestSave_FailsWhenTheLinkCannotBeResolved(t *testing.T) {
-	if os.Geteuid() == 0 {
-		t.Skip("permissions do not restrict root")
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("directory permissions do not restrict this user")
 	}
 	link, target := linkedFile(t, `{"specification":{"elements":{"a":{"notation":"A"}}},"model":{"x":{"kind":"a","title":"X"}}}`)
 	m, err := Load(link)

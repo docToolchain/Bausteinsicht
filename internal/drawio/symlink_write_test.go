@@ -3,6 +3,7 @@ package drawio
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -41,8 +42,8 @@ func TestSaveDocument_KeepsASymbolicLink(t *testing.T) {
 // make the write fail; replacing the link would report success and leave the
 // target unchanged.
 func TestSaveDocument_FailsWhenTheLinkCannotBeResolved(t *testing.T) {
-	if os.Geteuid() == 0 {
-		t.Skip("permissions do not restrict root")
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("directory permissions do not restrict this user")
 	}
 	root := t.TempDir()
 	dir := filepath.Join(root, "real")
