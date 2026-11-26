@@ -63,6 +63,18 @@ func Run(
 	// Step 5: Reverse sync (draw.io → model).
 	result.Reverse = ApplyReverse(changes, m, lastState)
 
+	// Step 5b: A relationship removed by reverse sync shifted the index of the
+	// relationships behind it and may free a pair for a lifted connector. Let the
+	// forward pipeline settle the connectors against the model as it is now
+	// (renumber, add, drop), so the next sync finds nothing to do (#719).
+	if result.Reverse.RelationshipsDeleted > 0 {
+		settled := ApplyForward(&ChangeSet{}, doc, templates, m, opts...)
+		result.Forward.ConnectorsCreated += settled.ConnectorsCreated
+		result.Forward.ConnectorsUpdated += settled.ConnectorsUpdated
+		result.Forward.ConnectorsDeleted += settled.ConnectorsDeleted
+		result.Forward.MetadataUpdated += settled.MetadataUpdated
+	}
+
 	// Step 6: Warn about model elements not visible in any view (#183).
 	if len(m.Views) > 0 {
 		visible := computeVisibleElements(m)
