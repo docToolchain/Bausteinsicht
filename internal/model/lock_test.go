@@ -186,9 +186,9 @@ func TestLockModel_ADeadOwnerDoesNotBlock(t *testing.T) {
 }
 
 func TestLockModel_TimesOutWithAMessageThatNamesTheFile(t *testing.T) {
-	oldTimeout, oldStale := lockTimeout, lockStaleAfter
-	lockTimeout, lockStaleAfter = 150*time.Millisecond, time.Hour
-	defer func() { lockTimeout, lockStaleAfter = oldTimeout, oldStale }()
+	oldTimeout := lockTimeout
+	lockTimeout = 150 * time.Millisecond
+	defer func() { lockTimeout = oldTimeout }()
 
 	p := newLockTarget(t)
 	holder, err := LockModel(p)
@@ -205,7 +205,7 @@ func TestLockModel_TimesOutWithAMessageThatNamesTheFile(t *testing.T) {
 	if time.Since(start) < 100*time.Millisecond {
 		t.Errorf("it gave up after %s, before the timeout", time.Since(start))
 	}
-	for _, want := range []string{p + ".lock", "held by process", "delete the file"} {
+	for _, want := range []string{p + ".lock", "held by process", "still working"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("the error must contain %q: %v", want, err)
 		}

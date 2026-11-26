@@ -197,7 +197,7 @@ When `--model` is not specified, all commands that require a model file invoke a
 
 === Concurrent Use
 
-Commands that change the model (`add element|relationship|view|specification|add-from-pattern`, `update`, `rename`, `remove`, `sync`) hold an exclusive lock, the file `<model>.lock`, from before they read the model until after they have written it, so parallel runs no longer overwrite each other's changes (#712). A waiting command retries for up to 30 seconds and then fails with exit code 2, naming the lock file; a lock file older than two minutes is taken over. The lock is advisory: `repl` and programs that edit the file directly are not covered.
+Commands that change the model (`add element|relationship|view|specification|add-from-pattern`, `update`, `rename`, `remove`, `sync`) hold an exclusive operating-system file lock on `<model>.lock` from before they read the model until after they have written it, so parallel runs no longer overwrite each other's changes (#712). The system releases the lock when the process ends, however it ends, and keeps it while the process is suspended, so there is no time limit and no takeover. A waiting command retries for up to 30 seconds and then fails with exit code 2, naming the lock file and the process that holds it. The lock file stays after the command (it holds only the process ID of the last owner); it can be added to `.gitignore`. The lock is advisory: `repl` and programs that edit the file directly are not covered.
 
 === Exit Codes
 
