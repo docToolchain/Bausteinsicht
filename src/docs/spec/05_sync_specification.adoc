@@ -318,6 +318,9 @@ If lifting moves an endpoint onto that boundary (e.g., `shop.web -> shop.lib.cor
 Such a relationship also does not count as visible on that view (see reverse-sync deletion detection, #167).
 A relationship that targets the scope element in the model (`shop.web -> shop`) is still drawn to the boundary (AC-9.4, #217).
 
+A relationship between the scope element and an element that is not part of the scope (`user -> shop` on a view of `shop` that also shows `user`, in either direction) is not drawn either: it belongs to the parent view.
+The same rule decides both whether the connector is drawn and whether the relationship counts as visible on the view, so a connector that was never drawn is never read as a user deletion; before (#736), the second sync removed such a relationship from the model.
+
 ==== Two-Pass Deduplication
 
 Relationships are processed in two passes to ensure correct deduplication (#197):
