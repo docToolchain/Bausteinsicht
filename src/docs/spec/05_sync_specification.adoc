@@ -156,6 +156,10 @@ Triggered when the draw.io file changes.
 | `<object>` wrapping a vertex `<mxCell>` with no `bausteinsicht_id` and a non-empty label
 | Generate ID via `sanitizeID` (lowercase, hyphen-separated from title). Default kind = first alphabetically-sorted kind from `specification.elements` (#206). Collision guard: skip import if generated ID already exists in the model (#203). Navigation buttons (`nav-back-*`) are excluded from import (#205). Bare `<mxCell>` elements without an `<object>` wrapper are excluded.
 
+| New element with an unknown `bausteinsicht_id` (from draw.io)
+| `<object>` with a `bausteinsicht_id` that is neither in the model nor in the last-sync state
+| Imported under that ID. The title is the shape's title (sub-cell or label); if it has none, the ID is the title, because a model element needs one. The kind is the shape's `bausteinsicht_kind` if the specification defines it, otherwise the first kind as above. The warning names the kind and says if the title or the kind had to be replaced (#721).
+
 | New relationship (from draw.io)
 | `<mxCell>` with `edge="1"`, `source` and `target` matching known element IDs, whose per-pair index (`rel-<from>-<to>-<index>`) is neither already recorded in the last-sync state nor already held by the model
 | Add relationship to model, capturing the connector label from `value` (#204).
