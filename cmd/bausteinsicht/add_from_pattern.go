@@ -51,6 +51,13 @@ func runAddFromPattern(cmd *cobra.Command, args []string) error {
 	if prefix != "" {
 		baseID = prefix + "-" + baseID
 	}
+	// The same ID rule as "add element" (#703).
+	if !isValidKey(baseID) {
+		return exitWithCode(
+			fmt.Errorf("invalid element ID %q: must start with a letter and contain only letters, digits, hyphens, or underscores", baseID),
+			1,
+		)
+	}
 
 	if modelPath == "" {
 		detected, err := model.AutoDetect(".")
@@ -69,6 +76,12 @@ func runAddFromPattern(cmd *cobra.Command, args []string) error {
 	m, err := model.Load(modelPath)
 	if err != nil {
 		return exitWithCode(fmt.Errorf("loading model: %w", err), 2)
+	}
+
+	// Errors the model has before the pattern is applied do not count against it.
+	known := make(map[string]bool)
+	for _, e := range model.Validate(m) {
+		known[e.Path+"|"+e.Message] = true
 	}
 
 	// Check if pattern exists
@@ -95,6 +108,11 @@ func runAddFromPattern(cmd *cobra.Command, args []string) error {
 
 	// The top-level elements, in the order of the expanded elements (#702).
 	topIDs := model.ExpandPatternTopLevelIDs(pattern, baseID)
+	for _, id := range topIDs {
+		if !isValidKey(id) {
+			return exitWithCode(fmt.Errorf("the pattern %q derives the invalid element ID %q from --id %q: IDs must start with a letter and contain only letters, digits, hyphens, or underscores", patternID, id, baseID), 1)
+		}
+	}
 	_, relIDs, err := model.ExpandPatternIDs(pattern, baseID)
 	if err != nil {
 		return exitWithCode(err, 2)
@@ -110,6 +128,20 @@ func runAddFromPattern(cmd *cobra.Command, args []string) error {
 
 	// Add relationships (From and To are already expanded by ExpandPattern)
 	m.Relationships = append(m.Relationships, relationships...)
+
+	// Refuse a pattern that would leave the model invalid (an unknown kind, a
+	// relationship to an element that does not exist, an ID that breaks the rules),
+	// like "add element" and "add relationship" do; nothing is saved (#703).
+	introduced := 0
+	for _, e := range model.Validate(m) {
+		if !known[e.Path+"|"+e.Message] {
+			introduced++
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "ERROR: [%s] %s\n", e.Path, e.Message)
+		}
+	}
+	if introduced > 0 {
+		return exitWithCode(fmt.Errorf("the pattern %q would make the model invalid (%d new error(s)); nothing was saved", patternID, introduced), 1)
+	}
 
 	// Save the updated model
 	if err := model.Save(modelPath, m); err != nil {
