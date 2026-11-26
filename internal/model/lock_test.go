@@ -262,7 +262,7 @@ func TestMustBeTheRegularFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer fa.Close()
+	defer func() { _ = fa.Close() }()
 
 	if err := mustBeTheRegularFile(fa, a); err != nil {
 		t.Errorf("the file and its own path must pass: %v", err)
@@ -277,7 +277,7 @@ func TestMustBeTheRegularFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer d.Close()
+	defer func() { _ = d.Close() }()
 	if err := mustBeTheRegularFile(d, dir); err == nil {
 		t.Error("a directory is not a lock file")
 	}
