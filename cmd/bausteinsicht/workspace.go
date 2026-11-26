@@ -81,21 +81,56 @@ func runWorkspaceFetch(cmd *cobra.Command, configPath string, update bool, f *wo
 }
 
 func newWorkspaceMergeCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "merge <config-file> <output-file>",
 		Short: "Merge multiple models into a single unified model",
-		Long:  "Reads a workspace configuration file and merges all referenced models into a single output file. Element IDs are prefixed to avoid collisions.",
-		Args:  cobra.ExactArgs(2),
+		Long: `Reads a workspace configuration file and merges all referenced models into a single output file. Element IDs are prefixed to avoid collisions.
+
+An existing output file is only replaced with --force. The workspace configuration, its lock file and the local input models are never overwritten, not even with --force.`,
+		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runWorkspaceMerge(cmd, args[0], args[1])
+			force, _ := cmd.Flags().GetBool("force")
+			return runWorkspaceMerge(cmd, args[0], args[1], force)
 		},
 	}
+	cmd.Flags().Bool("force", false, "Overwrite the output file if it already exists")
+	return cmd
 }
 
-func runWorkspaceMerge(cmd *cobra.Command, configPath, outputPath string) error {
+// checkMergeOutput refuses an output that would destroy the workspace: the
+// configuration, its lock file or a local input model (also reached through
+// another path or a symbolic link), and, without force, any existing file (#708).
+func checkMergeOutput(cfg *workspace.Config, configPath, outputPath string, force bool) error {
+	baseDir := filepath.Dir(configPath)
+	protected := []string{configPath, filepath.Join(baseDir, workspace.LockFileName)}
+	for _, ref := range cfg.Models {
+		if ref.Path != "" {
+			protected = append(protected, filepath.Join(baseDir, ref.Path))
+		}
+	}
+	outInfo, err := os.Stat(outputPath)
+	if err != nil {
+		return nil // nothing exists at the output path
+	}
+	for _, p := range protected {
+		if info, err := os.Stat(p); err == nil && os.SameFile(info, outInfo) {
+			return fmt.Errorf("output file %q would overwrite %q, which the workspace needs", outputPath, p)
+		}
+	}
+	if !force {
+		return fmt.Errorf("output file %q already exists — use --force to overwrite", outputPath)
+	}
+	return nil
+}
+
+func runWorkspaceMerge(cmd *cobra.Command, configPath, outputPath string, force bool) error {
 	cfg, err := workspace.LoadConfig(configPath)
 	if err != nil {
 		return exitWithCode(fmt.Errorf("loading workspace config: %w", err), 2)
+	}
+
+	if err := checkMergeOutput(cfg, configPath, outputPath, force); err != nil {
+		return exitWithCode(err, 2)
 	}
 
 	baseDir := filepath.Dir(configPath)
