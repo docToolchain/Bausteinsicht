@@ -25,7 +25,8 @@ type ElementChange struct {
 	Type     ChangeType
 	Field    string // "title", "description", "technology", "" for add/delete
 	OldValue string
-	NewValue string
+	NewValue string // for an element added in draw.io: its title
+	Kind     string // for an element added in draw.io: its bausteinsicht_kind, if any
 }
 
 // RelationshipChange represents a change to a relationship.
@@ -603,7 +604,8 @@ func detectDrawioElementChange(ctx elemScanContext, id string, drawio presence[d
 	lastElem, inLast := last.value, last.found
 	switch {
 	case inDrawio && !inLast:
-		ctx.cs.DrawioElementChanges = append(ctx.cs.DrawioElementChanges, ElementChange{ID: id, Type: Added})
+		ctx.cs.DrawioElementChanges = append(ctx.cs.DrawioElementChanges,
+			ElementChange{ID: id, Type: Added, NewValue: de.title, Kind: de.kind})
 	case !inDrawio && inLast:
 		appendDrawioDeletionIfVisible(ctx.cs, id, ctx.lastState, ctx.visibleElems, ctx.newPageOnly)
 	case inDrawio && inLast:

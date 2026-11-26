@@ -262,14 +262,30 @@ func applyReverseElementAdded(ch ElementChange, m *model.BausteinsichtModel, fla
 		}
 		return
 	}
+	// Keep the kind the shape carries if the specification has it; otherwise
+	// fall back to the first kind. A model element needs a title, so the ID
+	// stands in when the shape has none (#721).
 	kind := firstSpecKind(m)
+	note := ""
+	if ch.Kind != "" {
+		if _, known := m.Specification.Elements[ch.Kind]; known {
+			kind = ch.Kind
+		} else {
+			note = fmt.Sprintf(" (the kind %q of the shape is not in the specification)", ch.Kind)
+		}
+	}
+	title := strings.TrimSpace(ch.NewValue)
+	if title == "" {
+		title = ch.ID
+		note += " (the shape has no title, the ID is used)"
+	}
 	m.Model[ch.ID] = model.Element{
 		Kind:  kind,
-		Title: ch.NewValue,
+		Title: title,
 	}
 	result.ElementsCreated++
 	result.Warnings = append(result.Warnings,
-		fmt.Sprintf("New element %q added from draw.io (kind=%q) — review and assign a meaningful ID and kind.", ch.ID, kind))
+		fmt.Sprintf("New element %q added from draw.io (kind=%q)%s — review and assign a meaningful ID and kind.", ch.ID, kind, note))
 }
 
 func applyRelationshipChange(ch RelationshipChange, m *model.BausteinsichtModel, flatModel map[string]*model.Element, lastRelMap map[string]bool, modelRelMap map[string]RelationshipState, priorSync bool, result *ReverseResult) {
