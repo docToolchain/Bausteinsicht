@@ -51,8 +51,10 @@ The `bausteinsicht_id` attribute always stores the un-scoped element ID.
 
 ===== Duplicate bausteinsicht_id Handling
 
-When multiple `<object>` elements share the same `bausteinsicht_id` (e.g., across different view pages), the first occurrence encountered wins during draw.io element extraction.
-Duplicate occurrences are silently skipped (#213).
+An element is normally drawn on several view pages with the same `bausteinsicht_id`; a duplicate on the *same* page (a copy-paste) is not another view: the first occurrence on a page wins during draw.io element extraction.
+Across pages, an edit on any page counts (#684): the first page whose title, description or technology differs from the last-synced state is the edit and wins over pages that still show the old values, whatever the page order is. If two pages were edited differently, the first edited page wins and the run warns and names the ignored values; the same rule applies to the label of a connector drawn on several pages.
+So that no page stays behind, the run writes the edits that reverse sync took over to every page before it ends (the forward pipeline with those changes, run after reverse sync); a differing page is therefore always an edit, never a stale view.
+Duplicate occurrences on the same page are silently skipped (#213).
 
 ==== Relationship IDs
 

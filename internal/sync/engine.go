@@ -56,6 +56,7 @@ func Run(
 	}
 
 	result.Changes = changes
+	result.Warnings = append(result.Warnings, changes.Warnings...)
 
 	// Step 4: Forward sync (model → draw.io).
 	result.Forward = ApplyForward(changes, doc, templates, m, opts...)
@@ -63,17 +64,23 @@ func Run(
 	// Step 5: Reverse sync (draw.io → model).
 	result.Reverse = ApplyReverse(changes, m, lastState)
 
-	// Step 5b: Reverse sync that removed relationships shifted the index of the
-	// relationships behind them and may free a pair for a lifted connector, and
-	// an element it was asked to remove may have been kept (scope of a view,
-	// constraint). Let the forward pipeline settle the document against the model
-	// as it is now (renumber, add, drop), so the next sync finds nothing to do
-	// (#719, #720).
-	if hasDrawioDeletions(changes) {
-		settled := ApplyForward(&ChangeSet{}, doc, templates, m, opts...)
+	// Step 5b: Reverse sync changed the model on behalf of draw.io; bring the
+	// document in line with the model as it is now, in this same run:
+	//  - a title, description, technology or connector label edited on one page
+	//    must show on every other page, otherwise those pages are stale and the
+	//    next sync would read them as edits of their own (#684);
+	//  - relationships removed by reverse sync shifted the index of the ones
+	//    behind them and may free a pair for a lifted connector, and an element
+	//    it was asked to remove may have been kept (scope of a view, constraint)
+	//    (#719, #720).
+	// This is the forward pipeline with the changes reverse sync applied, so the
+	// next sync finds nothing to do.
+	if settle := settleChangeSet(changes); hasDrawioDeletions(changes) || len(settle.ModelElementChanges)+len(settle.ModelRelationshipChanges) > 0 {
+		settled := ApplyForward(settle, doc, templates, m, opts...)
+		// The writes of an edit made in draw.io are not "model → draw.io updates";
+		// only structural changes are counted.
 		result.Forward.ElementsCreated += settled.ElementsCreated
 		result.Forward.ConnectorsCreated += settled.ConnectorsCreated
-		result.Forward.ConnectorsUpdated += settled.ConnectorsUpdated
 		result.Forward.ConnectorsDeleted += settled.ConnectorsDeleted
 		result.Forward.MetadataUpdated += settled.MetadataUpdated
 	}
@@ -105,6 +112,23 @@ func Run(
 	}
 
 	return result
+}
+
+// settleChangeSet turns the field edits that reverse sync took over from draw.io
+// into model-side changes, so a forward pass writes them to every page.
+func settleChangeSet(cs *ChangeSet) *ChangeSet {
+	settle := &ChangeSet{}
+	for _, ch := range cs.DrawioElementChanges {
+		if ch.Type == Modified && ch.Field != "" {
+			settle.ModelElementChanges = append(settle.ModelElementChanges, ch)
+		}
+	}
+	for _, ch := range cs.DrawioRelationshipChanges {
+		if ch.Type == Modified && ch.Field == fieldLabel {
+			settle.ModelRelationshipChanges = append(settle.ModelRelationshipChanges, ch)
+		}
+	}
+	return settle
 }
 
 // hasDrawioDeletions reports whether cs contains an element or relationship

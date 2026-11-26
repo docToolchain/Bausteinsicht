@@ -159,3 +159,59 @@ func TestDetectChanges_ConnectorLabelEditedOnAnyPageIsDetected(t *testing.T) {
 		})
 	}
 }
+
+// TestRun_ReverseEditIsWrittenToEveryPage: reverse sync took the edit of one
+// page over into the model; the other pages must show it at the end of the same
+// run. Otherwise they would be stale, and the next sync would read their old
+// value as an edit of its own and change the model back (ping-pong).
+func TestRun_ReverseEditIsWrittenToEveryPage(t *testing.T) {
+	m, state := shopModelAndState("Shop")
+	doc := docWithElemOnPages("Shop", "Shop EDIT", "Shop")
+	ts := minimalTemplates(t)
+
+	Run(m, doc, state, ts, nil)
+
+	for _, name := range []string{"view-a", "view-b", "view-c"} {
+		page := doc.GetPage(name)
+		obj := page.FindElement("shop")
+		if obj == nil {
+			t.Fatalf("%s lost the element", name)
+		}
+		if title, _, _ := page.ReadElementFields(obj); title != "Shop EDIT" {
+			t.Errorf("%s still shows %q after the run, want %q", name, title, "Shop EDIT")
+		}
+	}
+
+	// The next sync, with the state of the run, is a no-op: nothing flips back.
+	state = elementDeleteState(t, m, doc)
+	result := Run(m, doc, state, ts, nil)
+	if r := result.Reverse; r.ElementsUpdated+r.ElementsCreated+r.ElementsDeleted != 0 || m.Model["shop"].Title != "Shop EDIT" {
+		t.Errorf("the next sync changed the model: %+v, title %q", r, m.Model["shop"].Title)
+	}
+}
+
+// Same for the label of a connector drawn on several pages.
+func TestRun_ReverseConnectorLabelEditIsWrittenToEveryPage(t *testing.T) {
+	m := &model.BausteinsichtModel{
+		Model:         map[string]model.Element{"a": {Kind: "container", Title: "a"}, "b": {Kind: "container", Title: "b"}},
+		Relationships: []model.Relationship{{From: "a", To: "b", Label: "calls"}},
+		Views:         map[string]model.View{"a": {Title: "A", Include: []string{"*"}}, "b": {Title: "B", Include: []string{"*"}}},
+	}
+	state := emptyState()
+	state.Elements["a"] = ElementState{Title: "a", Kind: "container"}
+	state.Elements["b"] = ElementState{Title: "b", Kind: "container"}
+	state.Relationships = []RelationshipState{{From: "a", To: "b", Index: 0, Label: "calls"}}
+	doc := docWithConnectorOnPages("calls", "edited")
+
+	Run(m, doc, state, minimalTemplates(t), nil)
+
+	if got := m.Relationships[0].Label; got != "edited" {
+		t.Fatalf("the model label is %q, want %q", got, "edited")
+	}
+	for _, name := range []string{"view-a", "view-b"} {
+		c := doc.GetPage(name).FindConnector(name[len("view-"):]+"--a", name[len("view-"):]+"--b", 0)
+		if c == nil || c.SelectAttrValue("value", "") != "edited" {
+			t.Errorf("%s still shows the old label", name)
+		}
+	}
+}
