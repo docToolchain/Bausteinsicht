@@ -51,6 +51,12 @@ func runSync(cmd *cobra.Command, _ []string) error {
 	drawioPath := filepath.Join(dir, "architecture.drawio")
 	statePath := filepath.Join(dir, ".bausteinsicht-sync")
 
+	unlock, err := lockModel(modelPath)
+	if err != nil {
+		return exitWithCode(err, 2)
+	}
+	defer unlock()
+
 	// Load model.
 	m, err := model.Load(modelPath)
 	if err != nil {

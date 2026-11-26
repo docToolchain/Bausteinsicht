@@ -34,6 +34,12 @@ func runEdit(cmd *cobra.Command, apply func(m *model.BausteinsichtModel) ([]mode
 		}
 		modelPath = detected
 	}
+	unlock, err := lockModel(modelPath)
+	if err != nil {
+		return exitWithCode(err, 2)
+	}
+	defer unlock()
+
 	m, err := model.Load(modelPath)
 	if err != nil {
 		return exitWithCode(fmt.Errorf("loading model: %w", err), 2)

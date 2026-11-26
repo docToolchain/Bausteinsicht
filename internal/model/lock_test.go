@@ -1,0 +1,196 @@
+package model
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+)
+
+func newLockTarget(t *testing.T) string {
+	t.Helper()
+	p := filepath.Join(t.TempDir(), "architecture.jsonc")
+	if err := os.WriteFile(p, []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+func TestLockModel_CreatesAndRemovesTheLockFile(t *testing.T) {
+	p := newLockTarget(t)
+	unlock, err := LockModel(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(p + ".lock")
+	if err != nil {
+		t.Fatalf("the lock file must exist while the lock is held: %v", err)
+	}
+	if !strings.HasSuffix(string(data), "\n") || strings.TrimSpace(string(data)) == "" {
+		t.Errorf("the lock file must name the owning process, got %q", data)
+	}
+	unlock()
+	if _, err := os.Stat(p + ".lock"); !os.IsNotExist(err) {
+		t.Errorf("the lock file must be removed on unlock: %v", err)
+	}
+	// The lock can be taken again after it was released.
+	unlock2, err := LockModel(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	unlock2()
+}
+
+func TestLockModel_RelativeAndAbsolutePathsShareOneLock(t *testing.T) {
+	p := newLockTarget(t)
+	old, _ := os.Getwd()
+	if err := os.Chdir(filepath.Dir(p)); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(old) }()
+
+	unlock, err := LockModel("architecture.jsonc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer unlock()
+	if _, err := os.Stat(p + ".lock"); err != nil {
+		t.Errorf("a relative path must lock the same file as the absolute one: %v", err)
+	}
+}
+
+func TestLockModel_SecondCallWaitsForTheFirst(t *testing.T) {
+	p := newLockTarget(t)
+	first, err := LockModel(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	acquired := make(chan struct{})
+	go func() {
+		unlock, err := LockModel(p)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		close(acquired)
+		unlock()
+	}()
+
+	select {
+	case <-acquired:
+		t.Fatal("the second call must wait while the first holds the lock")
+	case <-time.After(100 * time.Millisecond):
+	}
+	first()
+	select {
+	case <-acquired:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the second call did not get the lock after it was released")
+	}
+}
+
+// Many goroutines read, change and write a counter file under the lock; without
+// mutual exclusion updates are lost.
+func TestLockModel_ProvidesMutualExclusion(t *testing.T) {
+	p := newLockTarget(t)
+	counter := filepath.Join(filepath.Dir(p), "counter")
+	if err := os.WriteFile(counter, []byte("0"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	const n = 40
+	var wg sync.WaitGroup
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			unlock, err := LockModel(p)
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			defer unlock()
+			data, _ := os.ReadFile(counter)
+			v := 0
+			for _, c := range string(data) {
+				v = v*10 + int(c-'0')
+			}
+			time.Sleep(time.Millisecond) // widen the window
+			_ = os.WriteFile(counter, []byte(strings.TrimSpace(itoa(v+1))), 0o600)
+		}()
+	}
+	wg.Wait()
+	if data, _ := os.ReadFile(counter); string(data) != itoa(n) {
+		t.Errorf("the counter is %s, want %d: updates were lost", data, n)
+	}
+}
+
+func itoa(v int) string {
+	if v == 0 {
+		return "0"
+	}
+	var b []byte
+	for v > 0 {
+		b = append([]byte{byte('0' + v%10)}, b...)
+		v /= 10
+	}
+	return string(b)
+}
+
+func TestLockModel_TakesOverAStaleLock(t *testing.T) {
+	p := newLockTarget(t)
+	if err := os.WriteFile(p+".lock", []byte("99999\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-lockStaleAfter - time.Minute)
+	if err := os.Chtimes(p+".lock", old, old); err != nil {
+		t.Fatal(err)
+	}
+
+	unlock, err := LockModel(p)
+	if err != nil {
+		t.Fatalf("a lock whose owner died must be taken over: %v", err)
+	}
+	unlock()
+}
+
+func TestLockModel_TimesOutWithAMessageThatNamesTheFile(t *testing.T) {
+	oldTimeout, oldStale := lockTimeout, lockStaleAfter
+	lockTimeout, lockStaleAfter = 150*time.Millisecond, time.Hour
+	defer func() { lockTimeout, lockStaleAfter = oldTimeout, oldStale }()
+
+	p := newLockTarget(t)
+	holder, err := LockModel(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer holder()
+
+	start := time.Now()
+	_, err = LockModel(p)
+	if err == nil {
+		t.Fatal("a held lock must make the second call fail after the timeout")
+	}
+	if time.Since(start) < 100*time.Millisecond {
+		t.Errorf("it gave up after %s, before the timeout", time.Since(start))
+	}
+	for _, want := range []string{p + ".lock", "held by process", "delete the file"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("the error must contain %q: %v", want, err)
+		}
+	}
+}
+
+func TestLockModel_ReportsErrorsThatAreNotContention(t *testing.T) {
+	if _, err := LockModel(filepath.Join(t.TempDir(), "missing", "architecture.jsonc")); err == nil {
+		t.Error("a model in a directory that does not exist cannot be locked")
+	}
+}
+
+func TestLockOwner_WithoutAReadableFile(t *testing.T) {
+	if got := lockOwner(filepath.Join(t.TempDir(), "none.lock")); !strings.Contains(got, "another process") {
+		t.Errorf("lockOwner = %q", got)
+	}
+}
