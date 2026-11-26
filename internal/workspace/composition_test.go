@@ -196,6 +196,8 @@ func TestValidateWorkspace(t *testing.T) {
 		cfg.Models[1].ID = "team_a"
 		cfg.Models[1].Prefix = "team_a"
 		loaded[1].Ref = cfg.Models[1]
+		// Different view keys, so that the shared prefix alone does not make the merge fail.
+		loaded[1].Model.Views = map[string]model.View{"billing-overview": {Title: "Billing", Include: []string{"*"}}}
 		cfg.CrossRels = []CrossModelRelationship{
 			{ID: "dup", From: "team_a:shop", To: "team_a:ghost"},
 			{ID: "dup", From: "team_a:shop", To: "team_a:shop.api"},
@@ -223,4 +225,89 @@ func problems(errs []error) []string {
 		out[i] = e.Error()
 	}
 	return out
+}
+
+// Constraints name elements by ID, so they must follow the prefix of the
+// elements. Before, they were merged unchanged and matched nothing (found in
+// the review of #227: lint passed on a model that violated the rule).
+func TestMergeModels_RemapsConstraintSelectors(t *testing.T) {
+	cfg, loaded := twoTeams()
+	_ = cfg
+	loaded[0].Model.Constraints = []model.Constraint{
+		{ID: "c1", Rule: "no-relationship", From: "shop.api", To: "shop.db"},
+		{ID: "c2", Rule: "no-relationship", FromKind: "container", ToKind: "container"},
+	}
+	merged, err := MergeModels(loaded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(merged.Constraints) != 2 {
+		t.Fatalf("want 2 constraints, got %+v", merged.Constraints)
+	}
+	if c := merged.Constraints[0]; c.From != "team_a_shop.api" || c.To != "team_a_shop.db" {
+		t.Errorf("selectors by ID must get the prefix: %+v", c)
+	}
+	if c := merged.Constraints[1]; c.From != "" || c.To != "" || c.FromKind != "container" {
+		t.Errorf("selectors by kind or tag are left alone: %+v", c)
+	}
+	if loaded[0].Model.Constraints[0].From != "shop.api" {
+		t.Error("the loaded model must not be changed")
+	}
+}
+
+// Two different (prefix, element) pairs can give the same merged ID, because
+// the prefix and the element are joined with "_": ("a", "b_c") and ("a_b", "c").
+// That used to overwrite one element silently.
+func TestMergeModels_RejectsCollidingMergedIDs(t *testing.T) {
+	a := &model.BausteinsichtModel{Model: map[string]model.Element{"b_c": {Kind: "system", Title: "one"}}}
+	b := &model.BausteinsichtModel{Model: map[string]model.Element{"c": {Kind: "system", Title: "two"}}}
+	loaded := []LoadedModel{
+		{Ref: ModelRef{ID: "m1", Prefix: "a"}, Model: a},
+		{Ref: ModelRef{ID: "m2", Prefix: "a_b"}, Model: b},
+	}
+	_, err := MergeModels(loaded)
+	if err == nil || !strings.Contains(err.Error(), `"a_b_c"`) {
+		t.Errorf("err = %v, want a collision on a_b_c", err)
+	}
+
+	cfg := &Config{Models: []ModelRef{loaded[0].Ref, loaded[1].Ref}}
+	text := strings.Join(problems(ValidateWorkspace(cfg, loaded)), "\n")
+	if !strings.Contains(text, `"a_b_c"`) {
+		t.Errorf("validate must report the collision, got:\n%s", text)
+	}
+}
+
+func TestValidateWorkspace_ReportsDuplicateConstraintIDs(t *testing.T) {
+	cfg, loaded := twoTeams()
+	loaded[0].Model.Constraints = []model.Constraint{{ID: "no-cycles", Rule: "no-relationship", From: "shop", To: "shop"}}
+	loaded[1].Model.Constraints = []model.Constraint{{ID: "no-cycles", Rule: "no-relationship", From: "billing", To: "billing"}}
+	text := strings.Join(problems(ValidateWorkspace(cfg, loaded)), "\n")
+	if !strings.Contains(text, `constraint ID "no-cycles" is defined by more than one model`) {
+		t.Errorf("missing duplicate constraint ID problem:\n%s", text)
+	}
+}
+
+// If the models cannot be merged, the endpoints of cross-model relationships
+// are not reported as missing: only the collision is.
+func TestValidateWorkspace_CollisionDoesNotMakeEveryEndpointMissing(t *testing.T) {
+	a := &model.BausteinsichtModel{Model: map[string]model.Element{"b_c": {Kind: "system", Title: "one"}, "shop": {Kind: "system", Title: "Shop"}}}
+	b := &model.BausteinsichtModel{Model: map[string]model.Element{"c": {Kind: "system", Title: "two"}}}
+	loaded := []LoadedModel{
+		{Ref: ModelRef{ID: "m1", Prefix: "a"}, Model: a},
+		{Ref: ModelRef{ID: "m2", Prefix: "a_b"}, Model: b},
+	}
+	cfg := &Config{
+		Models:    []ModelRef{loaded[0].Ref, loaded[1].Ref},
+		CrossRels: []CrossModelRelationship{{ID: "r", From: "m1:shop", To: "m2:c"}, {ID: "bad", From: "m1:shop", To: "nope:c"}},
+	}
+	text := strings.Join(problems(ValidateWorkspace(cfg, loaded)), "\n")
+	if !strings.Contains(text, `"a_b_c"`) {
+		t.Errorf("the collision must be reported:\n%s", text)
+	}
+	if strings.Contains(text, "not found in model") {
+		t.Errorf("existing elements must not be reported as missing:\n%s", text)
+	}
+	if !strings.Contains(text, `unknown model "nope"`) {
+		t.Errorf("an unknown model is still reported:\n%s", text)
+	}
 }

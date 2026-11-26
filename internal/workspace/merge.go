@@ -55,7 +55,11 @@ func MergeModels(loaded []LoadedModel) (*model.BausteinsichtModel, error) {
 		// second time, as a top-level entry with a dotted key.)
 		prefix := resolvePrefix(lm)
 		for id, elem := range lm.Model.Model {
-			merged.Model[prefixElementID(id, prefix)] = elem
+			prefixed := prefixElementID(id, prefix)
+			if _, taken := merged.Model[prefixed]; taken {
+				return nil, collisionError("element", prefixed)
+			}
+			merged.Model[prefixed] = elem
 		}
 	}
 
@@ -77,6 +81,9 @@ func MergeModels(loaded []LoadedModel) (*model.BausteinsichtModel, error) {
 			if view.Scope != "" {
 				remappedView.Scope = prefixElementID(view.Scope, prefix)
 			}
+			if _, taken := merged.Views[prefix+"_"+viewID]; taken {
+				return nil, collisionError("view", prefix+"_"+viewID)
+			}
 			merged.Views[prefix+"_"+viewID] = remappedView
 		}
 
@@ -90,7 +97,17 @@ func MergeModels(loaded []LoadedModel) (*model.BausteinsichtModel, error) {
 			merged.DynamicViews = append(merged.DynamicViews, remappedDV)
 		}
 
-		merged.Constraints = append(merged.Constraints, lm.Model.Constraints...)
+		for _, c := range lm.Model.Constraints {
+			// Selectors by element ID follow the prefix of the elements; by kind
+			// or tag they apply to the merged model as they are.
+			if c.From != "" {
+				c.From = prefixElementID(c.From, prefix)
+			}
+			if c.To != "" {
+				c.To = prefixElementID(c.To, prefix)
+			}
+			merged.Constraints = append(merged.Constraints, c)
+		}
 	}
 
 	return merged, nil
@@ -180,4 +197,11 @@ func contains(slice []string, s string) bool {
 		}
 	}
 	return false
+}
+
+// collisionError reports that two models produce the same merged ID. The prefix
+// and the ID are joined with "_", so different pairs can give the same result,
+// for example ("a", "b_c") and ("a_b", "c"); one would silently replace the other.
+func collisionError(what, id string) error {
+	return fmt.Errorf("merged %s ID %q is produced by more than one model; use different prefixes", what, id)
 }
