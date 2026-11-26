@@ -97,6 +97,16 @@ func doSync(changedFile, modelPath, drawioPath, templatePath string, enableMerma
 	dir := filepath.Dir(modelPath)
 	statePath := filepath.Join(dir, ".bausteinsicht-sync")
 
+	// Hold the model lock from before the first read until the model, the diagram
+	// and the state are saved, like "sync" does (#712). A lock that cannot be taken
+	// skips this cycle; the next change triggers another one.
+	unlock, err := lockModel(modelPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "ERROR locking model: %v\n", err)
+		return
+	}
+	defer unlock()
+
 	m, err := model.Load(modelPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR loading model: %v\n", err)

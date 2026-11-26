@@ -64,6 +64,12 @@ func runAddElement(cmd *cobra.Command, args []string) error {
 		modelPath = detected
 	}
 
+	unlock, err := lockModel(modelPath)
+	if err != nil {
+		return exitWithCode(err, 2)
+	}
+	defer unlock()
+
 	m, err := model.Load(modelPath)
 	if err != nil {
 		return exitWithCode(fmt.Errorf("loading model: %w", err), 2)
