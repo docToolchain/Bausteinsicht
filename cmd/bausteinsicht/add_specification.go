@@ -44,10 +44,11 @@ func runAddSpecificationElement(cmd *cobra.Command, args []string) error {
 	container, _ := cmd.Flags().GetBool("container")
 	format, _ := cmd.Flags().GetString("format")
 
-	m, modelPath, err := loadModelForSpecificationCmd(cmd, key)
+	m, modelPath, unlock, err := loadModelForSpecificationCmd(cmd, key)
 	if err != nil {
 		return err
 	}
+	defer unlock()
 
 	// Add element kind
 	err = m.AddSpecificationElement(key, model.ElementKind{
@@ -120,10 +121,11 @@ func runAddSpecificationRelationship(cmd *cobra.Command, args []string) error {
 	dashed, _ := cmd.Flags().GetBool("dashed")
 	format, _ := cmd.Flags().GetString("format")
 
-	m, modelPath, err := loadModelForSpecificationCmd(cmd, key)
+	m, modelPath, unlock, err := loadModelForSpecificationCmd(cmd, key)
 	if err != nil {
 		return err
 	}
+	defer unlock()
 
 	// Add relationship kind
 	err = m.AddSpecificationRelationship(key, model.RelationshipKind{
@@ -175,9 +177,9 @@ func runAddSpecificationRelationship(cmd *cobra.Command, args []string) error {
 // --model was omitted) and loads the model shared by "add specification
 // element" and "add specification relationship" — both need the exact same
 // key-validation-then-load sequence before diverging on what they add.
-func loadModelForSpecificationCmd(cmd *cobra.Command, key string) (*model.BausteinsichtModel, string, error) {
+func loadModelForSpecificationCmd(cmd *cobra.Command, key string) (*model.BausteinsichtModel, string, func(), error) {
 	if !isValidKey(key) {
-		return nil, "", exitWithCode(
+		return nil, "", nil, exitWithCode(
 			fmt.Errorf("invalid specification key %q: must start with a letter and contain only letters, digits, hyphens, or underscores", key),
 			1,
 		)
@@ -187,17 +189,24 @@ func loadModelForSpecificationCmd(cmd *cobra.Command, key string) (*model.Bauste
 	if modelPath == "" {
 		detected, err := model.AutoDetect(".")
 		if err != nil {
-			return nil, "", exitWithCode(fmt.Errorf("auto-detecting model: %w", err), 2)
+			return nil, "", nil, exitWithCode(fmt.Errorf("auto-detecting model: %w", err), 2)
 		}
 		modelPath = detected
 	}
 
+	// The caller changes the model and writes it back: hold the lock until it
+	// is done (#712).
+	unlock, err := lockModel(modelPath)
+	if err != nil {
+		return nil, "", nil, exitWithCode(err, 2)
+	}
 	m, err := model.Load(modelPath)
 	if err != nil {
-		return nil, "", exitWithCode(fmt.Errorf("loading model: %w", err), 2)
+		unlock()
+		return nil, "", nil, exitWithCode(fmt.Errorf("loading model: %w", err), 2)
 	}
 
-	return m, modelPath, nil
+	return m, modelPath, unlock, nil
 }
 
 // insertSpecificationKind inserts one entry into specification.<section>

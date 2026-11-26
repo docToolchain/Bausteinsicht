@@ -195,6 +195,10 @@ When `--model` is not specified, all commands that require a model file invoke a
 3. If more than one `.jsonc` file is found, the command **aborts** with exit code 2 and the message `multiple .jsonc files in <dir> — use --model to select one`. It does **not** silently pick one, because the tool mutates files and synchronizes — operating on the wrong model must never happen by accident.
 4. If no `.jsonc` file is found, the command exits with code 2 and an error message.
 
+=== Concurrent Use
+
+Commands that change the model (`add element|relationship|view|specification|add-from-pattern`, `update`, `rename`, `remove`, `sync`, and every sync cycle of `watch`) hold an exclusive operating-system file lock on `<model>.lock` from before they read the model until after they have written it, so parallel runs no longer overwrite each other's changes (#712). The system releases the lock when the process ends, however it ends, and keeps it while the process is suspended, so there is no time limit and no takeover. A waiting command retries for up to 30 seconds and then fails with exit code 2, naming the lock file and the process that holds it. The lock file stays after the command (it holds only the process ID of the last owner); it can be added to `.gitignore`. The lock path must be a regular file; a symbolic link there is refused. The lock is advisory and does **not** cover `repl` (its save writes the whole session), `import --force` (it replaces the output file without taking the lock, so importing over a model that another command is changing can lose either write) and programs that edit the file directly.
+
 === Exit Codes
 
 [cols="1,3"]
@@ -661,7 +665,9 @@ Expands a pattern of `specification.patterns` into elements and relationships of
 
 * Refuses the pattern (exit code `2`, nothing written) if a new **top-level** ID already exists in the model. The children live below the new elements, so an unrelated element with the ID of a child is no conflict (#702).
 * Prints every created element with its full ID, children below their parent (`pay`, `pay.db`), then the relationships.
-* Known gaps (#703): the expanded model is not validated before it is saved, and `--id` is not checked against the ID rules.
+* `--id` (with `--prefix`) and the IDs the pattern derives from it must follow the ID rules of `add element` (exit code `1`).
+* The expanded model is validated before it is saved: a pattern that would add an element of an unknown kind, a relationship to an element that does not exist or any other new validation error is refused with exit code `1`, the new errors are listed on stderr and nothing is saved. Errors the model had before do not count (#703).
+* Known gap: patterns are only added at the top level (no `--parent`).
 
 ==== `bausteinsicht add specification`
 
@@ -1416,7 +1422,7 @@ Imports an architecture model from an external DSL and writes a Bausteinsicht `.
 | `--json` | Print the post-import summary as machine-readable JSON instead of human-readable text. | No | `false`
 |===
 
-**Behavior:** parses the source DSL, maps people/systems/containers and relationships, and generates a matching specification. Exit `2` if the output file already exists and neither `--force` nor `--dry-run` is set — `--dry-run` prints to stdout and skips the existence check, so it never fails on an existing output. Exit `1` on any other import failure (unknown `--from`, unreadable input, parse/encoding error).
+**Behavior:** parses the source DSL, maps people/systems/containers and relationships, and generates a matching specification. Exit `2` if the output file already exists and neither `--force` nor `--dry-run` is set — `--dry-run` prints to stdout and skips the existence check, so it never fails on an existing output. Exit `1` on any other import failure (unknown `--from`, unreadable input, parse/encoding error). Exit `1` with `no elements found in <file> - is --from <format> correct?` if the import yields no element (a file in another format, a text file without a model), with and without `--dry-run`; nothing is written and an existing output file is left alone (#705). A file in another format that happens to contain a line that parses as an element is not detected.
 
 **Post-import summary:** on a successful (non-dry-run) import, prints an element count per kind, the output file path, the generated view count (omitted when zero — `xmi` never produces views), and any warnings collected during import. `--json` emits the same information as `{"elements":{"<kind>":<count>,...},"outputPath":"...","views":<count>,"warnings":["..."]}` instead (the `views` key is present but `0` in JSON mode, unlike the omitted text line, since machine consumers should not have to distinguish "zero" from "absent"). Followed by a next-steps hint: `bausteinsicht sync` and `bausteinsicht export diagram` on a fresh import; `bausteinsicht diff` instead of `sync` when `--force` overwrote an existing output file (the existing file likely already has synced draw.io state, so reviewing the delta is more useful than re-syncing). The hint is suppressed entirely under `--dry-run`, since nothing was persisted.
 
@@ -1524,7 +1530,7 @@ Works with multi-model workspaces that combine several architecture models.
 | Subcommand | Description
 
 | `list <config-file>` | List the models in a workspace configuration.
-| `merge <config-file> <output-file>` | Merge the configured models into one unified model.
+| `merge <config-file> <output-file> [--force]` | Merge the configured models into one unified model. An existing output file is only replaced with `--force` (exit code `2` otherwise). The configuration, its `bausteinsicht.lock` and the local input models are never overwritten, not even with `--force` (exit code `2`), also when the output is reached through another path or a symbolic link (#708).
 | `validate <config-file>` | Validate a workspace configuration: every model, and what the models cannot check alone (see below).
 | `fetch <config-file> [--update]` | Download the remote models (`source`) into the local cache and write `bausteinsicht.lock`. The only subcommand that uses the network (see <<workspace-remote,Remote sources>>).
 |===

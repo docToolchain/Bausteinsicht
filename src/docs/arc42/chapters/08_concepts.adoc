@@ -279,6 +279,14 @@ This prevents corrupted files if the process is interrupted during write (mitiga
 
 A model, diagram, state or lock file that is a symbolic link (monorepo, dotfiles) is written through the link: the path is resolved first (`model.ResolveWriteTarget`, a private copy in `internal/drawio`) and the target is replaced, so the link stays and its target is updated (#723). A link to a file that does not exist is replaced like any other missing file; any other failure to resolve the link (for example no permission to enter the directory of the target) fails the write, because replacing the link would report success and leave the target unchanged.
 
+==== Concurrent Writers
+
+An atomic rename protects against torn files, not against lost updates: two commands that read the model, change it and write it back at the same time overwrite each other, and both report success (#712).
+Every command that changes the model (`add element|relationship|view|specification|add-from-pattern`, `update`, `rename`, `remove`, `sync`, and every sync cycle of `watch`) therefore takes an exclusive operating-system file lock (`flock`, `LockFileEx`) on `<model>.lock` (`internal/model/lock.go`) from before it reads the model until after it has written it.
+The system releases the lock when the owner dies and keeps it while the owner is suspended, so there is no lock age and no takeover (an earlier version took over old lock files; that let a suspended command lose its lock).
+A waiting command retries for up to 30 seconds. The lock path must be a regular file; a symbolic link there is refused, so a checkout cannot make the PID that is written into it replace another file.
+The lock is advisory and not reentrant; `repl` (a long-lived in-memory session whose save writes the whole session), `import --force` and programs that edit the file directly are not covered.
+
 === 8.8 Configuration Discovery
 
 Bausteinsicht uses convention over configuration:
