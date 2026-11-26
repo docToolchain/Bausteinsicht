@@ -223,3 +223,29 @@ func TestLockOwner_WithoutAReadableFile(t *testing.T) {
 		t.Errorf("lockOwner = %q", got)
 	}
 }
+
+// A checkout can contain <model>.lock as a symbolic link. LockModel writes the
+// process ID into the lock file, so following the link would replace the content
+// of whatever file the link points at (review of #712).
+func TestLockModel_RefusesASymbolicLinkAndLeavesItsTargetAlone(t *testing.T) {
+	p := newLockTarget(t)
+	victim := filepath.Join(filepath.Dir(p), "victim.txt")
+	if err := os.WriteFile(victim, []byte("precious content\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(victim, p+".lock"); err != nil {
+		t.Skipf("symbolic links are not available: %v", err)
+	}
+
+	unlock, err := LockModel(p)
+	if err == nil {
+		unlock()
+		t.Fatal("a symbolic link at the lock path must be refused")
+	}
+	if data, _ := os.ReadFile(victim); string(data) != "precious content\n" {
+		t.Errorf("the target of the link was modified: %q", data)
+	}
+	if !strings.Contains(err.Error(), "symbolic link") {
+		t.Errorf("the error must say why: %v", err)
+	}
+}
