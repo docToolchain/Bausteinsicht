@@ -11,6 +11,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/docToolchain/Bausteinsicht/internal/model"
 )
 
 const (
@@ -90,6 +92,10 @@ func hashHex(data []byte) string {
 // writeFileAtomic writes data to path through a temp file in the same
 // directory, with 0600 permissions.
 func writeFileAtomic(path string, data []byte) error {
+	path, err := model.ResolveWriteTarget(path)
+	if err != nil {
+		return err
+	}
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err

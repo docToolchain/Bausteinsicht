@@ -120,6 +120,10 @@ func extractElementOrder(data []byte) []string {
 // existing file so that users' header comments are not lost (#242).
 // Uses os.CreateTemp for a randomized temp file name to prevent TOCTOU attacks.
 func Save(path string, model *BausteinsichtModel) error {
+	path, err := ResolveWriteTarget(path)
+	if err != nil {
+		return err
+	}
 	data, err := json.MarshalIndent(model, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshaling model: %w", err)

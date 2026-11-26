@@ -2,7 +2,9 @@
 package drawio
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 
@@ -53,6 +55,14 @@ func LoadDocument(path string) (*Document, error) {
 
 // SaveDocument writes a Document to disk using an atomic temp-file + rename.
 func SaveDocument(path string, doc *Document) error {
+	// A diagram that is a symbolic link is updated in place, the link stays (#723).
+	// Any failure other than "does not exist" is an error: replacing the link would
+	// report success and leave the target unchanged.
+	if resolved, err := filepath.EvalSymlinks(path); err == nil {
+		path = resolved
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("SaveDocument resolve %s: %w", path, err)
+	}
 	doc.tree.Indent(2)
 
 	dir := filepath.Dir(path)
