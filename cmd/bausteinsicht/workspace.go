@@ -27,8 +27,57 @@ func newWorkspaceCmd() *cobra.Command {
 	cmd.AddCommand(newWorkspaceMergeCmd())
 	cmd.AddCommand(newWorkspaceValidateCmd())
 	cmd.AddCommand(newWorkspaceListCmd())
+	cmd.AddCommand(newWorkspaceFetchCmd())
 
 	return cmd
+}
+
+func newWorkspaceFetchCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "fetch <config-file>",
+		Short: "Download the remote models of a workspace into the local cache",
+		Long: `Downloads every model reference that has a "source" (https URL on a host listed in
+workspace.allowedHosts) into .bausteinsicht-cache next to the configuration and records its
+SHA-256 in bausteinsicht.lock. This is the only command that uses the network; merge, validate
+and list read the cache and verify the hash. A model whose content differs from the lock file
+is an error; --update accepts the new content and rewrites the lock file.
+
+A token for a host is read from the environment variable BAUSTEINSICHT_FETCH_TOKEN_<HOST>
+(host upper-cased, other characters replaced by "_") and sent as a bearer token.`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			update, _ := cmd.Flags().GetBool("update")
+			return runWorkspaceFetch(cmd, args[0], update, workspace.NewFetcher())
+		},
+	}
+	cmd.Flags().Bool("update", false, "Accept changed content of remote models and rewrite the lock file")
+	return cmd
+}
+
+func runWorkspaceFetch(cmd *cobra.Command, configPath string, update bool, f *workspace.Fetcher) error {
+	cfg, err := workspace.LoadConfig(configPath)
+	if err != nil {
+		return exitWithCode(fmt.Errorf("loading workspace config: %w", err), 2)
+	}
+	results, err := workspace.Sync(cmd.Context(), cfg, configPath, f, update)
+	if err != nil {
+		return exitWithCode(fmt.Errorf("fetching remote models: %w", err), 2)
+	}
+
+	format, _ := cmd.Flags().GetString(flagFormat)
+	if format == formatJSON {
+		out, _ := json.Marshal(map[string]interface{}{"results": results})
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), string(out))
+		return nil
+	}
+	if len(results) == 0 {
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No remote models in the workspace configuration.")
+		return nil
+	}
+	for _, r := range results {
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s: %s (sha256 %.12s)\n", r.ID, r.Status, r.SHA256)
+	}
+	return nil
 }
 
 func newWorkspaceMergeCmd() *cobra.Command {
@@ -196,7 +245,11 @@ func runWorkspaceList(cmd *cobra.Command, configPath string) error {
 
 	_, _ = fmt.Fprint(cmd.OutOrStdout(), "Models:\n")
 	for i, ref := range cfg.Models {
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "  %d. ID: %s, Path: %s", i+1, ref.ID, ref.Path)
+		if ref.Source != "" {
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "  %d. ID: %s, Source: %s", i+1, ref.ID, ref.Source)
+		} else {
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "  %d. ID: %s, Path: %s", i+1, ref.ID, ref.Path)
+		}
 		if ref.Prefix != "" {
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), ", Prefix: %s", ref.Prefix)
 		}

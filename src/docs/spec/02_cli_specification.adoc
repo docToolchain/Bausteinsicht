@@ -147,7 +147,7 @@ See link:01_use_cases.html[Use Cases] for the functional overview of all CLI com
 | Implemented
 
 | `bausteinsicht workspace`
-| List, merge, and validate multi-model workspaces
+| List, merge, validate and fetch (remote sources) multi-model workspaces
 | Implemented
 
 | `bausteinsicht schema`
@@ -1511,6 +1511,7 @@ Works with multi-model workspaces that combine several architecture models.
 | `list <config-file>` | List the models in a workspace configuration.
 | `merge <config-file> <output-file>` | Merge the configured models into one unified model.
 | `validate <config-file>` | Validate a workspace configuration: every model, and what the models cannot check alone (see below).
+| `fetch <config-file> [--update]` | Download the remote models (`source`) into the local cache and write `bausteinsicht.lock`. The only subcommand that uses the network (see <<workspace-remote,Remote sources>>).
 |===
 
 **Workspace configuration** (JSON, paths relative to the configuration file):
@@ -1560,7 +1561,51 @@ Works with multi-model workspaces that combine several architecture models.
 * `validate` checks every model and then the workspace: duplicate model IDs or prefixes, cross-model relationships that point at models or elements that do not exist (or repeat an ID), and workspace views that name an unknown model. It reports every problem and exits `2` if there is one.
 * Constraints of a model are merged too; their `from` and `to` (element IDs) get the model's prefix, so they keep matching the prefixed elements. Selectors by kind or tag are unchanged.
 * Prefix and element (or view key) are joined with `_`, so different pairs can give the same merged ID (prefix `a` with element `b_c`, and prefix `a_b` with element `c`). `merge` fails on such a collision instead of replacing one element with the other, and `validate` reports it. `validate` also reports constraint IDs that more than one model defines.
-* Only local paths are supported. Models in other repositories are used by checking them out (for example as a git submodule) and pointing `path` at the checkout; see ADR-012 for the proposed remote sources.
+* Models in other repositories are used either by checking them out (for example as a git submodule) and pointing `path` at the checkout, or as a pinned remote source (next section).
+
+[[workspace-remote]]
+**Remote sources (#227, ADR-012 Phase 2):**
+
+A model reference has either a local `path` or a `source`: an `https` URL of a model file, pinned by a tag or a commit in the URL (for example `https://raw.githubusercontent.com/acme/billing/v1.4.0/architecture.jsonc`). Remote sources are off by default.
+
+[source,jsonc]
+----
+{
+  "workspace": { "name": "landscape", "allowedHosts": ["raw.githubusercontent.com"] },
+  "models": [
+    { "id": "team_a", "path": "../team-a/architecture.jsonc" },
+    { "id": "billing", "source": "https://raw.githubusercontent.com/acme/billing/v1.4.0/architecture.jsonc", "prefix": "b" }
+  ]
+}
+----
+
+[cols="2,4"]
+|===
+| Item | Rule
+
+| `workspace.allowedHosts`
+| Exact, lower-case host names (no scheme, port or wildcard). A `source` on a host that is not listed is a configuration error, so `fetch`, `validate` and `merge` refuse the configuration before any request.
+
+| `models[].source`
+| `https` only, port 443 only, no credentials and no fragment in the URL. Mutually exclusive with `path`. The `id` of a remote model may contain only letters, digits, `-` and `_` (it becomes the cache file name).
+
+| `fetch`
+| Downloads each remote model to `.bausteinsicht-cache/<id>.jsonc` (next to the configuration; the directory gets a `.gitignore` containing `*`) and records its SHA-256 and URL in `bausteinsicht.lock`. A model that is cached and matches the lock is not downloaded again (`up-to-date`); a missing cache file is restored from the lock (`restored`) and must have the locked hash. If the downloaded content differs from the lock, `fetch` fails and changes nothing; `--update` accepts the new content (`updated`) and rewrites the lock. A changed `source` URL is a new source (`fetched`). Lock entries of models that are no longer remote are removed.
+
+| `merge`, `validate`, `list`
+| Never use the network. A remote model is read from the cache after its SHA-256 matches the lock; a missing lock entry or cache file is an error that names `workspace fetch`, a hash mismatch is an error that names the expected and the actual hash.
+
+| Network rules
+| HTTPS with certificate verification, 30 second timeout, response limited to the model file size limit (10 MiB), no redirects (a redirect is an error: use the final URL), no proxy. The host name is resolved by Bausteinsicht and the connection is refused if any resolved address is loopback, private (RFC 1918, ULA), link-local (including the metadata address `169.254.169.254`), multicast, unspecified or in a reserved range; the validated address is the one that is connected to.
+
+| Authentication
+| Only through the environment variable `BAUSTEINSICHT_FETCH_TOKEN_<HOST>` (host upper-cased, every character other than A-Z and 0-9 replaced by `_`, e.g. `BAUSTEINSICHT_FETCH_TOKEN_RAW_GITHUBUSERCONTENT_COM`), sent as `Authorization: Bearer`. Never stored in the configuration, the lock file or the cache.
+
+| `bausteinsicht.lock`
+| JSON `{"version": 1, "sources": {"<id>": {"url": "...", "sha256": "..."}}}` next to the configuration; commit it. Written with permissions `0600`.
+|===
+
+`fetch` prints one line per remote model (`<id>: fetched|restored|updated|up-to-date (sha256 <prefix>)`) or `{"results": [...]}` with `--format json`. Exit code `2` on any error.
 
 ==== `bausteinsicht schema`
 

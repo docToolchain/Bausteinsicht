@@ -3,7 +3,7 @@
 # To update: copy this block from the reference project.
 # Configurable via ARGs: BASE_IMAGE, DEV_USER
 # ══════════════════════════════════════════════════════════════
-ARG BASE_IMAGE=mcr.microsoft.com/devcontainers/go:1.25
+ARG BASE_IMAGE=mcr.microsoft.com/devcontainers/go:1.26
 ARG DEV_USER=vscode
 
 FROM ${BASE_IMAGE}
