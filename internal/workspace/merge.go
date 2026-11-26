@@ -135,62 +135,6 @@ func remapElementIDs(ids []string, prefix string) []string {
 	return result
 }
 
-// ResolveWorkspaceView resolves a workspace view by expanding element filters
-// across all loaded models and returning a unified element set.
-func ResolveWorkspaceView(cfg *Config, loaded []LoadedModel, view *WorkspaceView) (map[string]*model.Element, error) {
-	merged, err := MergeModels(loaded)
-	if err != nil {
-		return nil, err
-	}
-
-	flatElems, _ := model.FlattenElements(merged)
-	result := make(map[string]*model.Element)
-
-	// Start with includes
-	if len(view.IncludeFrom) > 0 {
-		// Include from specific models
-		for _, modelID := range view.IncludeFrom {
-			for _, lm := range loaded {
-				if lm.Ref.ID == modelID {
-					prefix := lm.Ref.Prefix
-					if prefix == "" {
-						prefix = lm.Ref.ID
-					}
-					flatLM, _ := model.FlattenElements(lm.Model)
-					for id, elemPtr := range flatLM {
-						prefixedID := prefixElementID(id, prefix)
-						if len(view.IncludeKinds) == 0 || contains(view.IncludeKinds, elemPtr.Kind) {
-							result[prefixedID] = elemPtr
-						}
-					}
-					break
-				}
-			}
-		}
-	} else if len(view.IncludeKinds) > 0 {
-		// Include by kinds across all models
-		for id, elemPtr := range flatElems {
-			if contains(view.IncludeKinds, elemPtr.Kind) && !contains(view.ExcludeKinds, elemPtr.Kind) {
-				result[id] = elemPtr
-			}
-		}
-	} else {
-		// Include all
-		result = flatElems
-	}
-
-	// Apply excludes
-	for _, kind := range view.ExcludeKinds {
-		for id, elemPtr := range result {
-			if elemPtr.Kind == kind {
-				delete(result, id)
-			}
-		}
-	}
-
-	return result, nil
-}
-
 func contains(slice []string, s string) bool {
 	for _, item := range slice {
 		if item == s {

@@ -33,6 +33,7 @@ func MergeWorkspace(cfg *Config, loaded []LoadedModel) (*model.BausteinsichtMode
 			From: from, To: to, Label: cr.Label, Kind: cr.Kind, Description: cr.Description,
 		})
 	}
+	errs = append(errs, applyWorkspaceViews(cfg, loaded, merged)...)
 	if len(errs) > 0 {
 		return nil, errors.Join(errs...)
 	}
@@ -157,9 +158,12 @@ func ValidateWorkspace(cfg *Config, loaded []LoadedModel) []error {
 	// of the cross-model endpoints; looking elements up in a merged model that
 	// does not exist would report every endpoint as missing.
 	var mergedFlat map[string]*model.Element
+	var merged *model.BausteinsichtModel
 	if len(loaded) > 0 {
-		if merged, err := MergeModels(loaded); err != nil {
+		var err error
+		if merged, err = MergeModels(loaded); err != nil {
 			problems = append(problems, err)
+			merged = nil
 		} else {
 			mergedFlat, _ = model.FlattenElements(merged)
 		}
@@ -178,15 +182,20 @@ func ValidateWorkspace(cfg *Config, loaded []LoadedModel) []error {
 		}
 	}
 
-	viewKeys := make([]string, 0, len(cfg.Views))
-	for key := range cfg.Views {
-		viewKeys = append(viewKeys, key)
-	}
-	sort.Strings(viewKeys)
-	for _, key := range viewKeys {
-		for _, modelID := range cfg.Views[key].IncludeFrom {
-			if !seenID[modelID] {
-				problems = append(problems, fmt.Errorf("view %q: include-from refers to unknown model %q", key, modelID))
+	if merged != nil {
+		problems = append(problems, applyWorkspaceViews(cfg, loaded, merged)...)
+	} else {
+		// The models could not be merged: check only what needs no merged model.
+		viewKeys := make([]string, 0, len(cfg.Views))
+		for key := range cfg.Views {
+			viewKeys = append(viewKeys, key)
+		}
+		sort.Strings(viewKeys)
+		for _, key := range viewKeys {
+			for _, modelID := range cfg.Views[key].IncludeFrom {
+				if !seenID[modelID] {
+					problems = append(problems, fmt.Errorf("view %q: include-from refers to unknown model %q", key, modelID))
+				}
 			}
 		}
 	}

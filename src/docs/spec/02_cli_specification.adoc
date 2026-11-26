@@ -1528,7 +1528,11 @@ Works with multi-model workspaces that combine several architecture models.
   ],
   "crossModelRelationships": [
     { "id": "pay", "from": "team_a:shop.api", "to": "team_b:billing", "label": "charges via", "kind": "uses" }
-  ]
+  ],
+  "views": {
+    // one page with the systems of both teams
+    "landscape": { "title": "Landscape", "include-from": ["team_a", "team_b"], "include-kinds": ["system"] }
+  }
 }
 ----
 
@@ -1552,14 +1556,15 @@ Works with multi-model workspaces that combine several architecture models.
 | Relationships between models. `from` and `to` have the form `<model id>:<element id>` (for example `team_a:shop.api`); they are translated to the merged IDs. `id` must be unique; `label`, `kind` and `description` are copied to the relationship.
 
 | `views`
-| Workspace views that select elements from several models (`include-from` lists model IDs). `validate` checks that they name known models; `merge` does **not** apply them yet, so they do not appear in the merged model. The merged model contains the views of the fully imported models, prefixed (`<prefix>_<view key>`).
+| Workspace views that select elements from several models, keyed by the view key of the merged model. Fields: `title` (required), `description`, `layout` (`layered`, `grid`, `none`), `include-from` (model IDs; omitted or empty: every model), `include-kinds` (keep only these element kinds), `exclude-kinds` (drop these kinds). `merge` applies them (see below). The merged model also contains the views of the fully imported models, prefixed (`<prefix>_<view key>`).
 |===
 
 **Behavior (#227):**
 
 * `merge` combines the models into one: elements get the prefix, each nested element appears once below its parent, and the cross-model relationships are added. A cross-model relationship whose model or element does not exist makes `merge` fail (exit `2`) and nothing is written.
-* `validate` checks every model and then the workspace: duplicate model IDs or prefixes, cross-model relationships that point at models or elements that do not exist (or repeat an ID), and workspace views that name an unknown model. It reports every problem and exits `2` if there is one.
+* `validate` checks every model and then the workspace: duplicate model IDs or prefixes, cross-model relationships that point at models or elements that do not exist (or repeat an ID), and workspace views that are wrong (unknown model or kind, invalid layout, no elements, key already taken). It reports every problem and exits `2` if there is one.
 * The element kinds and relationship kinds of all models are merged. A kind that only one model defines is added. If two models define the same kind differently (element kind: `notation`, `container` or `c4`; relationship kind: `notation` or `dashed`), `merge` and `validate` fail with one message per kind that names both models (ADR-012); a different `description` is not a conflict, the first one is kept.
+* `merge` turns every workspace view into an ordinary view of the merged model: the selected elements are listed by their merged IDs, so nested elements are included, and a partially imported model contributes only what it imports. A kind in `include-kinds`/`exclude-kinds` must exist in the merged specification. `merge` and `validate` fail, naming the view, if a view selects no elements, names an unknown model or kind, has an invalid `layout`, or has the key of a prefixed model view (`<prefix>_<view key>`); nothing is written then.
 * Constraints of a model are merged too; their `from` and `to` (element IDs) get the model's prefix, so they keep matching the prefixed elements. Selectors by kind or tag are unchanged.
 * Prefix and element (or view key) are joined with `_`, so different pairs can give the same merged ID (prefix `a` with element `b_c`, and prefix `a_b` with element `c`). `merge` fails on such a collision instead of replacing one element with the other, and `validate` reports it. `validate` also reports constraint IDs that more than one model defines.
 * Models in other repositories are used either by checking them out (for example as a git submodule) and pointing `path` at the checkout, or as a pinned remote source (next section).

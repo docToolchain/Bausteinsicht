@@ -132,7 +132,7 @@ Option D wins only narrowly over the status quo, which is the honest result: for
 
 **Adopt Option D, in two phases, and do not change the model format.**
 
-. **Phase 1 first and on its own.** Partial/black-box imports in the workspace, validation of cross-model relationships, and documentation of the checkout pattern. No network code. *Implemented* (#227): `elements`/`depth` per model, cross-model relationships applied by `workspace merge`, `workspace validate` for IDs, prefixes, relationships and views, and the workspace configuration documented in the CLI specification.
+. **Phase 1 first and on its own.** Partial/black-box imports in the workspace, validation of cross-model relationships, and documentation of the checkout pattern. No network code. *Implemented* (#227): `elements`/`depth` per model, cross-model relationships applied by `workspace merge`, `workspace validate` for IDs, prefixes, relationships and views, workspace views (`include-from`, `include-kinds`, `exclude-kinds`) applied by `workspace merge` as ordinary views of the merged model, and the workspace configuration documented in the CLI specification.
 . **Phase 2 only after** a STRIDE entry for remote fetching in arc42 chapter 8 and a SEC finding in the security review exist, and the points below are specified. *Implemented* (#227): STRIDE entries T-7 to T-10 (chapter 8), SEC-022 (security review), and `workspace.allowedHosts`, `models[].source`, `workspace fetch`, the cache and `bausteinsicht.lock` as specified below; the details are in the CLI specification (remote sources).
 
 === Security model for Phase 2
