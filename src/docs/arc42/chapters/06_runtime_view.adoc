@@ -144,7 +144,7 @@ image::arc42/architecture-sequence-validate-standalone.svg[Validate Standalone,w
 
 === Tooling: Workspace, Layout, Generate-Template, Schema
 
-Cross-cutting setup/maintenance commands, not part of the daily edit-sync loop: multi-model workspaces (`workspace merge`, `workspace validate`, `workspace list`), auto-layout, template scaffolding, and JSON Schema regeneration (`schema generate`) for IDE support.
+Cross-cutting setup/maintenance commands, not part of the daily edit-sync loop: multi-model workspaces (`workspace merge`, `workspace validate`, `workspace list`, and `workspace fetch`, the only command that uses the network: it downloads pinned remote models into a local cache and `bausteinsicht.lock`, all other commands read the verified cache), auto-layout, template scaffolding, and JSON Schema regeneration (`schema generate`) for IDE support.
 
 .Tooling: Workspace, Layout, Generate-Template, Schema (generated from `dynamicViews.tooling-commands` in architecture.jsonc via `bausteinsicht export-sequence`)
 image::arc42/architecture-sequence-tooling-commands.svg[Tooling Commands,width=80%]

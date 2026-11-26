@@ -59,6 +59,9 @@
 | 2026-08-13 (chaos permissions)
 | Fixed SEC-020 (#585): `internal/chaos.TestChaos.MakeReadOnly`/`MakeWritable` chmod'd to `0444`/`0644`, granting group/other read access on test-only files. Tightened to `0400`/`0600` (owner-only). TDD: regression test added first (commit `12c942e`), then the fix.
 
+| 2026-11-26 (remote workspace sources)
+| Added SEC-022 and threats T-7 to T-10 for `workspace fetch` (#227, ADR-012 Phase 2): the first network access in the tool. Design reviewed before the implementation; the implementation and its tests (SSRF address checks, redirect refusal, size limit, hash verification, tamper detection) are listed in the finding.
+
 | 2026-08-13 (PATH hotspot review)
 | Fixed SEC-021 (#585): `internal/changelog/git.go` and `internal/lsp/diagnostics.go` invoked `git`/`bausteinsicht` by bare name; resolved via `exec.LookPath` instead, matching the existing `internal/stale/git.go` pattern. Added `TestValidateDocument_BinaryNotOnPath` covering the new missing-binary diagnostic.
 |===
@@ -450,6 +453,35 @@ Low. Bausteinsicht is a local CLI tool (per the Threat Model above) — `$PATH` 
 **Fix:**
 Resolved both binaries via `exec.LookPath` once per call site, matching the existing `gitPath()` pattern in `internal/stale/git.go` — added an equivalent `gitPath()` helper in `internal/changelog/git.go`, and resolve `bausteinsicht` via `exec.LookPath` in `diagnostics.go` (now also surfaces a clear diagnostic if the binary is missing from `$PATH`, instead of silently failing). #585.
 
+==== SEC-022: Remote Model Sources in `workspace fetch` (Medium) — Mitigated by design
+
+_Added 2026-11-26_
+
+**Affected files:** `internal/workspace/fetch.go`, `internal/workspace/lock.go`, `internal/workspace/loader.go`, `cmd/bausteinsicht/workspace.go`
+
+**Description:**
+Phase 2 of #227 (ADR-012) lets a workspace model reference name an `https` URL (`source`) instead of a local `path`. `bausteinsicht workspace fetch` downloads it into a project-local cache. This is the first code in Bausteinsicht that talks to the network, driven by a configuration file that can come from a pull request or a cloned repository. The threats are listed as T-7 to T-10 in arc42 chapter 8: content substitution, server-side request forgery (loopback, private networks, cloud metadata, DNS rebinding), token leakage and oversized or path-escaping files.
+
+**Risk:**
+Medium if unguarded (a malicious workspace configuration in a reviewed-by-nobody branch could make CI call internal services, or silently swap an architecture model). Reduced to Low by the controls below, because remote sources are off by default and only one command uses the network.
+
+**Controls (implemented with the feature):**
+
+* Opt-in: `workspace.allowedHosts` (exact lower-case host names, no wildcard/port/scheme); without a matching entry, `fetch`, `validate` and `merge` reject the configuration before any request.
+* `https` only, port 443 only, no credentials or fragment in the URL; no proxy; no redirects (a redirect target would bypass the allowlist and the address check).
+* Address check at connect time: the name is resolved by the tool, the connection is refused if any address is loopback, private, link-local (incl. `169.254.169.254`), multicast, unspecified or reserved (CGNAT, benchmarking, documentation ranges; IPv4-mapped IPv6 is unwrapped), and the validated address is dialed, so a rebinding DNS server cannot switch the target between check and connect.
+* Integrity: SHA-256 per file in `bausteinsicht.lock` (committed); every read of a remote model verifies the cache against it; a download whose hash differs from the lock fails unless `--update`; a missing lock entry or cache fails with a hint to run `workspace fetch` (nothing is fetched implicitly).
+* Authentication only via `BAUSTEINSICHT_FETCH_TOKEN_<HOST>`, never written to a file.
+* Limits: 10 MiB response, 30 s timeout; the ID of a remote model is restricted to `[A-Za-z0-9_-]`, the cache file is written atomically at `0600` below `.bausteinsicht-cache` (which gets a `.gitignore` with `*`).
+
+**Tests:** `internal/workspace/remote_test.go` (blocked address table incl. metadata and IPv4-mapped addresses, dialer with a fake resolver incl. mixed answers, loopback server refused by the real fetcher, redirect/404/size/token behaviour against a local TLS server, lock/cache/tamper/`--update`/restore/prune paths) and `e2e/workspace_remote_test.go` (no allowlist, http/wildcard rejected, `localhost`/`127.0.0.1`/`169.254.169.254` refused, offline merge from cache, tampered cache detected).
+
+**Residual risk / not covered:**
+
+* A pinned URL on a host that serves mutable content (branch name instead of tag/commit) changes only the hash, which `fetch` reports and the reviewer of the lock-file change sees; the first fetch trusts whatever the URL returns (trust on first use).
+* The allowed host itself is trusted; a malicious but allowed host can still serve a hostile model, which is then handled like any local model (size limit, depth limit, validation).
+* Only single model files are fetched; git clone sources are not supported.
+
 === Not Vulnerable
 
 The following attack vectors were explicitly tested and confirmed **not exploitable**:
@@ -549,6 +581,7 @@ SEC-004, SEC-007, SEC-011 verified fixed 2026-03-30 (see individual findings abo
 SEC-019 (PR #561).
 SEC-020 (#585).
 SEC-021 (#585).
+SEC-022 (design review and controls with the Phase 2 implementation of #227).
 
 ==== Remaining Open
 

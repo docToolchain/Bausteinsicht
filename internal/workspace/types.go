@@ -14,12 +14,21 @@ type Config struct {
 type WorkspaceMetadata struct {
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
+	// AllowedHosts lists the hosts remote model sources may be fetched from
+	// (exact host names, no scheme, port or wildcard). Without an entry, a
+	// model reference with a Source is rejected (remote sources are opt-in).
+	AllowedHosts []string `json:"allowedHosts,omitempty"`
 }
 
 // ModelRef references a team model with ID and path
 type ModelRef struct {
-	ID     string `json:"id"`
-	Path   string `json:"path"`
+	ID string `json:"id"`
+	// Path is a local model file. Exactly one of Path and Source is set.
+	Path string `json:"path,omitempty"`
+	// Source is an https URL of a model file, pinned by tag or commit in the
+	// URL. It is downloaded only by "workspace fetch" into a project-local
+	// cache and verified against bausteinsicht.lock on every read.
+	Source string `json:"source,omitempty"`
 	Prefix string `json:"prefix,omitempty"`
 	// Elements selects top-level elements of the model to import (each with its
 	// children, cut off at Depth). Empty means all top-level elements.

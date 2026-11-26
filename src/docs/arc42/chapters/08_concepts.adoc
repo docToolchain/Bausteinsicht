@@ -56,6 +56,30 @@ The primary trust boundary is the filesystem: the tool processes user-supplied J
 | Low
 | `sanitizeID` passes dot and slash characters into draw.io attribute values (XSS-adjacent)
 | `sanitizeID` strips dots and slashes (SEC-013); `stripTags` fixes attribute-value quoting (SEC-008)
+
+| T-7
+| Spoofing / Tampering
+| Medium
+| Remote model source (`workspace fetch`, ADR-012 Phase 2): the content behind a URL is replaced or served by a different party (compromised repository, mutable tag, man in the middle), and the changed architecture is merged unnoticed
+| HTTPS with certificate verification only; sources pinned by tag or commit in the URL; SHA-256 of every file in `bausteinsicht.lock` (committed and reviewed), verified on every read; a differing download is an error unless `--update` is given; hosts must be listed in `workspace.allowedHosts` (SEC-022)
+
+| T-8
+| Information Disclosure / Elevation of Privilege
+| Medium
+| Server-side request forgery from a configuration: a source URL (or a name that resolves, or rebinds, to a local address) makes the tool call loopback, private or cloud-metadata addresses (`169.254.169.254`) from the developer's or CI machine
+| Allowlist of exact hosts, port 443 only, no credentials in URLs; the tool resolves the name itself, refuses if any address is loopback/private/link-local/reserved and connects to the validated address (no DNS-rebinding window); redirects are not followed; no proxy; the only command with network access is `workspace fetch` (SEC-022)
+
+| T-9
+| Information Disclosure
+| Low
+| Access token for a private source leaks through the configuration, the lock file, the cache, logs or a redirect to another host
+| Tokens only from the environment variable `BAUSTEINSICHT_FETCH_TOKEN_<HOST>`, sent as bearer token to the allowed host only; never written to any file; redirects are not followed (SEC-022)
+
+| T-10
+| Denial of Service / Tampering
+| Low
+| A remote file that is huge, slow or whose ID escapes the cache directory (`../`)
+| Response limited to 10 MiB (same as SEC-006), 30 second timeout; the model `id` of a remote model is restricted to letters, digits, `-` and `_`, so the cache file stays inside `.bausteinsicht-cache`; the cache is written atomically at `0600` (SEC-022)
 |===
 
 Spoofing and Repudiation are **not applicable**: the tool operates on local files under the user's own identity; no authentication or audit log is required.
@@ -103,6 +127,10 @@ Security controls implemented across the codebase, keyed to threat IDs:
 | HTML sanitization
 | T-6
 | `internal/drawio/label.go:sanitizeID` strips `./`; `stripTags` quotes attribute values
+
+| Remote source guard
+| T-7/T-8/T-9/T-10
+| `internal/workspace/fetch.go` (`Fetcher`, `safeDialer`, `blockedIP`), `internal/workspace/lock.go` (lock file, cache path, `ValidateSources`); network only in `workspace fetch`
 
 | Dependency scanning
 | All

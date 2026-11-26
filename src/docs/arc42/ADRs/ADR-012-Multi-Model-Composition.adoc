@@ -133,7 +133,7 @@ Option D wins only narrowly over the status quo, which is the honest result: for
 **Adopt Option D, in two phases, and do not change the model format.**
 
 . **Phase 1 first and on its own.** Partial/black-box imports in the workspace, validation of cross-model relationships, and documentation of the checkout pattern. No network code. *Implemented* (#227): `elements`/`depth` per model, cross-model relationships applied by `workspace merge`, `workspace validate` for IDs, prefixes, relationships and views, and the workspace configuration documented in the CLI specification.
-. **Phase 2 only after** a STRIDE entry for remote fetching in arc42 chapter 8 and a SEC finding in the security review exist, and the points below are specified.
+. **Phase 2 only after** a STRIDE entry for remote fetching in arc42 chapter 8 and a SEC finding in the security review exist, and the points below are specified. *Implemented* (#227): STRIDE entries T-7 to T-10 (chapter 8), SEC-022 (security review), and `workspace.allowedHosts`, `models[].source`, `workspace fetch`, the cache and `bausteinsicht.lock` as specified below; the details are in the CLI specification (remote sources).
 
 === Security model for Phase 2
 
@@ -165,6 +165,8 @@ No new top-level command. `workspace fetch` (Phase 2) is the only one that touch
 * Phase 2 is real work (fetcher, cache, lock, tests) and has to be reviewed from a security point of view before it ships.
 
 === Open Questions for the Maintainers
+
+_Phase 2 was built before these were answered, using the following assumptions; each can still be changed:_ the workspace configuration stays the home of composition (no `imports` in the model); the fetcher is a plain HTTPS fetcher for single model files (any host on the allowlist, no `git clone`, so no dependency on a git binary and no submodule semantics); included models do not bring their own `specification` into the landscape beyond today's rule, the first definition wins.
 
 * Is a separate workspace configuration acceptable as the long-term home of composition, or is a single-file `imports` (Option B) wanted despite its cost?
 * Which hosts matter in practice (GitHub only, or also self-hosted Git)? That decides between a git-based and a plain HTTPS fetcher in Phase 2.
