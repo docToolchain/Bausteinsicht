@@ -115,3 +115,34 @@ func TestResolveWriteTarget(t *testing.T) {
 		t.Errorf("a link to nothing is returned as it is: %q", got)
 	}
 }
+
+// If the link cannot be resolved for another reason than "does not exist" (no
+// permission to enter the directory of the target), the write must fail instead
+// of replacing the link by a regular file and reporting success (review of #723).
+func TestSave_FailsWhenTheLinkCannotBeResolved(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("permissions do not restrict root")
+	}
+	link, target := linkedFile(t, `{"specification":{"elements":{"a":{"notation":"A"}}},"model":{"x":{"kind":"a","title":"X"}}}`)
+	m, err := Load(link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Dir(target)
+	if err := os.Chmod(dir, 0o000); err != nil {
+		t.Skipf("cannot restrict the directory: %v", err)
+	}
+	defer func() { _ = os.Chmod(dir, 0o700) }()
+
+	m.Model["y"] = Element{Kind: "a", Title: "Y"}
+	if err := Save(link, m); err == nil {
+		t.Error("Save must fail when the link cannot be resolved")
+	}
+	_ = os.Chmod(dir, 0o700)
+	if info, err := os.Lstat(link); err != nil || info.Mode()&os.ModeSymlink == 0 {
+		t.Errorf("the symbolic link was replaced by a regular file (err %v)", err)
+	}
+	if data, _ := os.ReadFile(target); strings.Contains(string(data), `"y"`) {
+		t.Error("the target must not have been changed")
+	}
+}
