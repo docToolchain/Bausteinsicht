@@ -49,6 +49,9 @@ type ChangeSet struct {
 	DrawioElementChanges      []ElementChange
 	DrawioRelationshipChanges []RelationshipChange
 	Conflicts                 []Conflict
+	// Warnings are findings of the detection that the user should see, for
+	// example an element that was edited differently on several pages (#684).
+	Warnings []string
 }
 
 // drawioElemSnapshot holds extracted data from a draw.io element.
@@ -218,7 +221,7 @@ func DetectChanges(m *model.BausteinsichtModel, doc *drawio.Document, lastState 
 	cs := &ChangeSet{}
 
 	flatModel, _ := model.FlattenElements(m)
-	drawioElems := extractDrawioElements(doc)
+	drawioElems := extractDrawioElements(doc, lastState.Elements, cs)
 	visibleElems := computeVisibleElements(m)
 	newPageOnly := computeNewPageOnlyElements(m, newPageIDs)
 	detectElementChanges(cs, flatModel, drawioElems, lastState, visibleElems, newPageOnly)
@@ -226,18 +229,44 @@ func DetectChanges(m *model.BausteinsichtModel, doc *drawio.Document, lastState 
 	detectUnmanagedDrawioElements(cs, doc)
 
 	modelRels := buildModelRelMap(m)
-	drawioRels := extractDrawioRelationships(doc)
+	lastRels := make(map[string]RelationshipState, len(lastState.Relationships))
+	for _, r := range lastState.Relationships {
+		lastRels[relKey(r.From, r.To, r.Index)] = r
+	}
+	drawioRels := extractDrawioRelationshipsFor(doc, lastRels, cs)
 	visibleRels := computeVisibleRelationships(m)
 	detectRelationshipChanges(cs, modelRels, drawioRels, lastState, visibleRels)
 
 	return cs
 }
 
+// pageSnapshot is the data of an element as one draw.io page shows it.
+type pageSnapshot struct {
+	page string
+	snap drawioElemSnapshot
+}
+
+// onPage reports whether snaps already has the element of the page named page.
+func onPage(snaps []pageSnapshot, page string) bool {
+	for _, ps := range snaps {
+		if ps.page == page {
+			return true
+		}
+	}
+	return false
+}
+
 // extractDrawioElements gathers element data from all pages in the document.
+// An element drawn on several pages (a container, an element in several views)
+// can be edited on any of them: the first page whose values differ from the
+// last-synced state is the edit, and it wins over pages that still show the old
+// values. If other pages were edited differently, the first edited page wins and
+// cs gets a warning that names the ignored values (#684).
 // It reads from child text sub-cells first, falling back to HTML label parsing
 // for backward compatibility with older draw.io files.
-func extractDrawioElements(doc *drawio.Document) map[string]drawioElemSnapshot {
-	result := make(map[string]drawioElemSnapshot)
+func extractDrawioElements(doc *drawio.Document, last map[string]ElementState, cs *ChangeSet) map[string]drawioElemSnapshot {
+	byID := make(map[string][]pageSnapshot)
+	var order []string
 	for _, page := range doc.Pages() {
 		for _, obj := range page.FindAllElements() {
 			id := obj.SelectAttrValue(attrBausteinsichtID, "")
@@ -256,17 +285,46 @@ func extractDrawioElements(doc *drawio.Document) map[string]drawioElemSnapshot {
 			if description == "" {
 				description = labelDesc
 			}
-			// Skip duplicate bausteinsicht_id — keep first occurrence (#213).
-			if _, exists := result[id]; exists {
+			if _, seen := byID[id]; !seen {
+				order = append(order, id)
+			}
+			// A duplicate bausteinsicht_id on the same page (a copy-paste) is not
+			// another view of the element: keep the first occurrence (#213).
+			if onPage(byID[id], page.Name()) {
 				continue
 			}
-			result[id] = drawioElemSnapshot{
+			byID[id] = append(byID[id], pageSnapshot{page: page.Name(), snap: drawioElemSnapshot{
 				title:       title,
 				technology:  technology,
 				description: description,
 				kind:        obj.SelectAttrValue("bausteinsicht_kind", ""),
+			}})
+		}
+	}
+
+	result := make(map[string]drawioElemSnapshot, len(byID))
+	for _, id := range order {
+		snaps := byID[id]
+		chosen := snaps[0]
+		if lastElem, ok := last[id]; ok {
+			var edited []pageSnapshot
+			for _, ps := range snaps {
+				if ps.snap.title != lastElem.Title || ps.snap.description != lastElem.Description || ps.snap.technology != lastElem.Technology {
+					edited = append(edited, ps)
+				}
+			}
+			if len(edited) > 0 {
+				chosen = edited[0]
+				for _, other := range edited[1:] {
+					if other.snap.title != chosen.snap.title || other.snap.description != chosen.snap.description || other.snap.technology != chosen.snap.technology {
+						cs.Warnings = append(cs.Warnings, fmt.Sprintf(
+							"Element %q was edited differently on several pages: using the values from page %q, ignoring title %q, description %q, technology %q from page %q",
+							id, chosen.page, other.snap.title, other.snap.description, other.snap.technology, other.page))
+					}
+				}
 			}
 		}
+		result[id] = chosen.snap
 	}
 	return result
 }
@@ -440,7 +498,17 @@ func unmanagedElementID(obj *etree.Element) (cellID, id string, ok bool) {
 // original target is not visible on a view) are excluded to avoid phantom
 // reverse changes.
 func extractDrawioRelationships(doc *drawio.Document) map[string]RelationshipState {
+	return extractDrawioRelationshipsFor(doc, nil, nil)
+}
+
+// extractDrawioRelationshipsFor is extractDrawioRelationships with the
+// last-synced relationships: a connector drawn on several pages can be relabelled
+// on any of them, so the first page whose label differs from the last-synced
+// label is the edit and wins over pages that still show the old one (#684). A
+// second, different edit is reported in cs.Warnings. last and cs may be nil.
+func extractDrawioRelationshipsFor(doc *drawio.Document, last map[string]RelationshipState, cs *ChangeSet) map[string]RelationshipState {
 	cellToElem := buildCellIDToElemID(doc)
+	edited := make(map[string]bool) // keys whose label comes from an edited page
 	result := make(map[string]RelationshipState)
 	for _, page := range doc.Pages() {
 		pageID := page.Name()
@@ -466,19 +534,32 @@ func extractDrawioRelationships(doc *drawio.Document) map[string]RelationshipSta
 			cellID := cell.SelectAttrValue("id", "")
 			index := parseConnectorIndex(cellID)
 			key := relKey(from, to, index)
+			label := cell.SelectAttrValue("value", "")
+			lastRel, inLast := last[key]
+			isEdit := inLast && label != lastRel.Label
 			if existing, exists := result[key]; exists {
 				// If relationship already exists on another page, append this page to the list.
 				// PageIDs is a []string of page names (page.Name()), used later in warnings.
 				existing.PageIDs = append(existing.PageIDs, pageID)
+				switch {
+				case isEdit && !edited[key]:
+					existing.Label = label
+					edited[key] = true
+				case isEdit && edited[key] && label != existing.Label && cs != nil:
+					cs.Warnings = append(cs.Warnings, fmt.Sprintf(
+						"Relationship %q->%q was relabelled differently on several pages: using %q, ignoring %q from page %q",
+						from, to, existing.Label, label, pageID))
+				}
 				result[key] = existing
 			} else {
 				result[key] = RelationshipState{
 					From:    from,
 					To:      to,
 					Index:   index,
-					Label:   cell.SelectAttrValue("value", ""),
+					Label:   label,
 					PageIDs: []string{pageID},
 				}
+				edited[key] = isEdit
 			}
 		}
 	}

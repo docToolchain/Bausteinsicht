@@ -1373,15 +1373,17 @@ func TestDetectChanges_DuplicateBausteinsichtIDKeepsFirst(t *testing.T) {
 // --- Cross-view consistency (#236) ---
 
 func TestDetectChanges_CrossViewStaleTitle(t *testing.T) {
-	// Scenario: reverse sync updated the title in one view (and the model/state),
-	// but a second view still shows the old title. The next sync must emit a
-	// forward change to bring the stale view up to date.
+	// A page that shows another value than the last-synced state is an edit,
+	// whichever page it is (#684): the first page cannot be trusted over the
+	// others. Pages used to be left stale by reverse sync (#236), where the
+	// second page here was the old value; Run now writes a reverse edit to every
+	// page in the same run (see TestRun_ReverseEditIsWrittenToEveryPage), so a
+	// differing page is an edit and no longer a stale view.
 	//
-	// After reverse sync:
 	//   model  = "New Title"
 	//   state  = "New Title"
-	//   View A = "New Title"  (was edited here)
-	//   View B = "Old Title"  (stale)
+	//   View A = "New Title"
+	//   View B = "Old Title"  (edited here)
 
 	m := &model.BausteinsichtModel{
 		Model: map[string]model.Element{
@@ -1402,7 +1404,6 @@ func TestDetectChanges_CrossViewStaleTitle(t *testing.T) {
 	state := emptyState()
 	state.Elements["svc"] = ElementState{Title: "New Title", Kind: "system"}
 
-	// Build a two-page document: page 1 has the updated title, page 2 is stale.
 	doc := drawio.NewDocument()
 	page1 := doc.AddPage("view-context", "Context View")
 	_ = page1.CreateElement(drawio.ElementData{
@@ -1415,23 +1416,20 @@ func TestDetectChanges_CrossViewStaleTitle(t *testing.T) {
 
 	cs := DetectChanges(m, doc, state, nil)
 
-	// Expect a forward change to update the stale title.
+	// The differing page is a draw.io-side edit ...
 	found := false
-	for _, ch := range cs.ModelElementChanges {
-		if ch.ID == "svc" && ch.Type == Modified && ch.Field == "title" &&
-			ch.OldValue == "Old Title" && ch.NewValue == "New Title" {
+	for _, ch := range cs.DrawioElementChanges {
+		if ch.ID == "svc" && ch.Type == Modified && ch.Field == "title" && ch.NewValue == "Old Title" {
 			found = true
 		}
 	}
 	if !found {
-		t.Errorf("expected forward change to fix stale cross-view title, got model changes: %+v",
-			cs.ModelElementChanges)
+		t.Errorf("expected the differing page to be taken as an edit, got draw.io changes: %+v", cs.DrawioElementChanges)
 	}
-
-	// Should NOT produce a drawio-side change (no conflict — model is authoritative).
-	for _, ch := range cs.DrawioElementChanges {
-		if ch.ID == "svc" && ch.Type == Modified && ch.Field == "title" {
-			t.Errorf("unexpected drawio-side title change: %+v", ch)
+	// ... and forward sync must not overwrite it with the model's title.
+	for _, ch := range cs.ModelElementChanges {
+		if ch.ID == "svc" && ch.Field == "title" {
+			t.Errorf("forward sync must not overwrite the edit: %+v", ch)
 		}
 	}
 }
