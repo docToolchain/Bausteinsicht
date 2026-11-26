@@ -53,6 +53,10 @@ func LoadDocument(path string) (*Document, error) {
 
 // SaveDocument writes a Document to disk using an atomic temp-file + rename.
 func SaveDocument(path string, doc *Document) error {
+	// A diagram that is a symbolic link is updated in place, the link stays (#723).
+	if resolved, err := filepath.EvalSymlinks(path); err == nil {
+		path = resolved
+	}
 	doc.tree.Indent(2)
 
 	dir := filepath.Dir(path)

@@ -277,6 +277,8 @@ When writing files, Bausteinsicht uses a write-to-temp-then-rename pattern:
 
 This prevents corrupted files if the process is interrupted during write (mitigates T-1).
 
+A model, diagram, state or lock file that is a symbolic link (monorepo, dotfiles) is written through the link: the path is resolved first (`model.ResolveWriteTarget`, a private copy in `internal/drawio`) and the target is replaced, so the link stays and its target is updated (#723). A link to a file that does not exist is replaced like any other missing file.
+
 === 8.8 Configuration Discovery
 
 Bausteinsicht uses convention over configuration:

@@ -16,6 +16,7 @@ type PatchOp struct {
 // the result back atomically. Comments, formatting, and key ordering are
 // preserved because only the target values are replaced in the raw text.
 func PatchSave(path string, ops []PatchOp) error {
+	path = ResolveWriteTarget(path)
 	data, err := os.ReadFile(path) // #nosec G304 -- path from CLI flag
 	if err != nil {
 		return fmt.Errorf("reading %s: %w", path, err)
@@ -54,6 +55,7 @@ func PatchSave(path string, ops []PatchOp) error {
 // and writes the result back atomically. Used by InsertObjectEntry and
 // AppendArrayEntry for comment-preserving insertions.
 func PatchInsert(path string, transform func([]byte) ([]byte, error)) error {
+	path = ResolveWriteTarget(path)
 	data, err := os.ReadFile(path) // #nosec G304 -- path from CLI flag
 	if err != nil {
 		return fmt.Errorf("reading %s: %w", path, err)

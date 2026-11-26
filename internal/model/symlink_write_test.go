@@ -75,3 +75,43 @@ func TestPatchInsert_KeepsASymbolicLink(t *testing.T) {
 	}
 	assertStillALink(t, link, target, `"y"`)
 }
+
+func TestResolveWriteTarget(t *testing.T) {
+	dir := t.TempDir()
+	real := filepath.Join(dir, "real.jsonc")
+	if err := os.WriteFile(real, []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	canonical, err := filepath.EvalSymlinks(real)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got := ResolveWriteTarget(real); got != canonical {
+		t.Errorf("a regular file resolves to itself: %q, want %q", got, canonical)
+	}
+	missing := filepath.Join(dir, "new.jsonc")
+	if got := ResolveWriteTarget(missing); got != missing {
+		t.Errorf("a file that does not exist yet is returned as it is: %q", got)
+	}
+
+	one := filepath.Join(dir, "one")
+	two := filepath.Join(dir, "two")
+	if err := os.Symlink(real, one); err != nil {
+		t.Skipf("symbolic links are not available: %v", err)
+	}
+	if err := os.Symlink(one, two); err != nil {
+		t.Fatal(err)
+	}
+	if got := ResolveWriteTarget(two); got != canonical {
+		t.Errorf("a chain of links resolves to the final file: %q, want %q", got, canonical)
+	}
+
+	dangling := filepath.Join(dir, "dangling")
+	if err := os.Symlink(filepath.Join(dir, "gone"), dangling); err != nil {
+		t.Fatal(err)
+	}
+	if got := ResolveWriteTarget(dangling); got != dangling {
+		t.Errorf("a link to nothing is returned as it is: %q", got)
+	}
+}
