@@ -1031,7 +1031,7 @@ func TestApplyReverse_ElementAddedAlreadySyncedSkipped(t *testing.T) {
 	}
 }
 
-// TestApplyReverse_ElementDeletedNotFoundWarns covers deleteElement's error
+// TestApplyReverse_ElementDeletedNotFoundWarns covers the error of the removal
 // path: a Deleted change for an ID that doesn't exist in the model at all.
 func TestApplyReverse_ElementDeletedNotFoundWarns(t *testing.T) {
 	m := simpleModel("api", "API", "", "")

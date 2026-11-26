@@ -63,12 +63,15 @@ func Run(
 	// Step 5: Reverse sync (draw.io → model).
 	result.Reverse = ApplyReverse(changes, m, lastState)
 
-	// Step 5b: A relationship removed by reverse sync shifted the index of the
-	// relationships behind it and may free a pair for a lifted connector. Let the
-	// forward pipeline settle the connectors against the model as it is now
-	// (renumber, add, drop), so the next sync finds nothing to do (#719).
-	if result.Reverse.RelationshipsDeleted > 0 {
+	// Step 5b: Reverse sync that removed relationships shifted the index of the
+	// relationships behind them and may free a pair for a lifted connector, and
+	// an element it was asked to remove may have been kept (scope of a view,
+	// constraint). Let the forward pipeline settle the document against the model
+	// as it is now (renumber, add, drop), so the next sync finds nothing to do
+	// (#719, #720).
+	if hasDrawioDeletions(changes) {
 		settled := ApplyForward(&ChangeSet{}, doc, templates, m, opts...)
+		result.Forward.ElementsCreated += settled.ElementsCreated
 		result.Forward.ConnectorsCreated += settled.ConnectorsCreated
 		result.Forward.ConnectorsUpdated += settled.ConnectorsUpdated
 		result.Forward.ConnectorsDeleted += settled.ConnectorsDeleted
@@ -102,6 +105,22 @@ func Run(
 	}
 
 	return result
+}
+
+// hasDrawioDeletions reports whether cs contains an element or relationship
+// deleted in draw.io.
+func hasDrawioDeletions(cs *ChangeSet) bool {
+	for _, ch := range cs.DrawioElementChanges {
+		if ch.Type == Deleted {
+			return true
+		}
+	}
+	for _, ch := range cs.DrawioRelationshipChanges {
+		if ch.Type == Deleted {
+			return true
+		}
+	}
+	return false
 }
 
 // RemoveOrphanedViewPages removes pages from the draw.io document that were

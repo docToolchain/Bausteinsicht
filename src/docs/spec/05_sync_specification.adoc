@@ -168,7 +168,7 @@ A same-index relationship the model already holds but that was never synced from
 
 | Element deleted in draw.io
 | Known `bausteinsicht_id` no longer present in any `<object>` on visible view pages
-| Remove from model. Clean stale references from view include/exclude lists. Display warning listing removed elements.
+| Remove from model together with everything that refers to it (same handling as `remove element --cascade`): relationships, view include/exclude entries (wildcards stay), and dynamic-view steps (block steps stay; a dynamic view that only involved the element is removed). An element that a view uses as its `scope`, or that a constraint names, cannot be removed without breaking the model: it is kept (the model wins) and drawn again in the same run. Display a warning that lists the removed elements and the dropped references (#720).
 
 | Relationship deleted in draw.io
 | Connector with known `source`/`target` pair no longer present on any visible view page
@@ -336,11 +336,13 @@ Relationships are processed in two passes to ensure correct deduplication (#197)
 
 This ensures that when a direct relationship (e.g., `api->db`) and a lifted relationship (e.g., `api.catalog->db` lifted to `api->db`) map to the same pair, only one connector is created with the direct relationship's label (#142, #197).
 
-==== Relationship Deleted in draw.io
+==== Relationship or Element Deleted in draw.io
 
 A relationship counts as deleted in draw.io only if its connector is gone from every page; if another page still shows it, the model wins and the connector comes back (reverse sync never deletes on the strength of a single page).
 Removing a relationship from the model shifts the array index of every relationship behind it, and it can free a pair for a lifted connector of another relationship.
 Within the same run, forward sync therefore does not draw the connector of a relationship that reverse sync is going to remove, and after reverse sync a second forward pass without changes renumbers the connectors, adds the lifted ones that are now due and drops the superfluous ones, so the next sync finds nothing to do and the model does not drift (#719).
+
+The same holds for an element deleted on every page: forward sync does not draw it again in the same run (it would otherwise leave a shape that no model element owns, which the next sync imports as a new element of the wrong kind, #720), and the second forward pass runs after every run in which something was deleted in draw.io, so an element that reverse sync had to keep (scope of a view, named by a constraint) is drawn again at once.
 
 ==== Connector Reconciliation
 
