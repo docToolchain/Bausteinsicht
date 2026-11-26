@@ -7,7 +7,7 @@ import (
 	"github.com/docToolchain/Bausteinsicht/internal/model"
 )
 
-// maxReverseDepth limits recursion in modifyInMap/deleteFromMap to prevent stack overflow.
+// maxReverseDepth limits recursion in modifyInMap to prevent stack overflow.
 const maxReverseDepth = model.MaxElementDepth
 
 // ReverseResult summarizes the changes applied back to the model.
@@ -192,35 +192,47 @@ func applyReverseElementModified(ch ElementChange, m *model.BausteinsichtModel, 
 }
 
 // applyReverseElementDeleted removes an element deleted in draw.io from the
-// model, along with the relationships and view references it leaves behind.
+// model, together with everything that refers to it: relationships, entries of
+// view lists and the steps of dynamic views (a dynamic view that only involved
+// the element goes too). It uses the same reference handling as "remove
+// element --cascade", so the model stays valid (#266, #720). An element that a
+// view uses as its scope, or that a constraint names, cannot be removed without
+// breaking the model; it is kept (the model wins) and the warning says why.
 func applyReverseElementDeleted(ch ElementChange, m *model.BausteinsichtModel, result *ReverseResult) {
-	err := deleteElement(m, ch.ID)
+	relationshipsBefore := len(m.Relationships)
+	changes, err := m.RemoveElement(ch.ID, true)
 	if err != nil {
-		result.Warnings = append(result.Warnings,
-			fmt.Sprintf("Element %q could not be deleted: %v", ch.ID, err))
+		if strings.HasPrefix(err.Error(), "cannot remove") {
+			// Blocked by a view scope or a constraint (see RemoveElement).
+			result.Warnings = append(result.Warnings,
+				fmt.Sprintf("Element %q was deleted in draw.io but kept in the model: %v", ch.ID, err))
+		} else {
+			result.Warnings = append(result.Warnings,
+				fmt.Sprintf("Element %q could not be deleted: %v", ch.ID, err))
+		}
 		return
 	}
 	result.ElementsDeleted++
-	// Clean orphaned relationships referencing the deleted element (#266).
-	prefix := ch.ID + "."
-	var kept []model.Relationship
-	for _, r := range m.Relationships {
-		if r.From == ch.ID || r.To == ch.ID ||
-			strings.HasPrefix(r.From, prefix) || strings.HasPrefix(r.To, prefix) {
-			result.RelationshipsDeleted++
+	result.RelationshipsDeleted += relationshipsBefore - len(m.Relationships)
+
+	warning := fmt.Sprintf("Element %q was deleted in draw.io and removed from model", ch.ID)
+	if refs := droppedReferences(changes); refs != "" {
+		warning += "; also dropped the references " + refs
+	}
+	result.Warnings = append(result.Warnings, warning)
+}
+
+// droppedReferences lists the model paths that RemoveElement dropped besides the
+// element itself, leaving out relationships (they are counted separately).
+func droppedReferences(changes []model.Change) string {
+	var paths []string
+	for _, c := range changes[1:] {
+		if strings.HasPrefix(c.Path, "relationships[") {
 			continue
 		}
-		kept = append(kept, r)
+		paths = append(paths, c.Path)
 	}
-	m.Relationships = kept
-	// Clean stale references from view include/exclude lists.
-	for viewID, v := range m.Views {
-		v.Include = removeFromSlice(v.Include, ch.ID)
-		v.Exclude = removeFromSlice(v.Exclude, ch.ID)
-		m.Views[viewID] = v
-	}
-	result.Warnings = append(result.Warnings,
-		fmt.Sprintf("Element %q was deleted in draw.io and removed from model", ch.ID))
+	return strings.Join(paths, ", ")
 }
 
 // applyReverseElementAdded imports an element that was created directly in
@@ -441,42 +453,6 @@ func modifyInMap(elems map[string]model.Element, parts []string, fullID string, 
 	return nil
 }
 
-// deleteElement removes an element by dot-notation ID from the model hierarchy.
-func deleteElement(m *model.BausteinsichtModel, id string) error {
-	parts := strings.Split(id, ".")
-	return deleteFromMap(m.Model, parts, id)
-}
-
-// deleteFromMap recursively walks to find the parent map and deletes the element.
-func deleteFromMap(elems map[string]model.Element, parts []string, fullID string) error {
-	if len(parts) == 0 {
-		return fmt.Errorf("empty path")
-	}
-	if len(parts) > maxReverseDepth {
-		return fmt.Errorf("element path %q exceeds maximum depth of %d", fullID, maxReverseDepth)
-	}
-	key := parts[0]
-	if len(parts) == 1 {
-		if _, ok := elems[key]; !ok {
-			return fmt.Errorf("element %q not found", fullID)
-		}
-		delete(elems, key)
-		return nil
-	}
-	elem, ok := elems[key]
-	if !ok {
-		return fmt.Errorf("element %q not found", fullID)
-	}
-	if elem.Children == nil {
-		return fmt.Errorf("element %q not found: no children at this level", fullID)
-	}
-	if err := deleteFromMap(elem.Children, parts[1:], fullID); err != nil {
-		return err
-	}
-	elems[key] = elem
-	return nil
-}
-
 // firstSpecKind returns the first element kind defined in the specification,
 // sorted alphabetically for determinism. Returns "" if no kinds are defined.
 func firstSpecKind(m *model.BausteinsichtModel) string {
@@ -490,18 +466,4 @@ func firstSpecKind(m *model.BausteinsichtModel) string {
 		}
 	}
 	return best
-}
-
-// removeFromSlice returns a new slice with all occurrences of val removed.
-func removeFromSlice(s []string, val string) []string {
-	result := make([]string, 0, len(s))
-	for _, v := range s {
-		if v != val {
-			result = append(result, v)
-		}
-	}
-	if len(result) == 0 {
-		return nil
-	}
-	return result
 }
