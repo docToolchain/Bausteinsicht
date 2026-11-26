@@ -447,11 +447,36 @@ func connectorStyle(baseStyle, kind string, spec *model.Specification) string {
 // newly populated elements are rendered (#231). It returns the expected set
 // so stale connectors can be reconciled against it.
 func populateConnectors(in forwardRenderInputs, viewID string, scopeID string, elemSet map[string]bool) []viewConnector {
-	conns := expectedViewConnectors(in.model, elemSet, scopeID)
-	for _, vc := range conns {
+	deleted := deletedInDrawio(in.cs)
+	var conns []viewConnector
+	for _, vc := range expectedViewConnectors(in.model, elemSet, scopeID) {
+		// A relationship whose connector the user deleted everywhere in draw.io
+		// is removed from the model by reverse sync in this same run; drawing
+		// the connector again would leave one behind that no relationship
+		// owns, and the next sync would import it as a new relationship (#719).
+		if deleted[vc.index] {
+			continue
+		}
+		conns = append(conns, vc)
 		createConnectorIfAbsent(in, viewID, vc.from, vc.to, vc.index, vc.label, vc.dashed)
 	}
 	return conns
+}
+
+// deletedInDrawio returns the model indexes of the relationships whose
+// connectors were deleted in draw.io (and that reverse sync will therefore
+// remove from the model).
+func deletedInDrawio(cs *ChangeSet) map[int]bool {
+	deleted := make(map[int]bool)
+	if cs == nil {
+		return deleted
+	}
+	for _, ch := range cs.DrawioRelationshipChanges {
+		if ch.Type == Deleted {
+			deleted[ch.Index] = true
+		}
+	}
+	return deleted
 }
 
 // computeDashedPairs precomputes, per lifted (from,to) pair, whether ANY
