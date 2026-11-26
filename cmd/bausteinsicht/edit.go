@@ -20,9 +20,10 @@ func addDryRunFlag(cmd *cobra.Command) {
 }
 
 // runEdit loads the model, applies one edit, refuses it if it would introduce
-// validation errors, and saves it (unless --dry-run). Saving rewrites the file
-// like "add view" did before #635, which is announced on stderr.
-func runEdit(cmd *cobra.Command, apply func(m *model.BausteinsichtModel) ([]model.Change, error)) error {
+// validation errors, and saves it (unless --dry-run). The change is written as a
+// patch of the file text, so comments and formatting stay (#685); only if the
+// patch cannot be applied is the file rewritten, which is announced on stderr.
+func runEdit(cmd *cobra.Command, apply func(m *model.BausteinsichtModel) ([]model.Change, error), patch func([]byte, []model.Change) ([]byte, error)) error {
 	modelPath, _ := cmd.Flags().GetString("model")
 	format, _ := cmd.Flags().GetString("format")
 	dryRun, _ := cmd.Flags().GetBool("dry-run")
@@ -61,8 +62,7 @@ func runEdit(cmd *cobra.Command, apply func(m *model.BausteinsichtModel) ([]mode
 	}
 
 	if !dryRun {
-		_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "note: model rewritten, comments and formatting were not preserved")
-		if err := model.Save(modelPath, m); err != nil {
+		if err := savePatchedChanges(cmd.ErrOrStderr(), modelPath, m, changes, patch); err != nil {
 			return exitWithCode(fmt.Errorf("saving model: %w", err), 2)
 		}
 	}

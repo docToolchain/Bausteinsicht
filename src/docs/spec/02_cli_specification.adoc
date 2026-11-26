@@ -798,7 +798,7 @@ Renames an element and rewrites every reference to it, so that IDs no longer hav
 * Rewrites every reference to the element and to its children: relationship `from`/`to`, view `scope`, `include` and `exclude` (including patterns such as `shop.*`), message steps of dynamic views, and `from`/`to` selectors of constraints.
 * Lists every rewritten location (`path`, `from`, `to`); with `--format json` as `{ "dry_run": false, "changes": [ ... ] }`.
 * Validates the model before saving: if the change would introduce validation errors, they are printed and nothing is saved. Errors that were already in the model do not block the command.
-* The file is rewritten as a whole; comments and formatting are not preserved (`note: model rewritten, comments and formatting were not preserved` on stderr).
+* The change is written as a patch of the file text (#685): comments and formatting stay, a field is replaced in place (or inserted, or removed when it is set to an empty value), an element or relationship is removed together with the comment lines directly above it, and a rename changes the key and every reference in place. The patched text is parsed again and must hold exactly the model the command produced; only if the patch cannot be applied or that check fails is the file rewritten as a whole (`note: model rewritten, comments and formatting were not preserved` on stderr).
 * The draw.io file is not touched. After the rename, `sync` treats the old ID as deleted and the new one as added, so the position of the element on the draw.io pages is lost.
 
 **Exit codes:** `0` -- renamed (or dry run); `1` -- element not found, new key invalid or already taken, or the change would make the model invalid; `2` -- model file not found or I/O error.

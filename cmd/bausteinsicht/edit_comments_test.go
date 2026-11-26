@@ -230,7 +230,7 @@ func TestRemoveElementKeepsOtherComments(t *testing.T) {
 		func(m *model.BausteinsichtModel) error {
 			_, err := m.RemoveElement("customer", true)
 			return err
-		}, []string{"// The user", "// the customer browses", "// last"})
+		}, []string{"// The user", "// shown on the diagram", "// the customer browses", "// last"})
 }
 
 func TestRenameKeepsComments(t *testing.T) {
@@ -267,4 +267,54 @@ func changedLines(before, after string) int {
 		}
 	}
 	return n
+}
+
+// If the text patch cannot be applied, or the patched text would not hold the
+// model the command produced, the file is rewritten as a whole and the note says
+// so; the edit itself is never lost.
+func TestSavePatchedChangesFallsBackToAFullSave(t *testing.T) {
+	failing := func([]byte, []model.Change) ([]byte, error) { return nil, os.ErrInvalid }
+	wrong := func(data []byte, _ []model.Change) ([]byte, error) { return data, nil } // changes nothing
+
+	for name, patch := range map[string]func([]byte, []model.Change) ([]byte, error){"the patch fails": failing, "the patched text is not the edited model": wrong} {
+		t.Run(name, func(t *testing.T) {
+			_, path := writeCommentedModel(t)
+			m, err := model.Load(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			changes, err := m.UpdateElement("customer", model.ElementUpdate{Title: ptr("Client")})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var note strings.Builder
+			if err := savePatchedChanges(&note, path, m, changes, patch); err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(note.String(), "rewritten") {
+				t.Errorf("the full rewrite must be announced: %q", note.String())
+			}
+			again, err := model.Load(path)
+			if err != nil || again.Model["customer"].Title != "Client" {
+				t.Errorf("the edit was lost: %v", err)
+			}
+		})
+	}
+}
+
+// A patched text that does not parse at all falls back the same way.
+func TestSavePatchedChangesRejectsATextThatDoesNotParse(t *testing.T) {
+	_, path := writeCommentedModel(t)
+	m, _ := model.Load(path)
+	garbage := func([]byte, []model.Change) ([]byte, error) { return []byte("{ not json"), nil }
+	var note strings.Builder
+	if err := savePatchedChanges(&note, path, m, nil, garbage); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(note.String(), "rewritten") {
+		t.Errorf("the full rewrite must be announced: %q", note.String())
+	}
+	if _, err := model.Load(path); err != nil {
+		t.Errorf("the file must still load: %v", err)
+	}
 }

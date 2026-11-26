@@ -32,7 +32,7 @@ func newUpdateElementCmd() *cobra.Command {
 			}
 			return runEdit(cmd, func(m *model.BausteinsichtModel) ([]model.Change, error) {
 				return m.UpdateElement(id, u)
-			})
+			}, model.PatchUpdateChanges)
 		},
 	}
 	cmd.Flags().String("id", "", "Element to change (dot notation)")
