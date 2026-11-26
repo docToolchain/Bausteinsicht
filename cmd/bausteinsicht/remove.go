@@ -27,7 +27,7 @@ func newRemoveElementCmd() *cobra.Command {
 			cascade, _ := cmd.Flags().GetBool("cascade")
 			return runEdit(cmd, func(m *model.BausteinsichtModel) ([]model.Change, error) {
 				return m.RemoveElement(id, cascade)
-			})
+			}, model.PatchRemoveChanges)
 		},
 	}
 	cmd.Flags().String("id", "", "Element to remove (dot notation)")
@@ -48,7 +48,7 @@ func newRemoveRelationshipCmd() *cobra.Command {
 			label, _ := cmd.Flags().GetString("label")
 			return runEdit(cmd, func(m *model.BausteinsichtModel) ([]model.Change, error) {
 				return m.RemoveRelationship(from, to, label)
-			})
+			}, model.PatchRemoveChanges)
 		},
 	}
 	cmd.Flags().String("from", "", "Source element (dot notation)")

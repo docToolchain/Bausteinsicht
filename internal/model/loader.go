@@ -46,6 +46,22 @@ func Load(path string) (*BausteinsichtModel, error) {
 	return &m, nil
 }
 
+// ParseModel parses the text of a model file (JSONC) like Load does, without
+// the size limit and the file system; it is used to check a patched text.
+func ParseModel(data []byte) (*BausteinsichtModel, error) {
+	clean := StripJSONC(data)
+	trimmed := strings.TrimSpace(string(clean))
+	if trimmed == "null" || trimmed == "" {
+		return nil, fmt.Errorf("model text is empty or contains a null JSON root")
+	}
+	var m BausteinsichtModel
+	if err := json.Unmarshal(clean, &m); err != nil {
+		return nil, err
+	}
+	m.ElementOrder = extractElementOrder(clean)
+	return &m, nil
+}
+
 // extractElementOrder walks the JSON with a streaming decoder to capture the
 // definition order of keys in specification.elements. Go maps don't preserve
 // insertion order, so we need this to determine layer assignment for layout.

@@ -263,7 +263,7 @@ Standard Go `encoding/json` does not support comments. Bausteinsicht strips comm
 1. Remove single-line comments (`// ...`) and trailing commas before parsing
 2. Parse the cleaned JSON with `encoding/json`
 3. **On pure insertions (new elements, new relationships):** `model.PatchInsert` / `cmd/bausteinsicht/sync.go:saveModel` patches only the changed lines, preserving existing comments and key ordering (link:../ADRs/ADR-011-Comment-Preserving-PatchSave.html[ADR-011])
-4. **On deletions or modifications of existing entries:** full rewrite via `model.Save` — comments are lost
+4. **On modifications, renames and deletions of existing entries (`update`, `rename`, `remove`, #685):** a text patch built from the list of changes the command reports (`PatchUpdateChanges`, `PatchRenameChanges`, `PatchRemoveChanges`): values are replaced in place (also inside arrays), entries are removed with the comment lines directly above them, keys are renamed. The patched text is parsed again and compared with the edited model; only if that fails does a full rewrite via `model.Save` happen (comments lost, announced on stderr)
 
 NOTE: The REPL's `save` command follows the same patch-first/full-save-fallback strategy.
 
