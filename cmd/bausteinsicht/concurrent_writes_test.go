@@ -176,3 +176,52 @@ func TestAddSpecificationReleasesTheLockWhenTheModelCannotBeLoaded(t *testing.T)
 		t.Fatal("the second command is blocked: the lock was not released")
 	}
 }
+
+// The sync cycle of "watch" loads the model, syncs and saves it like "sync" does,
+// so it takes the lock too (review of #712): with a lock that cannot be taken it
+// must not touch the model, the diagram or the state.
+func TestWatchSyncCycleTakesTheModelLock(t *testing.T) {
+	dir := t.TempDir()
+	modelPath := writeSampleModel(t, dir)
+	if err := runInProcess("add", "view", "all", "--title", "All", "--include", "customer", "--model", modelPath); err != nil {
+		t.Fatal(err)
+	}
+	if err := runInProcess("sync", "--model", modelPath); err != nil {
+		t.Fatal(err)
+	}
+	drawioPath := dir + "/architecture.drawio"
+	statePath := dir + "/.bausteinsicht-sync"
+	read := func(p string) string { b, _ := os.ReadFile(p); return string(b) }
+	// A change that the next sync would write into the diagram.
+	edited := strings.Replace(read(modelPath), `"title": "Customer"`, `"title": "Customer Edited"`, 1)
+	if edited == read(modelPath) {
+		t.Fatal("the sample model has no element titled Customer")
+	}
+	if err := os.WriteFile(modelPath, []byte(edited), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	drawioBefore, stateBefore := read(drawioPath), read(statePath)
+	victim := dir + "/victim.txt"
+	if err := os.WriteFile(victim, []byte("keep\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_ = os.Remove(modelPath + ".lock") // left behind by the commands above
+	if err := os.Symlink(victim, modelPath+".lock"); err != nil {
+		t.Skipf("symbolic links are not available: %v", err)
+	}
+
+	doSync("architecture.jsonc", modelPath, drawioPath, "", false, "")
+
+	if read(drawioPath) != drawioBefore {
+		t.Error("the diagram was written although the lock could not be taken")
+	}
+	if read(statePath) != stateBefore {
+		t.Error("the sync state was written although the lock could not be taken")
+	}
+	if read(modelPath) != edited {
+		t.Error("the model was rewritten although the lock could not be taken")
+	}
+	if read(victim) != "keep\n" {
+		t.Error("the target of the link was modified")
+	}
+}
