@@ -152,14 +152,14 @@ func computeVisibleRelationships(m *model.BausteinsichtModel) map[string]bool {
 	visible := make(map[string]bool)
 	for i, r := range m.Relationships {
 		for _, vs := range views {
-			from := liftEndpoint(r.From, vs.elems)
-			to := liftEndpoint(r.To, vs.elems)
-			// Lifting onto the view's own scope boundary renders no
-			// connector (see liftedOntoScope), so it does not count.
-			if liftedOntoScope(r.From, from, vs.scope) || liftedOntoScope(r.To, to, vs.scope) {
-				continue
-			}
-			if from != "" && to != "" && from != to {
+			// Use the rule that decides whether forward sync draws a connector
+			// on this page (lifting, self-loops, connectors onto or from the
+			// scope boundary), so a relationship counts as visible only if a
+			// connector is expected. Otherwise reverse sync reads the missing
+			// connector as a user deletion and removes the relationship from
+			// the model (#167, #736).
+			from, to, ok := liftModelRelationshipEndpoints(r, vs.elems, vs.scope)
+			if ok && from != to {
 				visible[relKey(r.From, r.To, i)] = true
 				break // found on at least one view
 			}
