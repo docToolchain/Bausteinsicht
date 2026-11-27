@@ -23,7 +23,7 @@ func addDryRunFlag(cmd *cobra.Command) {
 // validation errors, and saves it (unless --dry-run). The change is written as a
 // patch of the file text, so comments and formatting stay (#685); only if the
 // patch cannot be applied is the file rewritten, which is announced on stderr.
-func runEdit(cmd *cobra.Command, apply func(m *model.BausteinsichtModel) ([]model.Change, error), patch func([]byte, []model.Change) ([]byte, error)) error {
+func runEdit(cmd *cobra.Command, apply func(m *model.BausteinsichtModel) ([]model.Change, error), patch func([]byte, []model.Change) ([]byte, error), afterSave ...func(cmd *cobra.Command, modelPath string, changes []model.Change)) error {
 	modelPath, _ := cmd.Flags().GetString("model")
 	format, _ := cmd.Flags().GetString("format")
 	dryRun, _ := cmd.Flags().GetBool("dry-run")
@@ -70,6 +70,9 @@ func runEdit(cmd *cobra.Command, apply func(m *model.BausteinsichtModel) ([]mode
 	if !dryRun {
 		if err := savePatchedChanges(cmd.ErrOrStderr(), modelPath, m, changes, patch); err != nil {
 			return exitWithCode(fmt.Errorf("saving model: %w", err), 2)
+		}
+		for _, f := range afterSave {
+			f(cmd, modelPath, changes)
 		}
 	}
 	return printEditResult(cmd.OutOrStdout(), format, dryRun, changes)

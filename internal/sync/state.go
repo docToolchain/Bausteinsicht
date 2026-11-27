@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/docToolchain/Bausteinsicht/internal/drawio"
@@ -209,4 +210,33 @@ func BuildState(m *model.BausteinsichtModel, doc *drawio.Document, modelPath, dr
 		Relationships:    rels,
 		RenderedElements: rendered,
 	}, nil
+}
+
+// RenameElement moves the entries of the element oldID and of every element
+// below it to newID, in the element states, the relationships and the record of
+// rendered elements, so that a rename is not seen as a deletion and an addition
+// by the next sync (#686).
+func (s *SyncState) RenameElement(oldID, newID string) {
+	rename := func(id string) string {
+		if id == oldID || strings.HasPrefix(id, oldID+".") {
+			return newID + id[len(oldID):]
+		}
+		return id
+	}
+	elements := make(map[string]ElementState, len(s.Elements))
+	for id, e := range s.Elements {
+		elements[rename(id)] = e
+	}
+	s.Elements = elements
+	for i := range s.Relationships {
+		s.Relationships[i].From = rename(s.Relationships[i].From)
+		s.Relationships[i].To = rename(s.Relationships[i].To)
+	}
+	if s.RenderedElements != nil {
+		rendered := make(map[string]bool, len(s.RenderedElements))
+		for id, v := range s.RenderedElements {
+			rendered[rename(id)] = v
+		}
+		s.RenderedElements = rendered
+	}
 }
