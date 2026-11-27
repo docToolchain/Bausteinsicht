@@ -350,8 +350,9 @@ func TestRekeyStaleConnectors_MatchesByOldIndex(t *testing.T) {
 func TestSync_RekeyedConnectorGetsTheHTMLFlag(t *testing.T) {
 	notify := model.Relationship{From: "shop.lib", To: "shop.web", Label: "notifies"}
 	solid := model.Relationship{From: "shop.web", To: "shop.lib.core", Label: "R&D <calls>"}
-	m1 := liftingModel(notify, solid, solid)
-	m2 := liftingModel(notify, solid)
+	inserted := model.Relationship{From: "shop.lib", To: "shop.web", Label: "inserted"}
+	m1 := liftingModel(notify, solid)
+	m2 := liftingModel(inserted, notify, solid) // both shift by one: their cells are re-keyed, nothing is modified
 
 	ts := minimalTemplates(t)
 	doc := shopContainersDoc()

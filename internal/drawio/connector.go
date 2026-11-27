@@ -106,6 +106,8 @@ func (p *Page) SetConnectorStyle(from, to string, index int, style string) {
 	if conn == nil {
 		return
 	}
+	// The label is stored escaped, so the cell must stay an HTML cell.
+	style = setStyleFlags(style, "html=1")
 	attr := conn.SelectAttr("style")
 	if attr != nil {
 		attr.Value = style

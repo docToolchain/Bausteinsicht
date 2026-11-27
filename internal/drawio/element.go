@@ -386,13 +386,13 @@ func (p *Page) ReadElementFields(obj *etree.Element) (title, technology, descrip
 
 	if len(childCells) > 0 {
 		if tc, ok := childCells["title"]; ok {
-			title = UnescapeCellText(tc.SelectAttrValue("value", ""))
+			title = CellText(tc)
 		}
 		if tc, ok := childCells["tech"]; ok {
-			technology = UnescapeCellText(trimBrackets(tc.SelectAttrValue("value", "")))
+			technology = trimBrackets(CellText(tc))
 		}
 		if dc, ok := childCells["desc"]; ok {
-			description = UnescapeCellText(dc.SelectAttrValue("value", ""))
+			description = CellText(dc)
 		}
 		return title, technology, description
 	}

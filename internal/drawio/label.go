@@ -194,5 +194,9 @@ func UnescapeCellText(s string) string { return html.UnescapeString(s) }
 // CellText returns the text of a cell's value attribute as it is shown: HTML
 // cells (html=1) hold escaped text, other cells show the value literally.
 func CellText(cell *etree.Element) string {
-	return UnescapeCellText(cell.SelectAttrValue("value", ""))
+	value := cell.SelectAttrValue("value", "")
+	if !strings.Contains(cell.SelectAttrValue("style", ""), "html=1") {
+		return value
+	}
+	return UnescapeCellText(value)
 }

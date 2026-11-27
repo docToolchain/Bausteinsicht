@@ -141,7 +141,7 @@ func rekeyStaleConnectors(page *drawio.Page, viewID string, conns []viewConnecto
 		if vc.dashed {
 			dashed = "dashed=1;"
 		}
-		setAttrOn(cell, "style", mergeStyles(cell.SelectAttrValue("style", ""), dashed))
+		setAttrOn(cell, "style", mergeStyles(cell.SelectAttrValue("style", ""), dashed+"html=1;"))
 		present[id] = true
 		rekeyed++
 	}
