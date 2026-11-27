@@ -129,7 +129,8 @@ func runSync(cmd *cobra.Command, _ []string) error {
 	// so the sync engine can avoid treating their missing elements as deletions
 	// (#184, #188, #189).
 	newPageIDs := make(map[string]bool)
-	for viewID, view := range m.Views {
+	for _, viewID := range model.OrderedViewKeys(m) {
+		view := m.Views[viewID]
 		pageID := "view-" + viewID
 		if doc.GetPage(pageID) == nil {
 			doc.AddPage(pageID, view.Title)

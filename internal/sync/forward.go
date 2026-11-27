@@ -175,8 +175,8 @@ func applyForwardToPage(in forwardRenderInputs, elemFilter map[string]bool) {
 func applyForwardPerView(in forwardRenderInputs, opts *ForwardOptions) {
 	drillDownLinks := buildDrillDownLinks(in.model)
 
-	for viewID, view := range in.model.Views {
-		applyForwardToView(in, opts, viewID, view, drillDownLinks)
+	for _, viewID := range model.OrderedViewKeys(in.model) {
+		applyForwardToView(in, opts, viewID, in.model.Views[viewID], drillDownLinks)
 	}
 }
 

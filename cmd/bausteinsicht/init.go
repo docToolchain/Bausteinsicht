@@ -87,7 +87,8 @@ func runInit(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Add pages for each view before sync.
-	for viewID, view := range m.Views {
+	for _, viewID := range model.OrderedViewKeys(m) {
+		view := m.Views[viewID]
 		doc.AddPage("view-"+viewID, view.Title)
 	}
 

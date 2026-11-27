@@ -119,7 +119,7 @@ func runExport(cmd *cobra.Command, _ []string) error {
 	}
 	var exports []viewExport
 
-	for viewKey := range m.Views {
+	for _, viewKey := range model.OrderedViewKeys(m) {
 		if viewFilter != "" && viewKey != viewFilter {
 			continue
 		}
