@@ -24,15 +24,24 @@ func tokenize(src string) ([]dsl.Token, error) {
 	return dsl.Tokenize(src, identStart, scanIdent)
 }
 
-// identStart reports whether c can start a LikeC4 identifier. Unlike
-// Structurizr, LikeC4 has no "*" wildcard or "!" prefix identifiers.
+// identStart reports whether c can start a LikeC4 identifier: a letter, "_" or
+// the "*" wildcard of view predicates ("include *", "include a.*").
 func identStart(c rune) bool {
-	return unicode.IsLetter(c) || c == '_'
+	return unicode.IsLetter(c) || c == '_' || c == '*'
 }
 
 func scanIdent(s *dsl.Scanner, line int) (dsl.Token, error) {
 	var sb strings.Builder
-	dsl.ScanIdentBody(s, &sb)
+	if c, _ := s.At(0); c != '*' {
+		dsl.ScanIdentBody(s, &sb)
+	}
+	// A "*" or "**" wildcard, alone or after "name." ("include a.*").
+	if c, _ := s.At(0); c == '*' && (sb.Len() == 0 || strings.HasSuffix(sb.String(), ".")) {
+		sb.WriteRune(s.Consume())
+		if n, _ := s.At(0); n == '*' {
+			sb.WriteRune(s.Consume())
+		}
+	}
 	return dsl.Token{Kind: dsl.Ident, Val: sb.String(), Line: line}, nil
 }
 
@@ -274,20 +283,33 @@ func (ls *lc4State) applyViewBody(v *model.View, body []dsl.Stmt) {
 	}
 }
 
-// applyViewInclude sets v.Include from an "include" statement's arguments.
+// applyViewInclude sets v.Include from an "include" statement's arguments. A
+// plain "*" is the top-level elements and, in a view of an element, also that
+// element's children (as in the Structurizr import); "name.*" and "name.**"
+// keep their wildcard after the name is resolved to its path (#706).
 func (ls *lc4State) applyViewInclude(v *model.View, args []string) {
-	if len(args) == 1 && args[0] == "*" {
-		v.Include = []string{"*"}
-		return
-	}
 	v.Include = nil
 	for _, arg := range args {
 		if arg == "*" {
 			v.Include = []string{"*"}
+			if v.Scope != "" {
+				v.Include = append(v.Include, v.Scope+".*")
+			}
 			return
 		}
-		v.Include = append(v.Include, ls.resolveVar(arg))
+		v.Include = append(v.Include, ls.resolveInclude(arg))
 	}
+}
+
+// resolveInclude resolves a variable name, or the name part of "name.*" and
+// "name.**", to its element path.
+func (ls *lc4State) resolveInclude(arg string) string {
+	for _, wildcard := range []string{".**", ".*"} {
+		if name, ok := strings.CutSuffix(arg, wildcard); ok {
+			return ls.resolveVar(name) + wildcard
+		}
+	}
+	return ls.resolveVar(arg)
 }
 
 func (ls *lc4State) buildRelationships() []model.Relationship {
