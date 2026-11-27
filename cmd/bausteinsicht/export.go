@@ -24,6 +24,7 @@ func newExportCmd() *cobra.Command {
 	cmd.Flags().String("output", ".", "Output directory")
 	cmd.Flags().Bool("embed-diagram", false, "Embed draw.io XML source in output")
 	cmd.Flags().Float64("scale", 1.0, "Export scale factor (e.g. 2.0 for retina, 3.0 for print); scale > 1 requires hardware GPU")
+	cmd.Flags().Duration("timeout", export.DefaultTimeout, "Time limit for the export of one view; draw.io is killed after it (0 = no limit)")
 	cmd.Flags().String("drawio-path", "", "Path to the draw.io CLI binary (overrides "+export.DrawioPathEnvVar+" and auto-detection)")
 	addNoValidateFlag(cmd)
 	return cmd
@@ -44,6 +45,7 @@ func runExport(cmd *cobra.Command, _ []string) error {
 	outputDir, _ := cmd.Flags().GetString("output")
 	embedDiagram, _ := cmd.Flags().GetBool("embed-diagram")
 	scale, _ := cmd.Flags().GetFloat64("scale")
+	timeout, _ := cmd.Flags().GetDuration("timeout")
 	drawioPathFlag, _ := cmd.Flags().GetString("drawio-path")
 
 	if outputDir != "" {
@@ -152,6 +154,7 @@ func runExport(cmd *cobra.Command, _ []string) error {
 			EmbedDiagram: embedDiagram,
 			InputFile:    drawioPath,
 			Scale:        scale,
+			Timeout:      timeout,
 		})
 		if err != nil {
 			exportErrors = append(exportErrors, fmt.Sprintf("view %q: %v", ex.key, err))

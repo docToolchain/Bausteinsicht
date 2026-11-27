@@ -6,7 +6,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -19,9 +18,6 @@ import (
 // never produces the output file.
 func hangingDrawio(t *testing.T) (binary, pidFile string) {
 	t.Helper()
-	if runtime.GOOS == "windows" {
-		t.Skip("the stand-in is a shell script")
-	}
 	dir := t.TempDir()
 	pidFile = filepath.Join(dir, "child.pid")
 	script := "#!/bin/sh\n" +
@@ -95,9 +91,6 @@ func TestExportPage_TimeoutKillsTheChildProcesses(t *testing.T) {
 
 // Timeout 0 means no limit, as before.
 func TestExportPage_ZeroTimeoutIsNoLimit(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("the stand-in is a shell script")
-	}
 	dir := t.TempDir()
 	out := filepath.Join(dir, "out.png")
 	bin := filepath.Join(dir, "drawio")
