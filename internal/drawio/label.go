@@ -3,6 +3,8 @@ package drawio
 import (
 	"html"
 	"strings"
+
+	"github.com/beevik/etree"
 )
 
 // Label color constants for technology and description lines.
@@ -188,3 +190,9 @@ func EscapeCellText(s string) string { return escapeHTML(s) }
 // of an html=1 text cell. It also decodes the other entities draw.io writes
 // (&#39;, &nbsp;, ...).
 func UnescapeCellText(s string) string { return html.UnescapeString(s) }
+
+// CellText returns the text of a cell's value attribute as it is shown: HTML
+// cells (html=1) hold escaped text, other cells show the value literally.
+func CellText(cell *etree.Element) string {
+	return UnescapeCellText(cell.SelectAttrValue("value", ""))
+}

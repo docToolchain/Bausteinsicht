@@ -1,6 +1,7 @@
 package drawio
 
 import (
+	"github.com/beevik/etree"
 	"strings"
 	"testing"
 
@@ -101,4 +102,52 @@ func TestSubCells_TextRoundtripProperty(t *testing.T) {
 			}
 		}
 	})
+}
+
+// Cells without html=1 show their value literally, so it must not be decoded
+// when read (#699 review).
+func TestReadElementFields_NoDecodingInSubCellsWithoutHTML(t *testing.T) {
+	p := textCellPage(t)
+	if err := p.CreateElement(ElementData{ID: "u", CellID: "u", Kind: "actor", Title: "x", Technology: "y", Description: "z",
+		SubCells: testSubCellTemplates(), Width: 160, Height: 80}, "rounded=1;"); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range p.Root().SelectElements("mxCell") {
+		id := c.SelectAttrValue("id", "")
+		if strings.HasPrefix(id, "u-") {
+			c.CreateAttr("style", strings.ReplaceAll(c.SelectAttrValue("style", ""), "html=1", "html=0"))
+			c.CreateAttr("value", "&lt;"+id+"&gt;")
+		}
+	}
+	title, tech, desc := p.ReadElementFields(p.FindElement("u"))
+	if title != "&lt;u-title&gt;" || tech != "&lt;u-tech&gt;" || desc != "&lt;u-desc&gt;" {
+		t.Errorf("read %q %q %q, want the literal values", title, tech, desc)
+	}
+}
+
+func TestCellText_DecodesOnlyHTMLCells(t *testing.T) {
+	doc := etree.NewDocument()
+	html := doc.CreateElement("mxCell")
+	html.CreateAttr("style", "text;html=1;")
+	html.CreateAttr("value", "a &lt; b")
+	plain := doc.CreateElement("mxCell")
+	plain.CreateAttr("style", "text;html=0;")
+	plain.CreateAttr("value", "a &lt; b")
+	if got := CellText(html); got != "a < b" {
+		t.Errorf("html cell: %q", got)
+	}
+	if got := CellText(plain); got != "a &lt; b" {
+		t.Errorf("plain cell: %q", got)
+	}
+}
+
+// A connector whose style is replaced (kind change) must keep html=1, because
+// its label is stored escaped (#699 review).
+func TestSetConnectorStyle_KeepsTheHTMLFlag(t *testing.T) {
+	p := textCellPage(t)
+	p.CreateConnector(ConnectorData{From: "a", To: "b", Label: "x & y"}, "html=1;")
+	p.SetConnectorStyle("a", "b", 0, "endArrow=block;dashed=1;")
+	if style := p.FindConnector("a", "b", 0).SelectAttrValue("style", ""); !strings.Contains(style, "html=1") {
+		t.Errorf("style %q lacks html=1", style)
+	}
 }
