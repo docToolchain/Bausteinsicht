@@ -396,3 +396,35 @@ func TestImport_RelationshipTechnology(t *testing.T) {
 		t.Errorf("payment>shop = %q, want %q", got["payment>shop"], "notifies|")
 	}
 }
+
+// Structurizr views read `systemContext <scope> <key> <description>`: with two
+// arguments after the scope the first is the key and the second the description
+// (#687); a single one stays the title.
+func TestImport_ViewKeyAndDescription(t *testing.T) {
+	src := `workspace {
+  model {
+    system = softwareSystem "System" {
+      app = container "App"
+    }
+  }
+  views {
+    systemContext system "ctx-key" "The context" { include * }
+    container system "Only title" { include * }
+    systemLandscape "land" "All systems" { include * }
+  }
+}`
+	result, err := structurizr.ImportSource(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	v := result.Model.Views
+	if got, ok := v["ctx-key"]; !ok || got.Title != "The context" {
+		t.Errorf("want view ctx-key titled %q, got %+v", "The context", v)
+	}
+	if got, ok := v["system"]; !ok || got.Title != "Only title" {
+		t.Errorf("a single argument keeps the old reading (key from the scope, argument as title), got %+v", v)
+	}
+	if got, ok := v["land"]; !ok || got.Title != "All systems" {
+		t.Errorf("want landscape view land titled %q, got %+v", "All systems", v)
+	}
+}
