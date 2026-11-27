@@ -1440,6 +1440,8 @@ Imports an architecture model from an external DSL and writes a Bausteinsicht `.
 
 **Structurizr-specific behavior:** a view's `autoLayout <direction>` directive is mapped to Bausteinsicht's `layered` layout (there is no direction-aware equivalent). The direction argument itself is not preserved, and a warning is emitted noting the dropped value (e.g. `line 12: view "context": autoLayout direction "lr" not preserved, mapped to layout: "layered"`). `include *` on a `container`/`component` view is expanded to also include the view's scope's children (e.g. `["*", "<scope>.*"]`, plus the parent scope for `component` views), matching Structurizr's semantics where a scoped view's wildcard include means "everything visible in this scope" rather than Bausteinsicht's default top-level-only `*` match. `filtered`, `dynamic`, and `deployment` views are not supported and are skipped with a warning (#512).
 
+**LikeC4-specific behavior:** the `include` and `exclude` predicates of a view are translated into the view's include and exclude lists: names are resolved to element paths, `name.*` and `name.**` keep their wildcard. A plain `include *` becomes `["*"]`, and in a view `of <element>` it also adds that element's children (`["*", "<element>.*"]`), as for Structurizr; a view without `include` shows the top-level elements. An imported view is never left without an include list, so `sync` does not report it as resolving to 0 elements (#706).
+
 ==== `bausteinsicht generate-template`
 
 Generates a draw.io template with a styled shape for each element kind in the specification.
