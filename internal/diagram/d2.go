@@ -105,5 +105,6 @@ func escapeD2String(s string) string {
 
 // escapeD2Inner escapes s for the inside of a double-quoted D2 string.
 func escapeD2Inner(s string) string {
+	s = strings.ReplaceAll(s, "\\", "\\\\")
 	return strings.ReplaceAll(s, "\"", "\\\"")
 }
