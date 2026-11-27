@@ -323,6 +323,7 @@ Runs one bidirectional synchronization cycle between the architecture model and 
 * Validates the model before syncing. If validation fails, the sync is aborted with exit code 1.
 * If the draw.io file is missing or has no diagram pages, it is recreated from the template and sync state is reset.
 * Pages are created for new views and orphaned pages (views removed from model) are deleted.
+* New view pages are appended in a fixed order: views without a `scope` (landscape and context views) first, then the scoped views, each group sorted by view key. The model file is read into a map, so the declaration order is not available; the same order is used by `init`, `watch` and for the files `export` writes, so regenerating `architecture.drawio` from the same model gives the same file and draw.io opens on the first context view (#683). Pages that already exist keep their position.
 * Forward sync propagates model changes to draw.io; reverse sync propagates draw.io changes back to the model.
 * Conflicts are resolved with **model wins** strategy.
 * Model saves preserve JSONC comments and key ordering when possible (patch save), falling back to full save for structural changes.
