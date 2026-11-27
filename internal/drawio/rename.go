@@ -79,12 +79,14 @@ func (p *Page) renameElement(oldID, newID string) int {
 			}
 		}
 	}
-	// A cell wrapped in an <object> has no ID of its own; its parent link
-	// moves with the cells above.
+	// A cell wrapped in an <object> has no ID of its own; its links move with
+	// the cells above.
 	for _, obj := range root.SelectElements("object") {
 		for _, cell := range obj.SelectElements("mxCell") {
-			if v := cell.SelectAttrValue("parent", ""); ids[v] != "" {
-				cell.CreateAttr("parent", ids[v])
+			for _, attr := range []string{"parent", "source", "target"} {
+				if v := cell.SelectAttrValue(attr, ""); ids[v] != "" {
+					cell.CreateAttr(attr, ids[v])
+				}
 			}
 		}
 	}
