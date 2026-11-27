@@ -344,3 +344,46 @@ func TestRekeyStaleConnectors_MatchesByOldIndex(t *testing.T) {
 		t.Errorf("cell with old index 5 should become index 1, got %s", ids[len(ids)-2].SelectAttrValue("id", ""))
 	}
 }
+
+// A re-keyed connector gets its label written escaped, so it needs html=1
+// even when the cell was created without it (#699 review).
+func TestSync_RekeyedConnectorGetsTheHTMLFlag(t *testing.T) {
+	notify := model.Relationship{From: "shop.lib", To: "shop.web", Label: "notifies"}
+	solid := model.Relationship{From: "shop.web", To: "shop.lib.core", Label: "R&D <calls>"}
+	inserted := model.Relationship{From: "shop.lib", To: "shop.web", Label: "inserted"}
+	m1 := liftingModel(notify, solid)
+	m2 := liftingModel(inserted, notify, solid) // both shift by one: their cells are re-keyed, nothing is modified
+
+	ts := minimalTemplates(t)
+	doc := shopContainersDoc()
+	Run(m1, doc, emptyState(), ts, nil)
+	page := requirePage(t, doc, "view-containers")
+	for _, c := range page.FindAllConnectors() {
+		c.CreateAttr("style", strings.ReplaceAll(c.SelectAttrValue("style", ""), "html=1", "html=0"))
+	}
+	Run(m2, doc, buildTestState(t, m1, doc), ts, nil)
+
+	for _, c := range page.FindAllConnectors() {
+		if strings.Contains(c.SelectAttrValue("value", ""), "&lt;") && !strings.Contains(c.SelectAttrValue("style", ""), "html=1") {
+			t.Errorf("connector %s holds escaped text but its style is %q", c.SelectAttrValue("id", ""), c.SelectAttrValue("style", ""))
+		}
+	}
+}
+
+// The value of a connector without html=1 is shown literally, so a label such
+// as "&lt;x&gt;" in the model must not be read back as "<x>" (#699 review).
+func TestSync_LiteralEntityLabelOfAPlainConnectorIsNotRewritten(t *testing.T) {
+	m := liftingModel(model.Relationship{From: "shop.web", To: "shop.lib", Label: "a &lt; b"})
+	ts := minimalTemplates(t)
+	doc := shopContainersDoc()
+	Run(m, doc, emptyState(), ts, nil)
+	page := requirePage(t, doc, "view-containers")
+	for _, c := range page.FindAllConnectors() {
+		c.CreateAttr("style", strings.ReplaceAll(c.SelectAttrValue("style", ""), "html=1", "html=0"))
+		c.CreateAttr("value", "a &lt; b")
+	}
+	Run(m, doc, buildTestState(t, m, doc), ts, nil)
+	if got := m.Relationships[0].Label; got != "a &lt; b" {
+		t.Errorf("model label rewritten to %q", got)
+	}
+}

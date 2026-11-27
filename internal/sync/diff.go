@@ -534,7 +534,7 @@ func extractDrawioRelationshipsFor(doc *drawio.Document, last map[string]Relatio
 			cellID := cell.SelectAttrValue("id", "")
 			index := parseConnectorIndex(cellID)
 			key := relKey(from, to, index)
-			label := cell.SelectAttrValue("value", "")
+			label := drawio.CellText(cell)
 			lastRel, inLast := last[key]
 			isEdit := inLast && label != lastRel.Label
 			if existing, exists := result[key]; exists {

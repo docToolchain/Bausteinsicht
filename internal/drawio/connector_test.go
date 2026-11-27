@@ -116,8 +116,8 @@ func TestSetConnectorStyle(t *testing.T) {
 	if conn == nil {
 		t.Fatal("connector not found after style update")
 	}
-	if got := conn.SelectAttrValue("style", ""); got != "endArrow=block;dashed=1;" {
-		t.Errorf("style = %q, want %q", got, "endArrow=block;dashed=1;")
+	if got := conn.SelectAttrValue("style", ""); got != "endArrow=block;dashed=1;html=1;" {
+		t.Errorf("style = %q, want %q", got, "endArrow=block;dashed=1;html=1;")
 	}
 }
 

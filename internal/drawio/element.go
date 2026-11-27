@@ -113,13 +113,13 @@ type SubCellTemplates struct {
 func createSubCells(root *etree.Element, parentCellID string, data ElementData, sc *SubCellTemplates) {
 	// Title sub-cell (always created).
 	if sc.Title != nil {
-		createTextSubCell(root, parentCellID+"-title", parentCellID, data.Title,
+		createTextSubCell(root, parentCellID+"-title", parentCellID, EscapeCellText(data.Title),
 			sc.Title, data.Width, data.Height)
 	}
 
 	// Technology sub-cell (only when technology is non-empty).
 	if sc.Tech != nil && data.Technology != "" {
-		createTextSubCell(root, parentCellID+"-tech", parentCellID, "["+data.Technology+"]",
+		createTextSubCell(root, parentCellID+"-tech", parentCellID, "["+EscapeCellText(data.Technology)+"]",
 			sc.Tech, data.Width, data.Height)
 	}
 
@@ -127,7 +127,7 @@ func createSubCells(root *etree.Element, parentCellID string, data ElementData, 
 	// The display value is truncated to avoid visual overflow; the full text
 	// is preserved in the element's tooltip attribute.
 	if sc.Desc != nil && data.Description != "" {
-		createTextSubCell(root, parentCellID+"-desc", parentCellID, truncateText(data.Description, 120),
+		createTextSubCell(root, parentCellID+"-desc", parentCellID, EscapeCellText(truncateText(data.Description, 120)),
 			sc.Desc, data.Width, data.Height)
 	}
 }
@@ -152,7 +152,7 @@ func createTextSubCell(root *etree.Element, id, parentID, value string, sub *Sub
 	// to the parent element. This lets users grab the whole shape at once.
 	// overflow=hidden clips text at the fixed sub-cell boundary; the full
 	// content remains accessible via the element's tooltip attribute.
-	style := setStyleFlags(sub.Style, "pointerEvents=0", "overflow=hidden")
+	style := setStyleFlags(sub.Style, "pointerEvents=0", "overflow=hidden", "html=1")
 	cell.CreateAttr("style", style)
 	cell.CreateAttr("vertex", "1")
 	cell.CreateAttr("connectable", "0")
@@ -285,14 +285,14 @@ func hasSuffix(s, suffix string) bool {
 func updateSubCells(root *etree.Element, parentCellID string, cells map[string]*etree.Element, data ElementData) {
 	// Update title.
 	if tc, ok := cells["title"]; ok {
-		setAttr(tc, "value", data.Title)
+		setAttr(tc, "value", EscapeCellText(data.Title))
 		ensureSubCellStyle(tc)
 	}
 
 	// Update or add/remove technology cell.
 	if tc, ok := cells["tech"]; ok {
 		if data.Technology != "" {
-			setAttr(tc, "value", "["+data.Technology+"]")
+			setAttr(tc, "value", "["+EscapeCellText(data.Technology)+"]")
 			ensureSubCellStyle(tc)
 		} else {
 			root.RemoveChild(tc)
@@ -302,7 +302,7 @@ func updateSubCells(root *etree.Element, parentCellID string, cells map[string]*
 	// Update or add/remove description cell.
 	if dc, ok := cells["desc"]; ok {
 		if data.Description != "" {
-			setAttr(dc, "value", truncateText(data.Description, 120))
+			setAttr(dc, "value", EscapeCellText(truncateText(data.Description, 120)))
 			ensureSubCellStyle(dc)
 		} else {
 			root.RemoveChild(dc)
@@ -314,7 +314,7 @@ func updateSubCells(root *etree.Element, parentCellID string, cells map[string]*
 // This migrates older sub-cells that were created before these flags existed.
 func ensureSubCellStyle(cell *etree.Element) {
 	style := cell.SelectAttrValue("style", "")
-	updated := setStyleFlags(style, "pointerEvents=0", "overflow=hidden")
+	updated := setStyleFlags(style, "pointerEvents=0", "overflow=hidden", "html=1")
 	if updated != style {
 		setAttr(cell, "style", updated)
 	}
@@ -386,13 +386,13 @@ func (p *Page) ReadElementFields(obj *etree.Element) (title, technology, descrip
 
 	if len(childCells) > 0 {
 		if tc, ok := childCells["title"]; ok {
-			title = tc.SelectAttrValue("value", "")
+			title = CellText(tc)
 		}
 		if tc, ok := childCells["tech"]; ok {
-			technology = trimBrackets(tc.SelectAttrValue("value", ""))
+			technology = trimBrackets(CellText(tc))
 		}
 		if dc, ok := childCells["desc"]; ok {
-			description = dc.SelectAttrValue("value", "")
+			description = CellText(dc)
 		}
 		return title, technology, description
 	}

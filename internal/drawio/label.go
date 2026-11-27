@@ -1,7 +1,10 @@
 package drawio
 
 import (
+	"html"
 	"strings"
+
+	"github.com/beevik/etree"
 )
 
 // Label color constants for technology and description lines.
@@ -177,4 +180,23 @@ func stripTags(s string) string {
 		}
 	}
 	return unescapeHTML(b.String())
+}
+
+// EscapeCellText turns model text into the value of an html=1 text cell: the
+// cell holds HTML, so "<", ">" and "&" must not reach draw.io as markup (#699).
+func EscapeCellText(s string) string { return escapeHTML(s) }
+
+// UnescapeCellText is the inverse of EscapeCellText: the plain text of the value
+// of an html=1 text cell. It also decodes the other entities draw.io writes
+// (&#39;, &nbsp;, ...).
+func UnescapeCellText(s string) string { return html.UnescapeString(s) }
+
+// CellText returns the text of a cell's value attribute as it is shown: HTML
+// cells (html=1) hold escaped text, other cells show the value literally.
+func CellText(cell *etree.Element) string {
+	value := cell.SelectAttrValue("value", "")
+	if !strings.Contains(cell.SelectAttrValue("style", ""), "html=1") {
+		return value
+	}
+	return UnescapeCellText(value)
 }
