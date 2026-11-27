@@ -19,17 +19,18 @@ func RenderSequencePlantUML(view model.DynamicView, flat map[string]*model.Eleme
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "@startuml %s\n", sanitizeID(view.Key))
-	fmt.Fprintf(&b, "title %s\n", escapeQuotes(view.Title))
+	fmt.Fprintf(&b, "title %s\n", escapePlantUMLText(view.Title))
 	b.WriteString("autonumber\n\n")
 
 	for _, id := range collectParticipants(steps) {
 		shape := plantUMLParticipantShape(participantMacro(id, flat, spec))
-		fmt.Fprintf(&b, "%s \"%s\" as %s\n", shape, escapeQuotes(participantTitle(id, flat)), sanitizeID(id))
+		fmt.Fprintf(&b, "%s \"%s\" as %s\n", shape, escapePlantUMLText(participantTitle(id, flat)), sanitizeID(id))
 	}
 	b.WriteString("\n")
 
 	depth := 0
 	for _, step := range steps {
+		step.Label = replaceLineBreaks(step.Label, `\n`)
 		if keyword, isBlock := blockKeyword(step.Type); isBlock {
 			depth = writeBlockStep(&b, "", keyword, step, depth)
 			continue

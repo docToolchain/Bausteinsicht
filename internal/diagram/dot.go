@@ -36,7 +36,7 @@ func RenderDOT(m *model.BausteinsichtModel, viewKey string) (string, error) {
 	rels := filterRelationships(m.Relationships, elemSet, &m.Specification)
 
 	var b strings.Builder
-	b.WriteString("digraph \"" + escapeQuotes(view.Title) + "\" {\n")
+	b.WriteString("digraph \"" + escapeDOTText(view.Title) + "\" {\n")
 	b.WriteString("  rankdir=LR\n")
 	b.WriteString("  node [shape=box style=filled fontname=\"Arial\" fontsize=9]\n")
 	b.WriteString("  edge [fontsize=8]\n\n")
@@ -60,7 +60,7 @@ func RenderDOT(m *model.BausteinsichtModel, viewKey string) (string, error) {
 		}
 
 		fmt.Fprintf(&b, "  %s [label=\"%s\" fillcolor=\"%s\" color=\"%s\"]\n",
-			nodeID, escapeQuotes(label), style.Fill, style.Stroke)
+			nodeID, escapeDOTText(label), style.Fill, style.Stroke)
 	}
 
 	// Write relationships
@@ -71,7 +71,7 @@ func RenderDOT(m *model.BausteinsichtModel, viewKey string) (string, error) {
 			toID := sanitizeID(r.To)
 			var attrs []string
 			if label := r.displayLabel(); label != "" {
-				attrs = append(attrs, fmt.Sprintf("label=\"%s\"", escapeQuotes(label)))
+				attrs = append(attrs, fmt.Sprintf("label=\"%s\"", escapeDOTText(label)))
 			}
 			if r.Dashed {
 				attrs = append(attrs, `style="dashed"`)

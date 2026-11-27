@@ -328,19 +328,47 @@ func escapeQuotes(s string) string {
 	return strings.ReplaceAll(s, "\"", "'")
 }
 
+// textEscaper turns free text into the inside of a quoted string of one output
+// format.
+type textEscaper func(string) string
+
+// lineBreakEscaper replaces quotes and every kind of line break (CRLF, LF, CR)
+// with br, the format's in-string line break (#690).
+func lineBreakEscaper(br string) textEscaper {
+	return func(s string) string {
+		return replaceLineBreaks(escapeQuotes(s), br)
+	}
+}
+
+// replaceLineBreaks replaces CRLF, LF and CR in s with br.
+func replaceLineBreaks(s, br string) string {
+	s = strings.ReplaceAll(s, "\r\n", "\n")
+	s = strings.ReplaceAll(s, "\r", "\n")
+	return strings.ReplaceAll(s, "\n", br)
+}
+
+var (
+	// escapePlantUMLText and escapeDOTText write a line break as \n, which both
+	// languages expand inside quoted strings.
+	escapePlantUMLText = lineBreakEscaper(`\n`)
+	escapeDOTText      = lineBreakEscaper(`\n`)
+	// escapeMermaidText writes <br/>, the only line break Mermaid's C4 text takes.
+	escapeMermaidText = lineBreakEscaper("<br/>")
+)
+
 // writeC4Element writes one element as a C4 macro call. PlantUML-C4 and
 // Mermaid's C4 diagram syntax use the same macro-call format, so both
 // writePlantUML and writeMermaid share this.
-func writeC4Element(b *strings.Builder, e elemEntry, indent string) {
+func writeC4Element(b *strings.Builder, e elemEntry, indent string, esc textEscaper) {
 	macro := e.Macro
 	if e.Elem.Technology != "" {
 		fmt.Fprintf(b, "%s%s(%s, \"%s\", \"%s\", \"%s\")\n",
 			indent, macro, sanitizeID(e.ID),
-			escapeQuotes(e.Elem.Title), escapeQuotes(e.Elem.Technology), escapeQuotes(e.Elem.Description))
+			esc(e.Elem.Title), esc(e.Elem.Technology), esc(e.Elem.Description))
 	} else {
 		fmt.Fprintf(b, "%s%s(%s, \"%s\", \"%s\")\n",
 			indent, macro, sanitizeID(e.ID),
-			escapeQuotes(e.Elem.Title), escapeQuotes(e.Elem.Description))
+			esc(e.Elem.Title), esc(e.Elem.Description))
 	}
 }
 
@@ -373,16 +401,16 @@ func resolveBoundary(view model.View, flat map[string]*model.Element, spec *mode
 // Shared by writePlantUML and writeMermaid, which differ only in
 // indentation convention (PlantUML: no base indent, 2-space nesting;
 // Mermaid: 4-space base indent, 4-space nesting).
-func writeScopeSection(b *strings.Builder, view model.View, bnd boundary, inside []elemEntry, outerIndent, innerIndent string) {
+func writeScopeSection(b *strings.Builder, view model.View, bnd boundary, inside []elemEntry, outerIndent, innerIndent string, esc textEscaper) {
 	if view.Scope == "" {
 		for _, e := range inside {
-			writeC4Element(b, e, outerIndent)
+			writeC4Element(b, e, outerIndent, esc)
 		}
 		return
 	}
-	fmt.Fprintf(b, "%s%s(%s, \"%s\") {\n", outerIndent, bnd.Macro, sanitizeID(view.Scope), escapeQuotes(bnd.Title))
+	fmt.Fprintf(b, "%s%s(%s, \"%s\") {\n", outerIndent, bnd.Macro, sanitizeID(view.Scope), esc(bnd.Title))
 	for _, e := range inside {
-		writeC4Element(b, e, innerIndent)
+		writeC4Element(b, e, innerIndent, esc)
 	}
 	fmt.Fprintf(b, "%s}\n", outerIndent)
 }
@@ -394,7 +422,7 @@ func writePlantUML(b *strings.Builder, view model.View, level string, inside, ou
 	fmt.Fprintf(b, "!include <C4/C4_%s>\n", level)
 	// The view title and, unless the view opts out, the legend that tells the
 	// C4 shapes apart (#642).
-	fmt.Fprintf(b, "title %s\n", view.Title)
+	fmt.Fprintf(b, "title %s\n", escapePlantUMLText(view.Title))
 	if view.Legend == nil || *view.Legend {
 		b.WriteString("LAYOUT_WITH_LEGEND()\n")
 	}
@@ -402,11 +430,11 @@ func writePlantUML(b *strings.Builder, view model.View, level string, inside, ou
 
 	// External elements (outside scope boundary).
 	for _, e := range outside {
-		writeC4Element(b, e, "")
+		writeC4Element(b, e, "", escapePlantUMLText)
 	}
 
 	// Scope boundary with internal elements.
-	writeScopeSection(b, view, bnd, inside, "", "  ")
+	writeScopeSection(b, view, bnd, inside, "", "  ", escapePlantUMLText)
 
 	writePlantUMLRelationships(b, rels)
 
@@ -426,32 +454,32 @@ func writePlantUMLRelationships(b *strings.Builder, rels []relEntry) {
 	}
 	for _, r := range rels {
 		if r.Dashed {
-			fmt.Fprintf(b, "%s ..> %s : \"%s\"\n", sanitizeID(r.From), sanitizeID(r.To), escapeQuotes(r.displayLabel()))
+			fmt.Fprintf(b, "%s ..> %s : \"%s\"\n", sanitizeID(r.From), sanitizeID(r.To), escapePlantUMLText(r.displayLabel()))
 		} else {
-			fmt.Fprintf(b, "Rel(%s, %s, \"%s\"%s)\n", sanitizeID(r.From), sanitizeID(r.To), escapeQuotes(r.Label), relTechnologyArg(r))
+			fmt.Fprintf(b, "Rel(%s, %s, \"%s\"%s)\n", sanitizeID(r.From), sanitizeID(r.To), escapePlantUMLText(r.Label), relTechnologyArg(r, escapePlantUMLText))
 		}
 	}
 }
 
 // relTechnologyArg is the optional fourth argument of the C4 Rel() macro.
-func relTechnologyArg(r relEntry) string {
+func relTechnologyArg(r relEntry, esc textEscaper) string {
 	if r.Technology == "" {
 		return ""
 	}
-	return fmt.Sprintf(", \"%s\"", escapeQuotes(r.Technology))
+	return fmt.Sprintf(", \"%s\"", esc(r.Technology))
 }
 
 // --- Mermaid ---
 
 func writeMermaid(b *strings.Builder, view model.View, level string, inside, outside []elemEntry, rels []relEntry, bnd boundary) {
 	fmt.Fprintf(b, "C4%s\n", level)
-	fmt.Fprintf(b, "    title %s\n\n", view.Title)
+	fmt.Fprintf(b, "    title %s\n\n", escapeMermaidText(view.Title))
 
 	for _, e := range outside {
-		writeC4Element(b, e, "    ")
+		writeC4Element(b, e, "    ", escapeMermaidText)
 	}
 
-	writeScopeSection(b, view, bnd, inside, "    ", "        ")
+	writeScopeSection(b, view, bnd, inside, "    ", "        ", escapeMermaidText)
 
 	// Relationships. r.Dashed is intentionally not applied here: Mermaid's
 	// own C4 diagram docs mark UpdateRelStyle's $lineStyle=DashedLine() as
@@ -464,7 +492,7 @@ func writeMermaid(b *strings.Builder, view model.View, level string, inside, out
 		b.WriteString("\n")
 	}
 	for _, r := range rels {
-		fmt.Fprintf(b, "    Rel(%s, %s, \"%s\"%s)\n", sanitizeID(r.From), sanitizeID(r.To), escapeQuotes(r.Label), relTechnologyArg(r))
+		fmt.Fprintf(b, "    Rel(%s, %s, \"%s\"%s)\n", sanitizeID(r.From), sanitizeID(r.To), escapeMermaidText(r.Label), relTechnologyArg(r, escapeMermaidText))
 	}
 }
 
