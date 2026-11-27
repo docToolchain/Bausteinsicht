@@ -178,3 +178,10 @@ func stripTags(s string) string {
 	}
 	return unescapeHTML(b.String())
 }
+
+// EscapeCellText and UnescapeCellText convert between plain model text and the
+// value of an html=1 text cell. The skeleton does not convert yet.
+func EscapeCellText(s string) string { return s }
+
+// UnescapeCellText is the inverse of EscapeCellText.
+func UnescapeCellText(s string) string { return s }
