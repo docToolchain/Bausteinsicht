@@ -428,3 +428,31 @@ func TestImport_ViewKeyAndDescription(t *testing.T) {
 		t.Errorf("want landscape view land titled %q, got %+v", "All systems", v)
 	}
 }
+
+// A generated view key must not replace a view that already has that key,
+// whether the earlier key was generated or written in the DSL (CodeRabbit
+// finding on #755).
+func TestImport_ViewKeysNeverOverwriteEachOther(t *testing.T) {
+	src := `workspace {
+  model {
+    s = softwareSystem "S" {
+      c = container "C"
+    }
+  }
+  views {
+    systemContext s "ctx" { include * }
+    systemContext s "s_1" "Second" { include * }
+    container s "cont" { include * }
+  }
+}`
+	result, err := structurizr.ImportSource(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := len(result.Model.Views); got != 3 {
+		t.Errorf("want 3 views, got %d: %v", got, result.Model.Views)
+	}
+	if v := result.Model.Views["s_1"]; v.Title != "Second" {
+		t.Errorf("the explicit key s_1 must keep its view, got %+v", v)
+	}
+}
