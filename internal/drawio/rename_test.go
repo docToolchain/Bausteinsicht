@@ -19,6 +19,7 @@ const renameDoc = `<mxfile><diagram id="view-ctx" name="Ctx"><mxGraphModel><root
 <mxCell id="rel-ctx--shop-ctx--shopper-0" edge="1" source="ctx--shop" target="ctx--shopper" parent="1"/>
 <mxCell id="rel-ctx--shop.api-ctx--shopper-3" edge="1" source="ctx--shop.api" target="ctx--shopper" parent="1"/>
 <mxCell id="user-arrow" edge="1" source="ctx--shop" target="ctx--shopper" parent="1"/>
+<object id="wrapped-edge" label="x"><mxCell edge="1" source="ctx--shop.api" target="ctx--shop" parent="ctx--shop"/></object>
 </root></mxGraphModel></diagram></mxfile>`
 
 func ids(t *testing.T, doc *Document) string {
@@ -62,8 +63,24 @@ func TestDocument_RenameElement(t *testing.T) {
 			t.Errorf("missing %q in:\n%s", want, got)
 		}
 	}
-	if strings.Contains(got, "ctx--shop\"") || strings.Contains(got, "bausteinsicht_id=\"shop\"") {
-		t.Errorf("old IDs left:\n%s", got)
+	// No attribute of any cell, wrapped or not, may still name the old element;
+	// "shopper" only starts with the same letters and is not the old element.
+	root := doc.Pages()[0].Root()
+	var check func(el *etree.Element)
+	check = func(el *etree.Element) {
+		for _, attr := range []string{"id", "parent", "source", "target", "bausteinsicht_id"} {
+			if v := strings.ReplaceAll(el.SelectAttrValue(attr, ""), "shopper", ""); strings.Contains(v, "shop") {
+				t.Errorf("%s=%q of <%s> still names the old element", attr, el.SelectAttrValue(attr, ""), el.Tag)
+			}
+		}
+		for _, c := range el.ChildElements() {
+			check(c)
+		}
+	}
+	check(root)
+	wrapped := root.FindElement("object[@id='wrapped-edge']/mxCell")
+	if wrapped == nil || wrapped.SelectAttrValue("source", "") != "ctx--store.api" || wrapped.SelectAttrValue("target", "") != "ctx--store" {
+		t.Errorf("the ends of an edge wrapped in an object were not renamed: %v", wrapped)
 	}
 	if x := doc.Pages()[0].FindElement("store").SelectElement("mxCell").SelectElement("mxGeometry").SelectAttrValue("x", ""); x != "777" {
 		t.Errorf("the geometry changed: x=%s", x)
