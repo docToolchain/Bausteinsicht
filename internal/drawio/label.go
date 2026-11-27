@@ -1,6 +1,7 @@
 package drawio
 
 import (
+	"html"
 	"strings"
 )
 
@@ -179,9 +180,11 @@ func stripTags(s string) string {
 	return unescapeHTML(b.String())
 }
 
-// EscapeCellText and UnescapeCellText convert between plain model text and the
-// value of an html=1 text cell. The skeleton does not convert yet.
-func EscapeCellText(s string) string { return s }
+// EscapeCellText turns model text into the value of an html=1 text cell: the
+// cell holds HTML, so "<", ">" and "&" must not reach draw.io as markup (#699).
+func EscapeCellText(s string) string { return escapeHTML(s) }
 
-// UnescapeCellText is the inverse of EscapeCellText.
-func UnescapeCellText(s string) string { return s }
+// UnescapeCellText is the inverse of EscapeCellText: the plain text of the value
+// of an html=1 text cell. It also decodes the other entities draw.io writes
+// (&#39;, &nbsp;, ...).
+func UnescapeCellText(s string) string { return html.UnescapeString(s) }

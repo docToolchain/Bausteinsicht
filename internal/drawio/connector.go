@@ -47,8 +47,8 @@ func (p *Page) CreateConnector(data ConnectorData, style string) {
 
 	cell := root.CreateElement("mxCell")
 	cell.CreateAttr("id", connectorID(srcRef, tgtRef, data.Index))
-	cell.CreateAttr("value", data.Label)
-	cell.CreateAttr("style", style)
+	cell.CreateAttr("value", EscapeCellText(data.Label))
+	cell.CreateAttr("style", setStyleFlags(style, "html=1"))
 	cell.CreateAttr("edge", "1")
 	cell.CreateAttr("source", srcRef)
 	cell.CreateAttr("target", tgtRef)
@@ -95,12 +95,7 @@ func (p *Page) UpdateConnectorLabel(from, to string, index int, label string) {
 	if conn == nil {
 		return
 	}
-	attr := conn.SelectAttr("value")
-	if attr != nil {
-		attr.Value = label
-	} else {
-		conn.CreateAttr("value", label)
-	}
+	conn.CreateAttr("value", EscapeCellText(label))
 }
 
 // SetConnectorStyle overwrites the style attribute on the connector between

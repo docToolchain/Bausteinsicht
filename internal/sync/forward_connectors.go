@@ -136,7 +136,7 @@ func rekeyStaleConnectors(page *drawio.Page, viewID string, conns []viewConnecto
 		cell := cells[0]
 		stale[src+"->"+tgt] = cells[1:]
 		setAttrOn(cell, "id", id)
-		setAttrOn(cell, "value", vc.label)
+		setAttrOn(cell, "value", drawio.EscapeCellText(vc.label))
 		dashed := "dashed=0;"
 		if vc.dashed {
 			dashed = "dashed=1;"
