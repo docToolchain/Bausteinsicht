@@ -20,6 +20,10 @@ func TestParentDirectoryPathsForModelAndTemplate(t *testing.T) {
 		t.Fatal(err)
 	}
 	model := filepath.Join("..", "architecture.jsonc")
+	// init writes the state too; remove it so that only sync can recreate it.
+	if err := os.Remove(filepath.Join(root, ".bausteinsicht-sync")); err != nil {
+		t.Fatal(err)
+	}
 
 	for _, args := range [][]string{
 		{"validate"},
