@@ -115,3 +115,49 @@ func TestSequencePlantUML_LineBreaks(t *testing.T) {
 		}
 	}
 }
+
+// A literal backslash in front of a line break must not swallow the break: in
+// DOT and PlantUML "\\" is a backslash, so the backslash is doubled before the
+// \n marker is added (CodeRabbit finding on #754).
+func TestExports_BackslashBeforeLineBreak(t *testing.T) {
+	m := multilineModel()
+	e := m.Model["u"]
+	e.Description = "A\\\nB"
+	m.Model["u"] = e
+	m.Relationships[0].Label = "C:\\dir\\\nnext"
+
+	plant, _ := FormatView(m, "v", PlantUML)
+	if !strings.Contains(plant, `"A\\\nB"`) || !strings.Contains(plant, `"C:\\dir\\\nnext"`) {
+		t.Errorf("PlantUML does not double the backslash before the break:\n%s", plant)
+	}
+	dot, _ := RenderDOT(m, "v")
+	if !strings.Contains(dot, `label="C:\\dir\\\nnext"`) {
+		t.Errorf("DOT does not double the backslash before the break:\n%s", dot)
+	}
+	mer, _ := FormatView(m, "v", Mermaid)
+	if !strings.Contains(mer, `"A\<br/>B"`) {
+		t.Errorf("Mermaid should keep the backslash as it is:\n%s", mer)
+	}
+}
+
+// Rendered by graphviz the text keeps the backslash and still breaks the line.
+func TestExports_DOTBackslashBeforeLineBreakRenders(t *testing.T) {
+	bin, err := exec.LookPath("dot")
+	if err != nil {
+		t.Skip("graphviz dot not installed")
+	}
+	m := multilineModel()
+	m.Relationships[0].Label = "A\\\nB"
+	out, _ := RenderDOT(m, "v")
+	p := filepath.Join(t.TempDir(), "v.dot")
+	if err := os.WriteFile(p, []byte(out), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	svg, err := exec.Command(bin, "-Tsvg", p).CombinedOutput()
+	if err != nil {
+		t.Fatalf("dot failed: %v\n%s", err, svg)
+	}
+	if strings.Contains(string(svg), `A\\nB`) || !strings.Contains(string(svg), `>A\</text>`) {
+		t.Errorf("the break after the backslash was lost:\n%s", svg)
+	}
+}
