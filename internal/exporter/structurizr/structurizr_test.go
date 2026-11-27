@@ -39,7 +39,7 @@ func buildTestModel() *model.BausteinsichtModel {
 		},
 		Views: map[string]model.View{
 			"context":    {Title: "System Context", Scope: "orderSystem", Include: []string{"*"}},
-			"containers": {Title: "Containers", Scope: "orderSystem", Include: []string{"*"}},
+			"containers": {Title: "Containers", Scope: "orderSystem", Include: []string{"*", "orderSystem.*"}},
 		},
 	}
 }
@@ -219,7 +219,7 @@ func TestExport_TechnologyAndDescription(t *testing.T) {
 		Views:         map[string]model.View{},
 	}
 	out := structurizr.Export(m)
-	if !strings.Contains(out, `svc = container "Service" "Go" "Does stuff"`) {
+	if !strings.Contains(out, `svc = container "Service" "Does stuff" "Go"`) {
 		t.Errorf("expected technology and description in output, got:\n%s", out)
 	}
 }

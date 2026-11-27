@@ -81,16 +81,27 @@ func (e *exporter) writeElement(b *strings.Builder, dotPath string, elem model.E
 		title = varName
 	}
 
-	hasChildren := len(elem.Children) > 0
+	// Structurizr: person/softwareSystem take name, description; container and
+	// component take name, description, technology. A technology without a
+	// description keeps its slot with an empty description.
+	args := []string{title, desc}
+	if hasTechnologySlot(kind) {
+		args = append(args, tech)
+	}
+	for len(args) > 1 && args[len(args)-1] == "" {
+		args = args[:len(args)-1]
+	}
+	if tech != "" && hasTechnologySlot(kind) && len(args) == 1 {
+		args = []string{title, "", tech}
+	}
+	var line strings.Builder
+	fmt.Fprintf(&line, "%s%s = %s", indent, varName, kind)
+	for _, a := range args {
+		fmt.Fprintf(&line, " \"%s\"", a)
+	}
 
-	if hasChildren {
-		if tech != "" {
-			fmt.Fprintf(b, "%s%s = %s \"%s\" \"%s\" \"%s\" {\n", indent, varName, kind, title, tech, desc)
-		} else if desc != "" {
-			fmt.Fprintf(b, "%s%s = %s \"%s\" \"%s\" {\n", indent, varName, kind, title, desc)
-		} else {
-			fmt.Fprintf(b, "%s%s = %s \"%s\" {\n", indent, varName, kind, title)
-		}
+	if len(elem.Children) > 0 {
+		fmt.Fprintf(b, "%s {\n", line.String())
 		for _, childKey := range sortedKeys(elem.Children) {
 			childElem := elem.Children[childKey]
 			childDotPath := dotPath + "." + childKey
@@ -98,14 +109,14 @@ func (e *exporter) writeElement(b *strings.Builder, dotPath string, elem model.E
 		}
 		fmt.Fprintf(b, "%s}\n", indent)
 	} else {
-		if tech != "" {
-			fmt.Fprintf(b, "%s%s = %s \"%s\" \"%s\" \"%s\"\n", indent, varName, kind, title, tech, desc)
-		} else if desc != "" {
-			fmt.Fprintf(b, "%s%s = %s \"%s\" \"%s\"\n", indent, varName, kind, title, desc)
-		} else {
-			fmt.Fprintf(b, "%s%s = %s \"%s\"\n", indent, varName, kind, title)
-		}
+		fmt.Fprintf(b, "%s\n", line.String())
 	}
+}
+
+// hasTechnologySlot reports whether the Structurizr keyword takes a technology
+// argument; person and softwareSystem do not (a third string would be a tag).
+func hasTechnologySlot(kind string) bool {
+	return kind == "container" || kind == "component"
 }
 
 func (e *exporter) writeViews(b *strings.Builder, indent string) {
@@ -152,10 +163,13 @@ func (e *exporter) detectViewType(v model.View) string {
 		// Scope is a container → component view (shows what's inside a container).
 		return "component"
 	}
-	// System-kind scope: if the scope element has container-kind children it's a container view.
-	for _, child := range scopeElem.Children {
-		if isContainerKind(child.Kind) {
-			return "container"
+	// System-kind scope: a view that shows something inside the system is a
+	// container view, one that shows only its surroundings a context view.
+	if resolved, err := model.ResolveView(e.m, &v); err == nil {
+		for _, id := range resolved {
+			if strings.HasPrefix(id, v.Scope+".") {
+				return "container"
+			}
 		}
 	}
 	return "systemContext"
