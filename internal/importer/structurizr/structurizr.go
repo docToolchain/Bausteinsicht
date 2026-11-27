@@ -306,6 +306,12 @@ func (is *importState) nextViewKey(keyword, scope, explicit string) string {
 		viewKey = fmt.Sprintf("%s_%d", baseKey, is.viewKeys[baseKey])
 	}
 	is.viewKeys[baseKey]++
+	// An explicit key of another view can equal a generated one: take the next
+	// free suffix instead of replacing that view.
+	for _, taken := is.views[viewKey]; taken; _, taken = is.views[viewKey] {
+		viewKey = fmt.Sprintf("%s_%d", baseKey, is.viewKeys[baseKey])
+		is.viewKeys[baseKey]++
+	}
 	return viewKey
 }
 
