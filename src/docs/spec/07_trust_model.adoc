@@ -15,7 +15,9 @@ It operates entirely on the local filesystem with the permissions of the invokin
 
 === Path-Validated: CLI Flags
 
-CLI flags (`--model`, `--template`, `--output`) are provided by the user, but their paths are **validated** before use: `validatePathContainment` (`cmd/bausteinsicht/root.go`) rejects paths containing `..` or otherwise escaping the working directory, returning exit code 2 (SEC-001 / SEC-016). This guards against an automated agent with untrusted input reading or writing outside the intended directory. Absolute paths and ordinary relative paths within the tree are accepted; directory-traversal sequences are not.
+CLI flags are provided by the user. The paths of the files the tool **writes** (`--output`, the output directories of the export commands, `import` input and output, `--drawio-file`) are **validated** before use: `validatePathContainment` (`cmd/bausteinsicht/root.go`) rejects paths containing `..`, returning exit code 2 (SEC-001 / SEC-016). This guards against an automated agent with untrusted input writing outside the intended directory. Absolute paths and ordinary relative paths within the tree are accepted; directory-traversal sequences are not.
+
+`--model` and `--template` are **not** restricted: a relative path with `..` (a model in the parent directory of the working directory, a common monorepo or docs-folder layout) is accepted, like an absolute path. The tool only reads them (plus the sync state and draw.io file next to the model), and anyone who can choose these arguments can already read and write these files with the privileges of the invoking user (#700).
 
 === Resource Limits
 

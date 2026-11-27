@@ -14,6 +14,7 @@ func TestParentDirectoryPathsForModelAndTemplate(t *testing.T) {
 	bin := buildBinary(t)
 	root := t.TempDir()
 	runCLI(t, bin, root, "init")
+	runCLI(t, bin, root, "generate-template", "--output", "architecture-template.drawio")
 	sub := filepath.Join(root, "sub")
 	if err := os.MkdirAll(sub, 0o755); err != nil {
 		t.Fatal(err)

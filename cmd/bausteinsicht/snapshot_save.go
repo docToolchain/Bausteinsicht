@@ -26,10 +26,6 @@ func runSnapshotSave(cmd *cobra.Command, _ []string) error {
 	modelPath, _ := cmd.Flags().GetString("model")
 	message, _ := cmd.Flags().GetString("message")
 
-	if err := validatePathContainment(modelPath); err != nil {
-		return exitWithCode(err, 2)
-	}
-
 	// Load current model
 	m, err := model.Load(modelPath)
 	if err != nil {

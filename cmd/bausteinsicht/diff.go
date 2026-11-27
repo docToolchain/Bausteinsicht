@@ -28,10 +28,6 @@ func runDiff(cmd *cobra.Command, _ []string) error {
 	modelPath, _ := cmd.Flags().GetString("model")
 	format, _ := cmd.Flags().GetString("format")
 
-	if err := validatePathContainment(modelPath); err != nil {
-		return exitWithCode(err, 2)
-	}
-
 	m, err := model.Load(modelPath)
 	if err != nil {
 		return exitWithCode(fmt.Errorf("loading model: %w", err), 2)

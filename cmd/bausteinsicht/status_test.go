@@ -80,10 +80,13 @@ func TestStatusCmd_NonExistentModel(t *testing.T) {
 	}
 }
 
-func TestStatusCmd_InvalidPathTraversal(t *testing.T) {
-	_, err := executeRootCmd("status", "--model", "../../etc/passwd")
+func TestStatusCmd_MissingModelInParentDirectory(t *testing.T) {
+	_, err := executeRootCmd("status", "--model", "../../no-such-dir/model.jsonc")
 	if err == nil {
-		t.Fatal("expected error for path traversal attempt")
+		t.Fatal("expected error for a missing model")
+	}
+	if strings.Contains(err.Error(), "traversal") {
+		t.Fatalf("a parent directory must not be rejected as traversal: %v", err)
 	}
 }
 

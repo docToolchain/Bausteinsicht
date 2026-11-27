@@ -35,10 +35,6 @@ func runChangelog(cmd *cobra.Command, _ []string) error {
 	format, _ := cmd.Flags().GetString("changelog-format")
 	output, _ := cmd.Flags().GetString("output")
 
-	if err := validatePathContainment(modelPath); err != nil {
-		return exitWithCode(err, 2)
-	}
-
 	// Validate format
 	if format != "markdown" && format != "asciidoc" && format != "json" {
 		return exitWithCode(fmt.Errorf("invalid format: %s (expected markdown, asciidoc, or json)", format), 2)

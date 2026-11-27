@@ -50,9 +50,6 @@ func runStale(cmd *cobra.Command, _ []string) error {
 	unmarkDrawio, _ := cmd.Flags().GetBool("unmark-drawio")
 	drawioFile, _ := cmd.Flags().GetString("drawio-file")
 
-	if err := validatePathContainment(modelPath); err != nil {
-		return exitWithCode(fmt.Errorf("model path: %w", err), 1)
-	}
 	if days < 0 {
 		return exitWithCode(fmt.Errorf("--days must be non-negative"), 1)
 	}

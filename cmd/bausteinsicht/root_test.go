@@ -153,28 +153,27 @@ func TestRootCmd_AcceptsEmptyTemplate(t *testing.T) {
 	}
 }
 
-func TestRootCmd_RejectsModelPathTraversal(t *testing.T) {
-	_, err := executeRootCmd("validate", "--model", "../../etc/model.jsonc")
+// A relative --model with ".." is a normal path; it fails only because the
+// file is missing, not because of the path itself (#700).
+func TestRootCmd_AcceptsModelPathWithParentDirectory(t *testing.T) {
+	_, err := executeRootCmd("validate", "--model", "../../no-such-dir/model.jsonc")
 	if err == nil {
-		t.Fatal("expected error for model path with traversal")
+		t.Fatal("expected an error for a missing model file")
 	}
-	if !strings.Contains(err.Error(), "traversal") {
-		t.Fatalf("expected 'traversal' in error, got: %v", err)
+	if strings.Contains(err.Error(), "traversal") {
+		t.Fatalf("a parent directory in --model must not be rejected as traversal: %v", err)
 	}
 }
 
-func TestRootCmd_RejectsTemplatePathTraversal(t *testing.T) {
+func TestRootCmd_AcceptsTemplatePathWithParentDirectory(t *testing.T) {
 	dir := t.TempDir()
 	modelPath := filepath.Join(dir, "model.jsonc")
 	if err := os.WriteFile(modelPath, templates.SampleModel, 0644); err != nil {
 		t.Fatal(err)
 	}
 	_, err := executeRootCmd("validate", "--model", modelPath, "--template", "../../../tmp/evil.drawio")
-	if err == nil {
-		t.Fatal("expected error for template path with traversal")
-	}
-	if !strings.Contains(err.Error(), "traversal") {
-		t.Fatalf("expected 'traversal' in error, got: %v", err)
+	if err != nil && strings.Contains(err.Error(), "traversal") {
+		t.Fatalf("a parent directory in --template must not be rejected as traversal: %v", err)
 	}
 }
 
