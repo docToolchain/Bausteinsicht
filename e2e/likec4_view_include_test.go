@@ -22,8 +22,15 @@ func TestLikeC4ImportViewsAreNotEmpty(t *testing.T) {
 	runCLI(t, bin, dir, "validate")
 
 	out := runCLI(t, bin, dir, "sync")
-	if strings.Contains(out, "resolves to 0 elements") || strings.Contains(out, "not visible in any view") {
-		t.Errorf("sync reports empty views or hidden elements:\n%s", out)
+	if strings.Contains(out, "resolves to 0 elements") {
+		t.Errorf("sync reports an empty view:\n%s", out)
+	}
+	// The top-level elements and the children of the scope are visible; only
+	// the grandchild is not part of a container view.
+	for _, id := range []string{"user", "myPlatform.api", "myPlatform.db"} {
+		if strings.Contains(out, `Element "`+id+`" exists in the model but is not visible`) {
+			t.Errorf("%s is in no view:\n%s", id, out)
+		}
 	}
 	drawio, err := os.ReadFile(filepath.Join(dir, "architecture.drawio"))
 	if err != nil {
