@@ -10,16 +10,28 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // ExportOptions configures a single page export operation.
 type ExportOptions struct {
-	Format       string  // "png" or "svg"
-	PageIndex    int     // 1-based page index
-	OutputPath   string  // full path to output file
-	EmbedDiagram bool    // embed draw.io XML source in output
-	InputFile    string  // path to the .drawio file
-	Scale        float64 // export scale factor (0 = default, e.g. 2.0 for retina)
+	Format       string        // "png" or "svg"
+	PageIndex    int           // 1-based page index
+	OutputPath   string        // full path to output file
+	EmbedDiagram bool          // embed draw.io XML source in output
+	InputFile    string        // path to the .drawio file
+	Scale        float64       // export scale factor (0 = default, e.g. 2.0 for retina)
+	Timeout      time.Duration // kill draw.io after this long (0 = no limit)
+}
+
+// TimeoutError is returned when draw.io did not finish within the timeout.
+type TimeoutError struct {
+	Timeout time.Duration
+	Output  string // what draw.io printed before it was stopped
+}
+
+func (e *TimeoutError) Error() string {
+	return fmt.Sprintf("draw.io export timed out after %s", e.Timeout)
 }
 
 // platformPaths is a function variable so tests can override it.
