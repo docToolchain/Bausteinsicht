@@ -24,7 +24,7 @@ func TestD2_OutputCompiles(t *testing.T) {
 			Relationships: map[string]model.RelationshipKind{"async": {Notation: "publishes", Dashed: true}},
 		},
 		Model: map[string]model.Element{
-			"back-office": {Kind: "container", Title: `Back "Office" \ User a\"b`, Description: `says "hi"`,
+			"back-office": {Kind: "container", Title: `Back "Office" \ User a\"b`, Description: "says \"hi\"\\\nsecond line\r\nthird",
 				Children: map[string]model.Element{"api": {Kind: "container", Title: "API"}}},
 		},
 		Relationships: []model.Relationship{{From: "back-office", To: "back-office.api", Label: `reads "x"`, Kind: "async"}},
