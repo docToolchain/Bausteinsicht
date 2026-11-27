@@ -162,3 +162,14 @@ func TestExports_DOTBackslashBeforeLineBreakRenders(t *testing.T) {
 		t.Errorf("the break after the backslash was lost:\n%s", svg)
 	}
 }
+
+func TestSequencePlantUML_BackslashBeforeLineBreak(t *testing.T) {
+	flat := map[string]*model.Element{"u": {Kind: "actor", Title: "U"}, "s": {Kind: "system", Title: "S"}}
+	view := model.DynamicView{Key: "f", Title: "F", Steps: []model.SequenceStep{
+		{Index: 1, From: "u", To: "s", Label: "dir\\\nnext"},
+	}}
+	out := RenderSequencePlantUML(view, flat, &model.Specification{})
+	if !strings.Contains(out, `: dir\\\nnext`) {
+		t.Errorf("backslash before the break not doubled:\n%s", out)
+	}
+}
