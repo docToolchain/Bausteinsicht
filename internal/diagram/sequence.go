@@ -51,7 +51,7 @@ func RenderSequenceMermaid(view model.DynamicView, flat map[string]*model.Elemen
 
 	var b strings.Builder
 	b.WriteString("sequenceDiagram\n")
-	fmt.Fprintf(&b, "    title %s\n", escapeQuotes(view.Title))
+	fmt.Fprintf(&b, "    title %s\n", mermaidSequenceText(escapeQuotes(view.Title)))
 	b.WriteString("    autonumber\n\n")
 
 	for _, id := range collectParticipants(steps) {
@@ -59,7 +59,7 @@ func RenderSequenceMermaid(view model.DynamicView, flat map[string]*model.Elemen
 		if strings.HasPrefix(participantMacro(id, flat, spec), "Person") {
 			kind = "actor"
 		}
-		fmt.Fprintf(&b, "    %s %s as %s\n", kind, sanitizeID(id), escapeQuotes(participantTitle(id, flat)))
+		fmt.Fprintf(&b, "    %s %s as %s\n", kind, sanitizeID(id), mermaidSequenceText(escapeQuotes(participantTitle(id, flat))))
 	}
 	b.WriteString("\n")
 
@@ -70,14 +70,24 @@ func RenderSequenceMermaid(view model.DynamicView, flat map[string]*model.Elemen
 				keyword = "rect rgb(240, 240, 240)"
 				step.Label = ""
 			}
+			step.Label = mermaidSequenceText(step.Label)
 			depth = writeBlockStep(&b, "    ", keyword, step, depth)
 			continue
 		}
 		fmt.Fprintf(&b, "    %s%s%s%s: %s\n", strings.Repeat("  ", depth),
-			sanitizeID(step.From), mermaidArrow(step.Type), sanitizeID(step.To), step.Label)
+			sanitizeID(step.From), mermaidArrow(step.Type), sanitizeID(step.To), mermaidSequenceText(step.Label))
 	}
 
 	return b.String()
+}
+
+// mermaidSequenceText makes free text safe inside one statement of a Mermaid
+// sequence diagram: ";" ends a statement and is written as the entity "#59;", a
+// line break would start a new statement and becomes <br/> (#714).
+func mermaidSequenceText(s string) string {
+	s = strings.ReplaceAll(s, "\r\n", "\n")
+	s = strings.ReplaceAll(s, "\n", "<br/>")
+	return strings.ReplaceAll(s, ";", "#59;")
 }
 
 // blockKeyword returns the diagram keyword of a block step (alt, else, opt,

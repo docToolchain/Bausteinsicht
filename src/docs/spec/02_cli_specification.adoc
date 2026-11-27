@@ -1178,6 +1178,7 @@ Dynamic views describe the runtime behaviour of the system as ordered message se
 * Participant shapes follow the C4 export: elements that render as `Person` become `actor` (PlantUML and Mermaid); in PlantUML, data stores (`*Db` macros) become `database` and queues `queue`; everything else is a `participant` (#637).
 * Step numbers are produced by `autonumber` (one line at the top of the diagram), not by prefixing the labels, so they can be styled; `index` only orders the steps. Double quotes in labels are written as typed.
 * Block steps (`alt`, `else`, `opt`, `group`, `end`) become PlantUML blocks or the Mermaid equivalents (`alt`, `else`, `opt`, `end`); Mermaid has no `group`, so it is drawn as a grey `rect` without the title. Steps inside a block are indented.
+* Mermaid text (diagram title, participant names, step labels, block conditions) is made safe for one statement: `;` ends a statement in Mermaid and is written as the entity `#59;`, a line break becomes `<br/>` (#714). Other characters (`:`, `#`, `%%`, `,`, `<`, `>`, `{`, `}`, `--`, `&`, `|`) need no escaping in labels and names.
 * If `--output` is given, files are named `sequence-<view-key>.puml` (PlantUML) or `sequence-<view-key>.md` (Mermaid).
 * If no dynamic views are defined in the model, a warning is written to stderr and the command exits with `0`.
 
