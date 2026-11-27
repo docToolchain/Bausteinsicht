@@ -87,3 +87,31 @@ func TestExports_DOTCompiles(t *testing.T) {
 		t.Fatalf("dot rejected the output: %v\n%s\n%s", err, res, out)
 	}
 }
+
+// PlantUML sequence diagrams: a line break ends the statement, so titles,
+// participants and step labels write it as \n (#690).
+func TestSequencePlantUML_LineBreaks(t *testing.T) {
+	flat := map[string]*model.Element{
+		"u": {Kind: "actor", Title: "User\nTwo"},
+		"s": {Kind: "system", Title: "Core"},
+	}
+	view := model.DynamicView{Key: "f", Title: "Flow\none", Steps: []model.SequenceStep{
+		{Index: 1, From: "u", To: "s", Label: "read\r\nwrite"},
+		{Index: 2, Type: model.StepAlt, Label: "ok\nor not"},
+		{Index: 3, Type: model.StepEnd},
+	}}
+	out := RenderSequencePlantUML(view, flat, &model.Specification{})
+	for _, want := range []string{"title Flow\\none", `"User\nTwo"`, ": read\\nwrite", "alt ok\\nor not"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "\r") {
+		t.Errorf("carriage return left in:\n%s", out)
+	}
+	for i, line := range strings.Split(out, "\n") {
+		if line != "" && !strings.HasPrefix(line, "@") && !strings.Contains(line, " ") && line != "autonumber" && line != "end" {
+			t.Errorf("line %d looks like the tail of a broken statement: %q", i+1, line)
+		}
+	}
+}
