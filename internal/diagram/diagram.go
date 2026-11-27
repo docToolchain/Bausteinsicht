@@ -334,8 +334,15 @@ type textEscaper func(string) string
 
 // lineBreakEscaper replaces quotes and every kind of line break (CRLF, LF, CR)
 // with br, the format's in-string line break (#690).
-func lineBreakEscaper(br string) textEscaper {
+//
+// With doubleBackslash the backslashes of the text are doubled first: PlantUML
+// and DOT read "\\" as a backslash, and a literal backslash in front of the \n
+// marker would otherwise turn it into a backslash and an "n".
+func lineBreakEscaper(br string, doubleBackslash bool) textEscaper {
 	return func(s string) string {
+		if doubleBackslash {
+			s = strings.ReplaceAll(s, "\\", "\\\\")
+		}
 		return replaceLineBreaks(escapeQuotes(s), br)
 	}
 }
@@ -350,10 +357,10 @@ func replaceLineBreaks(s, br string) string {
 var (
 	// escapePlantUMLText and escapeDOTText write a line break as \n, which both
 	// languages expand inside quoted strings.
-	escapePlantUMLText = lineBreakEscaper(`\n`)
-	escapeDOTText      = lineBreakEscaper(`\n`)
+	escapePlantUMLText = lineBreakEscaper(`\n`, true)
+	escapeDOTText      = lineBreakEscaper(`\n`, true)
 	// escapeMermaidText writes <br/>, the only line break Mermaid's C4 text takes.
-	escapeMermaidText = lineBreakEscaper("<br/>")
+	escapeMermaidText = lineBreakEscaper("<br/>", false)
 )
 
 // writeC4Element writes one element as a C4 macro call. PlantUML-C4 and

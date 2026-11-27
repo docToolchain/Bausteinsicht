@@ -30,7 +30,7 @@ func RenderSequencePlantUML(view model.DynamicView, flat map[string]*model.Eleme
 
 	depth := 0
 	for _, step := range steps {
-		step.Label = replaceLineBreaks(step.Label, `\n`)
+		step.Label = replaceLineBreaks(strings.ReplaceAll(step.Label, "\\", "\\\\"), `\n`)
 		if keyword, isBlock := blockKeyword(step.Type); isBlock {
 			depth = writeBlockStep(&b, "", keyword, step, depth)
 			continue

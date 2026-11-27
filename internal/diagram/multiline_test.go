@@ -97,11 +97,12 @@ func TestSequencePlantUML_LineBreaks(t *testing.T) {
 	}
 	view := model.DynamicView{Key: "f", Title: "Flow\none", Steps: []model.SequenceStep{
 		{Index: 1, From: "u", To: "s", Label: "read\r\nwrite"},
+		{Index: 4, From: "s", To: "u", Label: "dir\\\nnext"},
 		{Index: 2, Type: model.StepAlt, Label: "ok\nor not"},
 		{Index: 3, Type: model.StepEnd},
 	}}
 	out := RenderSequencePlantUML(view, flat, &model.Specification{})
-	for _, want := range []string{"title Flow\\none", `"User\nTwo"`, ": read\\nwrite", "alt ok\\nor not"} {
+	for _, want := range []string{"title Flow\\none", `"User\nTwo"`, ": read\\nwrite", "alt ok\\nor not", `: dir\\\nnext`} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %q in:\n%s", want, out)
 		}
