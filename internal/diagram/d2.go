@@ -54,9 +54,11 @@ func RenderD2(m *model.BausteinsichtModel, viewKey string) (string, error) {
 		}
 
 		// Node with styling
+		// The kind goes into the label: D2 does not accept text after the quoted
+		// label (#713).
 		nodeLabel := escapeD2String(title)
 		if elem.Kind != "" {
-			nodeLabel = fmt.Sprintf("%s [%s]", escapeD2String(title), elem.Kind)
+			nodeLabel = "\"" + escapeD2Inner(title) + "\\n[" + escapeD2Inner(elem.Kind) + "]\""
 		}
 		fmt.Fprintf(&b, "%s: %s {\n", nodeID, nodeLabel)
 		fmt.Fprintf(&b, "  shape: rectangle\n")
@@ -98,5 +100,14 @@ func sanitizeD2ID(id string) string {
 
 // escapeD2String escapes a string for use in D2 string literals.
 func escapeD2String(s string) string {
-	return "\"" + strings.ReplaceAll(s, "\"", "\\\"") + "\""
+	return "\"" + escapeD2Inner(s) + "\""
+}
+
+// escapeD2Inner escapes s for the inside of a double-quoted D2 string.
+func escapeD2Inner(s string) string {
+	s = strings.ReplaceAll(s, "\\", "\\\\")
+	s = strings.ReplaceAll(s, "\"", "\\\"")
+	s = strings.ReplaceAll(s, "\r\n", "\\n")
+	s = strings.ReplaceAll(s, "\n", "\\n")
+	return strings.ReplaceAll(s, "\r", "\\n")
 }

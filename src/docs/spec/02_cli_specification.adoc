@@ -1067,6 +1067,7 @@ Exports views as text diagrams in one of several formats (C4-PlantUML, Mermaid, 
 * Auto-detects the C4 level (Context, Container, or Component) from the C4 macros the view's elements resolve to (see below), so kinds mapped via `c4` override or notation select the matching `C4_Container` / `C4_Component` include (#633).
 * Generates diagram source in the requested format. C4-PlantUML uses the stdlib include syntax (`!include <C4/C4_Context>`, etc.).
 * C4-PlantUML diagrams carry the view `title` (`title <view title>`) and, unless the view sets `"legend": false`, `LAYOUT_WITH_LEGEND()` right after the include, so readers can tell the C4 shapes apart (#642). Mermaid diagrams carry the title as before.
+* The D2 output must compile with the `d2` compiler: a node is written as `id: "Title\n[kind]" { ... }` (D2 accepts nothing after the quoted label), quote characters are escaped (#713). The e2e tests run it through `d2` when it is installed.
 * A relationship `technology` is passed as the technology argument of `Rel()` (`Rel(a, b, "charges", "HTTPS/JSON")`); dashed PlantUML arrows and the DOT, D2 and HTML formats show `label [technology]`; the Structurizr DSL gets it as the fourth token (#642).
 * **C4 macro selection (PlantUML and Mermaid)** — each element is rendered with the C4 macro resolved from its kind, in this order (#633):
 . the kind's explicit `specification.elements.<kind>.c4` override, if set (for example `"c4": "Person"`);
