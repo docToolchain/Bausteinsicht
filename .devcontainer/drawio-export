@@ -5,7 +5,7 @@
 #   - A virtual display (Xvfb) — no physical monitor available in containers
 #   - A running D-Bus system daemon — Electron uses it for internal IPC
 #   - --no-sandbox — containers typically lack user namespaces for Chromium sandbox
-#   - --disable-gpu — no GPU/rendering backend in containers
+#   - no GPU acceleration — set through ELECTRON_DISABLE_GPU below
 #
 # Without this wrapper, draw.io exits with code 0 but produces no output file.
 set -euo pipefail
@@ -15,6 +15,9 @@ set -euo pipefail
 # not sufficient — Electron specifically needs a session bus.
 # ELECTRON_DISABLE_GPU bypasses GPU acceleration without passing --disable-gpu
 # as a CLI flag. drawio's arg parser only filters --no-sandbox from program.args,
-# so --disable-gpu would land as paths[0] and break input file detection.
+# so --disable-gpu would land as paths[0] and break input file detection
+# (observed with older draw.io versions; 32.7.4 accepts it, see #716).
+# If the GPU process still crashes and draw.io hangs (#716), `bausteinsicht
+# export` stops it after --timeout (default 60s) and shows its output.
 export ELECTRON_DISABLE_GPU=1
 exec dbus-run-session -- xvfb-run -a drawio --no-sandbox "$@"

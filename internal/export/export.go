@@ -3,6 +3,8 @@
 package export
 
 import (
+	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -10,17 +12,38 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // ExportOptions configures a single page export operation.
 type ExportOptions struct {
-	Format       string  // "png" or "svg"
-	PageIndex    int     // 1-based page index
-	OutputPath   string  // full path to output file
-	EmbedDiagram bool    // embed draw.io XML source in output
-	InputFile    string  // path to the .drawio file
-	Scale        float64 // export scale factor (0 = default, e.g. 2.0 for retina)
+	Format       string        // "png" or "svg"
+	PageIndex    int           // 1-based page index
+	OutputPath   string        // full path to output file
+	EmbedDiagram bool          // embed draw.io XML source in output
+	InputFile    string        // path to the .drawio file
+	Scale        float64       // export scale factor (0 = default, e.g. 2.0 for retina)
+	Timeout      time.Duration // kill draw.io after this long (0 = no limit)
 }
+
+// TimeoutError is returned when draw.io did not finish within the timeout.
+type TimeoutError struct {
+	Timeout time.Duration
+	Output  string // what draw.io printed before it was stopped
+}
+
+func (e *TimeoutError) Error() string {
+	msg := fmt.Sprintf("draw.io export timed out after %s; see https://github.com/docToolchain/Bausteinsicht/issues/385", e.Timeout)
+	if out := strings.TrimSpace(e.Output); out != "" {
+		msg += "\nOutput: " + out
+	}
+	return msg
+}
+
+// DefaultTimeout is how long one page export may take before draw.io is
+// stopped. Exporting a page takes seconds; a hung GPU process or D-Bus session
+// otherwise blocks forever (#716).
+const DefaultTimeout = 60 * time.Second
 
 // platformPaths is a function variable so tests can override it.
 var platformPaths = platformDrawioPaths
@@ -160,13 +183,28 @@ func OutputFileName(viewKey, format string) string {
 	return fmt.Sprintf("architecture-%s.%s", SafeViewKey(viewKey), format)
 }
 
-// ExportPage runs the draw.io CLI to export a single page.
+// ExportPage runs the draw.io CLI to export a single page. When opts.Timeout is
+// set and draw.io has not finished by then, it and its child processes are
+// killed and a *TimeoutError carrying what draw.io printed is returned.
 func ExportPage(binary string, opts ExportOptions) error {
 	args := BuildExportArgs(opts)
-	cmd := exec.Command(binary, args...) // #nosec G204 -- binary is auto-detected draw.io CLI path
-	output, err := cmd.CombinedOutput()
+	ctx := context.Background()
+	if opts.Timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, opts.Timeout)
+		defer cancel()
+	}
+	cmd := exec.CommandContext(ctx, binary, args...) // #nosec G204 -- binary is auto-detected draw.io CLI path
+	killWithChildren(cmd)
+	var output bytes.Buffer
+	cmd.Stdout = &output
+	cmd.Stderr = &output
+	err := cmd.Run()
+	if ctx.Err() == context.DeadlineExceeded {
+		return &TimeoutError{Timeout: opts.Timeout, Output: output.String()}
+	}
 	if err != nil {
-		return fmt.Errorf("draw.io export failed: %w\nOutput: %s", err, string(output))
+		return fmt.Errorf("draw.io export failed: %w\nOutput: %s", err, output.String())
 	}
 	// Verify the output file was actually created (#195).
 	if _, err := os.Stat(opts.OutputPath); err != nil {
