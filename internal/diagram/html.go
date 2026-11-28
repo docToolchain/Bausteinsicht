@@ -25,12 +25,32 @@ type HTMLNode struct {
 // HTMLEdge is a type alias for relEntry used in HTML diagram output.
 type HTMLEdge = relEntry
 
+// HTMLEdgeLine is an edge with the line that the viewer draws for it: from the
+// border of the source node to the border of the target node (stub: zero).
+type HTMLEdgeLine struct {
+	HTMLEdge
+	X1 float64 `json:"x1"`
+	Y1 float64 `json:"y1"`
+	X2 float64 `json:"x2"`
+	Y2 float64 `json:"y2"`
+}
+
 // HTMLDiagramData is the data structure embedded in the HTML output.
 type HTMLDiagramData struct {
-	Title string     `json:"title"`
-	Nodes []HTMLNode `json:"nodes"`
-	Edges []HTMLEdge `json:"edges"`
+	Title string         `json:"title"`
+	Nodes []HTMLNode     `json:"nodes"`
+	Edges []HTMLEdgeLine `json:"edges"`
 }
+
+// Size of a node in the viewer.
+const (
+	htmlNodeWidth  = 160.0
+	htmlNodeHeight = 80.0
+)
+
+// borderPoint returns the point where the line from the centre of node a to the
+// centre of node b leaves node a (stub).
+func borderPoint(a, b HTMLNode) (x, y float64) { return 0, 0 }
 
 // RenderHTML renders a view as an interactive HTML5 diagram.
 func RenderHTML(m *model.BausteinsichtModel, viewKey string) (string, error) {
@@ -94,9 +114,9 @@ func RenderHTML(m *model.BausteinsichtModel, viewKey string) (string, error) {
 	}
 
 	// Build edge list from relationships
-	edges := make([]HTMLEdge, len(rels))
+	edges := make([]HTMLEdgeLine, len(rels))
 	for i, r := range rels {
-		edges[i] = HTMLEdge(r)
+		edges[i].HTMLEdge = HTMLEdge(r)
 		edges[i].Label = r.displayLabel() // the viewer shows one label per edge
 	}
 
