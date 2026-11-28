@@ -2,6 +2,7 @@ package layout
 
 import (
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/beevik/etree"
@@ -324,6 +325,39 @@ func TestLayoutDocument_OppositeConnectorsGetSeparateRoutes(t *testing.T) {
 			first = p
 		} else if p == first {
 			t.Errorf("both connectors have the waypoint %s", p)
+		}
+	}
+}
+
+// #718: a title cell from an older file has no wrapping; the layout repairs it
+// and grows the shape before it places the elements.
+func TestLayoutDocument_GrowsShapesForLongTitles(t *testing.T) {
+	doc := drawio.NewDocument()
+	page := doc.AddPage("view-v", "V")
+	sub := &drawio.SubCellTemplates{
+		Title: &drawio.SubCellStyle{Style: "text;html=1;fontSize=13;fontStyle=1;align=center;", X: 0, Y: 0, Width: 160, Height: 24},
+	}
+	if err := page.CreateElement(drawio.ElementData{ID: "u", CellID: "u", Kind: "actor", Title: "U",
+		X: 1, Y: 1, Width: 160, Height: 80, SubCells: sub}, "rounded=1"); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range page.Root().SelectElements("mxCell") {
+		if c.SelectAttrValue("id", "") == "u-title" {
+			c.CreateAttr("value", "Customer Relationship Management Back-Office Operator")
+			c.CreateAttr("style", "text;html=1;fontSize=13;fontStyle=1;align=center;")
+		}
+	}
+
+	if _, err := LayoutDocument(doc, Options{}); err != nil {
+		t.Fatal(err)
+	}
+
+	if h := geometry(t, page, "u").h; h <= 80 {
+		t.Errorf("shape height %v: it must grow for the three lines of the title", h)
+	}
+	for _, c := range page.Root().SelectElements("mxCell") {
+		if c.SelectAttrValue("id", "") == "u-title" && !strings.Contains(c.SelectAttrValue("style", ""), "whiteSpace=wrap") {
+			t.Errorf("the title cell does not wrap: %s", c.SelectAttrValue("style", ""))
 		}
 	}
 }
