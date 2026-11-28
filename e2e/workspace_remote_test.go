@@ -158,3 +158,41 @@ func TestWorkspaceRemoteSources(t *testing.T) {
 		}
 	})
 }
+
+// #735: a lock hash in upper case is accepted, and the cache file of a model that is
+// no longer remote goes with its lock entry (no network involved).
+func TestWorkspaceLockHygiene(t *testing.T) {
+	bin := buildBinary(t)
+	const url = "https://models.example.com/team-b/v1/architecture.jsonc"
+	config := `{ "workspace": { "name": "landscape", "allowedHosts": ["models.example.com"] },
+  "models": [ { "id": "team_a", "path": "a.jsonc" }, { "id": "team_b", "source": "` + url + `", "prefix": "b" } ] }`
+
+	t.Run("a hash in upper case matches", func(t *testing.T) {
+		dir, cfg := writeRemoteWorkspace(t, config)
+		placeCache(t, dir, "team_b", url, teamBModel)
+		lockFile := filepath.Join(dir, "bausteinsicht.lock")
+		data, err := os.ReadFile(lockFile)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(lockFile, []byte(strings.Replace(string(data), sha(teamBModel), strings.ToUpper(sha(teamBModel)), 1)), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if out, code := runCLIAllowFail(t, bin, dir, "workspace", "validate", cfg); code != 0 {
+			t.Errorf("validate with an upper-case lock hash: exit %d\n%s", code, out)
+		}
+	})
+
+	t.Run("the cache of a model that is no longer remote is removed", func(t *testing.T) {
+		dir, cfg := writeRemoteWorkspace(t, `{ "workspace": { "name": "landscape" }, "models": [ { "id": "team_a", "path": "a.jsonc" } ] }`)
+		placeCache(t, dir, "old_model", url, teamBModel)
+		stale := filepath.Join(dir, ".bausteinsicht-cache", "old_model.jsonc")
+		runCLI(t, bin, dir, "workspace", "fetch", cfg)
+		if _, err := os.Stat(stale); err == nil {
+			t.Error("the cache file of the model that is gone is still there")
+		}
+		if data, _ := os.ReadFile(filepath.Join(dir, "bausteinsicht.lock")); strings.Contains(string(data), "old_model") {
+			t.Errorf("the lock entry is still there:\n%s", data)
+		}
+	})
+}
