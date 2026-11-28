@@ -85,3 +85,41 @@ func TestStructurizrImport_GenerateTemplateKeepsAnExistingTemplate(t *testing.T)
 		t.Error("nothing may be written when the import is refused")
 	}
 }
+
+// External systems and Database containers with children keep their kind (they
+// cannot become kinds without children), and the model still validates and syncs.
+func TestStructurizrImport_TaggedElementsWithChildrenSync(t *testing.T) {
+	const dsl = `workspace {
+  model {
+    ext = softwareSystem "Mail" "ext" "External" {
+      smtp = container "SMTP"
+    }
+    ss = softwareSystem "Bank" {
+      db = container "DB" "" "Postgres" "Database" {
+        tbl = component "Table"
+      }
+      cache = container "Cache" "" "Redis" "Database"
+    }
+  }
+  views {
+    systemContext ss "ctx" { include * }
+  }
+}
+`
+	bin := buildBinary(t)
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "w.dsl"), []byte(dsl), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	runCLI(t, bin, dir, "import", "w.dsl", "--from", "structurizr", "--generate-template")
+	if out, code := runCLIAllowFail(t, bin, dir, "validate"); code != 0 {
+		t.Fatalf("the imported model does not validate (exit %d):\n%s", code, out)
+	}
+	if out, code := runCLIAllowFail(t, bin, dir, "sync"); code != 0 {
+		t.Fatalf("sync failed (exit %d):\n%s", code, out)
+	}
+	data, _ := os.ReadFile(filepath.Join(dir, "architecture.jsonc"))
+	if got := strings.Count(string(data), `"kind": "datastore"`); got != 1 {
+		t.Errorf("only the leaf Database container is a datastore, found %d:\n%s", got, data)
+	}
+}

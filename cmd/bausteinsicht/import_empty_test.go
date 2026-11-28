@@ -114,3 +114,20 @@ func TestImportCmd_GenerateTemplateRefusesADanglingLink(t *testing.T) {
 		t.Error("the model must not be written when the template is refused")
 	}
 }
+
+// The output directory is created before the template is, so --generate-template
+// also works for an output path in a directory that does not exist yet
+// (CodeRabbit finding on #775).
+func TestImportCmd_GenerateTemplateInANewDirectory(t *testing.T) {
+	dsl := absDSL(t, "internal", "importer", "structurizr", "testdata", "simple.dsl")
+	dir := t.TempDir()
+	out := filepath.Join(dir, "new", "sub", "m.jsonc")
+	if text, err := executeImportCmd("import", "--from", "structurizr", "--generate-template", "--output", out, dsl); err != nil {
+		t.Fatalf("import failed: %v\n%s", err, text)
+	}
+	for _, f := range []string{out, filepath.Join(dir, "new", "sub", "template.drawio")} {
+		if _, err := os.Stat(f); err != nil {
+			t.Errorf("want %s written: %v", f, err)
+		}
+	}
+}
