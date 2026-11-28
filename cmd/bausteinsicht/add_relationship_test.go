@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/docToolchain/Bausteinsicht/internal/model"
@@ -165,44 +166,67 @@ func TestAddRelationshipInvalidKind(t *testing.T) {
 	}
 }
 
+// The identity of a relationship is from, to, kind and label, as in validate
+// (BR-012): the same four are refused, another label is another relationship (#697).
 func TestAddRelationshipDuplicateBlocked(t *testing.T) {
 	dir := t.TempDir()
 	modelPath := writeRelTestModel(t, dir)
 
-	cmd1 := NewRootCmd()
-	cmd1.SetArgs([]string{"add", "relationship",
-		"--model", modelPath,
-		"--from", "webshop.api",
-		"--to", "webshop.db",
-		"--kind", "uses",
-	})
-	if err := cmd1.Execute(); err != nil {
+	add := func(label string) error {
+		cmd := NewRootCmd()
+		cmd.SetArgs([]string{"add", "relationship",
+			"--model", modelPath,
+			"--from", "webshop.api",
+			"--to", "webshop.db",
+			"--kind", "uses",
+			"--label", label,
+		})
+		cmd.SilenceErrors = true
+		cmd.SilenceUsage = true
+		return cmd.Execute()
+	}
+	if err := add("reads"); err != nil {
 		t.Fatalf("first add failed: %v", err)
 	}
-
-	cmd2 := NewRootCmd()
-	cmd2.SetArgs([]string{"add", "relationship",
-		"--model", modelPath,
-		"--from", "webshop.api",
-		"--to", "webshop.db",
-		"--kind", "uses",
-		"--label", "also reads",
-	})
-	cmd2.SilenceErrors = true
-	cmd2.SilenceUsage = true
-	err := cmd2.Execute()
-
-	if err == nil {
-		t.Fatal("expected error for duplicate relationship (same from, to, kind), got nil")
+	if err := add("reads"); err == nil {
+		t.Fatal("expected an error for a relationship with the same from, to, kind and label")
+	}
+	if err := add("also reads"); err != nil {
+		t.Fatalf("another label is another relationship, got: %v", err)
 	}
 
-	// Verify the duplicate was NOT added.
 	m, err := model.Load(modelPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(m.Relationships) != 1 {
-		t.Errorf("expected 1 relationship (duplicate blocked), got %d", len(m.Relationships))
+	if len(m.Relationships) != 2 {
+		t.Errorf("expected 2 relationships (the duplicate blocked), got %d", len(m.Relationships))
+	}
+}
+
+// A relationship of an element to itself is allowed, but on an element that is
+// not a container it is probably a mistake, so it is reported (#697).
+func TestAddRelationshipSelfRelationshipWarning(t *testing.T) {
+	for _, tc := range []struct {
+		id   string
+		warn bool
+	}{
+		{"payments", true},     // its kind is not a container kind
+		{"webshop", true},      // not a container kind either
+		{"webshop.api", false}, // a container kind: it may call itself
+	} {
+		dir := t.TempDir()
+		modelPath := writeRelTestModel(t, dir)
+		cmd := NewRootCmd()
+		stderr := &bytes.Buffer{}
+		cmd.SetErr(stderr)
+		cmd.SetArgs([]string{"add", "relationship", "--model", modelPath, "--from", tc.id, "--to", tc.id})
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("%s: a self-relationship is allowed, got %v", tc.id, err)
+		}
+		if got := strings.Contains(stderr.String(), "itself"); got != tc.warn {
+			t.Errorf("%s: warning = %v, want %v (stderr %q)", tc.id, got, tc.warn, stderr.String())
+		}
 	}
 }
 

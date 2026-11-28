@@ -66,19 +66,19 @@ func runAddRelationship(cmd *cobra.Command, args []string) error {
 		return exitWithCode(fmt.Errorf("--to: element %q not found", to), 1)
 	}
 
-	if kind != "" {
-		if m.Specification.Relationships == nil {
-			return exitWithCode(fmt.Errorf("--kind: %q not defined (no relationship kinds in specification)", kind), 1)
-		}
-		if _, ok := m.Specification.Relationships[kind]; !ok {
-			return exitWithCode(fmt.Errorf("--kind: %q not defined in specification", kind), 1)
-		}
+	if err := checkRelationshipKind(m, kind); err != nil {
+		return err
 	}
 
 	for _, r := range m.Relationships {
-		if r.From == from && r.To == to && r.Kind == kind {
-			return exitWithCode(fmt.Errorf("relationship %s -> %s (kind %q) already exists", from, to, kind), 1)
+		// The same four fields as validate (BR-012): another label is another relationship.
+		if r.From == from && r.To == to && r.Kind == kind && r.Label == label {
+			return exitWithCode(fmt.Errorf("relationship %s -> %s (kind %q, label %q) already exists", from, to, kind, label), 1)
 		}
+	}
+
+	if from == to {
+		warnSelfRelationship(cmd, m, from)
 	}
 
 	rel := model.Relationship{
@@ -168,4 +168,28 @@ func printRelationshipJSON(r model.Relationship) error {
 	}
 	fmt.Println(string(data))
 	return nil
+}
+
+// checkRelationshipKind validates --kind against the specification; an empty kind is fine.
+func checkRelationshipKind(m *model.BausteinsichtModel, kind string) error {
+	if kind == "" {
+		return nil
+	}
+	if m.Specification.Relationships == nil {
+		return exitWithCode(fmt.Errorf("--kind: %q not defined (no relationship kinds in specification)", kind), 1)
+	}
+	if _, ok := m.Specification.Relationships[kind]; !ok {
+		return exitWithCode(fmt.Errorf("--kind: %q not defined in specification", kind), 1)
+	}
+	return nil
+}
+
+// warnSelfRelationship reports a relationship of an element to itself if the
+// element's kind is not a container kind: it is allowed, but probably a mistake (#697).
+func warnSelfRelationship(cmd *cobra.Command, m *model.BausteinsichtModel, id string) {
+	elem, err := model.Resolve(m, id)
+	if err != nil || m.Specification.Elements[elem.Kind].Container {
+		return
+	}
+	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "WARNING: %s is related to itself, but its kind %q is not a container kind\n", id, elem.Kind)
 }

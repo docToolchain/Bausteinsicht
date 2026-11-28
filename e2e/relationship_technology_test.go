@@ -69,3 +69,27 @@ func TestRelationshipTechnologyAndC4Header(t *testing.T) {
 		t.Errorf("Structurizr DSL lacks the technology:\n%s", dsl)
 	}
 }
+
+// #697: a second relationship between the same elements with another label is
+// accepted and the model stays valid and syncs; a self-relationship on an element
+// that is not a container is reported on stderr.
+func TestAddRelationship_LabelIsPartOfTheIdentity(t *testing.T) {
+	bin := buildBinary(t)
+	dir := t.TempDir()
+	runCLI(t, bin, dir, "init")
+
+	runCLI(t, bin, dir, "add", "relationship", "--from", "customer", "--to", "onlineshop.db", "--kind", "uses", "--label", "a")
+	runCLI(t, bin, dir, "add", "relationship", "--from", "customer", "--to", "onlineshop.db", "--kind", "uses", "--label", "b")
+	if out, code := runCLIAllowFail(t, bin, dir, "add", "relationship", "--from", "customer", "--to", "onlineshop.db", "--kind", "uses", "--label", "b"); code != 1 || !strings.Contains(out, "already exists") {
+		t.Errorf("the same label again: want exit 1 and \"already exists\", got %d:\n%s", code, out)
+	}
+	if out, code := runCLIAllowFail(t, bin, dir, "validate"); code != 0 {
+		t.Fatalf("the model must stay valid (exit %d):\n%s", code, out)
+	}
+	runCLI(t, bin, dir, "sync")
+
+	_, stderr, code := runCLISplit(t, bin, dir, "add", "relationship", "--from", "customer", "--to", "customer", "--kind", "uses")
+	if code != 0 || !strings.Contains(stderr, "itself") {
+		t.Errorf("a self-relationship on a non-container: want exit 0 and a warning, got %d:\n%s", code, stderr)
+	}
+}
