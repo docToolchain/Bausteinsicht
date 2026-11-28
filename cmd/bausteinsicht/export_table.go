@@ -58,6 +58,10 @@ func runExportTable(cmd *cobra.Command, _ []string) error {
 		return exitWithCode(fmt.Errorf("loading model: %w", err), 2)
 	}
 
+	if viewKey == "" {
+		noteNoViews(cmd, m)
+	}
+
 	// When --format json is set, output structured JSON instead of a table. (#239, #631)
 	if format == "json" {
 		return exportTableJSON(cmd, m, viewKey, combined, outputDir)
