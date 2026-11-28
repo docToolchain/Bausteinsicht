@@ -131,3 +131,16 @@ func TestImportCmd_GenerateTemplateInANewDirectory(t *testing.T) {
 		}
 	}
 }
+
+// A dry run creates neither the output directory nor a template.
+func TestImportCmd_DryRunCreatesNoDirectory(t *testing.T) {
+	dsl := absDSL(t, "internal", "importer", "structurizr", "testdata", "simple.dsl")
+	dir := t.TempDir()
+	out := filepath.Join(dir, "new", "m.jsonc")
+	if _, err := executeImportCmd("import", "--from", "structurizr", "--generate-template", "--dry-run", "--output", out, dsl); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "new")); err == nil {
+		t.Error("--dry-run must not create the output directory")
+	}
+}

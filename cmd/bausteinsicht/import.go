@@ -135,6 +135,14 @@ func runImport(cmd *cobra.Command, args []string) error {
 		return exitWithCode(fmt.Errorf("encoding model: %w", err), 1)
 	}
 
+	// The directory exists before the template is created in it; a dry run
+	// writes nothing, so it does not create it.
+	if !dryRun {
+		if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil {
+			return exitWithCode(fmt.Errorf("creating output directory: %w", err), 1)
+		}
+	}
+
 	// The template is created first and exclusively: an import that overlaps
 	// with another one in the directory, or a dangling link, is refused before
 	// the model is written. A failing model write takes the template back.
@@ -162,9 +170,6 @@ func runImport(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil {
-		return exitWithCode(fmt.Errorf("creating output directory: %w", err), 1)
-	}
 	if err := os.WriteFile(outputPath, append(data, '\n'), 0o644); err != nil {
 		if templateWritten {
 			_ = os.Remove(templatePath)
