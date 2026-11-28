@@ -1407,14 +1407,14 @@ Generates a human-readable changelog between two versions of the model.
 |===
 | Flag | Description | Required | Default
 
-| `--since` | Starting git ref (commit SHA or tag). Must be provided — there is no implemented default. | Yes (in practice) | (none)
+| `--since` | Starting git ref (commit SHA, tag or branch). | No | the previous tag: the latest tag before `--until`, or, if `--until` is itself tagged, the one before it (#698)
 | `--until` | Ending git ref. | No | `HEAD`
 | `--model` | Model file path. | No | (auto-detect)
 | `--changelog-format` | Output format: `markdown`, `asciidoc`, or `json`. | No | `markdown`
 | `--output` | Write to a file instead of stdout. | No | (stdout)
 |===
 
-**Behavior:** loads the model at each git ref (via `git rev-parse` / `git show`) and reports the architecture changes between them. Only git refs are supported — snapshot IDs are not (yet) resolved, and an empty `--since` fails to resolve. (Note: changelog uses `--changelog-format`, not the global `--format`.)
+**Behavior:** loads the model at each git ref (via `git rev-parse` / `git show`) and reports the architecture changes between them. Only git refs are supported — snapshot IDs are not (yet) resolved. Errors say what is wrong, exit code `2`: `no git repository found` outside a repository, `no tag found before <ref>: tag a release or use --since <git ref>` when `--since` is omitted and there is no tag, and `cannot resolve git ref "<ref>": <git's message>` for an unknown ref (#698). (Note: changelog uses `--changelog-format`, not the global `--format`.)
 
 ==== `bausteinsicht import`
 

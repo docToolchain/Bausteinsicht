@@ -2,6 +2,7 @@ package changelog
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os/exec"
 	"strconv"
@@ -47,12 +48,10 @@ func resolveGitRef(gitRef string) (hash string, date time.Time, err error) {
 	}
 
 	// Get commit hash
-	hashCmd := exec.Command(git, "rev-parse", gitRef)
-	hashOut, err := hashCmd.Output()
+	hash, err = runGit("rev-parse", "--verify", gitRef+"^{commit}")
 	if err != nil {
-		return "", time.Time{}, fmt.Errorf("failed to resolve git ref: %w", err)
+		return "", time.Time{}, fmt.Errorf("cannot resolve git ref %q: %w", gitRef, err)
 	}
-	hash = strings.TrimSpace(string(hashOut))
 
 	// Get commit date
 	dateCmd := exec.Command(git, "log", "-1", "--format=%ct", hash)
@@ -162,4 +161,56 @@ func GetCommitInfo(gitRef string) (*CommitInfo, error) {
 		Message:   strings.TrimSpace(string(msgOut)),
 		Timestamp: date.Unix(),
 	}, nil
+}
+
+// errNoRepository is the error for a command that runs outside a git repository.
+var errNoRepository = errors.New("no git repository found (changelog compares git refs; run it inside the repository of the model)")
+
+// runGit runs git and returns its output. A failure carries git's own message
+// (its first line), not just the exit status; outside a repository the error says so.
+func runGit(args ...string) (string, error) {
+	git, err := gitPath()
+	if err != nil {
+		return "", fmt.Errorf("git not available: %w", err)
+	}
+	cmd := exec.Command(git, args...)
+	var stderr strings.Builder
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
+	if err != nil {
+		msg := strings.TrimSpace(stderr.String())
+		if strings.Contains(msg, "not a git repository") {
+			return "", errNoRepository
+		}
+		if first, _, _ := strings.Cut(msg, "\n"); first != "" {
+			return "", fmt.Errorf("%s", first)
+		}
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+// PreviousTag returns the most recent tag before until, the default of --since:
+// the latest tag reachable from until, or, if until itself is tagged, the one
+// before it.
+func PreviousTag(until string) (string, error) {
+	tag, err := runGit("describe", "--tags", "--abbrev=0", until)
+	if err != nil {
+		if errors.Is(err, errNoRepository) {
+			return "", err
+		}
+		return "", noTagError(until)
+	}
+	if tagHash, err := runGit("rev-list", "-1", tag); err == nil {
+		if untilHash, err := runGit("rev-parse", until+"^{commit}"); err == nil && tagHash == untilHash {
+			if tag, err = runGit("describe", "--tags", "--abbrev=0", tag+"^"); err != nil {
+				return "", noTagError(until)
+			}
+		}
+	}
+	return tag, nil
+}
+
+func noTagError(until string) error {
+	return fmt.Errorf("no tag found before %s: tag a release or use --since <git ref>", until)
 }

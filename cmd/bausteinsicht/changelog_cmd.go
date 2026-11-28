@@ -17,8 +17,8 @@ func newChangelogCmd() *cobra.Command {
 	}
 
 	cmd.Flags().String("model", "", "Model file path (default: auto-detect)")
-	cmd.Flags().String("since", "", "Starting git ref or snapshot ID (default: previous tag)")
-	cmd.Flags().String("until", "HEAD", "Ending git ref or snapshot ID")
+	cmd.Flags().String("since", "", "Starting git ref (default: the previous tag)")
+	cmd.Flags().String("until", "HEAD", "Ending git ref")
 	// Use a dedicated flag name (not the global --format, which only accepts
 	// text|json) so the markdown/asciidoc defaults are not rejected by the
 	// root command's global format validation (#425).
@@ -43,6 +43,15 @@ func runChangelog(cmd *cobra.Command, _ []string) error {
 	modelPath, err := resolveModelPath(modelPath)
 	if err != nil {
 		return err
+	}
+
+	// The default of --since is the previous tag (#698).
+	if since == "" {
+		tag, err := changelog.PreviousTag(until)
+		if err != nil {
+			return exitWithCode(err, 2)
+		}
+		since = tag
 	}
 
 	// Load models at the two refs

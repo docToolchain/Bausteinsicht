@@ -102,3 +102,34 @@ func TestChangelogWorkflow(t *testing.T) {
 		t.Errorf("changelog --output file missing \"new-service\", got: %s", written)
 	}
 }
+
+// #698: without a git repository or a tag the error says what is missing and what
+// to do, and with a tag the default of --since is the previous tag.
+func TestChangelogErrorsAndDefaultSince(t *testing.T) {
+	bin := buildBinary(t)
+	dir := t.TempDir()
+	runCLI(t, bin, dir, "init")
+
+	out, code := runCLIAllowFail(t, bin, dir, "changelog")
+	if code != 2 || !strings.Contains(out, "no git repository found") || strings.Contains(out, "exit status") {
+		t.Errorf("outside a repository: want exit 2 and \"no git repository found\", got %d:\n%s", code, out)
+	}
+
+	runGit(t, "init", dir)
+	runGit(t, "-C", dir, "config", "user.email", "test@test.com")
+	runGit(t, "-C", dir, "config", "user.name", "Test")
+	runGit(t, "-C", dir, "add", ".")
+	runGit(t, "-C", dir, "commit", "-m", "initial model")
+	out, code = runCLIAllowFail(t, bin, dir, "changelog")
+	if code != 2 || !strings.Contains(out, "no tag found") || !strings.Contains(out, "--since") {
+		t.Errorf("without a tag: want exit 2, \"no tag found\" and the hint, got %d:\n%s", code, out)
+	}
+
+	runGit(t, "-C", dir, "tag", "v1")
+	runCLI(t, bin, dir, "add", "element", "--id", "late", "--kind", "container", "--title", "Late Service")
+	runGit(t, "-C", dir, "commit", "-am", "add late")
+	md := runCLI(t, bin, dir, "changelog")
+	if !strings.Contains(md, "Late Service") {
+		t.Errorf("the default --since is the previous tag v1, so the added element must show:\n%s", md)
+	}
+}
