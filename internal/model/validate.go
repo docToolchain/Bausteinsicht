@@ -58,6 +58,7 @@ func ValidateWithWarnings(m *BausteinsichtModel) ValidationResult {
 	result.Errors = append(result.Errors, validateStaleDetection(m)...)
 	result.Warnings = append(result.Warnings, validateEmptyModel(m)...)
 	result.Warnings = append(result.Warnings, validateDocLinkTypes(m)...)
+	result.Warnings = append(result.Warnings, validateUnusedConstraintFields(m)...)
 	result.Warnings = append(result.Warnings, validateLifecycleStatus(m)...)
 	result.Warnings = append(result.Warnings, validateOrphanDecisions(m)...)
 	result.Warnings = append(result.Warnings, validateSupersededDecisions(m)...)
@@ -739,6 +740,15 @@ func validateConstraints(m *BausteinsichtModel) []ValidationError {
 				Message: fmt.Sprintf("unknown constraint rule %q (valid: %s)", c.Rule, strings.Join(ConstraintRules, ", ")),
 			})
 		}
+		if IsConstraintRule(c.Rule) {
+			for _, p := range CheckConstraint(c) {
+				path := fmt.Sprintf("constraints[%d]", i)
+				if p.Field != "" {
+					path += "." + p.Field
+				}
+				errs = append(errs, ValidationError{Path: path, Message: p.Message})
+			}
+		}
 		if c.ID == "" {
 			continue
 		}
@@ -849,6 +859,21 @@ func validateDocLinkTypes(m *BausteinsichtModel) []ValidationWarning {
 	sort.Strings(viewKeys)
 	for _, k := range viewKeys {
 		check("views."+k+".docLinks", m.Views[k].DocLinks)
+	}
+	return ws
+}
+
+// validateUnusedConstraintFields warns about constraint fields the rule does
+// not read: they have no effect (#727).
+func validateUnusedConstraintFields(m *BausteinsichtModel) []ValidationWarning {
+	var ws []ValidationWarning
+	for i, c := range m.Constraints {
+		for _, f := range UnusedConstraintFields(c) {
+			ws = append(ws, ValidationWarning{
+				Path:    fmt.Sprintf("constraints[%d].%s", i, f),
+				Message: fmt.Sprintf("field %q is not used by rule %q and has no effect", f, c.Rule),
+			})
+		}
 	}
 	return ws
 }

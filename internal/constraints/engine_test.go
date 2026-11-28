@@ -258,9 +258,10 @@ func TestAllowedRelationship_ExactFromID(t *testing.T) {
 }
 
 // TestConstraints_UnsetSelectorNeverMatches documents the deliberate behavior
-// (#542) that a constraint endpoint/element selector with NO field set
-// matches nothing — it is treated as a misconfiguration, not a wildcard that
-// matches every element/relationship.
+// (#542) that a constraint endpoint/element selector with NO field set is a
+// misconfiguration, not a wildcard that matches every element/relationship.
+// Since #727 lint reports the missing selector instead of staying silent, but
+// still never lists elements or relationships.
 func TestConstraints_UnsetSelectorNeverMatches(t *testing.T) {
 	m := makeModel(
 		map[string]model.Element{
@@ -275,8 +276,19 @@ func TestConstraints_UnsetSelectorNeverMatches(t *testing.T) {
 		},
 	)
 	r := constraints.Evaluate(m)
-	if r.Total != 0 {
-		t.Errorf("expected 0 violations for constraints with no selector fields set, got %d: %v", r.Total, r.Violations)
+	for _, v := range r.Violations {
+		if len(v.Elements) != 0 || !strings.Contains(v.Message, "constraint is incomplete") {
+			t.Errorf("a constraint without selectors must be reported as incomplete, never match elements: %+v", v)
+		}
+	}
+	reported := map[string]bool{}
+	for _, v := range r.Violations {
+		reported[v.ConstraintID] = true
+	}
+	for _, id := range []string{"c1", "c2", "c3"} {
+		if !reported[id] {
+			t.Errorf("constraint %s is not reported: %v", id, r.Violations)
+		}
 	}
 }
 
