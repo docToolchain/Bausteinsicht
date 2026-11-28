@@ -42,3 +42,32 @@ func TestLayoutVariants(t *testing.T) {
 		})
 	}
 }
+
+// #691: an unknown --algorithm is rejected with exit code 1 and the list of
+// valid values, and the diagram is not touched; --rank-dir already did this.
+func TestLayoutRejectsUnknownAlgorithm(t *testing.T) {
+	bin := buildBinary(t)
+	dir := t.TempDir()
+	runCLI(t, bin, dir, "init")
+	runCLI(t, bin, dir, "sync")
+	before, err := os.ReadFile(dir + "/architecture.drawio")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out, code := runCLIAllowFail(t, bin, dir, "layout", "--algorithm", "foo")
+	if code != 1 {
+		t.Fatalf("want exit code 1 for an unknown algorithm, got %d:\n%s", code, out)
+	}
+	if !strings.Contains(out, `"foo"`) || !strings.Contains(out, "hierarchical") {
+		t.Errorf("the error must name the value and the valid one:\n%s", out)
+	}
+	after, _ := os.ReadFile(dir + "/architecture.drawio")
+	if string(after) != string(before) {
+		t.Error("the diagram changed although the layout was refused")
+	}
+
+	if out, code := runCLIAllowFail(t, bin, dir, "layout", "--algorithm", "hierarchical"); code != 0 {
+		t.Errorf("--algorithm hierarchical must work (exit %d):\n%s", code, out)
+	}
+}

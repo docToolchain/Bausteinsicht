@@ -16,6 +16,7 @@ import (
 
 // Options controls LayoutDocument.
 type Options struct {
+	Algorithm      string // "hierarchical" (default; the only one)
 	RankDir        string // "TB" (top-to-bottom, default) or "LR" (left-to-right)
 	PreservePinned bool   // leave elements marked bausteinsicht-pinned=true (and what is inside them) alone
 	View           string // lay out only the page with this ID; empty means every page

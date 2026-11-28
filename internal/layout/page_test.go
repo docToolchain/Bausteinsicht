@@ -285,6 +285,22 @@ func hasPoints(connector *etree.Element) bool {
 	return g != nil && g.SelectElement("Array") != nil
 }
 
+// #691: an unknown algorithm is rejected, like an unknown rank direction, and
+// the error names the valid value.
+func TestLayoutDocument_UnknownAlgorithm(t *testing.T) {
+	doc := drawio.NewDocument()
+	doc.AddPage("v", "v")
+	_, err := LayoutDocument(doc, Options{Algorithm: "foo"})
+	if err == nil || !strings.Contains(err.Error(), `"foo"`) || !strings.Contains(err.Error(), "hierarchical") {
+		t.Errorf("want an error naming foo and hierarchical, got %v", err)
+	}
+	for _, ok := range []string{"", "hierarchical"} {
+		if _, err := LayoutDocument(doc, Options{Algorithm: ok}); err != nil {
+			t.Errorf("algorithm %q must be accepted: %v", ok, err)
+		}
+	}
+}
+
 func TestLayoutDocument_Errors(t *testing.T) {
 	doc := drawio.NewDocument()
 	doc.AddPage("v", "v")
