@@ -3,7 +3,6 @@ package model
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 )
 
 // PatchOp describes a single value replacement in a JSONC file.
@@ -32,26 +31,7 @@ func PatchSave(path string, ops []PatchOp) error {
 		}
 	}
 
-	dir := filepath.Dir(path)
-	tmp, err := os.CreateTemp(dir, ".model-tmp-*")
-	if err != nil {
-		return fmt.Errorf("creating temp file: %w", err)
-	}
-	tmpName := tmp.Name()
-	if _, err := tmp.Write(data); err != nil {
-		_ = tmp.Close()
-		_ = os.Remove(tmpName)
-		return fmt.Errorf("writing temp file: %w", err)
-	}
-	if err := tmp.Close(); err != nil {
-		_ = os.Remove(tmpName)
-		return fmt.Errorf("closing temp file: %w", err)
-	}
-	if err := os.Rename(tmpName, path); err != nil {
-		_ = os.Remove(tmpName)
-		return fmt.Errorf("renaming temp file: %w", err)
-	}
-	return nil
+	return WriteFileAtomic(path, ".model-tmp-*", data)
 }
 
 // PatchInsert reads the JSONC file at path, applies a raw data transformation,
@@ -72,26 +52,7 @@ func PatchInsert(path string, transform func([]byte) ([]byte, error)) error {
 		return err
 	}
 
-	dir := filepath.Dir(path)
-	tmp, err := os.CreateTemp(dir, ".model-tmp-*")
-	if err != nil {
-		return fmt.Errorf("creating temp file: %w", err)
-	}
-	tmpName := tmp.Name()
-	if _, err := tmp.Write(data); err != nil {
-		_ = tmp.Close()
-		_ = os.Remove(tmpName)
-		return fmt.Errorf("writing temp file: %w", err)
-	}
-	if err := tmp.Close(); err != nil {
-		_ = os.Remove(tmpName)
-		return fmt.Errorf("closing temp file: %w", err)
-	}
-	if err := os.Rename(tmpName, path); err != nil {
-		_ = os.Remove(tmpName)
-		return fmt.Errorf("renaming temp file: %w", err)
-	}
-	return nil
+	return WriteFileAtomic(path, ".model-tmp-*", data)
 }
 
 // PatchValue finds the JSON value at path in JSONC data and replaces it with
