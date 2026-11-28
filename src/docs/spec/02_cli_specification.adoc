@@ -199,6 +199,10 @@ When `--model` is not specified, every command that requires a model file invoke
 
 Commands that change the model (`add element|relationship|view|specification|add-from-pattern`, `update`, `rename`, `remove`, `sync`, and every sync cycle of `watch`) hold an exclusive operating-system file lock on `<model>.lock` from before they read the model until after they have written it, so parallel runs no longer overwrite each other's changes (#712). The system releases the lock when the process ends, however it ends, and keeps it while the process is suspended, so there is no time limit and no takeover. A waiting command retries for up to 30 seconds and then fails with exit code 2, naming the lock file and the process that holds it. The lock file stays after the command (it holds only the process ID of the last owner); it can be added to `.gitignore`. The lock path must be a regular file; a symbolic link there is refused. The lock is advisory and does **not** cover `repl` (its save writes the whole session), `import --force` (it replaces the output file without taking the lock, so importing over a model that another command is changing can lose either write) and programs that edit the file directly.
 
+=== Writing Files
+
+The model, the draw.io diagram and the other files that a command changes are written atomically: a temporary file next to the target is written and renamed over it. A target that is a symbolic link is updated in place (#723). A target that is **read-only** (no write bit for its owner) is not replaced: the command fails with exit code `2` and `file is read-only: <path>`, and the file is left as it is (#724). The replacing file gets the mode of the file it replaces, so `0664` stays `0664`; a new file is created with mode `0600`.
+
 === Exit Codes
 
 [cols="1,3"]

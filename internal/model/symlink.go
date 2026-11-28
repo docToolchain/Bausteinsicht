@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"os"
 	"path/filepath"
 )
 
@@ -25,4 +26,33 @@ func ResolveWriteTarget(path string) (string, error) {
 	default:
 		return "", fmt.Errorf("resolving %s: %w", path, err)
 	}
+}
+
+// writeTarget looks at the file that an atomic write is about to replace. A file
+// that is not writable is refused (the replacement would ignore the read-only
+// bit); for an existing file the mode is returned so that the replacement keeps
+// it, exists is false for a file that is new (#724).
+func writeTarget(path string) (mode os.FileMode, exists bool, err error) {
+	info, err := os.Stat(path)
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		return 0, false, nil
+	case err != nil:
+		return 0, false, fmt.Errorf("checking %s: %w", path, err)
+	}
+	if info.Mode().Perm()&0o200 == 0 {
+		return 0, true, fmt.Errorf("file is read-only: %s (make it writable to change it)", path)
+	}
+	return info.Mode().Perm(), true, nil
+}
+
+// keepMode gives the temporary file the mode of the file that it replaces.
+func keepMode(tmp *os.File, mode os.FileMode, exists bool) error {
+	if !exists {
+		return nil
+	}
+	if err := tmp.Chmod(mode); err != nil {
+		return fmt.Errorf("setting the mode of the temp file: %w", err)
+	}
+	return nil
 }

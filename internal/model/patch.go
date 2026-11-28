@@ -32,12 +32,21 @@ func PatchSave(path string, ops []PatchOp) error {
 		}
 	}
 
+	mode, exists, err := writeTarget(path)
+	if err != nil {
+		return err
+	}
 	dir := filepath.Dir(path)
 	tmp, err := os.CreateTemp(dir, ".model-tmp-*")
 	if err != nil {
 		return fmt.Errorf("creating temp file: %w", err)
 	}
 	tmpName := tmp.Name()
+	if err := keepMode(tmp, mode, exists); err != nil {
+		_ = tmp.Close()
+		_ = os.Remove(tmpName)
+		return err
+	}
 	if _, err := tmp.Write(data); err != nil {
 		_ = tmp.Close()
 		_ = os.Remove(tmpName)
@@ -72,12 +81,21 @@ func PatchInsert(path string, transform func([]byte) ([]byte, error)) error {
 		return err
 	}
 
+	mode, exists, err := writeTarget(path)
+	if err != nil {
+		return err
+	}
 	dir := filepath.Dir(path)
 	tmp, err := os.CreateTemp(dir, ".model-tmp-*")
 	if err != nil {
 		return fmt.Errorf("creating temp file: %w", err)
 	}
 	tmpName := tmp.Name()
+	if err := keepMode(tmp, mode, exists); err != nil {
+		_ = tmp.Close()
+		_ = os.Remove(tmpName)
+		return err
+	}
 	if _, err := tmp.Write(data); err != nil {
 		_ = tmp.Close()
 		_ = os.Remove(tmpName)

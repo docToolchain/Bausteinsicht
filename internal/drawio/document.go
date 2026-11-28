@@ -65,12 +65,33 @@ func SaveDocument(path string, doc *Document) error {
 	}
 	doc.tree.Indent(2)
 
+	// A diagram that is read-only is not replaced, and the replacement keeps the
+	// mode of the file (#724).
+	var mode os.FileMode
+	info, statErr := os.Stat(path)
+	switch {
+	case statErr == nil:
+		if info.Mode().Perm()&0o200 == 0 {
+			return fmt.Errorf("SaveDocument: file is read-only: %s (make it writable to change it)", path)
+		}
+		mode = info.Mode().Perm()
+	case !errors.Is(statErr, fs.ErrNotExist):
+		return fmt.Errorf("SaveDocument stat %s: %w", path, statErr)
+	}
+
 	dir := filepath.Dir(path)
 	tmp, err := os.CreateTemp(dir, ".drawio-tmp-*")
 	if err != nil {
 		return fmt.Errorf("SaveDocument create temp: %w", err)
 	}
 	tmpName := tmp.Name()
+	if statErr == nil {
+		if err := tmp.Chmod(mode); err != nil {
+			_ = tmp.Close()
+			_ = os.Remove(tmpName)
+			return fmt.Errorf("SaveDocument chmod: %w", err)
+		}
+	}
 
 	if _, err := doc.tree.WriteTo(tmp); err != nil {
 		_ = tmp.Close()
