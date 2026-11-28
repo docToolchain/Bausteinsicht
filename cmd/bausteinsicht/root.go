@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/docToolchain/Bausteinsicht/internal/model"
 	"github.com/spf13/cobra"
 )
 
@@ -99,6 +100,20 @@ func validatePathContainment(path string) error {
 		}
 	}
 	return nil
+}
+
+// resolveModelPath returns modelPath, the value of --model, or, when it is
+// empty, the single *.jsonc file of the current directory. Every command that
+// needs a model uses it, so they all find the file the same way (#692).
+func resolveModelPath(modelPath string) (string, error) {
+	if modelPath != "" {
+		return modelPath, nil
+	}
+	detected, err := model.AutoDetect(".")
+	if err != nil {
+		return "", exitWithCode(err, 2)
+	}
+	return detected, nil
 }
 
 // ExecuteRoot runs the root command and writes errors in the appropriate format

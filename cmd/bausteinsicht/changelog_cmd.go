@@ -16,7 +16,7 @@ func newChangelogCmd() *cobra.Command {
 		RunE:  runChangelog,
 	}
 
-	cmd.Flags().String("model", "architecture.jsonc", "Model file path")
+	cmd.Flags().String("model", "", "Model file path (default: auto-detect)")
 	cmd.Flags().String("since", "", "Starting git ref or snapshot ID (default: previous tag)")
 	cmd.Flags().String("until", "HEAD", "Ending git ref or snapshot ID")
 	// Use a dedicated flag name (not the global --format, which only accepts
@@ -38,6 +38,11 @@ func runChangelog(cmd *cobra.Command, _ []string) error {
 	// Validate format
 	if format != "markdown" && format != "asciidoc" && format != "json" {
 		return exitWithCode(fmt.Errorf("invalid format: %s (expected markdown, asciidoc, or json)", format), 2)
+	}
+
+	modelPath, err := resolveModelPath(modelPath)
+	if err != nil {
+		return err
 	}
 
 	// Load models at the two refs

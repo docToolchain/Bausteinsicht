@@ -17,7 +17,7 @@ func newDiffCmd() *cobra.Command {
 		RunE:  runDiff,
 	}
 
-	cmd.Flags().String("model", "architecture.jsonc", "Model file path")
+	cmd.Flags().String("model", "", "Model file path (default: auto-detect)")
 	cmd.Flags().String("view", "", "Show diff for one view only (optional)")
 	cmd.Flags().String("format", "text", "Output format: text or json")
 
@@ -28,6 +28,10 @@ func runDiff(cmd *cobra.Command, _ []string) error {
 	modelPath, _ := cmd.Flags().GetString("model")
 	format, _ := cmd.Flags().GetString("format")
 
+	modelPath, err := resolveModelPath(modelPath)
+	if err != nil {
+		return err
+	}
 	m, err := model.Load(modelPath)
 	if err != nil {
 		return exitWithCode(fmt.Errorf("loading model: %w", err), 2)

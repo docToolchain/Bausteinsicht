@@ -34,8 +34,9 @@ func runGraph(cmd *cobra.Command, _ []string) error {
 	cyclesOnly, _ := cmd.Flags().GetBool("cycles-only")
 	showCentrality, _ := cmd.Flags().GetBool("centrality")
 
-	if modelPath == "" {
-		return exitWithCode(fmt.Errorf("--model flag is required"), 2)
+	modelPath, err := resolveModelPath(modelPath)
+	if err != nil {
+		return err
 	}
 
 	m, err := model.Load(modelPath)

@@ -188,12 +188,12 @@ NOTE: `--version` is a root-level flag only, not a global flag. It is used as `b
 
 === Auto-Detection Behavior
 
-When `--model` is not specified, all commands that require a model file invoke auto-detection:
+When `--model` is not specified, every command that requires a model file invokes auto-detection (`health`, `graph`, `status`, `stale`, `diff`, `changelog`, `snapshot`, `overlay` and `adr` included, #692):
 
 1. The current working directory is scanned for files matching `*.jsonc`.
 2. If exactly one `.jsonc` file is found, it is used.
 3. If more than one `.jsonc` file is found, the command **aborts** with exit code 2 and the message `multiple .jsonc files in <dir> — use --model to select one`. It does **not** silently pick one, because the tool mutates files and synchronizes — operating on the wrong model must never happen by accident.
-4. If no `.jsonc` file is found, the command exits with code 2 and an error message.
+4. If no `.jsonc` file is found, the command exits with code 2 and the message `no model file found in <dir> (looked for *.jsonc) — use --model to select one`.
 
 === Concurrent Use
 
@@ -1281,7 +1281,7 @@ Computes an architecture health score (0–100, with a letter grade) across weig
 | `--output` | Write the report to a file instead of stdout. | No | (stdout)
 |===
 
-**Behavior:** requires an explicit `--model`. Emits a human-readable report (or JSON with `--format json`) of the overall score, per-category scores, and model statistics.
+**Behavior:** finds the model via `--model` or auto-detection. Emits a human-readable report (or JSON with `--format json`) of the overall score, per-category scores, and model statistics.
 
 ==== `bausteinsicht graph`
 
@@ -1298,7 +1298,7 @@ Analyzes the relationship graph: cycle detection, dependency depth, and centrali
 | `--output` | Write the report to a file instead of stdout. | No | (stdout)
 |===
 
-**Behavior:** requires an explicit `--model`. Reports element/relationship counts, max dependency depth, graph type (DAG / has cycles), and strongly connected components.
+**Behavior:** finds the model via `--model` or auto-detection. Reports element/relationship counts, max dependency depth, graph type (DAG / has cycles), and strongly connected components.
 
 ==== `bausteinsicht stale`
 
@@ -1311,7 +1311,7 @@ Flags elements that look forgotten. An element is reported only when **all three
 | Flag | Description | Required | Default
 
 | `--days`, `-d` | Consider an element stale if unmodified for this many days. | No | `90`
-| `--model`, `-m` | Model file path. | No | `architecture.jsonc`
+| `--model`, `-m` | Model file path. | No | (auto-detect)
 | `--drawio-file` | draw.io diagram path (auto-detected if empty). | No | (auto-detect)
 | `--mark-drawio` | Highlight stale elements in the diagram. | No | `false`
 | `--unmark-drawio` | Remove stale markers from the diagram (restores original styles). | No | `false`
@@ -1333,7 +1333,7 @@ Lists elements by lifecycle status (`proposed`, `design`, `implementation`, `dep
 | `--filter`, `-f` | Show only elements with this status. | No | (all)
 |===
 
-**Behavior:** requires an explicit `--model`. Groups elements under their status.
+**Behavior:** finds the model via `--model` or auto-detection. Groups elements under their status.
 
 ==== `bausteinsicht find`
 
@@ -1389,7 +1389,7 @@ Reports the gap between the model's `asIs` and `toBe` sections.
 |===
 | Flag | Description | Required | Default
 
-| `--model` | Model file path. | No | `architecture.jsonc`
+| `--model` | Model file path. | No | (auto-detect)
 | `--view` | Accepted for forward compatibility but currently has **no effect** (per-view diff is not yet implemented). | No | (all)
 | `--format` | Output format: `text` or `json`. | No | `text`
 |===
@@ -1408,7 +1408,7 @@ Generates a human-readable changelog between two versions of the model.
 
 | `--since` | Starting git ref (commit SHA or tag). Must be provided — there is no implemented default. | Yes (in practice) | (none)
 | `--until` | Ending git ref. | No | `HEAD`
-| `--model` | Model file path. | No | `architecture.jsonc`
+| `--model` | Model file path. | No | (auto-detect)
 | `--changelog-format` | Output format: `markdown`, `asciidoc`, or `json`. | No | `markdown`
 | `--output` | Write to a file instead of stdout. | No | (stdout)
 |===
@@ -1502,7 +1502,7 @@ Loads external metrics (error rate, coverage, …) from a JSON file and overlays
 | `remove` | Remove the overlay and restore original colors (`--output`, same default).
 |===
 
-`apply` and `remove` load the model directly and do **not** auto-detect — pass `--model` (there is no default). When `--output` is omitted it resolves relative to the model file's directory, not the current directory. Any overlay failure (missing model/metrics file, unreadable diagram, unknown metric) exits with code `2`.
+`apply` and `remove` find the model via `--model` or auto-detection. When `--output` is omitted it resolves relative to the model file's directory, not the current directory. Any overlay failure (missing model/metrics file, unreadable diagram, unknown metric) exits with code `2`.
 
 ==== `bausteinsicht repl`
 
@@ -1532,7 +1532,7 @@ Lists and shows Architecture Decision Records linked to model elements (the `dec
 | `show <adr-id>` | Show details of a specific ADR.
 |===
 
-**Flags:** `--model`, `-m` (default `architecture.jsonc`). `adr list` supports `--format text|json` and `--element <id>` to filter; `adr show` prints text only.
+**Flags:** `--model`, `-m` (default: auto-detect). `adr list` supports `--format text|json` and `--element <id>` to filter; `adr show` prints text only.
 
 ==== `bausteinsicht workspace`
 

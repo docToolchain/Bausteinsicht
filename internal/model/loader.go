@@ -167,7 +167,7 @@ func AutoDetect(dir string) (string, error) {
 		return "", fmt.Errorf("scanning %s: %w", dir, err)
 	}
 	if len(matches) == 0 {
-		return "", fmt.Errorf("no .jsonc file found in %s", dir)
+		return "", fmt.Errorf("no model file found in %s (looked for *.jsonc) — use --model to select one", dir)
 	}
 	if len(matches) > 1 {
 		return "", fmt.Errorf("multiple .jsonc files in %s — use --model to select one", dir)

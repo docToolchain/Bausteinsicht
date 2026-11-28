@@ -59,12 +59,9 @@ func runAddFromPattern(cmd *cobra.Command, args []string) error {
 		)
 	}
 
-	if modelPath == "" {
-		detected, err := model.AutoDetect(".")
-		if err != nil {
-			return exitWithCode(err, 2)
-		}
-		modelPath = detected
+	modelPath, err := resolveModelPath(modelPath)
+	if err != nil {
+		return err
 	}
 
 	unlock, err := lockModel(modelPath)
@@ -179,12 +176,9 @@ func printPatternElement(out io.Writer, id string, el model.Element) {
 func runListPatterns(cmd *cobra.Command) error {
 	modelPath, _ := cmd.Flags().GetString("model")
 
-	if modelPath == "" {
-		detected, err := model.AutoDetect(".")
-		if err != nil {
-			return exitWithCode(err, 2)
-		}
-		modelPath = detected
+	modelPath, err := resolveModelPath(modelPath)
+	if err != nil {
+		return err
 	}
 
 	m, err := model.Load(modelPath)
