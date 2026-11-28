@@ -1498,10 +1498,25 @@ Loads external metrics (error rate, coverage, …) from a JSON file and overlays
 |===
 | Subcommand | Description
 
-| `apply <metrics-file>` | Apply a metric heatmap (`--metric <key>`, default: first available; `--output`, default `<model-dir>/architecture.drawio`, i.e. next to the model file).
-| `list <metrics-file>` | List the metrics available in the file.
+| `apply <metrics-file>` | Apply a metric heatmap (`--metric <key>`, default: the first metric by name; `--output`, default `<model-dir>/architecture.drawio`, i.e. next to the model file).
+| `list <metrics-file>` | List the metrics available in the file, each with its minimum, maximum, number of elements and the description from `meta.metric_descriptions` (JSON: `metrics` list). The header names source and date only if the file has them.
 | `remove` | Remove the overlay and restore original colors (`--output`, same default).
 |===
+
+**Metrics file:**
+
+[source,json]
+----
+{
+  "meta": { "source": "grafana", "generated": "2026-11-28", "metric_descriptions": { "error_rate": "Errors per request" } },
+  "metrics": [
+    { "elementId": "customer", "error_rate": 0.5, "coverage": 70 },
+    { "elementId": "shop.api", "error_rate": 0.1 }
+  ]
+}
+----
+
+`meta` is optional. `elementId` is the model ID (dot path); every other key of an entry is a number and a metric. A file in another shape (no `metrics` list, `metrics` not a list, an empty list) is refused with exit code `2` and a message that shows this shape; `overlay apply --help` shows it too. `apply` warns on stderr about every `elementId` that is not in the model and ignores it (#696).
 
 `apply` and `remove` find the model via `--model` or auto-detection. When `--output` is omitted it resolves relative to the model file's directory, not the current directory. Any overlay failure (missing model/metrics file, unreadable diagram, unknown metric) exits with code `2`.
 

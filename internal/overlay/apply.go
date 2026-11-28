@@ -22,7 +22,10 @@ func LoadMetricsFile(path string) (*MetricsFile, error) {
 	}
 	var mf MetricsFile
 	if err := json.Unmarshal(data, &mf); err != nil {
-		return nil, fmt.Errorf("parsing metrics file: %w", err)
+		return nil, shapeError(fmt.Sprintf("parsing metrics file: %v", err))
+	}
+	if len(mf.Metrics) == 0 {
+		return nil, shapeError(`the metrics file has no entries in "metrics"`)
 	}
 	return &mf, nil
 }
