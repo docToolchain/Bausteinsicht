@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/docToolchain/Bausteinsicht/internal/diagram"
 	"github.com/docToolchain/Bausteinsicht/internal/export"
@@ -101,7 +102,11 @@ func runExportSequence(cmd *cobra.Command, _ []string) error {
 			if src == "" {
 				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "warning: view %q resolved to empty diagram\n", v.Key)
 			}
-			items = append(items, exportItem{viewKey: v.Key, filename: "sequence-" + export.SafeViewKey(v.Key) + "." + ext, content: src})
+			content := src
+			if outputDir != "" {
+				content = fenceForFile(ext, src)
+			}
+			items = append(items, exportItem{viewKey: v.Key, filename: "sequence-" + export.SafeViewKey(v.Key) + "." + ext, content: content})
 		}
 		return emitExportItems(cmd, diagramFormat, outputDir, items)
 	}
@@ -119,7 +124,7 @@ func runExportSequence(cmd *cobra.Command, _ []string) error {
 		}
 
 		filename := "sequence-" + export.SafeViewKey(v.Key) + "." + ext
-		absPath, writeErr := writeExportFile(filepath.Join(outputDir, filename), []byte(source))
+		absPath, writeErr := writeExportFile(filepath.Join(outputDir, filename), []byte(fenceForFile(ext, source)))
 		if writeErr != nil {
 			return exitWithCode(writeErr, 2)
 		}
@@ -127,4 +132,15 @@ func runExportSequence(cmd *cobra.Command, _ []string) error {
 	}
 
 	return nil
+}
+
+// fenceForFile prepares a rendered diagram for a file of the given extension: a
+// Mermaid diagram in a .md file is a fenced code block, otherwise Markdown viewers
+// show it as plain text and mmdc finds no diagram (#715). Other files and stdout
+// get the diagram as it is.
+func fenceForFile(ext, source string) string {
+	if ext != "md" {
+		return source
+	}
+	return "```mermaid\n" + strings.TrimRight(source, "\n") + "\n```\n"
 }
