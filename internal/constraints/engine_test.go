@@ -567,3 +567,53 @@ func TestEvaluate_HandlesEveryListedRule(t *testing.T) {
 		t.Errorf("an unlisted rule must stay unknown: %+v", res.Violations)
 	}
 }
+
+// #727: lint stayed silent for constraints that could not match anything, did
+// not support the tag selector of technology-allowed, and named elements by
+// their last ID segment.
+func TestTechnologyAllowed_SelectsByTag(t *testing.T) {
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{
+			"s": {Kind: "system", Title: "S", Children: map[string]model.Element{
+				"db":  {Kind: "db", Title: "DB", Technology: "MongoDB", Tags: []string{"pii"}},
+				"web": {Kind: "web", Title: "Web", Technology: "Go"},
+			}},
+		},
+		Constraints: []model.Constraint{{ID: "tech-tag", Rule: "technology-allowed", Tag: "pii", Technologies: []string{"Postgres"}}},
+	}
+	res := constraints.Evaluate(m)
+	if len(res.Violations) != 1 || len(res.Violations[0].Elements) != 1 || !strings.HasPrefix(res.Violations[0].Elements[0], "s.db:") {
+		t.Fatalf("violations: %+v", res.Violations)
+	}
+}
+
+func TestEvaluate_MisconfiguredConstraintIsReportedNotSilent(t *testing.T) {
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{"a": {Kind: "k", Title: "A", Children: map[string]model.Element{"b": {Kind: "k", Title: "B"}}}},
+		Constraints: []model.Constraint{
+			{ID: "depth0", Rule: "max-depth"},
+			{ID: "no-from", Rule: "no-relationship", ToKind: "k"},
+		},
+	}
+	res := constraints.Evaluate(m)
+	if len(res.Violations) != 2 {
+		t.Fatalf("violations: %+v", res.Violations)
+	}
+	for _, v := range res.Violations {
+		if len(v.Elements) != 0 || !strings.Contains(v.Message, "constraint is incomplete") {
+			t.Errorf("[%s] %+v: want a definition problem, no element list", v.ConstraintID, v)
+		}
+	}
+}
+
+func TestMaxDepth_NamesElementsByFullID(t *testing.T) {
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{"a": {Kind: "k", Title: "A", Children: map[string]model.Element{
+			"b": {Kind: "k", Title: "B", Children: map[string]model.Element{"deep": {Kind: "k", Title: "D"}}}}}},
+		Constraints: []model.Constraint{{ID: "d", Rule: "max-depth", Max: 2}},
+	}
+	res := constraints.Evaluate(m)
+	if len(res.Violations) != 1 || len(res.Violations[0].Elements) != 1 || res.Violations[0].Elements[0] != "a.b.deep (depth 3)" {
+		t.Fatalf("violations: %+v", res.Violations)
+	}
+}
