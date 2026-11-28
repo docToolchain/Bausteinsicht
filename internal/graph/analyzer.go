@@ -130,35 +130,42 @@ func (a *Analyzer) findCycles() []Cycle {
 	return cycles
 }
 
-// betweennessScore returns the simplified betweenness: fraction of other
-// elements reachable from id via any path.
-func (a *Analyzer) betweennessScore(id string, flatElems map[string]*model.Element) float64 {
-	count := 0
-	for target := range flatElems {
-		if target != id && a.hasPath(id, target) {
-			count++
+// reachability is one breadth-first search from id: the number of other
+// elements that can be reached from it and the sum of their shortest distances.
+// Betweenness and closeness both follow from it, so the search runs once per
+// element, not once per pair of elements (#730).
+func (a *Analyzer) reachability(id string) (reachable, totalDistance int) {
+	dist := map[string]int{id: 0}
+	queue := []string{id}
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+		for _, next := range a.graph[current] {
+			if _, seen := dist[next]; !seen {
+				dist[next] = dist[current] + 1
+				totalDistance += dist[next]
+				reachable++
+				queue = append(queue, next)
+			}
 		}
 	}
-	if n := len(flatElems) - 1; n > 0 {
-		return float64(count) / float64(n)
+	return reachable, totalDistance
+}
+
+// betweennessScore returns the simplified betweenness: the fraction of the other
+// elements that are reachable from id via any path.
+func betweennessScore(reachable, elements int) float64 {
+	if n := elements - 1; n > 0 {
+		return float64(reachable) / float64(n)
 	}
 	return 0
 }
 
-// closenessScore returns the simplified closeness: inverse of average shortest
-// path distance to all reachable elements.
-func (a *Analyzer) closenessScore(id string, flatElems map[string]*model.Element) float64 {
-	totalDist, reachable := 0, 0
-	for target := range flatElems {
-		if target != id {
-			if dist := a.shortestPath(id, target); dist > 0 {
-				totalDist += dist
-				reachable++
-			}
-		}
-	}
+// closenessScore returns the simplified closeness: inverse of one plus the mean
+// shortest distance to the reachable elements.
+func closenessScore(reachable, totalDistance int) float64 {
 	if reachable > 0 {
-		return 1.0 / (1.0 + float64(totalDist)/float64(reachable))
+		return 1.0 / (1.0 + float64(totalDistance)/float64(reachable))
 	}
 	return 0
 }
@@ -169,12 +176,13 @@ func (a *Analyzer) calculateCentrality() []Centrality {
 	var results []Centrality
 
 	for id := range flatElems {
+		reachable, total := a.reachability(id)
 		results = append(results, Centrality{
 			ID:          id,
 			InDegree:    len(a.reverse[id]),
 			OutDegree:   len(a.graph[id]),
-			Betweenness: a.betweennessScore(id, flatElems),
-			Closeness:   a.closenessScore(id, flatElems),
+			Betweenness: betweennessScore(reachable, len(flatElems)),
+			Closeness:   closenessScore(reachable, total),
 		})
 	}
 
@@ -215,8 +223,9 @@ func (a *Analyzer) calculateMaxDepth() int {
 	flatElems, _ := model.FlattenElements(a.model)
 	maxDepth := 0
 
+	memo := make(map[string]int)
 	for start := range flatElems {
-		depth := a.longestPathDAG(start)
+		depth := a.dfsLongestPath(start, memo)
 		if depth > maxDepth {
 			maxDepth = depth
 		}
@@ -257,81 +266,8 @@ func (a *Analyzer) isDAG() bool {
 	return !hasCycle
 }
 
-// hasPath checks if there is a path from src to dst (BFS with limit).
-func (a *Analyzer) hasPath(src, dst string) bool {
-	if src == dst {
-		return true
-	}
-
-	visited := make(map[string]bool)
-	queue := []string{src}
-
-	for len(queue) > 0 {
-		current := queue[0]
-		queue = queue[1:]
-
-		if visited[current] {
-			continue
-		}
-		visited[current] = true
-
-		if current == dst {
-			return true
-		}
-
-		for _, neighbor := range a.graph[current] {
-			if !visited[neighbor] {
-				queue = append(queue, neighbor)
-			}
-		}
-	}
-
-	return false
-}
-
-// shortestPath finds the shortest path from src to dst (BFS distance).
-func (a *Analyzer) shortestPath(src, dst string) int {
-	if src == dst {
-		return 0
-	}
-
-	visited := make(map[string]bool)
-	queue := []string{src}
-	distances := map[string]int{src: 0}
-
-	for len(queue) > 0 {
-		current := queue[0]
-		queue = queue[1:]
-
-		if visited[current] {
-			continue
-		}
-		visited[current] = true
-
-		if current == dst {
-			return distances[current]
-		}
-
-		for _, neighbor := range a.graph[current] {
-			if !visited[neighbor] {
-				if _, ok := distances[neighbor]; !ok {
-					distances[neighbor] = distances[current] + 1
-					queue = append(queue, neighbor)
-				}
-			}
-		}
-	}
-
-	return -1 // no path found
-}
-
-// longestPathDAG finds the longest path starting from a node (DFS with memoization).
-// Only valid for DAGs; cyclic graphs will have max depth 0.
-func (a *Analyzer) longestPathDAG(start string) int {
-	memo := make(map[string]int)
-	return a.dfsLongestPath(start, memo)
-}
-
+// dfsLongestPath finds the longest path starting from a node (DFS with
+// memoization). Only valid for DAGs; cyclic graphs have max depth 0.
 func (a *Analyzer) dfsLongestPath(node string, memo map[string]int) int {
 	if depth, ok := memo[node]; ok {
 		return depth
