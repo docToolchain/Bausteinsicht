@@ -550,3 +550,20 @@ func TestViolationMessage_WithoutDescriptionHasNoEmptyPrefix(t *testing.T) {
 		}
 	}
 }
+
+// Every rule the model and the schema allow is evaluated by the engine, and
+// nothing else is: the list cannot drift from the switch (#689).
+func TestEvaluate_HandlesEveryListedRule(t *testing.T) {
+	for _, rule := range model.ConstraintRules {
+		m := &model.BausteinsichtModel{Constraints: []model.Constraint{{ID: "c", Rule: rule}}}
+		for _, v := range constraints.Evaluate(m).Violations {
+			if strings.Contains(v.Message, "unknown constraint rule") {
+				t.Errorf("rule %q is listed but not evaluated: %s", rule, v.Message)
+			}
+		}
+	}
+	m := &model.BausteinsichtModel{Constraints: []model.Constraint{{ID: "c", Rule: "bogus"}}}
+	if res := constraints.Evaluate(m); len(res.Violations) != 1 || !strings.Contains(res.Violations[0].Message, "unknown constraint rule") {
+		t.Errorf("an unlisted rule must stay unknown: %+v", res.Violations)
+	}
+}

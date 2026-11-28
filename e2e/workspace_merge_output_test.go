@@ -3,6 +3,7 @@ package e2e
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -15,6 +16,9 @@ func TestWorkspaceMergeProtectsItsOutput(t *testing.T) {
 	dir := t.TempDir()
 	for _, sub := range []string{"a", "b"} {
 		runCLI(t, bin, filepath.Join(mkdir(t, dir, sub)), "init")
+		if sub == "b" {
+			renameSampleConstraintIDs(t, filepath.Join(dir, sub, "architecture.jsonc"))
+		}
 	}
 	cfg := `{"workspace":{"name":"ws"},"models":[
   {"id":"a","path":"a/architecture.jsonc","prefix":"a"},
@@ -43,4 +47,21 @@ func mkdir(t *testing.T, dir, sub string) string {
 		t.Fatal(err)
 	}
 	return p
+}
+
+// renameSampleConstraintIDs gives the constraints of an init model other IDs,
+// so that two of them can be merged: constraint IDs must be unique (#689).
+func renameSampleConstraintIDs(t *testing.T, path string) {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	renamed := regexp.MustCompile(`("id":\s*)"C0(\d)"`).ReplaceAll(data, []byte(`${1}"B0${2}"`))
+	if string(renamed) == string(data) {
+		t.Fatal("no constraint IDs found to rename")
+	}
+	if err := os.WriteFile(path, renamed, 0o644); err != nil {
+		t.Fatal(err)
+	}
 }

@@ -50,6 +50,7 @@ func ValidateWithWarnings(m *BausteinsichtModel) ValidationResult {
 	result.Errors = append(result.Errors, validatePatterns(m)...)
 	result.Errors = append(result.Errors, validateDuplicateDecisionIDs(m)...)
 	result.Errors = append(result.Errors, validateDecisions(m)...)
+	result.Errors = append(result.Errors, validateConstraints(m)...)
 	result.Warnings = append(result.Warnings, validateEmptyModel(m)...)
 	result.Warnings = append(result.Warnings, validateLifecycleStatus(m)...)
 	result.Warnings = append(result.Warnings, validateOrphanDecisions(m)...)
@@ -715,4 +716,31 @@ func validateSupersededDecisions(m *BausteinsichtModel) []ValidationWarning {
 	}
 
 	return warnings
+}
+
+// validateConstraints checks that every constraint names a known rule and that
+// constraint IDs are unique (BR-036, BR-037, #689). Without it `validate` said
+// "Model is valid." and only `lint` failed.
+func validateConstraints(m *BausteinsichtModel) []ValidationError {
+	var errs []ValidationError
+	seen := make(map[string]bool)
+	for i, c := range m.Constraints {
+		if !IsConstraintRule(c.Rule) {
+			errs = append(errs, ValidationError{
+				Path:    fmt.Sprintf("constraints[%d].rule", i),
+				Message: fmt.Sprintf("unknown constraint rule %q (valid: %s)", c.Rule, strings.Join(ConstraintRules, ", ")),
+			})
+		}
+		if c.ID == "" {
+			continue
+		}
+		if seen[c.ID] {
+			errs = append(errs, ValidationError{
+				Path:    fmt.Sprintf("constraints[%d].id", i),
+				Message: fmt.Sprintf("duplicate constraint id %q", c.ID),
+			})
+		}
+		seen[c.ID] = true
+	}
+	return errs
 }
