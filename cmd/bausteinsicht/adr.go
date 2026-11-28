@@ -180,7 +180,7 @@ func newADRShowCmd() *cobra.Command {
 				fmt.Printf("Date:   %s\n", decision.Date)
 			}
 			if decision.FilePath != "" {
-				fmt.Printf("File:   %s\n", decision.FilePath)
+				fmt.Printf("File:   %s%s\n", decision.FilePath, decisionFileNote(m.BaseDir, decision.FilePath))
 			}
 
 			if len(references) > 0 {
@@ -202,7 +202,7 @@ func newADRShowCmd() *cobra.Command {
 
 func getStatusIcon(status model.ADRStatus) string {
 	switch status {
-	case model.ADRActive:
+	case model.ADRActive, model.ADRAccepted:
 		return "✓"
 	case model.ADRProposed:
 		return "◯"
@@ -237,4 +237,12 @@ func findElementByID(m *model.BausteinsichtModel, id string) (*model.Element, bo
 	}
 
 	return current, true
+}
+
+// decisionFileNote says that the file of a decision was not found (#707).
+func decisionFileNote(baseDir, file string) string {
+	if exists, checked := model.DecisionFileExists(baseDir, file); checked && !exists {
+		return " (not found)"
+	}
+	return ""
 }

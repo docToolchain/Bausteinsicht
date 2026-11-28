@@ -43,6 +43,7 @@ func Load(path string) (*BausteinsichtModel, error) {
 
 	m.ElementOrder = extractElementOrder(clean)
 	m.UnknownFields = unknownFieldWarnings(clean)
+	m.BaseDir = filepath.Dir(path)
 
 	return &m, nil
 }

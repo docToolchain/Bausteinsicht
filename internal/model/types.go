@@ -42,7 +42,7 @@ func StatusColor(status string) string {
 // DecisionBadgeColor returns the draw.io badge color for a given ADR status
 func DecisionBadgeColor(status ADRStatus) string {
 	switch status {
-	case ADRActive:
+	case ADRActive, ADRAccepted:
 		return "#0066cc" // blue
 	case ADRSuperseded, ADRDeprecated:
 		return "#999999" // grey
@@ -233,10 +233,15 @@ type ADRStatus string
 
 const (
 	ADRProposed   ADRStatus = "proposed"
+	ADRAccepted   ADRStatus = "accepted"
 	ADRActive     ADRStatus = "active"
 	ADRDeprecated ADRStatus = "deprecated"
 	ADRSuperseded ADRStatus = "superseded"
 )
+
+// KnownADRStatuses are the statuses of a decision that the tools know; validate
+// reports any other (#707) and the JSON Schema lists them as an enum.
+var KnownADRStatuses = []ADRStatus{ADRProposed, ADRAccepted, ADRActive, ADRDeprecated, ADRSuperseded}
 
 // DecisionRecord represents an architecture decision record (ADR)
 type DecisionRecord struct {
