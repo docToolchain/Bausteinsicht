@@ -60,6 +60,14 @@ func TestSeparateOppositeConnectors_RoutesThemOnOppositeSides(t *testing.T) {
 	if math.Abs(y1-y2) < 40 {
 		t.Errorf("the routes are too close for two readable labels: y=%v and %v", y1, y2)
 	}
+	// Each label sits towards its own source, so the two labels are at the two
+	// ends of the line even when they are wider than the distance of the routes.
+	for _, c := range [][3]string{{"u", "s", "0"}, {"s", "u", "1"}} {
+		idx, _ := strconv.Atoi(c[2])
+		if x := p.FindConnector(c[0], c[1], idx).FindElement("mxGeometry").SelectAttrValue("x", ""); x != "-0.4" {
+			t.Errorf("connector %s->%s: label position x=%q, want -0.4", c[0], c[1], x)
+		}
+	}
 }
 
 func TestSeparateOppositeConnectors_IsIdempotentAndKeepsUserWaypoints(t *testing.T) {

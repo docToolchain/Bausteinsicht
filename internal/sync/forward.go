@@ -169,6 +169,9 @@ func applyForwardToPage(in forwardRenderInputs, elemFilter map[string]bool) {
 
 	// Show each relationship's technology on its connector. (#642)
 	synchronizeConnectorTechnology(page, "", legacyConnectors(in.model.Relationships))
+
+	// Route A→B and B→A apart, so that both labels can be read (#717).
+	page.SeparateOppositeConnectors()
 }
 
 // applyForwardPerView iterates over model views and applies changes per page.
@@ -294,6 +297,9 @@ func applyForwardToView(in forwardRenderInputs, opts *ForwardOptions, viewID str
 
 	// Show each relationship's technology as a second label on its connector.
 	synchronizeConnectorTechnology(page, viewID, conns)
+
+	// Route A→B and B→A apart, so that both labels can be read (#717).
+	page.SeparateOppositeConnectors()
 
 	// Reconciliation: remove elements on the page that are no longer
 	// in the resolved view (e.g., after exclude list changes). #102

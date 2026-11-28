@@ -115,7 +115,7 @@ Triggered when the JSON model changes.
 | Remove `<object>`, its child text sub-cells, and all connectors where `source` or `target` matches the element's cell ID.
 
 | New relationship
-| Create `<mxCell>` with `edge="1"`, `source`, `target`, and label. Use `id="rel-<from>-<to>-<index>"`. No `exitX`/`entryX` (auto-routing). Use `parent="1"` (layer, not container). If the relationship's `kind` resolves to a `specification.relationships.<kind>.dashed: true` entry, append `dashed=1;` to the connector style (#518).
+| Create `<mxCell>` with `edge="1"`, `source`, `target`, and label. Use `id="rel-<from>-<to>-<index>"`. No `exitX`/`entryX` (auto-routing). The one exception are the connectors of opposite directions between the same two elements on a page (A→B and B→A): on the automatic route they would run on top of each other and one label would be hidden, so each of them gets one waypoint in the middle between the two elements, moved 30 px to its own side of the line between the element centres (nested elements by their position on the page), and its label is moved towards its own source (label position `-0.4`), so the two labels sit at the two ends of the line and stay readable even when they are wider than the distance of the routes (#717). A connector that already has waypoints (drawn by the user, or set by an earlier run) is never changed, so the step can be repeated, and a connector without a counterpart keeps the automatic route. Use `parent="1"` (layer, not container). If the relationship's `kind` resolves to a `specification.relationships.<kind>.dashed: true` entry, append `dashed=1;` to the connector style (#518).
 
 | Updated relationship (label)
 | Update `value` attribute on the connector `<mxCell>`.

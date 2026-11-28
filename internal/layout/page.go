@@ -128,6 +128,9 @@ func layoutPage(page *drawio.Page, opts Options) (positioned, pinned int) {
 		}
 	}
 	clearWaypoints(page)
+	// The connectors of opposite directions lose their separate routes with the
+	// waypoints; give them new ones for the new positions (#717).
+	page.SeparateOppositeConnectors()
 	return positioned, pinned
 }
 
