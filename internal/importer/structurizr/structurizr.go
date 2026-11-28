@@ -69,15 +69,25 @@ type kindDef struct {
 var elementKindOrder = []kindDef{
 	{"person", "Person", false},
 	{"system", "Software System", true},
+	{"external_system", "External System", false},
 	{"container", "Container", true},
+	{"datastore", "Data Store", false},
 	{"component", "Component", false},
 }
 
 var structurizrKindMap = map[string]kindDef{
 	"person":         elementKindOrder[0],
 	"softwareSystem": elementKindOrder[1],
-	"container":      elementKindOrder[2],
-	"component":      elementKindOrder[3],
+	"container":      elementKindOrder[3],
+	"component":      elementKindOrder[5],
+}
+
+// tagKinds are the tags that select a kind the default specification has: a
+// software system tagged External is an external_system, a container tagged
+// Database a datastore (#688). The tag is not kept, the kind says it.
+var tagKinds = map[string]map[string]kindDef{
+	"system":    {"External": elementKindOrder[2]},
+	"container": {"Database": elementKindOrder[4]},
 }
 
 type pendingRel struct {
@@ -96,6 +106,7 @@ type importState struct {
 	pendingRels []pendingRel
 	views       map[string]model.View
 	viewKeys    map[string]int
+	tags        []model.TagDefinition
 	warnings    []string
 }
 
@@ -110,8 +121,7 @@ func newImportState() *importState {
 	}
 }
 
-func (is *importState) registerKind(kw string) {
-	kd := structurizrKindMap[kw]
+func (is *importState) registerKind(kd kindDef) {
 	if !is.specAdded[kd.kind] {
 		is.spec[kd.kind] = model.ElementKind{
 			Notation:  kd.notation,
@@ -149,8 +159,6 @@ func (is *importState) processModelStmt(s dsl.Stmt, parentPath, parentVar string
 		return
 	}
 
-	is.registerKind(s.Keyword)
-
 	key := is.resolveElementKey(s, kd)
 	path := key
 	if parentPath != "" {
@@ -164,6 +172,7 @@ func (is *importState) processModelStmt(s dsl.Stmt, parentPath, parentVar string
 	for _, child := range s.Body {
 		is.processModelChild(child, path, key, &el, children)
 	}
+	is.settleKindAndTags(&el, kd)
 	if len(children) > 0 {
 		el.Children = children
 	}
@@ -214,10 +223,60 @@ func buildElementFromStmt(s dsl.Stmt, kd kindDef) model.Element {
 	if len(s.Args) > 1 {
 		el.Description = s.Args[1]
 	}
-	if (kd.kind == "container" || kd.kind == "component") && len(s.Args) > 2 {
-		el.Technology = s.Args[2]
+	tagArg := 2
+	if kd.kind == "container" || kd.kind == "component" {
+		tagArg = 3
+		if len(s.Args) > 2 {
+			el.Technology = s.Args[2]
+		}
+	}
+	if len(s.Args) > tagArg {
+		el.Tags = splitTags(s.Args[tagArg])
 	}
 	return el
+}
+
+// splitTags reads the comma separated tags of a Structurizr tags argument.
+func splitTags(arg string) []string {
+	var tags []string
+	for _, tag := range strings.Split(arg, ",") {
+		if tag = strings.TrimSpace(tag); tag != "" {
+			tags = append(tags, tag)
+		}
+	}
+	return tags
+}
+
+// settleKindAndTags applies the kind that a tag selects, keeps the remaining
+// tags and defines them in the specification, so that the model validates.
+func (is *importState) settleKindAndTags(el *model.Element, kd kindDef) {
+	var kept []string
+	seen := make(map[string]bool)
+	for _, tag := range el.Tags {
+		if seen[tag] {
+			continue
+		}
+		seen[tag] = true
+		if to, ok := tagKinds[kd.kind][tag]; ok && kd.kind == el.Kind {
+			el.Kind, kd = to.kind, to
+			continue
+		}
+		kept = append(kept, tag)
+	}
+	el.Tags = kept
+	for _, tag := range kept {
+		is.defineTag(tag)
+	}
+	is.registerKind(kd)
+}
+
+func (is *importState) defineTag(tag string) {
+	for _, td := range is.tags {
+		if td.ID == tag {
+			return
+		}
+	}
+	is.tags = append(is.tags, model.TagDefinition{ID: tag})
 }
 
 // processModelChild applies a single child statement of an element's body:
@@ -234,7 +293,9 @@ func (is *importState) processModelChild(child dsl.Stmt, path, key string, el *m
 	case child.Keyword == "technology" && len(child.Args) > 0:
 		el.Technology = child.Args[0]
 	case child.Keyword == "tags":
-		el.Tags = child.Args
+		for _, arg := range child.Args {
+			el.Tags = append(el.Tags, splitTags(arg)...)
+		}
 	case child.Keyword == "properties":
 		el.Metadata = parseProperties(child.Body)
 	}
@@ -255,12 +316,16 @@ func (is *importState) processViewsStmts(stmts []dsl.Stmt) {
 		if scope != "" {
 			titleArgs = s.Args[1:]
 		}
-		// Structurizr: `<type> [scope] [key] [description]`. With both given the
-		// first is the key; a single argument stays the title (#687).
+		// Structurizr: `<type> [scope] [key] [description]`. The first argument
+		// is the key, the second the description, which becomes the title; a
+		// view without description is titled by its key (#687, #688).
 		title := strings.Join(titleArgs, " ")
 		baseKey := ""
+		if len(titleArgs) >= 1 {
+			baseKey = titleArgs[0]
+		}
 		if len(titleArgs) >= 2 {
-			baseKey, title = titleArgs[0], titleArgs[1]
+			title = titleArgs[1]
 		}
 
 		viewKey := is.nextViewKey(s.Keyword, scope, baseKey)
@@ -562,6 +627,7 @@ func (is *importState) buildResultModel(rels []model.Relationship) *model.Bauste
 		}
 	}
 
+	spec.Tags = is.tags
 	m := &model.BausteinsichtModel{
 		Schema:        schemaURL,
 		Specification: spec,

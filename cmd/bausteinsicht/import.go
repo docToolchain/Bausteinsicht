@@ -12,6 +12,7 @@ import (
 	"github.com/docToolchain/Bausteinsicht/internal/importer/structurizr"
 	"github.com/docToolchain/Bausteinsicht/internal/importer/xmi"
 	"github.com/docToolchain/Bausteinsicht/internal/model"
+	"github.com/docToolchain/Bausteinsicht/internal/template"
 	"github.com/spf13/cobra"
 )
 
@@ -41,6 +42,7 @@ Exit codes:
 	cmd.Flags().Bool("dry-run", false, "Print generated model to stdout instead of writing file")
 	cmd.Flags().Bool("force", false, "Overwrite output file if it already exists")
 	cmd.Flags().String("kind-map", "", "XMI only: comma-separated Type=kind overrides (e.g. Component=service,Class=entity)")
+	cmd.Flags().Bool("generate-template", false, "Also write template.drawio next to the output file, with a style for every imported kind")
 	cmd.Flags().Bool("json", false, "Print the post-import summary as JSON instead of human-readable text")
 	_ = cmd.MarkFlagRequired("from")
 	return cmd
@@ -53,6 +55,7 @@ func runImport(cmd *cobra.Command, args []string) error {
 	dryRun, _ := cmd.Flags().GetBool("dry-run")
 	force, _ := cmd.Flags().GetBool("force")
 	jsonSummary, _ := cmd.Flags().GetBool("json")
+	genTemplate, _ := cmd.Flags().GetBool("generate-template")
 
 	from = strings.ToLower(strings.TrimSpace(from))
 	if from != "structurizr" && from != "likec4" && from != "xmi" {
@@ -77,6 +80,15 @@ func runImport(cmd *cobra.Command, args []string) error {
 			fmt.Errorf("output file %q already exists — use --force to overwrite", outputPath),
 			2,
 		)
+	}
+
+	// The template belongs to the model: it lies next to it, where sync looks
+	// for it. An existing one is the user's, so refuse before anything is written (#688).
+	templatePath := filepath.Join(filepath.Dir(outputPath), "template.drawio")
+	if genTemplate && !dryRun {
+		if _, err := os.Stat(templatePath); err == nil {
+			return exitWithCode(fmt.Errorf("template %q already exists — remove it or run generate-template with --output", templatePath), 2)
+		}
 	}
 
 	var (
@@ -138,6 +150,13 @@ func runImport(cmd *cobra.Command, args []string) error {
 	}
 	if err := os.WriteFile(outputPath, append(data, '\n'), 0o644); err != nil {
 		return exitWithCode(fmt.Errorf("writing %s: %w", outputPath, err), 1)
+	}
+
+	if genTemplate {
+		xml := template.NewGenerator(resultModel.Specification, "default").Generate()
+		if err := os.WriteFile(templatePath, []byte(xml), 0o644); err != nil { //nolint:gosec
+			return exitWithCode(fmt.Errorf("writing %s: %w", templatePath, err), 1)
+		}
 	}
 
 	if jsonSummary {

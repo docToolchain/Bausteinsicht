@@ -170,18 +170,18 @@ func TestImport_ScopedView_IncludeExpansion(t *testing.T) {
 	m := result.Model
 
 	// systemContext with scope: keep plain "*" (top-level elements are correct)
-	ctxView, ok := m.Views["system"]
+	ctxView, ok := m.Views["Context"]
 	if !ok {
-		t.Fatal("expected view key 'system'")
+		t.Fatal("expected view key 'Context'")
 	}
 	if len(ctxView.Include) != 1 || ctxView.Include[0] != "*" {
 		t.Errorf("systemContext view: expected include=[\"*\"], got %v", ctxView.Include)
 	}
 
 	// container view: must add "system.*" so containers appear inside boundary
-	containersView, ok := m.Views["system_1"]
+	containersView, ok := m.Views["Containers"]
 	if !ok {
-		t.Fatal("expected view key 'system_1'")
+		t.Fatal("expected view key 'Containers'")
 	}
 	wantContainers := []string{"*", "system.*"}
 	if len(containersView.Include) != len(wantContainers) {
@@ -196,9 +196,9 @@ func TestImport_ScopedView_IncludeExpansion(t *testing.T) {
 
 	// component view: must add parent containers + scope components
 	// scope resolves to "system.app"
-	componentsView, ok := m.Views["system.app"]
+	componentsView, ok := m.Views["Components"]
 	if !ok {
-		t.Fatal("expected view key 'system.app'")
+		t.Fatal("expected view key 'Components'")
 	}
 	wantComponents := []string{"*", "system.*", "system.app.*"}
 	if len(componentsView.Include) != len(wantComponents) {
@@ -251,9 +251,9 @@ func TestImport_AutoLayout_MapsToLayeredAndWarns(t *testing.T) {
 	}
 	m := result.Model
 
-	view, ok := m.Views["a"]
+	view, ok := m.Views["Context"]
 	if !ok {
-		t.Fatal("expected view key 'a'")
+		t.Fatal("expected view key 'Context'")
 	}
 	if view.Layout != "layered" {
 		t.Errorf("expected layout \"layered\", got %q", view.Layout)

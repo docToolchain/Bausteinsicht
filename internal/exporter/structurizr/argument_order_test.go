@@ -94,7 +94,7 @@ func TestExport_ContextViewIsNotExportedAsContainerView(t *testing.T) {
 	for key, v := range m.Views {
 		t.Logf("view %s: scope=%q include=%v", key, v.Scope, v.Include)
 	}
-	for _, want := range []string{`systemContext ss "ss" "ctx"`, `container ss "ss_1" "cont"`, `component api "ss.api" "comp"`} {
+	for _, want := range []string{`systemContext ss "ctx" "ctx"`, `container ss "cont" "cont"`, `component api "comp" "comp"`} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %q in:\n%s", want, out)
 		}
