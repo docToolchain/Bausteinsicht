@@ -297,6 +297,10 @@ func applyForwardToView(in forwardRenderInputs, opts *ForwardOptions, viewID str
 
 	scopeID := view.Scope
 
+	// What the page looked like before this sync: "Last synced" is only updated if
+	// the sync changed the page (#731).
+	before := pageFingerprint(page, viewID)
+
 	// --relayout: clear all managed elements from the page so
 	// populateNewPage treats it as a fresh page.
 	if opts != nil && opts.Relayout {
@@ -359,6 +363,14 @@ func applyForwardToView(in forwardRenderInputs, opts *ForwardOptions, viewID str
 
 	// Synchronize the view-level DocLinks icon row (e.g. PRD/persona links for the whole page). (#543)
 	synchronizeViewDocLinkIcons(page, viewID, view)
+
+	// A sync that changed the page is the last sync of the page: the box says when.
+	metadataEnabled := m.Config.Metadata == nil || *m.Config.Metadata
+	if metadataEnabled && opts != nil && pageFingerprint(page, viewID) != before {
+		if refreshSyncTime(page, viewID, opts.SyncTime) {
+			in.result.MetadataUpdated++
+		}
+	}
 }
 
 // applyViewMetadataAndLegend creates the metadata and legend boxes on page,

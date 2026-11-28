@@ -41,11 +41,19 @@ func TestSync_UnchangedModelLeavesTheDiagramAlone(t *testing.T) {
 		t.Error("a sync without changes must leave the diagram byte-identical")
 	}
 
-	// A change refreshes the time.
+	// A change refreshes the time of the page that it changed, and only of that.
 	runCLI(t, bin, dir, "add", "element", "--id", "fresh", "--kind", "actor", "--title", "Fresh")
 	runCLI(t, bin, dir, "add", "view", "context", "--include", "fresh")
 	runCLI(t, bin, dir, "sync")
-	if after, _ := os.ReadFile(path); strings.Contains(string(after), "Last synced: 2001-01-01 00:00") {
-		t.Error("a sync that changed the diagram writes the new time")
+	after, _ := os.ReadFile(path)
+	stamps := stamp.FindAllString(string(after), -1)
+	oldOnes := 0
+	for _, s := range stamps {
+		if s == "Last synced: 2001-01-01 00:00" {
+			oldOnes++
+		}
+	}
+	if oldOnes == 0 || oldOnes == len(stamps) {
+		t.Errorf("the page that changed gets the new time, the others keep theirs: %d of %d still have the old one", oldOnes, len(stamps))
 	}
 }
