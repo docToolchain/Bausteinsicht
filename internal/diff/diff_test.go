@@ -189,3 +189,38 @@ func TestCompare_RemovedRelationship(t *testing.T) {
 		t.Errorf("Expected 1 removed relationship in summary, got %d", result.Summary.RemovedRelationships)
 	}
 }
+
+// FilterTo keeps the changes of the given elements, and the relationships whose
+// both ends are among them, and counts again (#709).
+func TestDiffResult_FilterTo(t *testing.T) {
+	asIs := &model.ModelSnapshot{
+		Elements:      map[string]model.Element{"u": {Kind: "actor", Title: "U"}, "old": {Kind: "db", Title: "Old"}},
+		Relationships: []model.Relationship{{From: "u", To: "old", Kind: "uses"}},
+	}
+	toBe := &model.ModelSnapshot{
+		Elements:      map[string]model.Element{"u": {Kind: "actor", Title: "U2"}, "new": {Kind: "db", Title: "New"}},
+		Relationships: []model.Relationship{{From: "u", To: "new", Kind: "uses"}},
+	}
+	r := Compare(asIs, toBe)
+	if r.Summary.AddedElements != 1 || r.Summary.RemovedElements != 1 || r.Summary.ChangedElements != 1 {
+		t.Fatalf("setup: unexpected summary %+v", r.Summary)
+	}
+
+	r.FilterTo(map[string]bool{"u": true})
+	if len(r.Elements) != 1 || r.Elements[0].ID != "u" || r.Elements[0].Type != ChangeChanged {
+		t.Errorf("only the change of u stays, got %+v", r.Elements)
+	}
+	if len(r.Relationships) != 0 {
+		t.Errorf("relationships to elements outside the set go, got %+v", r.Relationships)
+	}
+	if r.Summary.AddedElements != 0 || r.Summary.RemovedElements != 0 || r.Summary.ChangedElements != 1 ||
+		r.Summary.AddedRelationships != 0 || r.Summary.RemovedRelationships != 0 {
+		t.Errorf("the summary is counted again, got %+v", r.Summary)
+	}
+
+	r = Compare(asIs, toBe)
+	r.FilterTo(map[string]bool{"u": true, "new": true})
+	if r.Summary.AddedElements != 1 || r.Summary.AddedRelationships != 1 || r.Summary.RemovedRelationships != 0 {
+		t.Errorf("a relationship with both ends in the set stays, got %+v", r.Summary)
+	}
+}
