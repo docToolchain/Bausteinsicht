@@ -163,3 +163,6 @@ func GetCommitInfo(gitRef string) (*CommitInfo, error) {
 		Timestamp: date.Unix(),
 	}, nil
 }
+
+// PreviousTag returns the most recent tag before until (stub, filled in by the fix).
+func PreviousTag(until string) (string, error) { return "", nil }
