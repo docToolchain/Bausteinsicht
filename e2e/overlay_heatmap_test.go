@@ -166,3 +166,32 @@ func readFile(t *testing.T, path string) string {
 	}
 	return string(data)
 }
+
+// #696: list names the metrics, apply names the elements that are not in the
+// model, and a file of the wrong shape is refused with the shape that is expected.
+func TestOverlayHints(t *testing.T) {
+	bin := buildBinary(t)
+	dir := t.TempDir()
+	runCLI(t, bin, dir, "init")
+	runCLI(t, bin, dir, "sync")
+	write := func(name, content string) {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("met.json", `{"meta":{},"metrics":[{"elementId":"customer","error_rate":0.5},{"elementId":"nope","error_rate":1}]}`)
+	write("bad.json", `{"customer":{"error_rate":0.5}}`)
+
+	list := runCLI(t, bin, dir, "overlay", "list", "met.json")
+	if !strings.Contains(list, "error_rate") || strings.Contains(list, "()") {
+		t.Errorf("overlay list must name the metrics and not print an empty header:\n%s", list)
+	}
+	apply := runCLI(t, bin, dir, "overlay", "apply", "met.json", "--metric", "error_rate")
+	if !strings.Contains(apply, `"nope"`) {
+		t.Errorf("overlay apply must warn about the unknown element:\n%s", apply)
+	}
+	out, code := runCLIAllowFail(t, bin, dir, "overlay", "apply", "bad.json")
+	if code != 2 || !strings.Contains(out, `"elementId"`) {
+		t.Errorf("a file of the wrong shape: want exit 2 and the expected shape, got %d:\n%s", code, out)
+	}
+}

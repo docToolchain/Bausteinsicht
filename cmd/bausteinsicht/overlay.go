@@ -28,8 +28,10 @@ func newOverlayApplyCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "apply <metrics-file>",
 		Short: "Apply metric heatmap to draw.io diagram",
-		Long:  "Load metrics from JSON file and apply heatmap colors to elements. Original colors are saved in metadata.",
-		Args:  cobra.ExactArgs(1),
+		Long: "Load metrics from JSON file and apply heatmap colors to elements. Original colors are saved in metadata.\n\n" +
+			"Metrics file: " + overlay.FormatHint + ".\n" +
+			"Without --metric the first metric by name is used (see 'overlay list'). Entries for elements that are not in the model are reported as warnings.",
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			metricsPath := args[0]
 			modelPath, _ := cmd.Flags().GetString("model")
@@ -56,15 +58,18 @@ func newOverlayApplyCmd() *cobra.Command {
 			}
 
 			if metricKey == "" {
-				if len(mf.Metrics) > 0 && len(mf.Metrics[0].Values) > 0 {
-					for k := range mf.Metrics[0].Values {
-						metricKey = k
-						break
-					}
+				if metricKey = overlay.DefaultMetric(mf); metricKey == "" {
+					return exitWithCode(fmt.Errorf("no metrics found in file; %s", overlay.FormatHint), 2)
 				}
-				if metricKey == "" {
-					return exitWithCode(fmt.Errorf("no metrics found in file"), 2)
-				}
+			}
+
+			known := make(map[string]bool)
+			flat, _ := model.FlattenElements(m)
+			for id := range flat {
+				known[id] = true
+			}
+			for _, id := range overlay.UnknownElementIDs(mf, known) {
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "WARNING: metrics for element %q ignored: it is not in the model\n", id)
 			}
 
 			if err := overlay.Apply(drawioPath, mf, metricKey, overlay.DefaultColorScheme); err != nil {
@@ -138,6 +143,7 @@ func newOverlayListCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list <metrics-file>",
 		Short: "List available metrics in file",
+		Long:  "List the metrics of a metrics file with their range and the number of elements. Metrics file: " + overlay.FormatHint + ".",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			metricsPath := args[0]
@@ -147,20 +153,43 @@ func newOverlayListCmd() *cobra.Command {
 				return exitWithCode(fmt.Errorf("loading metrics: %w", err), 2)
 			}
 
+			summaries := overlay.Summaries(mf)
 			format, _ := cmd.Flags().GetString("format")
 			if format == "json" {
+				type metricJSON struct {
+					Name        string  `json:"name"`
+					Description string  `json:"description,omitempty"`
+					Min         float64 `json:"min"`
+					Max         float64 `json:"max"`
+					Elements    int     `json:"elements"`
+				}
+				metrics := make([]metricJSON, 0, len(summaries))
+				for _, s := range summaries {
+					metrics = append(metrics, metricJSON{s.Name, s.Description, s.Min, s.Max, s.Elements})
+				}
 				out, _ := json.Marshal(map[string]interface{}{
 					"source":              mf.Meta.Source,
 					"generated":           mf.Meta.Generated,
 					"metric_descriptions": mf.Meta.MetricDescriptions,
 					"element_count":       len(mf.Metrics),
+					"metrics":             metrics,
 				})
 				_, _ = fmt.Fprintln(cmd.OutOrStdout(), string(out))
 			} else {
-				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "📊 Metrics from: %s (%s)\n\n", mf.Meta.Source, mf.Meta.Generated)
-				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Available metrics (%d elements):\n", len(mf.Metrics))
-				for metric, desc := range mf.Meta.MetricDescriptions {
-					_, _ = fmt.Fprintf(cmd.OutOrStdout(), "  • %s: %s\n", metric, desc)
+				header := "📊 Metrics"
+				if mf.Meta.Source != "" {
+					header += " from: " + mf.Meta.Source
+				}
+				if mf.Meta.Generated != "" {
+					header += " (" + mf.Meta.Generated + ")"
+				}
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s\n\nAvailable metrics (%d elements):\n", header, len(mf.Metrics))
+				for _, s := range summaries {
+					line := fmt.Sprintf("  • %s: min %g, max %g (%d elements)", s.Name, s.Min, s.Max, s.Elements)
+					if s.Description != "" {
+						line += " — " + s.Description
+					}
+					_, _ = fmt.Fprintln(cmd.OutOrStdout(), line)
 				}
 			}
 			return nil
