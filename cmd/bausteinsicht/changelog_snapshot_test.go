@@ -46,3 +46,16 @@ func TestChangelogCmd_UnknownRefIsStillAnError(t *testing.T) {
 		t.Errorf("want an error that names the unknown ref, got %v", err)
 	}
 }
+
+// A snapshot has no previous tag, so --since cannot be left out when --until is one.
+func TestChangelogCmd_SinceIsRequiredForASnapshotUntil(t *testing.T) {
+	t.Chdir(t.TempDir())
+	if _, err := executeRootCmd("init"); err != nil {
+		t.Fatal(err)
+	}
+	id := savedSnapshotID(t, "")
+	_, err := executeRootCmd("changelog", "--until", id)
+	if err == nil || !strings.Contains(err.Error(), "--since is required") {
+		t.Errorf("want \"--since is required\", got %v", err)
+	}
+}
