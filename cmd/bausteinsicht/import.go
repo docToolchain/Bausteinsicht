@@ -2,7 +2,9 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -12,6 +14,7 @@ import (
 	"github.com/docToolchain/Bausteinsicht/internal/importer/structurizr"
 	"github.com/docToolchain/Bausteinsicht/internal/importer/xmi"
 	"github.com/docToolchain/Bausteinsicht/internal/model"
+	"github.com/docToolchain/Bausteinsicht/internal/template"
 	"github.com/spf13/cobra"
 )
 
@@ -41,6 +44,7 @@ Exit codes:
 	cmd.Flags().Bool("dry-run", false, "Print generated model to stdout instead of writing file")
 	cmd.Flags().Bool("force", false, "Overwrite output file if it already exists")
 	cmd.Flags().String("kind-map", "", "XMI only: comma-separated Type=kind overrides (e.g. Component=service,Class=entity)")
+	cmd.Flags().Bool("generate-template", false, "Also write template.drawio next to the output file, with a style for every imported kind")
 	cmd.Flags().Bool("json", false, "Print the post-import summary as JSON instead of human-readable text")
 	_ = cmd.MarkFlagRequired("from")
 	return cmd
@@ -53,6 +57,7 @@ func runImport(cmd *cobra.Command, args []string) error {
 	dryRun, _ := cmd.Flags().GetBool("dry-run")
 	force, _ := cmd.Flags().GetBool("force")
 	jsonSummary, _ := cmd.Flags().GetBool("json")
+	genTemplate, _ := cmd.Flags().GetBool("generate-template")
 
 	from = strings.ToLower(strings.TrimSpace(from))
 	if from != "structurizr" && from != "likec4" && from != "xmi" {
@@ -77,6 +82,15 @@ func runImport(cmd *cobra.Command, args []string) error {
 			fmt.Errorf("output file %q already exists — use --force to overwrite", outputPath),
 			2,
 		)
+	}
+
+	// The template belongs to the model: it lies next to it, where sync looks
+	// for it. An existing one is the user's, so refuse before anything is written (#688).
+	templatePath := filepath.Join(filepath.Dir(outputPath), "template.drawio")
+	if genTemplate && !dryRun {
+		if _, err := os.Stat(templatePath); err == nil {
+			return exitWithCode(fmt.Errorf("template %q already exists — remove it or run generate-template with --output", templatePath), 2)
+		}
 	}
 
 	var (
@@ -121,6 +135,29 @@ func runImport(cmd *cobra.Command, args []string) error {
 		return exitWithCode(fmt.Errorf("encoding model: %w", err), 1)
 	}
 
+	// The directory exists before the template is created in it; a dry run
+	// writes nothing, so it does not create it.
+	if !dryRun {
+		if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil {
+			return exitWithCode(fmt.Errorf("creating output directory: %w", err), 1)
+		}
+	}
+
+	// The template is created first and exclusively: an import that overlaps
+	// with another one in the directory, or a dangling link, is refused before
+	// the model is written. A failing model write takes the template back.
+	templateWritten := false
+	if genTemplate && !dryRun {
+		xml := template.NewGenerator(resultModel.Specification, "default").Generate()
+		if err := createFileExclusively(templatePath, []byte(xml)); err != nil {
+			if errors.Is(err, fs.ErrExist) {
+				return exitWithCode(fmt.Errorf("template %q already exists — remove it or run generate-template with --output", templatePath), 2)
+			}
+			return exitWithCode(fmt.Errorf("writing %s: %w", templatePath, err), 1)
+		}
+		templateWritten = true
+	}
+
 	if dryRun {
 		if _, err := fmt.Fprintln(cmd.OutOrStdout(), string(data)); err != nil {
 			return err
@@ -133,10 +170,10 @@ func runImport(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil {
-		return exitWithCode(fmt.Errorf("creating output directory: %w", err), 1)
-	}
 	if err := os.WriteFile(outputPath, append(data, '\n'), 0o644); err != nil {
+		if templateWritten {
+			_ = os.Remove(templatePath)
+		}
 		return exitWithCode(fmt.Errorf("writing %s: %w", outputPath, err), 1)
 	}
 
@@ -237,4 +274,19 @@ func elementCountsByKind(m *model.BausteinsichtModel) (map[string]int, error) {
 		counts[elem.Kind]++
 	}
 	return counts, nil
+}
+
+// createFileExclusively writes data to a new file; an existing file or link of
+// that name is an fs.ErrExist error and is left alone.
+func createFileExclusively(path string, data []byte) error {
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644) //nolint:gosec
+	if err != nil {
+		return err
+	}
+	if _, err := f.Write(data); err != nil {
+		_ = f.Close()
+		_ = os.Remove(path)
+		return err
+	}
+	return f.Close()
 }

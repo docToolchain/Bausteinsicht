@@ -94,6 +94,19 @@ func (e *exporter) writeElement(b *strings.Builder, dotPath string, elem model.E
 	if tech != "" && hasTechnologySlot(kind) && len(args) == 1 {
 		args = []string{title, "", tech}
 	}
+	// The tags come after the technology slot, or after the description for
+	// person and softwareSystem; the kinds external_system and datastore are
+	// written as the tags that select them on import.
+	if tags := exportTags(elem); len(tags) > 0 {
+		slot := 2
+		if hasTechnologySlot(kind) {
+			slot = 3
+		}
+		for len(args) < slot {
+			args = append(args, "")
+		}
+		args = append(args, escDQ(strings.Join(tags, ",")))
+	}
 	var line strings.Builder
 	fmt.Fprintf(&line, "%s%s = %s", indent, varName, kind)
 	for _, a := range args {
@@ -111,6 +124,18 @@ func (e *exporter) writeElement(b *strings.Builder, dotPath string, elem model.E
 	} else {
 		fmt.Fprintf(b, "%s\n", line.String())
 	}
+}
+
+// exportTags returns the tags of elem, the one that its kind stands for first.
+func exportTags(elem model.Element) []string {
+	var tags []string
+	switch elem.Kind {
+	case "external_system":
+		tags = append(tags, "External")
+	case "datastore":
+		tags = append(tags, "Database")
+	}
+	return append(tags, elem.Tags...)
 }
 
 // hasTechnologySlot reports whether the Structurizr keyword takes a technology

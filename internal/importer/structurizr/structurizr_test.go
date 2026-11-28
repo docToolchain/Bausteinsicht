@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/docToolchain/Bausteinsicht/internal/importer/structurizr"
+	"github.com/docToolchain/Bausteinsicht/internal/model"
 )
 
 func TestImport_Simple(t *testing.T) {
@@ -169,18 +170,18 @@ func TestImport_ScopedView_IncludeExpansion(t *testing.T) {
 	m := result.Model
 
 	// systemContext with scope: keep plain "*" (top-level elements are correct)
-	ctxView, ok := m.Views["system"]
+	ctxView, ok := m.Views["Context"]
 	if !ok {
-		t.Fatal("expected view key 'system'")
+		t.Fatal("expected view key 'Context'")
 	}
 	if len(ctxView.Include) != 1 || ctxView.Include[0] != "*" {
 		t.Errorf("systemContext view: expected include=[\"*\"], got %v", ctxView.Include)
 	}
 
 	// container view: must add "system.*" so containers appear inside boundary
-	containersView, ok := m.Views["system_1"]
+	containersView, ok := m.Views["Containers"]
 	if !ok {
-		t.Fatal("expected view key 'system_1'")
+		t.Fatal("expected view key 'Containers'")
 	}
 	wantContainers := []string{"*", "system.*"}
 	if len(containersView.Include) != len(wantContainers) {
@@ -195,9 +196,9 @@ func TestImport_ScopedView_IncludeExpansion(t *testing.T) {
 
 	// component view: must add parent containers + scope components
 	// scope resolves to "system.app"
-	componentsView, ok := m.Views["system.app"]
+	componentsView, ok := m.Views["Components"]
 	if !ok {
-		t.Fatal("expected view key 'system.app'")
+		t.Fatal("expected view key 'Components'")
 	}
 	wantComponents := []string{"*", "system.*", "system.app.*"}
 	if len(componentsView.Include) != len(wantComponents) {
@@ -250,9 +251,9 @@ func TestImport_AutoLayout_MapsToLayeredAndWarns(t *testing.T) {
 	}
 	m := result.Model
 
-	view, ok := m.Views["a"]
+	view, ok := m.Views["Context"]
 	if !ok {
-		t.Fatal("expected view key 'a'")
+		t.Fatal("expected view key 'Context'")
 	}
 	if view.Layout != "layered" {
 		t.Errorf("expected layout \"layered\", got %q", view.Layout)
@@ -399,7 +400,8 @@ func TestImport_RelationshipTechnology(t *testing.T) {
 
 // Structurizr views read `systemContext <scope> <key> <description>`: with two
 // arguments after the scope the first is the key and the second the description
-// (#687); a single one stays the title.
+// (#687); a single one is the key too (#688), and a view without any keeps the
+// scope as its key.
 func TestImport_ViewKeyAndDescription(t *testing.T) {
 	src := `workspace {
   model {
@@ -409,7 +411,8 @@ func TestImport_ViewKeyAndDescription(t *testing.T) {
   }
   views {
     systemContext system "ctx-key" "The context" { include * }
-    container system "Only title" { include * }
+    container system "only-key" { include * }
+    component app { include * }
     systemLandscape "land" "All systems" { include * }
   }
 }`
@@ -421,8 +424,11 @@ func TestImport_ViewKeyAndDescription(t *testing.T) {
 	if got, ok := v["ctx-key"]; !ok || got.Title != "The context" {
 		t.Errorf("want view ctx-key titled %q, got %+v", "The context", v)
 	}
-	if got, ok := v["system"]; !ok || got.Title != "Only title" {
-		t.Errorf("a single argument keeps the old reading (key from the scope, argument as title), got %+v", v)
+	if got, ok := v["only-key"]; !ok || got.Title != "only-key" {
+		t.Errorf("a single argument is the view key (Structurizr: <type> <scope> [key] [description]), got %+v", v)
+	}
+	if _, ok := v["system.app"]; !ok {
+		t.Errorf("a view without key or description is keyed by its scope, got %+v", v)
 	}
 	if got, ok := v["land"]; !ok || got.Title != "All systems" {
 		t.Errorf("want landscape view land titled %q, got %+v", "All systems", v)
@@ -440,9 +446,9 @@ func TestImport_ViewKeysNeverOverwriteEachOther(t *testing.T) {
     }
   }
   views {
-    systemContext s "ctx" { include * }
+    systemContext s { include * }
     systemContext s "s_1" "Second" { include * }
-    container s "cont" { include * }
+    container s { include * }
   }
 }`
 	result, err := structurizr.ImportSource(src)
@@ -454,5 +460,124 @@ func TestImport_ViewKeysNeverOverwriteEachOther(t *testing.T) {
 	}
 	if v := result.Model.Views["s_1"]; v.Title != "Second" {
 		t.Errorf("the explicit key s_1 must keep its view, got %+v", v)
+	}
+}
+
+// A tag in the DSL is not thrown away: "External" on a software system and
+// "Database" on a container select the kinds the default specification has
+// for them, every other tag stays on the element and is defined in the
+// specification, so the model validates (#688).
+func TestImport_TagsSelectKindsAndAreKept(t *testing.T) {
+	src := `workspace {
+  model {
+    ss = softwareSystem "Banking" "Core" {
+      db = container "DB" "store" "Postgres" "Database,Critical"
+      api = container "API" "REST" "Java" {
+        tags "Internal"
+      }
+    }
+    ext = softwareSystem "Mail" "ext" "External"
+  }
+}`
+	result, err := structurizr.ImportSource(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := result.Model
+	if got := m.Model["ext"].Kind; got != "external_system" {
+		t.Errorf("software system tagged External: want kind external_system, got %q", got)
+	}
+	db := m.Model["ss"].Children["db"]
+	if db.Kind != "datastore" {
+		t.Errorf("container tagged Database: want kind datastore, got %q", db.Kind)
+	}
+	if len(db.Tags) != 1 || db.Tags[0] != "Critical" {
+		t.Errorf("tags that do not select a kind stay on the element, want [Critical], got %v", db.Tags)
+	}
+	if got := m.Model["ss"].Children["api"].Tags; len(got) != 1 || got[0] != "Internal" {
+		t.Errorf("tags from a tags statement stay on the element, want [Internal], got %v", got)
+	}
+	for _, kind := range []string{"external_system", "datastore", "system", "container"} {
+		if _, ok := m.Specification.Elements[kind]; !ok {
+			t.Errorf("specification lacks the kind %q: %v", kind, m.Specification.Elements)
+		}
+	}
+	defined := map[string]bool{}
+	for _, td := range m.Specification.Tags {
+		defined[td.ID] = true
+	}
+	for _, tag := range []string{"Critical", "Internal"} {
+		if !defined[tag] {
+			t.Errorf("tag %q is used but not defined in specification.tags: %v", tag, m.Specification.Tags)
+		}
+	}
+	if errs := model.Validate(m); len(errs) > 0 {
+		t.Errorf("the imported model must validate, got %v", errs)
+	}
+}
+
+// An External system with containers, or a Database container with
+// components, cannot become external_system/datastore: those kinds have no
+// children in the default specification and the model would not validate.
+// The element keeps its kind and its tag then (CodeRabbit finding on #775).
+func TestImport_TagKindsNeedLeafElements(t *testing.T) {
+	src := `workspace {
+  model {
+    ext = softwareSystem "Mail" "ext" "External" {
+      smtp = container "SMTP"
+    }
+    ss = softwareSystem "Bank" {
+      db = container "DB" "" "Postgres" "Database" {
+        tbl = component "Table"
+      }
+      cache = container "Cache" "" "Redis" "Database"
+    }
+  }
+}`
+	result, err := structurizr.ImportSource(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := result.Model
+	if got := m.Model["ext"]; got.Kind != "system" || len(got.Tags) != 1 || got.Tags[0] != "External" {
+		t.Errorf("an External system with children keeps kind system and its tag, got kind %q tags %v", got.Kind, got.Tags)
+	}
+	if got := m.Model["ss"].Children["db"]; got.Kind != "container" || len(got.Tags) != 1 || got.Tags[0] != "Database" {
+		t.Errorf("a Database container with children keeps kind container and its tag, got kind %q tags %v", got.Kind, got.Tags)
+	}
+	if got := m.Model["ss"].Children["cache"].Kind; got != "datastore" {
+		t.Errorf("a leaf Database container is a datastore, got %q", got)
+	}
+	if errs := model.Validate(m); len(errs) > 0 {
+		t.Errorf("the imported model must validate, got %v", errs)
+	}
+}
+
+// Fallback keys (the scope, then scope_1, ...) must not take a key that a later
+// view writes explicitly, so explicit keys do not depend on the DSL order
+// (CodeRabbit finding on #775).
+func TestImport_ExplicitViewKeysAreReservedFirst(t *testing.T) {
+	src := `workspace {
+  model {
+    s = softwareSystem "S" {
+      c = container "C"
+    }
+  }
+  views {
+    systemContext s { include * }
+    container s { include * }
+    systemLandscape "s_1" "Landscape" { include * }
+  }
+}`
+	result, err := structurizr.ImportSource(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	v := result.Model.Views
+	if got, ok := v["s_1"]; !ok || got.Title != "Landscape" {
+		t.Errorf("the explicit key s_1 must keep its view, got %v", v)
+	}
+	if len(v) != 3 {
+		t.Errorf("want 3 views, got %d: %v", len(v), v)
 	}
 }

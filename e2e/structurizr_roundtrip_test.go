@@ -50,9 +50,9 @@ func TestStructurizrRoundtrip_ArgumentOrderAndViewTypes(t *testing.T) {
 	for _, want := range []string{
 		`api = container "API" "REST" "Java"`,
 		`ctrl = component "Controller" "ctl" "Spring"`,
-		`systemContext ss "ss" "ctx"`,
-		`container ss "ss_1" "cont"`,
-		`component api "ss.api" "comp"`,
+		`systemContext ss "ctx" "ctx"`,
+		`container ss "cont" "cont"`,
+		`component api "comp" "comp"`,
 	} {
 		if !strings.Contains(dsl, want) {
 			t.Errorf("exported DSL lacks %q:\n%s", want, dsl)
@@ -62,7 +62,7 @@ func TestStructurizrRoundtrip_ArgumentOrderAndViewTypes(t *testing.T) {
 	runCLI(t, bin, dir, "import", filepath.Join("out", "workspace.dsl"), "--from", "structurizr", "--output", "m2.jsonc")
 	for _, f := range []string{"m.jsonc", "m2.jsonc"} {
 		b, _ := os.ReadFile(filepath.Join(dir, f))
-		for _, want := range []string{`"description": "REST"`, `"technology": "Java"`, `"title": "cont"`} {
+		for _, want := range []string{`"description": "REST"`, `"technology": "Java"`, `"title": "cont"`, `"kind": "datastore"`, `"kind": "external_system"`} {
 			if !strings.Contains(string(b), want) {
 				t.Errorf("%s lacks %s", f, want)
 			}
