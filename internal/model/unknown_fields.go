@@ -26,7 +26,7 @@ func unknownFieldWarnings(clean []byte) []ValidationWarning {
 }
 
 func walkUnknownFields(val interface{}, t reflect.Type, path string, ws *[]ValidationWarning) {
-	for t.Kind() == reflect.Ptr {
+	for t.Kind() == reflect.Pointer {
 		t = t.Elem()
 	}
 	switch t.Kind() {
