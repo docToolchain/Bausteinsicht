@@ -112,6 +112,10 @@ type BausteinsichtModel struct {
 	// ElementOrder stores the definition order of element kinds from
 	// specification.elements. Used by the layout engine for layer assignment.
 	ElementOrder []string `json:"-"`
+
+	// UnknownFields are the warnings about keys of the file that no field
+	// knows, found when the file was parsed (#725); validate reports them.
+	UnknownFields []ValidationWarning `json:"-"`
 }
 
 // StepType describes how a sequence step arrow is rendered.

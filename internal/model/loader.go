@@ -42,6 +42,7 @@ func Load(path string) (*BausteinsichtModel, error) {
 	}
 
 	m.ElementOrder = extractElementOrder(clean)
+	m.UnknownFields = unknownFieldWarnings(clean)
 
 	return &m, nil
 }
@@ -59,6 +60,7 @@ func ParseModel(data []byte) (*BausteinsichtModel, error) {
 		return nil, err
 	}
 	m.ElementOrder = extractElementOrder(clean)
+	m.UnknownFields = unknownFieldWarnings(clean)
 	return &m, nil
 }
 
