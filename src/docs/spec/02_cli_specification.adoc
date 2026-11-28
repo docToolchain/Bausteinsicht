@@ -1370,14 +1370,14 @@ Manages versioned model snapshots stored in `.bausteinsicht-snapshots/`.
 |===
 | Subcommand | Description
 
-| `save` | Capture the current model as a snapshot (`--message` adds a note).
-| `list` | List saved snapshots (`--output-format table\|json`).
+| `save` | Capture the current model as a snapshot (`--message` adds a note; the model comes from the global `--model` or auto-detection, #693).
+| `list` | List saved snapshots as a table; the global `--format json` (or `--output-format json`, which wins when both are given) prints a JSON list, `[]` when there is none (#693).
 | `diff <id1> [id2]` | Diff snapshot `id1` against `id2`, or against the current model if `id2` is omitted (`--format text\|json`).
 | `restore <id> <output-path>` | Restore a snapshot to a file (`--force` to overwrite).
 | `delete <id>` | Delete a snapshot.
 |===
 
-**Behavior:** `diff` reports a structured architecture delta (added/removed elements and relationships), not a text diff.
+**Behavior:** `diff` reports a structured architecture delta (added/removed elements and relationships), not a text diff. The directory also holds `index.json`; it is not a snapshot, so `index` is an unknown snapshot ID for `diff`, `restore` and `delete` (exit code `2`, `snapshot not found: index`) and the index is never removed by them (#693).
 
 ==== `bausteinsicht diff`
 

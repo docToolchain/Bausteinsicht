@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -67,8 +68,17 @@ func (m *Manager) Save(snapshot *Snapshot) error {
 	return nil
 }
 
+// isSnapshotID reports whether id can name a snapshot: the index file lies in
+// the same directory but is not one (#693).
+func isSnapshotID(id string) bool {
+	return id != strings.TrimSuffix(indexFile, ".json")
+}
+
 // Load retrieves a snapshot from disk
 func (m *Manager) Load(id string) (*Snapshot, error) {
+	if !isSnapshotID(id) {
+		return nil, fmt.Errorf("snapshot not found: %s", id)
+	}
 	snapshotFile := m.snapshotFilePath(id)
 	data, err := os.ReadFile(snapshotFile)
 	if err != nil {
@@ -104,6 +114,9 @@ func (m *Manager) List() ([]SnapshotMetadata, error) {
 
 // Delete removes a snapshot from disk
 func (m *Manager) Delete(id string) error {
+	if !isSnapshotID(id) {
+		return fmt.Errorf("snapshot not found: %s", id)
+	}
 	snapshotFile := m.snapshotFilePath(id)
 	if err := os.Remove(snapshotFile); err != nil {
 		return fmt.Errorf("deleting snapshot file: %w", err)
@@ -196,6 +209,9 @@ func removeMetadataByID(metadata []SnapshotMetadata, id string) []SnapshotMetada
 
 // Exists checks if a snapshot exists
 func (m *Manager) Exists(id string) bool {
+	if !isSnapshotID(id) {
+		return false
+	}
 	snapshotFile := m.snapshotFilePath(id)
 	_, err := os.Stat(snapshotFile)
 	return err == nil
