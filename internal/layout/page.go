@@ -56,8 +56,17 @@ type node struct {
 
 type edge struct{ from, to string }
 
+// AlgorithmHierarchical is the layered layout, the only algorithm so far.
+const AlgorithmHierarchical = "hierarchical"
+
 // LayoutDocument lays out the pages of doc.
 func LayoutDocument(doc *drawio.Document, opts Options) (Report, error) {
+	if opts.Algorithm == "" {
+		opts.Algorithm = AlgorithmHierarchical
+	}
+	if opts.Algorithm != AlgorithmHierarchical {
+		return Report{}, fmt.Errorf("unknown layout algorithm %q: use %s", opts.Algorithm, AlgorithmHierarchical)
+	}
 	if opts.RankDir == "" {
 		opts.RankDir = "TB"
 	}
