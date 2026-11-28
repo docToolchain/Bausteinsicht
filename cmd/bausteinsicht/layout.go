@@ -47,11 +47,12 @@ func runLayout(cmd *cobra.Command, _ []string) error {
 		return exitWithCode(fmt.Errorf("loading diagram: %w", err), 2)
 	}
 
+	algorithm, _ := cmd.Flags().GetString("algorithm")
 	rankDir, _ := cmd.Flags().GetString("rank-dir")
 	preservePinned, _ := cmd.Flags().GetBool("preserve-pinned")
 	view, _ := cmd.Flags().GetString("view")
 
-	report, err := layout.LayoutDocument(doc, layout.Options{RankDir: rankDir, PreservePinned: preservePinned, View: view})
+	report, err := layout.LayoutDocument(doc, layout.Options{Algorithm: algorithm, RankDir: rankDir, PreservePinned: preservePinned, View: view})
 	if err != nil {
 		return exitWithCode(fmt.Errorf("applying layout: %w", err), 1)
 	}

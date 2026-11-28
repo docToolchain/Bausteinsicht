@@ -1486,7 +1486,7 @@ Computes a layered layout for every page of the draw.io diagram and writes the e
 * **Nested elements.** Elements inside a boundary or container are laid out inside it and get coordinates relative to it, as draw.io expects, so they stay within the boundary.
 * **Deterministic.** Elements are ordered by ID and crossings are reduced by a fixed barycenter sweep, so running the command twice, or on a copy of the file with the cells in another order, gives the same positions. A cycle is drawn as a chain that starts at the smallest ID.
 * **Connectors.** Stored waypoints of connectors on a laid out page are removed, because they belong to the old positions; draw.io routes the connectors again. Only the connectors of opposite directions between the same two elements get new waypoints for the new positions, so that both labels stay readable (#717; see the new-relationship rule of the synchronization specification).
-* Exit codes: `1` unknown `--view` or invalid `--rank-dir`; `2` the diagram next to the model cannot be read or written.
+* Exit codes: `1` unknown `--view`, invalid `--rank-dir` or unknown `--algorithm` (the message names the value and the valid one, `hierarchical`; the diagram is not changed, #691); `2` the diagram next to the model cannot be read or written.
 
 ==== `bausteinsicht overlay`
 
