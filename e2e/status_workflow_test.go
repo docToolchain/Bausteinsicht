@@ -6,6 +6,7 @@ package e2e
 
 import (
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -73,5 +74,22 @@ func TestStatusWorkflow(t *testing.T) {
 	}
 	if !foundCustomer {
 		t.Errorf("status json: expected element \"customer\" with status \"deprecated\", got: %+v", result.Elements)
+	}
+}
+
+// #710: an element with a status that is not a lifecycle status is listed in the
+// text output as well, so that the sections add up.
+func TestStatusListsElementsWithAnUnknownStatus(t *testing.T) {
+	bin := buildBinary(t)
+	dir := t.TempDir()
+	const m = `{"specification":{"elements":{"system":{"notation":"S","container":true},"db":{"notation":"D"}}},
+ "model":{"s":{"kind":"system","title":"S","status":"deployed","children":{"e":{"kind":"db","title":"E","status":"bogus"}}}},
+ "views":{"v":{"title":"V","include":["*"]}}}`
+	if err := os.WriteFile(filepath.Join(dir, "m.jsonc"), []byte(m), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out := runCLI(t, bin, dir, "--model", "m.jsonc", "status")
+	if !strings.Contains(out, "s.e") || !strings.Contains(out, `"bogus"`) {
+		t.Errorf("the element with the unknown status must be listed:\n%s", out)
 	}
 }
