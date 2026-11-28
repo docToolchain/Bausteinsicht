@@ -42,6 +42,7 @@ func Validate(m *BausteinsichtModel) []ValidationError {
 // ValidateWithWarnings checks the model for consistency and returns errors and warnings.
 func ValidateWithWarnings(m *BausteinsichtModel) ValidationResult {
 	var result ValidationResult
+	result.Warnings = append(result.Warnings, m.UnknownFields...)
 	result.Errors = append(result.Errors, validateElementKinds(m)...)
 	result.Errors = append(result.Errors, validateElements(m)...)
 	result.Errors = append(result.Errors, validateRelationships(m)...)

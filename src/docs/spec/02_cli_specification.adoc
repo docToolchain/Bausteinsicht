@@ -269,6 +269,7 @@ Validates the architecture model file for consistency. Reports both errors and w
 * Runs validation checks including referential integrity and model consistency.
 * In `--verbose` mode, prints element/relationship/view counts to stderr before validation.
 * Warnings are printed with `WARNING:` prefix; errors with `ERROR:` prefix.
+* Keys that no field of the model knows are warnings, not errors, because the model is still usable: `WARNING: [model.x] unknown field "titel" (did you mean "title"?)`, and `[(top level)] unknown top-level key "modle" (did you mean "model"?)`. The closest field name within two edits is suggested. Such keys are dropped when the file is rewritten (`update`, `rename`), so the warning is the only notice. The free-form maps `meta`, `style` and `metadata` may hold any keys and are not checked (#725).
 
 **JSON output structure:**
 [source,json]
