@@ -294,3 +294,36 @@ func TestLayoutDocument_Errors(t *testing.T) {
 		t.Error("expected an error for an unknown rank direction")
 	}
 }
+
+// #717: the layout drops the waypoints (they belong to the old positions); the
+// opposite connectors of a pair get theirs again for the new positions.
+func TestLayoutDocument_OppositeConnectorsGetSeparateRoutes(t *testing.T) {
+	doc := drawio.NewDocument()
+	page := doc.AddPage("view-v", "V")
+	addElem(t, page, "u", "", 100, 60)
+	addElem(t, page, "s", "", 100, 60)
+	page.CreateConnector(drawio.ConnectorData{From: "u", To: "s", SourceRef: "u", TargetRef: "s", Index: 0}, "")
+	page.CreateConnector(drawio.ConnectorData{From: "s", To: "u", SourceRef: "s", TargetRef: "u", Index: 1}, "")
+
+	if _, err := LayoutDocument(doc, Options{}); err != nil {
+		t.Fatal(err)
+	}
+
+	pts := map[string]string{}
+	for _, c := range page.FindAllConnectors() {
+		if pt := c.FindElement("mxGeometry/Array[@as='points']/mxPoint"); pt != nil {
+			pts[c.SelectAttrValue("id", "")] = pt.SelectAttrValue("x", "") + "," + pt.SelectAttrValue("y", "")
+		}
+	}
+	if len(pts) != 2 {
+		t.Fatalf("both connectors need a waypoint after the layout, got %v", pts)
+	}
+	var first string
+	for _, p := range pts {
+		if first == "" {
+			first = p
+		} else if p == first {
+			t.Errorf("both connectors have the waypoint %s", p)
+		}
+	}
+}
