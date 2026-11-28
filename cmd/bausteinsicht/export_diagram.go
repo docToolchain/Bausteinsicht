@@ -182,6 +182,10 @@ func runExportDiagram(cmd *cobra.Command, _ []string) error {
 		return nil
 	}
 
+	if viewKey == "" {
+		noteNoViews(cmd, m)
+	}
+
 	// Determine which views to export.
 	views := make(map[string]model.View)
 	if viewKey != "" {
@@ -379,4 +383,12 @@ func sortedKeys(views map[string]model.View) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+// noteNoViews says on stderr that there is nothing to export because the model has
+// no views, as export-sequence does for dynamic views; the exit code stays 0 (#737).
+func noteNoViews(cmd *cobra.Command, m *model.BausteinsichtModel) {
+	if len(m.Views) == 0 {
+		_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "No views defined in model; add one with 'bausteinsicht add view'.")
+	}
 }
