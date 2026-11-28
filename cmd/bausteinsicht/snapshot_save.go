@@ -16,7 +16,6 @@ func newSnapshotSaveCmd() *cobra.Command {
 		RunE:  runSnapshotSave,
 	}
 
-	cmd.Flags().String("model", "", "Model file path (default: auto-detect)")
 	cmd.Flags().String("message", "", "Optional message describing the snapshot")
 
 	return cmd

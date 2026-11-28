@@ -17,16 +17,18 @@ func newSnapshotListCmd() *cobra.Command {
 		RunE:  runSnapshotList,
 	}
 
-	// Use a dedicated flag name (not the global --format, which only accepts
-	// text|json) so the table default is not rejected by the root command's
-	// global format validation (#425).
-	cmd.Flags().String("output-format", "table", "Output format: table or json")
+	// The global --format (text|json) selects the output; --output-format is the
+	// older spelling with the table default (#425) and wins when it is given.
+	cmd.Flags().String("output-format", "table", "Output format: table or json (the global --format json also selects json)")
 
 	return cmd
 }
 
 func runSnapshotList(cmd *cobra.Command, _ []string) error {
 	format, _ := cmd.Flags().GetString("output-format")
+	if global, _ := cmd.Flags().GetString("format"); !cmd.Flags().Changed("output-format") && global == "json" {
+		format = "json"
+	}
 
 	manager := snapshot.NewManager(".")
 	snapshots, err := manager.List()
@@ -34,7 +36,7 @@ func runSnapshotList(cmd *cobra.Command, _ []string) error {
 		return exitWithCode(fmt.Errorf("listing snapshots: %w", err), 2)
 	}
 
-	if len(snapshots) == 0 {
+	if len(snapshots) == 0 && format != "json" {
 		_, _ = fmt.Fprint(cmd.OutOrStdout(), "No snapshots found.\n")
 		return nil
 	}

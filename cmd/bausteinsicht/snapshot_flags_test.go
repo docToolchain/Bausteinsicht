@@ -77,3 +77,16 @@ func TestSnapshotCommands_IndexIsNotASnapshot(t *testing.T) {
 		t.Errorf("the index must be intact with one snapshot: %v %v", list, err)
 	}
 }
+
+// Without snapshots the JSON output is an empty list, not a sentence (#693).
+func TestSnapshotList_EmptyJSONIsAList(t *testing.T) {
+	t.Chdir(t.TempDir())
+	out, err := executeImportCmd("snapshot", "list", "--format", "json")
+	if err != nil || strings.TrimSpace(out) != "[]" {
+		t.Errorf("want [], got %q (%v)", out, err)
+	}
+	out, err = executeImportCmd("snapshot", "list")
+	if err != nil || !strings.Contains(out, "No snapshots found.") {
+		t.Errorf("the table keeps its sentence, got %q (%v)", out, err)
+	}
+}
