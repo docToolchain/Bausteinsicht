@@ -203,6 +203,8 @@ Commands that change the model (`add element|relationship|view|specification|add
 
 The model, the draw.io diagram and the other files that a command changes are written atomically: a temporary file next to the target is written and renamed over it. A target that is a symbolic link is updated in place (#723). A target that is **read-only** (no write bit for its owner) is not replaced: the command fails with exit code `2` and `file is read-only: <path>`, and the file is left as it is (#724). The replacing file gets the mode of the file it replaces, so `0664` stays `0664`; a new file is created with mode `0600`.
 
+Text that a command inserts into the model (`add element|relationship|view|specification`, the comment-preserving patches) gets the line ending that most lines of the file have: a model with CRLF line endings stays CRLF, also inside a value that spans several lines, and a model with LF stays free of CR; when the whole file is rewritten (the fallback that announces `note: model rewritten, comments and formatting were not preserved`), the line endings of the file are kept as well (#729).
+
 === Exit Codes
 
 [cols="1,3"]
