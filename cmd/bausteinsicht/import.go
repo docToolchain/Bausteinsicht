@@ -2,7 +2,9 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -133,6 +135,21 @@ func runImport(cmd *cobra.Command, args []string) error {
 		return exitWithCode(fmt.Errorf("encoding model: %w", err), 1)
 	}
 
+	// The template is created first and exclusively: an import that overlaps
+	// with another one in the directory, or a dangling link, is refused before
+	// the model is written. A failing model write takes the template back.
+	templateWritten := false
+	if genTemplate && !dryRun {
+		xml := template.NewGenerator(resultModel.Specification, "default").Generate()
+		if err := createFileExclusively(templatePath, []byte(xml)); err != nil {
+			if errors.Is(err, fs.ErrExist) {
+				return exitWithCode(fmt.Errorf("template %q already exists — remove it or run generate-template with --output", templatePath), 2)
+			}
+			return exitWithCode(fmt.Errorf("writing %s: %w", templatePath, err), 1)
+		}
+		templateWritten = true
+	}
+
 	if dryRun {
 		if _, err := fmt.Fprintln(cmd.OutOrStdout(), string(data)); err != nil {
 			return err
@@ -149,14 +166,10 @@ func runImport(cmd *cobra.Command, args []string) error {
 		return exitWithCode(fmt.Errorf("creating output directory: %w", err), 1)
 	}
 	if err := os.WriteFile(outputPath, append(data, '\n'), 0o644); err != nil {
-		return exitWithCode(fmt.Errorf("writing %s: %w", outputPath, err), 1)
-	}
-
-	if genTemplate {
-		xml := template.NewGenerator(resultModel.Specification, "default").Generate()
-		if err := os.WriteFile(templatePath, []byte(xml), 0o644); err != nil { //nolint:gosec
-			return exitWithCode(fmt.Errorf("writing %s: %w", templatePath, err), 1)
+		if templateWritten {
+			_ = os.Remove(templatePath)
 		}
+		return exitWithCode(fmt.Errorf("writing %s: %w", outputPath, err), 1)
 	}
 
 	if jsonSummary {
@@ -256,4 +269,19 @@ func elementCountsByKind(m *model.BausteinsichtModel) (map[string]int, error) {
 		counts[elem.Kind]++
 	}
 	return counts, nil
+}
+
+// createFileExclusively writes data to a new file; an existing file or link of
+// that name is an fs.ErrExist error and is left alone.
+func createFileExclusively(path string, data []byte) error {
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644) //nolint:gosec
+	if err != nil {
+		return err
+	}
+	if _, err := f.Write(data); err != nil {
+		_ = f.Close()
+		_ = os.Remove(path)
+		return err
+	}
+	return f.Close()
 }

@@ -62,7 +62,7 @@ func TestStructurizrRoundtrip_ArgumentOrderAndViewTypes(t *testing.T) {
 	runCLI(t, bin, dir, "import", filepath.Join("out", "workspace.dsl"), "--from", "structurizr", "--output", "m2.jsonc")
 	for _, f := range []string{"m.jsonc", "m2.jsonc"} {
 		b, _ := os.ReadFile(filepath.Join(dir, f))
-		for _, want := range []string{`"description": "REST"`, `"technology": "Java"`, `"title": "cont"`} {
+		for _, want := range []string{`"description": "REST"`, `"technology": "Java"`, `"title": "cont"`, `"kind": "datastore"`, `"kind": "external_system"`} {
 			if !strings.Contains(string(b), want) {
 				t.Errorf("%s lacks %s", f, want)
 			}

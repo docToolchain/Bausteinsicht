@@ -107,6 +107,7 @@ type importState struct {
 	views       map[string]model.View
 	viewKeys    map[string]int
 	tags        []model.TagDefinition
+	reserved    map[string]bool // view keys written in the DSL; fallback keys skip them
 	warnings    []string
 }
 
@@ -172,10 +173,10 @@ func (is *importState) processModelStmt(s dsl.Stmt, parentPath, parentVar string
 	for _, child := range s.Body {
 		is.processModelChild(child, path, key, &el, children)
 	}
-	is.settleKindAndTags(&el, kd)
 	if len(children) > 0 {
 		el.Children = children
 	}
+	is.settleKindAndTags(&el, kd)
 	dest[key] = el
 }
 
@@ -249,6 +250,8 @@ func splitTags(arg string) []string {
 
 // settleKindAndTags applies the kind that a tag selects, keeps the remaining
 // tags and defines them in the specification, so that the model validates.
+// The kinds external_system and datastore have no children, so an element with
+// children keeps its kind and the tag.
 func (is *importState) settleKindAndTags(el *model.Element, kd kindDef) {
 	var kept []string
 	seen := make(map[string]bool)
@@ -257,7 +260,7 @@ func (is *importState) settleKindAndTags(el *model.Element, kd kindDef) {
 			continue
 		}
 		seen[tag] = true
-		if to, ok := tagKinds[kd.kind][tag]; ok && kd.kind == el.Kind {
+		if to, ok := tagKinds[kd.kind][tag]; ok && kd.kind == el.Kind && len(el.Children) == 0 {
 			el.Kind, kd = to.kind, to
 			continue
 		}
@@ -302,6 +305,7 @@ func (is *importState) processModelChild(child dsl.Stmt, path, key string, el *m
 }
 
 func (is *importState) processViewsStmts(stmts []dsl.Stmt) {
+	is.reserveExplicitViewKeys(stmts)
 	for _, s := range stmts {
 		if !is.isSupportedViewKeyword(s) {
 			continue
@@ -341,6 +345,34 @@ func (is *importState) processViewsStmts(stmts []dsl.Stmt) {
 	}
 }
 
+// viewKeyArg returns the key that a view statement writes, if it writes one.
+func (is *importState) viewKeyArg(s dsl.Stmt) string {
+	args := s.Args
+	if s.Keyword != "systemLandscape" && len(args) > 0 {
+		args = args[1:]
+	}
+	if len(args) > 0 {
+		return args[0]
+	}
+	return ""
+}
+
+// reserveExplicitViewKeys notes every key the DSL writes, so that a generated
+// key (the scope, scope_1, ...) never takes it, whatever the order of the views.
+func (is *importState) reserveExplicitViewKeys(stmts []dsl.Stmt) {
+	is.reserved = make(map[string]bool)
+	for _, s := range stmts {
+		switch s.Keyword {
+		case "systemContext", "container", "component", "systemLandscape":
+		default:
+			continue
+		}
+		if key := is.viewKeyArg(s); key != "" {
+			is.reserved[key] = true
+		}
+	}
+}
+
 // isSupportedViewKeyword reports whether s is a supported view statement,
 // warning and returning false for recognized-but-unsupported view types.
 func (is *importState) isSupportedViewKeyword(s dsl.Stmt) bool {
@@ -366,6 +398,11 @@ func (is *importState) nextViewKey(keyword, scope, explicit string) string {
 	if explicit != "" {
 		baseKey = explicit
 	}
+	// A generated key also skips the keys that the DSL writes for later views.
+	taken := func(key string) bool {
+		_, ok := is.views[key]
+		return ok || (explicit == "" && is.reserved[key])
+	}
 	viewKey := baseKey
 	if is.viewKeys[baseKey] > 0 {
 		viewKey = fmt.Sprintf("%s_%d", baseKey, is.viewKeys[baseKey])
@@ -373,7 +410,7 @@ func (is *importState) nextViewKey(keyword, scope, explicit string) string {
 	is.viewKeys[baseKey]++
 	// An explicit key of another view can equal a generated one: take the next
 	// free suffix instead of replacing that view.
-	for _, taken := is.views[viewKey]; taken; _, taken = is.views[viewKey] {
+	for taken(viewKey) {
 		viewKey = fmt.Sprintf("%s_%d", baseKey, is.viewKeys[baseKey])
 		is.viewKeys[baseKey]++
 	}
