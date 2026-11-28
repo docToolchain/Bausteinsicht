@@ -40,10 +40,6 @@ func runStatus(cmd *cobra.Command, _ []string) error {
 	filter, _ := cmd.Flags().GetString("filter")
 	format, _ := cmd.Flags().GetString("format")
 
-	if err := validatePathContainment(modelPath); err != nil {
-		return exitWithCode(fmt.Errorf("model path: %w", err), 1)
-	}
-
 	m, err := model.Load(modelPath)
 	if err != nil {
 		return exitWithCode(fmt.Errorf("loading model: %w", err), 1)

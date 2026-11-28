@@ -30,18 +30,9 @@ func NewRootCmd() *cobra.Command {
 				return fmt.Errorf("template file %q must have a .drawio extension", templatePath)
 			}
 
-			// Validate --model path is under working directory (SEC-001).
-			modelPath, _ := cmd.Flags().GetString("model")
-			if modelPath != "" {
-				if err := validatePathContainment(modelPath); err != nil {
-					return fmt.Errorf("--model: %w", err)
-				}
-			}
-			if templatePath != "" {
-				if err := validatePathContainment(templatePath); err != nil {
-					return fmt.Errorf("--template: %w", err)
-				}
-			}
+			// --model and --template are typed by the user, so a relative path
+			// with ".." (a model in the parent directory) is allowed (#700).
+			// Output paths are still checked by validatePathContainment.
 
 			return nil
 		},

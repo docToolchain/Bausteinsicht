@@ -172,7 +172,7 @@ These flags are available on all subcommands via persistent flags on the root co
 | `text`
 
 | `--model <path>`
-| Path to the model file (`.jsonc`). When omitted, auto-detection scans the current directory for a single `*.jsonc` file; if more than one is present, the command aborts and asks for `--model` (see Auto-Detection Behavior).
+| Path to the model file (`.jsonc`). When omitted, auto-detection scans the current directory for a single `*.jsonc` file; if more than one is present, the command aborts and asks for `--model` (see Auto-Detection Behavior). The path may be relative and contain `..` (a model in the parent directory), or absolute; the same holds for `--template` (#700).
 | auto-detect
 
 | `--template <path>`
