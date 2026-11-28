@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -269,5 +270,35 @@ func TestNonNil(t *testing.T) {
 	in := []string{"a"}
 	if got := nonNil(in); !reflect.DeepEqual(got, in) {
 		t.Errorf("nonNil(%v) = %v", in, got)
+	}
+}
+
+// add view on an existing key says that it updated the view and what it added
+// to the include list, not that it added the view (#704).
+func TestAddView_ReportsAnUpdate(t *testing.T) {
+	t.Chdir(t.TempDir())
+	if out, err := executeImportCmd("init"); err != nil {
+		t.Fatalf("init: %v\n%s", err, out)
+	}
+
+	out, err := executeImportCmd("add", "view", "v1", "--title", "V1", "--include", "onlineshop.api")
+	if err != nil || !strings.Contains(out, "View 'v1' added to model") {
+		t.Fatalf("a new view is reported as added, got %q (%v)", out, err)
+	}
+
+	out, err = executeImportCmd("add", "view", "v1", "--include", "onlineshop.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out, "added to model") || !strings.Contains(out, "View 'v1' updated") || !strings.Contains(out, "+onlineshop.db") {
+		t.Errorf("want \"View 'v1' updated (include: +onlineshop.db)\", got %q", out)
+	}
+	if !strings.Contains(out, "onlineshop.api") || !strings.Contains(out, "onlineshop.db") {
+		t.Errorf("the final include list is shown, got %q", out)
+	}
+
+	out, err = executeImportCmd("add", "view", "v1", "--include", "onlineshop.db")
+	if err != nil || !strings.Contains(out, "View 'v1' updated") || strings.Contains(out, "+onlineshop.db") || !strings.Contains(out, "already") {
+		t.Errorf("an include that is already there is skipped and said so, got %q (%v)", out, err)
 	}
 }
