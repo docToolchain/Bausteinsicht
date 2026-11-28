@@ -1,8 +1,12 @@
 package sync
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"html"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -40,10 +44,11 @@ func createMetadata(
 		return false
 	}
 
-	// Update existing metadata cell — only if label actually changed.
+	// Update existing metadata cell — only if the label changed apart from the
+	// time of the last sync; that is refreshed when the page changes (#731).
 	for _, obj := range root.SelectElements("object") {
 		if obj.SelectAttrValue("id", "") == cellID {
-			if obj.SelectAttrValue(fieldLabel, "") == label {
+			if withoutSyncTime(obj.SelectAttrValue(fieldLabel, "")) == withoutSyncTime(label) {
 				return false
 			}
 			obj.CreateAttr(fieldLabel, label)
@@ -324,4 +329,53 @@ func computeContentWidth(page *drawio.Page, excludeIDs ...string) float64 {
 func parseFloat(s string) float64 {
 	f, _ := strconv.ParseFloat(s, 64)
 	return f
+}
+
+// syncTimeText matches the time in "Last synced: <time>" of a metadata label.
+var syncTimeText = regexp.MustCompile(`Last synced: [^<]*`)
+
+// withoutSyncTime returns the label with the time of the last sync taken out, so
+// that two labels that differ in nothing else compare equal (#731).
+func withoutSyncTime(label string) string {
+	return syncTimeText.ReplaceAllString(label, "Last synced: ")
+}
+
+// refreshSyncTime writes the time of this sync into the metadata box of the view,
+// if there is one. It reports whether the box changed.
+func refreshSyncTime(page *drawio.Page, viewID, timestamp string) bool {
+	root := page.Root()
+	if root == nil {
+		return false
+	}
+	for _, obj := range root.SelectElements("object") {
+		if obj.SelectAttrValue("id", "") != metadataPrefix+viewID {
+			continue
+		}
+		old := obj.SelectAttrValue(fieldLabel, "")
+		label := syncTimeText.ReplaceAllString(old, "Last synced: "+html.EscapeString(timestamp))
+		if label == old {
+			return false
+		}
+		obj.CreateAttr(fieldLabel, label)
+		return true
+	}
+	return false
+}
+
+// pageFingerprint is a hash of the content of the page without its metadata box,
+// to tell whether a sync changed the page (#731).
+func pageFingerprint(page *drawio.Page, viewID string) string {
+	root := page.Root()
+	if root == nil {
+		return ""
+	}
+	var buf bytes.Buffer
+	for _, child := range root.ChildElements() {
+		if child.SelectAttrValue("id", "") == metadataPrefix+viewID {
+			continue
+		}
+		child.WriteTo(&buf, &etree.WriteSettings{})
+	}
+	sum := sha256.Sum256(buf.Bytes())
+	return hex.EncodeToString(sum[:])
 }

@@ -706,6 +706,8 @@ Forward sync can add two informational boxes to each view page:
 
 Both are enabled by default and switched off per model via `config.metadata: false` and `config.legend: false` — the gate is `Config.Metadata == nil || *Config.Metadata`, so an unset value means on. The metadata box additionally needs the sync to supply the model path and timestamp, which the normal `sync` / `watch` path always does. The boxes are keyed by `metadata-<viewID>` / `legend-<viewID>` cell IDs and are updated in place on subsequent syncs rather than duplicated.
 
+The sync time in the metadata box (`Last synced: YYYY-MM-DD HH:MM`) is the time of the last sync that changed the page. A sync that changes nothing on a page leaves the page, and so the diagram file, byte-identical, however much later it runs: the time is neither compared nor rewritten on its own. It is written when the box is created, when the other text of the box changes (title, description, source, repository, author), and when the sync changed anything else on the page (the page is compared before and after, without the metadata box); the summary then counts the page as updated. An idempotent sync therefore prints `Already in sync. No changes.`, does not make a running `watch` run again and leaves no diff in git (#731, #761).
+
 === Edge Cases
 
 ==== Element appears in multiple views
