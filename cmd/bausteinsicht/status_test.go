@@ -136,3 +136,35 @@ func writeStatusTestModel(t *testing.T) string {
 	}
 	return path
 }
+
+const statusUnknownModel = `{"specification":{"elements":{"system":{"notation":"S","container":true},"db":{"notation":"D"}}},
+ "model":{"s":{"kind":"system","title":"S","status":"deployed","children":{"e":{"kind":"db","title":"E","status":"bogus"},"f":{"kind":"db","title":"F","status":"odd"}}}},
+ "views":{"v":{"title":"V","include":["*"]}}}`
+
+// An element with a status that is not a lifecycle status is listed too, in a
+// section of its own, so that the sections add up (#710).
+func TestStatusCmd_ListsElementsWithAnUnknownStatus(t *testing.T) {
+	path := createTempFile(t, statusUnknownModel)
+	defer removeTempFile(t, path)
+
+	out, err := executeRootCmd("status", "--model", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"unknown status (2)", "s.e", `status "bogus"`, "s.f", `status "odd"`} {
+		if !strings.Contains(out, want) {
+			t.Errorf("want %q in:\n%s", want, out)
+		}
+	}
+	if strings.Index(out, "unknown status") < strings.Index(out, "unset (") {
+		t.Errorf("the unknown section comes after the known ones and unset:\n%s", out)
+	}
+}
+
+// Without an unknown status there is no such section.
+func TestStatusCmd_NoUnknownSectionWithoutUnknownStatus(t *testing.T) {
+	out, err := executeRootCmd("status", "--model", writeStatusTestModel(t))
+	if err != nil || strings.Contains(out, "unknown status") {
+		t.Errorf("no unknown section expected, got %q (%v)", out, err)
+	}
+}

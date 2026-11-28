@@ -1335,7 +1335,7 @@ Lists elements by lifecycle status (`proposed`, `design`, `implementation`, `dep
 | `--filter`, `-f` | Show only elements with this status. | No | (all)
 |===
 
-**Behavior:** finds the model via `--model` or auto-detection. Groups elements under their status.
+**Behavior:** finds the model via `--model` or auto-detection. Groups elements under their status. Elements whose status is not one of the lifecycle statuses (`validate` warns about them, BR-029) are listed after `unset` in a section `unknown status (<n>)` with the status they carry, so that the sections add up to all elements; the JSON summary counts them under that status (#710).
 
 ==== `bausteinsicht find`
 

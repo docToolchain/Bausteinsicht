@@ -160,5 +160,33 @@ func outputStatusText(cmd *cobra.Command, result statusResult) error {
 		}
 	}
 
-	return nil
+	return outputUnknownStatuses(cmd, result)
+}
+
+// outputUnknownStatuses lists the elements whose status is not a lifecycle status
+// in a section of their own, so that the sections add up to all elements (#710).
+func outputUnknownStatuses(cmd *cobra.Command, result statusResult) error {
+	known := map[string]bool{"unset": true}
+	for _, status := range model.ValidStatuses {
+		known[status] = true
+	}
+	var unknown []statusElement
+	for _, elem := range result.Elements {
+		if !known[elem.Status] {
+			unknown = append(unknown, elem)
+		}
+	}
+	if len(unknown) == 0 {
+		return nil
+	}
+	if _, err := fmt.Fprintf(cmd.OutOrStdout(), "unknown status (%d):\n", len(unknown)); err != nil {
+		return err
+	}
+	for _, elem := range unknown {
+		if _, err := fmt.Fprintf(cmd.OutOrStdout(), "  %-20s [%-12s] %q (status %q)\n", elem.ID, elem.Kind, elem.Title, elem.Status); err != nil {
+			return err
+		}
+	}
+	_, err := fmt.Fprintf(cmd.OutOrStdout(), "\n")
+	return err
 }
