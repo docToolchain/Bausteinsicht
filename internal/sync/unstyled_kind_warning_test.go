@@ -48,7 +48,7 @@ func TestRun_UnstyledKindIsReportedOncePerKind(t *testing.T) {
 			t.Errorf("the warning must contain %q: %s", want, service[0])
 		}
 	}
-	if !strings.Contains(database[0], "1 element)") {
+	if !strings.Contains(database[0], "(1 element ") {
 		t.Errorf("a single element is counted as such: %s", database[0])
 	}
 }

@@ -99,6 +99,43 @@ type ForwardResult struct {
 	ConnectorsDeleted int
 	MetadataUpdated   int // metadata and legend boxes created/updated
 	Warnings          []string
+
+	// unstyled collects, per kind without a template style, the elements drawn
+	// with the default rectangle; reportUnstyledKinds turns it into one warning
+	// per kind (#694).
+	unstyled map[string]map[string]bool
+}
+
+// noteUnstyled records that the element id of kind is drawn without a template style.
+func (r *ForwardResult) noteUnstyled(kind, id string) {
+	if r.unstyled == nil {
+		r.unstyled = make(map[string]map[string]bool)
+	}
+	if r.unstyled[kind] == nil {
+		r.unstyled[kind] = make(map[string]bool)
+	}
+	r.unstyled[kind][id] = true
+}
+
+// reportUnstyledKinds appends one warning per kind without a template style, with
+// the number of elements and what to do about it.
+func (r *ForwardResult) reportUnstyledKinds() {
+	kinds := make([]string, 0, len(r.unstyled))
+	for kind := range r.unstyled {
+		kinds = append(kinds, kind)
+	}
+	sort.Strings(kinds)
+	for _, kind := range kinds {
+		n := len(r.unstyled[kind])
+		noun := "elements"
+		if n == 1 {
+			noun = "element"
+		}
+		r.Warnings = append(r.Warnings, fmt.Sprintf(
+			"no template style for kind: %s (%d %s drawn as a plain rectangle): run 'bausteinsicht generate-template' and pass the file with --template",
+			kind, n, noun))
+	}
+	r.unstyled = nil
 }
 
 // forwardRenderInputs bundles the read-only inputs threaded through the
@@ -142,10 +179,10 @@ func ApplyForward(
 
 	if len(m.Views) == 0 {
 		applyForwardToPage(in, nil)
-		return result
+	} else {
+		applyForwardPerView(in, &fwdOpts)
 	}
-
-	applyForwardPerView(in, &fwdOpts)
+	result.reportUnstyledKinds()
 	return result
 }
 
@@ -1212,7 +1249,7 @@ func lookupElementStyle(
 	style, styleOk := templates.GetStyle(e.Kind)
 	if !styleOk {
 		style = drawio.TemplateStyle{Width: defaultWidth, Height: defaultHeight}
-		result.Warnings = append(result.Warnings, "no template style for kind: "+e.Kind)
+		result.noteUnstyled(e.Kind, id)
 	}
 	bs := style.Style
 	if spec != nil && len(e.Tags) > 0 {

@@ -260,7 +260,7 @@ The boundary template is used when this element is the `scope` of a view and ren
 | Situation | Behavior
 
 | Element kind has no matching template
-| A default rectangle (160×70 px, no style) is used. Warning: `no template style for kind: <kind>`
+| A default rectangle (160×70 px, no style) is used. One warning per kind, however many elements and pages it affects: `no template style for kind: <kind> (<n> elements drawn as a plain rectangle): run 'bausteinsicht generate-template' and pass the file with --template` (#694)
 
 | Boundary kind has no matching template
 | A default swimlane (400×300 px) is used. Warning: `no boundary template for kind: <kind>_boundary`
