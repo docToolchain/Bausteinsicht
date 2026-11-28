@@ -42,7 +42,7 @@ func StatusColor(status string) string {
 // DecisionBadgeColor returns the draw.io badge color for a given ADR status
 func DecisionBadgeColor(status ADRStatus) string {
 	switch status {
-	case ADRActive:
+	case ADRActive, ADRAccepted:
 		return "#0066cc" // blue
 	case ADRSuperseded, ADRDeprecated:
 		return "#999999" // grey
@@ -116,6 +116,11 @@ type BausteinsichtModel struct {
 	// UnknownFields are the warnings about keys of the file that no field
 	// knows, found when the file was parsed (#725); validate reports them.
 	UnknownFields []ValidationWarning `json:"-"`
+
+	// BaseDir is the directory of the file the model was loaded from, so that
+	// paths in the model (decision files, #707) can be checked; empty for a model
+	// that was parsed from text.
+	BaseDir string `json:"-"`
 }
 
 // StepType describes how a sequence step arrow is rendered.
@@ -228,10 +233,15 @@ type ADRStatus string
 
 const (
 	ADRProposed   ADRStatus = "proposed"
+	ADRAccepted   ADRStatus = "accepted"
 	ADRActive     ADRStatus = "active"
 	ADRDeprecated ADRStatus = "deprecated"
 	ADRSuperseded ADRStatus = "superseded"
 )
+
+// KnownADRStatuses are the statuses of a decision that the tools know; validate
+// reports any other (#707) and the JSON Schema lists them as an enum.
+var KnownADRStatuses = []ADRStatus{ADRProposed, ADRAccepted, ADRActive, ADRDeprecated, ADRSuperseded}
 
 // DecisionRecord represents an architecture decision record (ADR)
 type DecisionRecord struct {

@@ -591,6 +591,7 @@ Model files use the JSONC (JSON with Comments) format. Both comment styles are s
 * **Values (errors):** `lastModified` is an RFC3339 timestamp and `meta.staleDetection.thresholdDays` a non-negative integer (BR-040, BR-041).
 * **Constraints (errors):** a constraint's `rule` is one of the six known rule names, which the JSON Schema lists as an `enum` (BR-036), and the constraint has the selectors and values its rule needs (BR-043); a field the rule does not read is a warning (BR-044). `bausteinsicht lint` reports an incomplete constraint as a violation (`constraint is incomplete: …`) instead of evaluating it. A violation message starts with the constraint's `description` only when it has one.
 * **Lifecycle & advisory (warnings):** valid `status`, archived/deprecated lifecycle rules, orphan and superseded decision references, and empty-model checks (BR-027–BR-033); keys of the file that no field knows, such as `titel` for `title` (BR-038), and a `docLinks` type outside the conventional values (BR-042).
+* **Decision records (BR-045–BR-048, #707):** a decision's `status` is one of `proposed`, `accepted`, `active`, `deprecated`, `superseded` and its `date` is `YYYY-MM-DD` (warnings otherwise); its `file` is a path below the model's directory (an absolute path or `../` is an error) and should exist (warning). `adr list` shows `accepted` like `active`; `adr show` marks a file that does not exist with `(not found)`.
 
 Errors abort the command (exit code 1); warnings are reported with a `WARNING:` prefix and are non-blocking (exit code 0).
 

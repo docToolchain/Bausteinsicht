@@ -10,7 +10,16 @@ import (
 // fieldEnums lists the fixed values of string fields, keyed by "Type.field",
 // so that the IDE flags a typo (#689).
 var fieldEnums = map[string][]string{
-	"Constraint.rule": model.ConstraintRules,
+	"Constraint.rule":       model.ConstraintRules,
+	"DecisionRecord.status": decisionStatuses(),
+}
+
+func decisionStatuses() []string {
+	out := make([]string, len(model.KnownADRStatuses))
+	for i, s := range model.KnownADRStatuses {
+		out[i] = string(s)
+	}
+	return out
 }
 
 // JSONSchema represents a JSON Schema Draft 7 schema

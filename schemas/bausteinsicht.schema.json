@@ -168,6 +168,13 @@
           "type": "string"
         },
         "status": {
+          "enum": [
+            "proposed",
+            "accepted",
+            "active",
+            "deprecated",
+            "superseded"
+          ],
           "type": "string"
         },
         "title": {
