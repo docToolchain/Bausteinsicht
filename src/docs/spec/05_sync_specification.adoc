@@ -222,6 +222,7 @@ Sub-cell rules:
 * **Technology sub-cell**: Only created when technology is non-empty. Value is `[bracketed]`.
 * **Description sub-cell**: Only created when description is non-empty.
 * All sub-cells use `movable=0;resizable=0;deletable=0;editable=0;` to prevent accidental manipulation.
+* **Long text (#718).** The title and technology cells carry `whiteSpace=wrap`, so a long text wraps instead of being cut off at the cell width. The height of the wrapped text is estimated from the cell width and the font (about 0.55 em per Latin character, 0.6 em in bold, one em for CJK characters and emoji, a line is 1.2 em plus 4 px). If the text needs more than the cell has, the cell grows to that height, the cells below it move down by the same amount and the shape grows with them. This happens when an element is created, when its title or technology is updated, and in `layout` (for files written before this rule). Cells and shapes never shrink: a shorter title leaves the room, and a shape the user has enlarged keeps its size. The description cell keeps its template height; its text is shortened to 120 characters and the full text is in the tooltip.
 
 During reverse sync, `ReadElementFields` extracts values from sub-cells first. If no sub-cells are found, it falls back to parsing the HTML label (backward compatibility).
 

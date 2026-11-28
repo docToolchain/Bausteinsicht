@@ -97,6 +97,7 @@ func (p *Page) CreateElement(data ElementData, style string) error {
 	// Create grouped sub-cells for title, technology, and description.
 	if data.SubCells != nil {
 		createSubCells(root, cellID, data, data.SubCells)
+		p.FitElementText(p.FindElement(data.ID))
 	}
 
 	return nil
@@ -216,6 +217,7 @@ func (p *Page) UpdateElement(id string, data ElementData) {
 	if len(childCells) > 0 {
 		// Update existing sub-cells and manage tech/desc cells.
 		updateSubCells(root, cellID, childCells, data)
+		p.FitElementText(obj)
 		setAttr(obj, "label", "")
 	} else {
 		setAttr(obj, "label", GenerateLabel(data.Title, data.Technology, data.Description))

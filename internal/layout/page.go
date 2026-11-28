@@ -91,6 +91,11 @@ func layoutPage(page *drawio.Page, opts Options) (positioned, pinned int) {
 	if root == nil {
 		return 0, 0
 	}
+	// Make the text cells hold their text first: the shapes may have to grow,
+	// and the layout places them by their size (#718).
+	for _, obj := range page.FindAllElements() {
+		page.FitElementText(obj)
+	}
 	byID, top := readNodes(root)
 	edges := readEdges(page)
 
