@@ -587,3 +587,63 @@ func TestDescribePreservedFields_AllFields(t *testing.T) {
 		}
 	}
 }
+
+// newNestedReplState is the test model with a nested element, a relationship to
+// it and a view that includes it (#695).
+func newNestedReplState() *replState {
+	s := newTestReplState("")
+	s.model.Model["webshop"] = model.Element{Kind: "system", Title: "Webshop", Children: map[string]model.Element{
+		"api": {Kind: "container", Title: "API"},
+		"db":  {Kind: "container", Title: "DB"},
+	}}
+	s.model.Relationships = []model.Relationship{{From: "customer", To: "webshop.api", Label: "uses"}}
+	return s
+}
+
+// remove element accepts a dot path and removes the nested element only (#695).
+func TestReplRemoveNestedElement(t *testing.T) {
+	s := newNestedReplState()
+	s.removeCommand([]string{"element", "webshop.db"})
+	flat, _ := model.FlattenElements(s.model)
+	if _, ok := flat["webshop.db"]; ok {
+		t.Error("the nested element webshop.db should have been removed")
+	}
+	if _, ok := flat["webshop.api"]; !ok {
+		t.Error("its sibling must stay")
+	}
+	if !s.modified {
+		t.Error("modified flag should be true after remove")
+	}
+}
+
+// An element that something still refers to is not removed, as in the remove
+// command, unless --cascade is given; then the references go too (#695).
+func TestReplRemoveReferencedElement(t *testing.T) {
+	s := newNestedReplState()
+	s.removeCommand([]string{"element", "webshop.api"})
+	flat, _ := model.FlattenElements(s.model)
+	if _, ok := flat["webshop.api"]; !ok {
+		t.Error("a referenced element must not be removed without --cascade")
+	}
+	if len(s.undoStack) != 0 || s.modified {
+		t.Errorf("a refused removal changes nothing: undo %d, modified %v", len(s.undoStack), s.modified)
+	}
+
+	s.removeCommand([]string{"element", "webshop.api", "--cascade"})
+	flat, _ = model.FlattenElements(s.model)
+	if _, ok := flat["webshop.api"]; ok {
+		t.Error("--cascade removes the element")
+	}
+	if len(s.model.Relationships) != 0 {
+		t.Errorf("--cascade drops the relationship too, got %v", s.model.Relationships)
+	}
+}
+
+// The start line counts every element, not only the top-level ones (#695).
+func TestReplHeaderCountsNestedElements(t *testing.T) {
+	s := newNestedReplState()
+	got := replHeader("m.jsonc", s.model)
+	if !strings.Contains(got, "(4 elements)") {
+		t.Errorf("want 4 elements (2 top-level + 2 nested), got %q", got)
+	}
+}

@@ -60,7 +60,7 @@ func runRepl(cmd *cobra.Command, _ []string) error {
 		scanner:    bufio.NewScanner(os.Stdin),
 	}
 
-	fmt.Printf("Bausteinsicht REPL — %s (%d elements)\n", modelPath, len(m.Model))
+	fmt.Println(replHeader(modelPath, m))
 	fmt.Println("Type 'help' for commands, 'exit' to quit")
 
 	for {
@@ -163,7 +163,7 @@ Commands:
   add element            — Add new element (guided prompts)
   add relationship       — Add new relationship (guided prompts)
   show <id>              — Show element details
-  remove element <id>              — Remove top-level element
+  remove element <id> [--cascade] — Remove an element (dot path for nested ones) and its children
   remove relationship <from> <to> [label] — Remove relationship
   validate               — Validate model
   save                   — Save changes to file
@@ -476,23 +476,29 @@ func (s *replState) removeCommand(parts []string) {
 
 	switch parts[0] {
 	case "element":
-		s.removeElementCommand(parts[1], popUndo)
+		s.removeElementCommand(parts[1:], popUndo)
 	case "relationship":
 		s.removeRelationshipCommand(parts[1:], popUndo)
 	}
 }
 
-// removeElementCommand removes a top-level element from the model. Only
-// top-level elements can be removed this way; nested children (dot-path IDs
-// like "shop.api") must be edited in the JSONC directly. popUndo rolls back
-// the undo-stack push removeCommand already made, if this ends up a no-op.
-func (s *replState) removeElementCommand(id string, popUndo func()) {
-	if _, exists := s.model.Model[id]; !exists {
-		fmt.Printf("Element '%s' not found (nested elements must be edited in the model file)\n", id)
+// removeElementCommand removes an element and its children, addressed by its
+// dot path, like the remove command: references to it (relationships, view
+// entries, dynamic view steps) block the removal unless --cascade is given, which
+// drops them too. popUndo rolls back the undo-stack push removeCommand already
+// made, if this ends up a no-op.
+func (s *replState) removeElementCommand(args []string, popUndo func()) {
+	id, cascade := args[0], false
+	for _, a := range args[1:] {
+		if a == "--cascade" {
+			cascade = true
+		}
+	}
+	if _, err := s.model.RemoveElement(id, cascade); err != nil {
+		fmt.Printf("%v\n", err)
 		popUndo()
 		return
 	}
-	delete(s.model.Model, id)
 	s.modified = true
 	fmt.Printf("✅ Removed element '%s'\n", id)
 }
@@ -542,4 +548,11 @@ func (s *replState) validateCommand() {
 	for _, err := range errs {
 		fmt.Printf("  %s\n", err.Error())
 	}
+}
+
+// replHeader is the first line of the REPL: the model and the number of all its
+// elements, nested ones included.
+func replHeader(modelPath string, m *model.BausteinsichtModel) string {
+	flat, _ := model.FlattenElements(m)
+	return fmt.Sprintf("Bausteinsicht REPL — %s (%d elements)", modelPath, len(flat))
 }
