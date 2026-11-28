@@ -227,3 +227,33 @@ func TestFreeFormMapStaysOpen(t *testing.T) {
 		t.Error("meta (map[string]interface{}) must stay an open object")
 	}
 }
+
+// #689: the IDE flags a misspelt constraint rule only if the schema lists the
+// rule names.
+func TestGenerator_ConstraintRuleEnum(t *testing.T) {
+	gen := NewGenerator()
+	raw, err := gen.Generate(model.BausteinsichtModel{}).ToJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var s struct {
+		Definitions map[string]struct {
+			Properties map[string]struct {
+				Enum []string `json:"enum"`
+			} `json:"properties"`
+		} `json:"definitions"`
+	}
+	if err := json.Unmarshal(raw, &s); err != nil {
+		t.Fatal(err)
+	}
+	got := s.Definitions["Constraint"].Properties["rule"].Enum
+	want := []string{"allowed-relationship", "max-depth", "no-circular-dependency", "no-relationship", "required-field", "technology-allowed"}
+	if len(got) != len(want) {
+		t.Fatalf("enum of Constraint.rule = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("enum of Constraint.rule = %v, want %v", got, want)
+		}
+	}
+}

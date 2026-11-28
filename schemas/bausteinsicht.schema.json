@@ -119,6 +119,14 @@
           "type": "integer"
         },
         "rule": {
+          "enum": [
+            "allowed-relationship",
+            "max-depth",
+            "no-circular-dependency",
+            "no-relationship",
+            "required-field",
+            "technology-allowed"
+          ],
           "type": "string"
         },
         "tag": {

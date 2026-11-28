@@ -21,6 +21,7 @@ func TestWorkspaceMerge(t *testing.T) {
 
 	runCLI(t, bin, dirA, "init")
 	runCLI(t, bin, dirB, "init")
+	renameSampleConstraintIDs(t, filepath.Join(dirB, "architecture.jsonc"))
 
 	// ── Write a workspace config referencing both models ──────────────────
 	type workspaceConfig struct {

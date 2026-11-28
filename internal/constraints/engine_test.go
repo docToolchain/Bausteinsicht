@@ -527,3 +527,43 @@ func TestMultipleConstraints(t *testing.T) {
 		t.Errorf("expected 2 violations, got %d", r.Total)
 	}
 }
+
+// #689: a constraint without a description produced ": elements matching ..."
+// and lint printed "VIOLATION [c]: : elements ...".
+func TestViolationMessage_WithoutDescriptionHasNoEmptyPrefix(t *testing.T) {
+	m := &model.BausteinsichtModel{
+		Model: map[string]model.Element{"a": {Kind: "service", Title: "A"}},
+		Constraints: []model.Constraint{
+			{ID: "c1", Rule: "required-field", ElementKind: "service", Field: "description"},
+			{ID: "c2", Rule: "max-depth", Max: 0},
+			{ID: "c3", Rule: "no-relationship", FromKind: "service", ToKind: "service"},
+		},
+		Relationships: []model.Relationship{{From: "a", To: "a"}},
+	}
+	res := constraints.Evaluate(m)
+	if len(res.Violations) == 0 {
+		t.Fatal("expected violations")
+	}
+	for _, v := range res.Violations {
+		if strings.HasPrefix(v.Message, ":") || strings.HasPrefix(v.Message, " ") {
+			t.Errorf("[%s] message starts with an empty description: %q", v.ConstraintID, v.Message)
+		}
+	}
+}
+
+// Every rule the model and the schema allow is evaluated by the engine, and
+// nothing else is: the list cannot drift from the switch (#689).
+func TestEvaluate_HandlesEveryListedRule(t *testing.T) {
+	for _, rule := range model.ConstraintRules {
+		m := &model.BausteinsichtModel{Constraints: []model.Constraint{{ID: "c", Rule: rule}}}
+		for _, v := range constraints.Evaluate(m).Violations {
+			if strings.Contains(v.Message, "unknown constraint rule") {
+				t.Errorf("rule %q is listed but not evaluated: %s", rule, v.Message)
+			}
+		}
+	}
+	m := &model.BausteinsichtModel{Constraints: []model.Constraint{{ID: "c", Rule: "bogus"}}}
+	if res := constraints.Evaluate(m); len(res.Violations) != 1 || !strings.Contains(res.Violations[0].Message, "unknown constraint rule") {
+		t.Errorf("an unlisted rule must stay unknown: %+v", res.Violations)
+	}
+}

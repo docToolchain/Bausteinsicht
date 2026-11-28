@@ -104,7 +104,7 @@ func noRelationship(c model.Constraint, m *model.BausteinsichtModel) []Violation
 	}
 	return []Violation{{
 		ConstraintID: c.ID,
-		Message:      fmt.Sprintf("%s: %s must not relate to %s", c.Description, from.describe(), to.describe()),
+		Message:      withDescription(c, fmt.Sprintf("%s must not relate to %s", from.describe(), to.describe())),
 		Elements:     bad,
 	}}
 }
@@ -137,7 +137,7 @@ func allowedRelationship(c model.Constraint, m *model.BausteinsichtModel) []Viol
 	}
 	return []Violation{{
 		ConstraintID: c.ID,
-		Message:      fmt.Sprintf("%s: only %s may relate to %s", c.Description, from.describe(), to.describe()),
+		Message:      withDescription(c, fmt.Sprintf("only %s may relate to %s", from.describe(), to.describe())),
 		Elements:     bad,
 	}}
 }
@@ -169,7 +169,7 @@ func requiredField(c model.Constraint, m *model.BausteinsichtModel) []Violation 
 			// Unsupported field name — return error violation immediately
 			return []Violation{{
 				ConstraintID: c.ID,
-				Message:      fmt.Sprintf("%s: unsupported field %q (valid: description, technology, title)", c.Description, c.Field),
+				Message:      withDescription(c, fmt.Sprintf("unsupported field %q (valid: description, technology, title)", c.Field)),
 			}}
 		}
 		if missing {
@@ -181,7 +181,7 @@ func requiredField(c model.Constraint, m *model.BausteinsichtModel) []Violation 
 	}
 	return []Violation{{
 		ConstraintID: c.ID,
-		Message:      fmt.Sprintf("%s: elements matching %s must have %q set", c.Description, sel.describe(), c.Field),
+		Message:      withDescription(c, fmt.Sprintf("elements matching %s must have %q set", sel.describe(), c.Field)),
 		Elements:     bad,
 	}}
 }
@@ -196,7 +196,7 @@ func maxDepth(c model.Constraint, m *model.BausteinsichtModel) []Violation {
 	}
 	return []Violation{{
 		ConstraintID: c.ID,
-		Message:      fmt.Sprintf("%s: maximum nesting depth is %d", c.Description, c.Max),
+		Message:      withDescription(c, fmt.Sprintf("maximum nesting depth is %d", c.Max)),
 		Elements:     bad,
 	}}
 }
@@ -265,7 +265,7 @@ func noCircularDependency(c model.Constraint, m *model.BausteinsichtModel) []Vio
 	}
 	return []Violation{{
 		ConstraintID: c.ID,
-		Message:      c.Description + ": circular dependencies detected",
+		Message:      withDescription(c, "circular dependencies detected"),
 		Elements:     cycles,
 	}}
 }
@@ -300,7 +300,16 @@ func technologyAllowed(c model.Constraint, m *model.BausteinsichtModel) []Violat
 	}
 	return []Violation{{
 		ConstraintID: c.ID,
-		Message:      fmt.Sprintf("%s: %s elements must use one of [%s]", c.Description, c.ElementKind, strings.Join(c.Technologies, ", ")),
+		Message:      withDescription(c, fmt.Sprintf("%s elements must use one of [%s]", c.ElementKind, strings.Join(c.Technologies, ", "))),
 		Elements:     bad,
 	}}
+}
+
+// withDescription puts the constraint's description in front of msg; a
+// constraint without one gives just msg (no empty ": " prefix, #689).
+func withDescription(c model.Constraint, msg string) string {
+	if c.Description == "" {
+		return msg
+	}
+	return c.Description + ": " + msg
 }

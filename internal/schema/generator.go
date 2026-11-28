@@ -3,7 +3,15 @@ package schema
 import (
 	"encoding/json"
 	"reflect"
+
+	"github.com/docToolchain/Bausteinsicht/internal/model"
 )
+
+// fieldEnums lists the fixed values of string fields, keyed by "Type.field",
+// so that the IDE flags a typo (#689).
+var fieldEnums = map[string][]string{
+	"Constraint.rule": model.ConstraintRules,
+}
 
 // JSONSchema represents a JSON Schema Draft 7 schema
 type JSONSchema struct {
@@ -152,6 +160,9 @@ func (g *Generator) generateObjectSchema(t reflect.Type) interface{} {
 		}
 
 		properties[fieldName] = g.generateFieldSchema(field.Type)
+		if enum, ok := fieldEnums[typeName+"."+fieldName]; ok {
+			properties[fieldName].(map[string]interface{})["enum"] = enum
+		}
 
 		if !hasOmitempty(jsonTag) {
 			required = append(required, fieldName)
