@@ -286,6 +286,11 @@ func syncOne(ctx context.Context, ref ModelRef, baseDir string, lock *Lock, f *F
 	if err != nil {
 		return res, err
 	}
+	// Status 200 does not make a model: a README, an error page or a login page
+	// must not be cached and pinned (#734).
+	if err := checkIsModel(ref.Source, data); err != nil {
+		return res, err
+	}
 	got := hashHex(data)
 	switch {
 	case !locked:
@@ -310,4 +315,18 @@ func syncOne(ctx context.Context, ref ModelRef, baseDir string, lock *Lock, f *F
 	lock.Sources[ref.ID] = LockEntry{URL: ref.Source, SHA256: got}
 	res.SHA256 = got
 	return res, nil
+}
+
+// checkIsModel parses the downloaded bytes as a model, with the loader that local
+// files go through, without writing anything. A file that parses but holds neither
+// a specification nor a model (a JSON error object, say) is not one either.
+func checkIsModel(source string, data []byte) error {
+	m, err := model.ParseModel(data)
+	if err != nil {
+		return fmt.Errorf("%s is not a Bausteinsicht model: %w", source, err)
+	}
+	if len(m.Specification.Elements) == 0 && len(m.Model) == 0 {
+		return fmt.Errorf("%s is not a Bausteinsicht model: it has neither a specification nor a model", source)
+	}
+	return nil
 }

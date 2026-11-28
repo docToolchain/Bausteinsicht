@@ -1672,6 +1672,8 @@ A model reference has either a local `path` or a `source`: an `https` URL of a m
 | JSON `{"version": 1, "sources": {"<id>": {"url": "...", "sha256": "..."}}}` next to the configuration; commit it. Written with permissions `0600`.
 |===
 
+A download is parsed as a model before anything is written, with the loader that local files go through: content that does not parse (a README, an HTML error page behind a status 200) or that has neither a specification nor a model (a JSON error object) is refused with `<url> is not a Bausteinsicht model: <reason>`, and neither the cache nor `bausteinsicht.lock` changes, also with `--update` (the pin that is there stays) (#734).
+
 `fetch` prints one line per remote model (`<id>: fetched|restored|updated|up-to-date (sha256 <prefix>)`) or `{"results": [...]}` with `--format json`. Exit code `2` on any error.
 
 ==== `bausteinsicht schema`
