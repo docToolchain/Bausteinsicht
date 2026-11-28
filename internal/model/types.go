@@ -116,6 +116,11 @@ type BausteinsichtModel struct {
 	// UnknownFields are the warnings about keys of the file that no field
 	// knows, found when the file was parsed (#725); validate reports them.
 	UnknownFields []ValidationWarning `json:"-"`
+
+	// BaseDir is the directory of the file the model was loaded from, so that
+	// paths in the model (decision files, #707) can be checked; empty for a model
+	// that was parsed from text.
+	BaseDir string `json:"-"`
 }
 
 // StepType describes how a sequence step arrow is rendered.
