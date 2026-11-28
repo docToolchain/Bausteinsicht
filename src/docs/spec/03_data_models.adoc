@@ -327,7 +327,7 @@ A `DocLink` is a typed link to an external documentation artifact, usable on bot
 | `type`
 | string
 | yes
-| Free string, not a closed schema enum. Conventional values: `arc42`, `adr`, `persona`, `prd`, `spec`. Unknown values still render (a generic link icon), so new documentation kinds don't require a schema change. `persona` pairs naturally with elements of kind `actor`/`person`.
+| Free string, not a closed schema enum. Conventional values: `arc42`, `adr`, `persona`, `prd`, `spec`. Unknown values still render (a generic link icon), so new documentation kinds don't require a schema change; `validate` reports them as a warning (BR-042). `persona` pairs naturally with elements of kind `actor`/`person`.
 
 | `href`
 | string
@@ -582,14 +582,15 @@ Model files use the JSONC (JSON with Comments) format. Both comment styles are s
 [[validation-rules]]
 === Validation Rules
 
-`bausteinsicht validate` enforces the model's integrity constraints. The complete, code-traceable catalogue — each rule's exact statement, severity, and source function — is in the Business Rules section of link:01_use_cases.html#business-rules[01_use_cases] (BR-001–BR-038). The constraints on the data model group as follows:
+`bausteinsicht validate` enforces the model's integrity constraints. The complete, code-traceable catalogue — each rule's exact statement, severity, and source function — is in the Business Rules section of link:01_use_cases.html#business-rules[01_use_cases] (BR-001–BR-042). The constraints on the data model group as follows:
 
 * **Structural (errors):** required fields — `kind`/`title` on elements, `title` on views, `key`/`title` on dynamic views, at least one step per dynamic view, and `type`/`href` on `docLinks` entries (BR-001, BR-004, BR-013, BR-018, BR-019, BR-020, BR-034); known kinds (BR-002, BR-009, BR-024, BR-025); container nesting and depth limit (BR-003, BR-006); non-empty element IDs (BR-005).
-* **Referential integrity (errors):** relationship `from`/`to`, view `scope`, non-wildcard `include`/`exclude`, `filter-tags`/`exclude-tags`, dynamic-view step `from`/`to`, and `decisions` references all resolve into the model or specification (BR-007, BR-008, BR-015, BR-016, BR-017, BR-021, BR-026).
+* **Referential integrity (errors):** relationship `from`/`to`, view `scope`, non-wildcard `include`/`exclude`, `filter-tags`/`exclude-tags`, dynamic-view step `from`/`to`, and `decisions` references all resolve into the model or specification (BR-007, BR-008, BR-015, BR-016, BR-017, BR-021, BR-026); the `tags` of elements resolve into `specification.tags` too (BR-039).
 * **Enumerations (errors):** `cardinality`, `dataFlow`, view `layout`, and step `type` take only their fixed defined values (BR-010, BR-011, BR-014, BR-022).
 * **Uniqueness (errors):** no fully-duplicate relationships; unique step indices; unique constraint IDs (BR-012, BR-023, BR-037).
+* **Values (errors):** `lastModified` is an RFC3339 timestamp and `meta.staleDetection.thresholdDays` a non-negative integer (BR-040, BR-041).
 * **Constraints (errors):** a constraint's `rule` is one of the six known rule names, which the JSON Schema lists as an `enum` (BR-036). A violation message starts with the constraint's `description` only when it has one.
-* **Lifecycle & advisory (warnings):** valid `status`, archived/deprecated lifecycle rules, orphan and superseded decision references, and empty-model checks (BR-027–BR-033); keys of the file that no field knows, such as `titel` for `title` (BR-038).
+* **Lifecycle & advisory (warnings):** valid `status`, archived/deprecated lifecycle rules, orphan and superseded decision references, and empty-model checks (BR-027–BR-033); keys of the file that no field knows, such as `titel` for `title` (BR-038), and a `docLinks` type outside the conventional values (BR-042).
 
 Errors abort the command (exit code 1); warnings are reported with a `WARNING:` prefix and are non-blocking (exit code 0).
 

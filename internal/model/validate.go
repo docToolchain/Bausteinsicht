@@ -2,8 +2,11 @@ package model
 
 import (
 	"fmt"
+	"math"
+	"slices"
 	"sort"
 	"strings"
+	"time"
 )
 
 const (
@@ -52,7 +55,9 @@ func ValidateWithWarnings(m *BausteinsichtModel) ValidationResult {
 	result.Errors = append(result.Errors, validateDuplicateDecisionIDs(m)...)
 	result.Errors = append(result.Errors, validateDecisions(m)...)
 	result.Errors = append(result.Errors, validateConstraints(m)...)
+	result.Errors = append(result.Errors, validateStaleDetection(m)...)
 	result.Warnings = append(result.Warnings, validateEmptyModel(m)...)
+	result.Warnings = append(result.Warnings, validateDocLinkTypes(m)...)
 	result.Warnings = append(result.Warnings, validateLifecycleStatus(m)...)
 	result.Warnings = append(result.Warnings, validateOrphanDecisions(m)...)
 	result.Warnings = append(result.Warnings, validateSupersededDecisions(m)...)
@@ -141,6 +146,8 @@ func validateElement(m *BausteinsichtModel, path string, elem Element, depth int
 	}
 
 	errs = append(errs, validateDocLinks(path+".docLinks", elem.DocLinks)...)
+	errs = append(errs, validateElementTags(m, path, elem)...)
+	errs = append(errs, validateLastModified(path, elem)...)
 
 	for childID, child := range elem.Children {
 		if err := validateElementID(childID); err != nil {
@@ -744,4 +751,104 @@ func validateConstraints(m *BausteinsichtModel) []ValidationError {
 		seen[c.ID] = true
 	}
 	return errs
+}
+
+// validateElementTags checks that every tag of an element is defined in
+// specification.tags, like the filter-tags of views (BR-017, BR-039, #726).
+func validateElementTags(m *BausteinsichtModel, path string, elem Element) []ValidationError {
+	var errs []ValidationError
+	defined := make(map[string]bool, len(m.Specification.Tags))
+	for _, tag := range m.Specification.Tags {
+		defined[tag.ID] = true
+	}
+	for _, tag := range elem.Tags {
+		if !defined[tag] {
+			errs = append(errs, ValidationError{
+				Path:    path + ".tags",
+				Message: fmt.Sprintf("tag %q is not defined in specification.tags", tag),
+			})
+		}
+	}
+	return errs
+}
+
+// validateLastModified checks that lastModified, which overrides the
+// git-based staleness date, is an RFC3339 timestamp; stale detection ignores
+// any other text silently (BR-040, #726).
+func validateLastModified(path string, elem Element) []ValidationError {
+	if elem.LastModified == "" {
+		return nil
+	}
+	if _, err := time.Parse(time.RFC3339, elem.LastModified); err != nil {
+		return []ValidationError{{
+			Path:    path + ".lastModified",
+			Message: fmt.Sprintf("lastModified %q is not an RFC3339 timestamp (for example \"2020-01-01T00:00:00Z\")", elem.LastModified),
+		}}
+	}
+	return nil
+}
+
+// validateStaleDetection checks meta.staleDetection.thresholdDays: a
+// non-negative whole number (BR-041, #726).
+func validateStaleDetection(m *BausteinsichtModel) []ValidationError {
+	cfg, ok := m.Meta["staleDetection"].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+	raw, ok := cfg["thresholdDays"]
+	if !ok {
+		return nil
+	}
+	if f, isNum := raw.(float64); isNum && f >= 0 && f == math.Trunc(f) {
+		return nil
+	}
+	return []ValidationError{{
+		Path:    "meta.staleDetection.thresholdDays",
+		Message: fmt.Sprintf("thresholdDays must be a non-negative integer, got %v", raw),
+	}}
+}
+
+// ConventionalDocLinkTypes are the docLinks types the tool knows; any other
+// value still renders (a generic link icon), so it only warrants a warning.
+var ConventionalDocLinkTypes = []string{"arc42", "adr", "persona", "prd", "spec"}
+
+// validateDocLinkTypes warns about docLinks types outside the conventional ones,
+// on elements and on views (BR-042, #726).
+func validateDocLinkTypes(m *BausteinsichtModel) []ValidationWarning {
+	var ws []ValidationWarning
+	check := func(path string, links []DocLink) {
+		for i, dl := range links {
+			if dl.Type == "" || slices.Contains(ConventionalDocLinkTypes, dl.Type) {
+				continue
+			}
+			ws = append(ws, ValidationWarning{
+				Path: fmt.Sprintf("%s[%d].type", path, i),
+				Message: fmt.Sprintf("unknown docLinks type %q (conventional: %s); it is rendered as a generic link",
+					dl.Type, strings.Join(ConventionalDocLinkTypes, ", ")),
+			})
+		}
+	}
+	var walk func(path string, elems map[string]Element)
+	walk = func(path string, elems map[string]Element) {
+		ids := make([]string, 0, len(elems))
+		for id := range elems {
+			ids = append(ids, id)
+		}
+		sort.Strings(ids)
+		for _, id := range ids {
+			p := path + "." + id
+			check(p+".docLinks", elems[id].DocLinks)
+			walk(p, elems[id].Children)
+		}
+	}
+	walk("model", m.Model)
+	viewKeys := make([]string, 0, len(m.Views))
+	for k := range m.Views {
+		viewKeys = append(viewKeys, k)
+	}
+	sort.Strings(viewKeys)
+	for _, k := range viewKeys {
+		check("views."+k+".docLinks", m.Views[k].DocLinks)
+	}
+	return ws
 }
