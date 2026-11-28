@@ -1674,6 +1674,8 @@ A model reference has either a local `path` or a `source`: an `https` URL of a m
 
 A download is parsed as a model before anything is written, with the loader that local files go through: content that does not parse (a README, an HTML error page behind a status 200) or that has neither a specification nor a model (a JSON error object) is refused with `<url> is not a Bausteinsicht model: <reason>`, and neither the cache nor `bausteinsicht.lock` changes, also with `--update` (the pin that is there stays) (#734).
 
+The SHA-256 in the lock file is compared as a hex number: a hash written in upper case is the same hash, and it is written in lower case the next time the lock is saved. When a model is no longer remote (removed from the configuration, renamed, or given a `path`), `fetch` drops its lock entry and deletes its cache file `.bausteinsicht-cache/<id>.jsonc`; other files in the cache directory, and lock entries whose ID cannot be a file name, are left alone (#735).
+
 `fetch` prints one line per remote model (`<id>: fetched|restored|updated|up-to-date (sha256 <prefix>)`) or `{"results": [...]}` with `--format json`. Exit code `2` on any error.
 
 ==== `bausteinsicht schema`
