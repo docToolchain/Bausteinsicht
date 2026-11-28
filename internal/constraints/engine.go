@@ -34,6 +34,15 @@ func Evaluate(m *model.BausteinsichtModel) Result {
 }
 
 func evaluate(c model.Constraint, m *model.BausteinsichtModel) ([]Violation, error) {
+	// A constraint without what its rule needs matches nothing or everything;
+	// say so instead of evaluating it (#727).
+	if problems := model.CheckConstraint(c); len(problems) > 0 && model.IsConstraintRule(c.Rule) {
+		vs := make([]Violation, 0, len(problems))
+		for _, p := range problems {
+			vs = append(vs, Violation{ConstraintID: c.ID, Message: withDescription(c, "constraint is incomplete: "+p.Message)})
+		}
+		return vs, nil
+	}
 	switch c.Rule {
 	case "no-relationship":
 		return noRelationship(c, m), nil

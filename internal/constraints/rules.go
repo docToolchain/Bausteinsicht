@@ -2,6 +2,7 @@ package constraints
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/docToolchain/Bausteinsicht/internal/model"
@@ -190,7 +191,8 @@ func requiredField(c model.Constraint, m *model.BausteinsichtModel) []Violation 
 // Root-level elements have depth 1.
 func maxDepth(c model.Constraint, m *model.BausteinsichtModel) []Violation {
 	var bad []string
-	walkDepth(m.Model, 1, c.Max, &bad)
+	walkDepth(m.Model, "", 1, c.Max, &bad)
+	sort.Strings(bad)
 	if len(bad) == 0 {
 		return nil
 	}
@@ -201,13 +203,16 @@ func maxDepth(c model.Constraint, m *model.BausteinsichtModel) []Violation {
 	}}
 }
 
-func walkDepth(elements map[string]model.Element, depth, max int, bad *[]string) {
+// walkDepth collects the elements deeper than max, named by their full ID
+// (prefix is the ID of the parent plus a dot).
+func walkDepth(elements map[string]model.Element, prefix string, depth, max int, bad *[]string) {
 	for id, el := range elements {
+		full := prefix + id
 		if depth > max {
-			*bad = append(*bad, fmt.Sprintf("%s (depth %d)", id, depth))
+			*bad = append(*bad, fmt.Sprintf("%s (depth %d)", full, depth))
 		}
 		if len(el.Children) > 0 {
-			walkDepth(el.Children, depth+1, max, bad)
+			walkDepth(el.Children, full+".", depth+1, max, bad)
 		}
 	}
 }
@@ -282,9 +287,11 @@ func technologyAllowed(c model.Constraint, m *model.BausteinsichtModel) []Violat
 		allowed[strings.ToLower(t)] = true
 	}
 
+	sel := elementSelector{tag: c.Tag, kind: c.ElementKind}
+
 	var bad []string
 	for id, el := range flat {
-		if el.Kind != c.ElementKind {
+		if !sel.matches(id, el) {
 			continue
 		}
 		if el.Technology == "" {
@@ -295,14 +302,24 @@ func technologyAllowed(c model.Constraint, m *model.BausteinsichtModel) []Violat
 				id, el.Technology, strings.Join(c.Technologies, ", ")))
 		}
 	}
+	sort.Strings(bad)
 	if len(bad) == 0 {
 		return nil
 	}
 	return []Violation{{
 		ConstraintID: c.ID,
-		Message:      withDescription(c, fmt.Sprintf("%s elements must use one of [%s]", c.ElementKind, strings.Join(c.Technologies, ", "))),
+		Message:      withDescription(c, fmt.Sprintf("%s elements must use one of [%s]", technologySelectorName(sel, c), strings.Join(c.Technologies, ", "))),
 		Elements:     bad,
 	}}
+}
+
+// technologySelectorName names the elements of a technology-allowed
+// constraint: the kind as before, or the tag.
+func technologySelectorName(sel elementSelector, c model.Constraint) string {
+	if sel.tag != "" {
+		return sel.describe()
+	}
+	return c.ElementKind
 }
 
 // withDescription puts the constraint's description in front of msg; a
