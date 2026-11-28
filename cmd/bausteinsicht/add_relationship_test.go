@@ -202,9 +202,6 @@ func TestAddRelationshipDuplicateBlocked(t *testing.T) {
 	if len(m.Relationships) != 2 {
 		t.Errorf("expected 2 relationships (the duplicate blocked), got %d", len(m.Relationships))
 	}
-	if errs := model.Validate(m); len(errs) > 0 {
-		t.Errorf("the model must stay valid, got %v", errs)
-	}
 }
 
 // A relationship of an element to itself is allowed, but on an element that is

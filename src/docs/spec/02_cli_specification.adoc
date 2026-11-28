@@ -526,7 +526,8 @@ Adds a new relationship between two existing elements. Designed for LLM-driven w
 
 * Validates that both `--from` and `--to` elements exist in the model.
 * If `--kind` is specified, validates it against the model's specification.
-* Checks for duplicate relationships (same from, to, and kind combination).
+* Checks for duplicate relationships: the same `from`, `to`, `kind` and `label` as an existing relationship is refused; another label (or kind) makes another relationship, as in `validate` (BR-012, #697).
+* A relationship of an element to itself is added; if the element's kind is not a container kind in the specification, a warning `<id> is related to itself, but its kind "<kind>" is not a container kind` is written to stderr.
 * Uses comment-preserving array append to update the JSONC file. If patching fails it falls back to a full save and prints `note: model rewritten, comments and formatting were not preserved` to stderr (#635).
 
 **Exit codes:**

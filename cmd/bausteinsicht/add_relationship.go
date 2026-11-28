@@ -76,8 +76,15 @@ func runAddRelationship(cmd *cobra.Command, args []string) error {
 	}
 
 	for _, r := range m.Relationships {
-		if r.From == from && r.To == to && r.Kind == kind {
-			return exitWithCode(fmt.Errorf("relationship %s -> %s (kind %q) already exists", from, to, kind), 1)
+		// The same four fields as validate (BR-012): another label is another relationship.
+		if r.From == from && r.To == to && r.Kind == kind && r.Label == label {
+			return exitWithCode(fmt.Errorf("relationship %s -> %s (kind %q, label %q) already exists", from, to, kind, label), 1)
+		}
+	}
+
+	if from == to {
+		if elem, err := model.Resolve(m, from); err == nil && !m.Specification.Elements[elem.Kind].Container {
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "WARNING: %s is related to itself, but its kind %q is not a container kind\n", from, elem.Kind)
 		}
 	}
 
