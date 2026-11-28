@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -157,5 +158,52 @@ func TestDiff_InvalidFormat(t *testing.T) {
 
 	if err == nil {
 		t.Error("Expected error for invalid format")
+	}
+}
+
+const diffViewModel = `{"specification":{"elements":{"actor":{"notation":"A"},"db":{"notation":"D"}},"relationships":{"uses":{"notation":"uses"}}},
+ "model":{"u":{"kind":"actor","title":"U"}},
+ "asIs":{"elements":{"u":{"kind":"actor","title":"U"},"old":{"kind":"db","title":"Old"}},"relationships":[{"from":"u","to":"old","kind":"uses"}]},
+ "toBe":{"elements":{"u":{"kind":"actor","title":"U"},"new":{"kind":"db","title":"New"}},"relationships":[{"from":"u","to":"new","kind":"uses"}]},
+ "views":{"v":{"title":"V","include":["u"]},"w":{"title":"W","include":["u","new"]}}}`
+
+func runDiffOn(t *testing.T, args ...string) (string, error) {
+	t.Helper()
+	path := createTempFile(t, diffViewModel)
+	t.Cleanup(func() { removeTempFile(t, path) })
+	return executeImportCmd(append([]string{"diff", "--model", path}, args...)...)
+}
+
+// diff --view keeps the changes of the elements of that view only (#709).
+func TestDiff_ViewFiltersTheChanges(t *testing.T) {
+	full, err := runDiffOn(t)
+	if err != nil || !strings.Contains(full, "new") || !strings.Contains(full, "old") {
+		t.Fatalf("without --view: want the whole diff, got %q (%v)", full, err)
+	}
+	out, err := runDiffOn(t, "--view", "v")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out, "new") || strings.Contains(out, "old") || !strings.Contains(out, "No changes found") {
+		t.Errorf("view v shows only u, which did not change; want no changes, got:\n%s", out)
+	}
+	out, err = runDiffOn(t, "--view", "w", "--format", "json")
+	if err != nil || !strings.Contains(out, `"new"`) || strings.Contains(out, `"old"`) || !strings.Contains(out, `"addedElements": 1`) {
+		t.Errorf("view w shows u and new: want the added new, not old, with a fitting summary, got:\n%s (%v)", out, err)
+	}
+}
+
+func TestDiff_UnknownViewFails(t *testing.T) {
+	_, err := runDiffOn(t, "--view", "nope")
+	if err == nil || exitCodeOf(t, err) != 1 || !strings.Contains(err.Error(), `"nope"`) || !strings.Contains(err.Error(), "v, w") {
+		t.Errorf("want exit code 1 naming nope and the known views, got %v", err)
+	}
+}
+
+// A relationship without a label is printed without "()" (#709).
+func TestDiff_EmptyLabelHasNoParentheses(t *testing.T) {
+	out, err := runDiffOn(t)
+	if err != nil || strings.Contains(out, "()") || !strings.Contains(out, "u → new") {
+		t.Errorf("want \"u → new\" without (), got %q (%v)", out, err)
 	}
 }

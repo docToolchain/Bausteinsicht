@@ -158,3 +158,6 @@ func calculateSummary(result *DiffResult) {
 		}
 	}
 }
+
+// FilterTo keeps only the changes that concern the elements in ids (stub, filled in by the fix).
+func (r *DiffResult) FilterTo(ids map[string]bool) {}
