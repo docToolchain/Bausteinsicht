@@ -298,7 +298,7 @@ func TestAddView_ReportsAnUpdate(t *testing.T) {
 	}
 
 	out, err = executeImportCmd("add", "view", "v1", "--include", "onlineshop.db")
-	if err != nil || !strings.Contains(out, "View 'v1' updated") || strings.Contains(out, "+onlineshop.db") || !strings.Contains(out, "already") {
+	if err != nil || !strings.Contains(out, "View 'v1' updated") || strings.Contains(out, "+onlineshop.db") || !strings.Contains(out, "lready included") {
 		t.Errorf("an include that is already there is skipped and said so, got %q (%v)", out, err)
 	}
 }
