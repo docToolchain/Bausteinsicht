@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html"
+	"math"
 	"sort"
 
 	"github.com/docToolchain/Bausteinsicht/internal/model"
@@ -26,7 +27,8 @@ type HTMLNode struct {
 type HTMLEdge = relEntry
 
 // HTMLEdgeLine is an edge with the line that the viewer draws for it: from the
-// border of the source node to the border of the target node (stub: zero).
+// border of the source node to the border of the target node, so that the
+// arrowhead at its end is not hidden by the node (#732).
 type HTMLEdgeLine struct {
 	HTMLEdge
 	X1 float64 `json:"x1"`
@@ -49,8 +51,24 @@ const (
 )
 
 // borderPoint returns the point where the line from the centre of node a to the
-// centre of node b leaves node a (stub).
-func borderPoint(a, b HTMLNode) (x, y float64) { return 0, 0 }
+// centre of node b leaves node a.
+func borderPoint(a, b HTMLNode) (x, y float64) {
+	cx, cy := a.X+htmlNodeWidth/2, a.Y+htmlNodeHeight/2
+	dx := (b.X + htmlNodeWidth/2) - cx
+	dy := (b.Y + htmlNodeHeight/2) - cy
+	if dx == 0 && dy == 0 {
+		return cx, cy
+	}
+	// Scale the direction until it touches the side of the rectangle that it hits first.
+	t := math.Inf(1)
+	if dx != 0 {
+		t = math.Min(t, (htmlNodeWidth/2)/math.Abs(dx))
+	}
+	if dy != 0 {
+		t = math.Min(t, (htmlNodeHeight/2)/math.Abs(dy))
+	}
+	return cx + dx*t, cy + dy*t
+}
 
 // RenderHTML renders a view as an interactive HTML5 diagram.
 func RenderHTML(m *model.BausteinsichtModel, viewKey string) (string, error) {
@@ -114,10 +132,17 @@ func RenderHTML(m *model.BausteinsichtModel, viewKey string) (string, error) {
 	}
 
 	// Build edge list from relationships
+	byID := make(map[string]HTMLNode, len(nodes))
+	for _, n := range nodes {
+		byID[n.ID] = n
+	}
 	edges := make([]HTMLEdgeLine, len(rels))
 	for i, r := range rels {
 		edges[i].HTMLEdge = HTMLEdge(r)
 		edges[i].Label = r.displayLabel() // the viewer shows one label per edge
+		from, to := byID[r.From], byID[r.To]
+		edges[i].X1, edges[i].Y1 = borderPoint(from, to)
+		edges[i].X2, edges[i].Y2 = borderPoint(to, from)
 	}
 
 	// Create diagram data
@@ -140,7 +165,7 @@ func generateHTMLTemplate(title, dataJSON string) string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Architecture — %s</title>
+  <title>Architecture — %[1]s</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { height: 100%%; }
@@ -226,12 +251,12 @@ func generateHTMLTemplate(title, dataJSON string) string {
     .edge.highlighted { stroke: #0066cc; stroke-width: 3; }
     .edge.faded { opacity: 0.2; }
 
-    .edge-label { font-size: 12px; fill: #333; pointer-events: none; }
+    .edge-label { font-size: 12px; fill: #333; pointer-events: none; paint-order: stroke; stroke: #fff; stroke-width: 4px; stroke-linejoin: round; }
   </style>
 </head>
 <body>
   <div id="header">
-    <h1>Architecture Diagram</h1>
+    <h1>%[1]s</h1>
     <div id="controls">
       <input type="text" id="searchInput" placeholder="Search elements..." />
       <button onclick="resetZoom()">Reset View</button>
@@ -249,7 +274,7 @@ func generateHTMLTemplate(title, dataJSON string) string {
   </div>
 
   <script>
-    const DIAGRAM_DATA = %s;
+    const DIAGRAM_DATA = %[2]s;
 
     const state = {
       zoom: 1,
@@ -289,10 +314,12 @@ func generateHTMLTemplate(title, dataJSON string) string {
         const toNode = DIAGRAM_DATA.nodes.find(n => n.id === edge.to);
         if (fromNode && toNode) {
           const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-          line.setAttribute('x1', fromNode.x + 80);
-          line.setAttribute('y1', fromNode.y + 40);
-          line.setAttribute('x2', toNode.x + 80);
-          line.setAttribute('y2', toNode.y + 40);
+          // The line runs from the border of the source to the border of the
+          // target (computed by the exporter), so that the arrowhead is visible.
+          line.setAttribute('x1', edge.x1);
+          line.setAttribute('y1', edge.y1);
+          line.setAttribute('x2', edge.x2);
+          line.setAttribute('y2', edge.y2);
           line.setAttribute('stroke', '#999');
           line.setAttribute('stroke-width', '2');
           if (edge.dashed) {
@@ -307,8 +334,8 @@ func generateHTMLTemplate(title, dataJSON string) string {
           // Label
           if (edge.label) {
             const mid = {
-              x: (fromNode.x + toNode.x) / 2 + 80,
-              y: (fromNode.y + toNode.y) / 2 + 40
+              x: (edge.x1 + edge.x2) / 2,
+              y: (edge.y1 + edge.y2) / 2
             };
             const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
             text.setAttribute('x', mid.x);
