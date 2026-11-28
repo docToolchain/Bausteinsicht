@@ -38,6 +38,10 @@ func Run(
 ) *SyncResult {
 	result := &SyncResult{}
 
+	// Step 0: A copy of an element cell carries the same bausteinsicht_id;
+	// it must not be read as the element (#722).
+	result.Warnings = append(result.Warnings, stripDuplicateElementIDs(doc)...)
+
 	// Step 1: Detect changes from both sides.
 	// Pass newPageIDs so that elements expected only on newly created pages
 	// are not mistakenly treated as "deleted from draw.io" (#184, #188, #189).
