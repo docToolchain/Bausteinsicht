@@ -32,7 +32,7 @@ Example:
 		RunE: runStale,
 	}
 
-	cmd.Flags().StringP("model", "m", "architecture.jsonc", "Path to architecture model file")
+	cmd.Flags().StringP("model", "m", "", "Path to architecture model file (default: auto-detect)")
 	cmd.Flags().IntP("days", "d", 90, "Consider elements stale if not modified in this many days")
 	cmd.Flags().StringP("format", "f", "text", "Output format: text or json")
 	cmd.Flags().Bool("mark-drawio", false, "Mark stale elements in draw.io diagram")
@@ -50,6 +50,10 @@ func runStale(cmd *cobra.Command, _ []string) error {
 	unmarkDrawio, _ := cmd.Flags().GetBool("unmark-drawio")
 	drawioFile, _ := cmd.Flags().GetString("drawio-file")
 
+	modelPath, err := resolveModelPath(modelPath)
+	if err != nil {
+		return err
+	}
 	if days < 0 {
 		return exitWithCode(fmt.Errorf("--days must be non-negative"), 1)
 	}

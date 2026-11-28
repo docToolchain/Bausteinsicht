@@ -31,8 +31,9 @@ func runHealth(cmd *cobra.Command, _ []string) error {
 	outputPath, _ := cmd.Flags().GetString("output")
 	summaryOnly, _ := cmd.Flags().GetBool("summary")
 
-	if modelPath == "" {
-		return exitWithCode(fmt.Errorf("--model flag is required"), 2)
+	modelPath, err := resolveModelPath(modelPath)
+	if err != nil {
+		return err
 	}
 
 	m, err := model.Load(modelPath)

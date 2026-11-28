@@ -36,8 +36,9 @@ func newADRListCmd() *cobra.Command {
 			elementID := cmd.Flag("element").Value.String()
 			format := cmd.Flag("format").Value.String()
 
-			if modelPath == "" {
-				modelPath = "architecture.jsonc"
+			modelPath, err := resolveModelPath(modelPath)
+			if err != nil {
+				return err
 			}
 
 			m, err := model.Load(modelPath)
@@ -109,7 +110,7 @@ func newADRListCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringP("model", "m", "", "Path to architecture model (default: architecture.jsonc)")
+	cmd.Flags().StringP("model", "m", "", "Path to architecture model (default: auto-detect)")
 	cmd.Flags().String("element", "", "Filter decisions linked to this element")
 	cmd.Flags().String("format", "text", "Output format: text or json")
 
@@ -126,8 +127,9 @@ func newADRShowCmd() *cobra.Command {
 			modelPath := cmd.Flag("model").Value.String()
 			decisionID := args[0]
 
-			if modelPath == "" {
-				modelPath = "architecture.jsonc"
+			modelPath, err := resolveModelPath(modelPath)
+			if err != nil {
+				return err
 			}
 
 			m, err := model.Load(modelPath)
@@ -193,7 +195,7 @@ func newADRShowCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringP("model", "m", "", "Path to architecture model (default: architecture.jsonc)")
+	cmd.Flags().StringP("model", "m", "", "Path to architecture model (default: auto-detect)")
 
 	return cmd
 }

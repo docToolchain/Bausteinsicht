@@ -36,6 +36,10 @@ func newOverlayApplyCmd() *cobra.Command {
 			metricKey, _ := cmd.Flags().GetString("metric")
 			outputPath, _ := cmd.Flags().GetString("output")
 
+			modelPath, err := resolveModelPath(modelPath)
+			if err != nil {
+				return err
+			}
 			m, err := model.Load(modelPath)
 			if err != nil {
 				return exitWithCode(fmt.Errorf("loading model: %w", err), 2)
@@ -95,7 +99,11 @@ func newOverlayRemoveCmd() *cobra.Command {
 			modelPath, _ := cmd.Flags().GetString("model")
 			outputPath, _ := cmd.Flags().GetString("output")
 
-			_, err := model.Load(modelPath)
+			modelPath, err := resolveModelPath(modelPath)
+			if err != nil {
+				return err
+			}
+			_, err = model.Load(modelPath)
 			if err != nil {
 				return exitWithCode(fmt.Errorf("loading model: %w", err), 2)
 			}

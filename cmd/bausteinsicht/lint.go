@@ -24,12 +24,9 @@ func runLint(cmd *cobra.Command, _ []string) error {
 	format, _ := cmd.Flags().GetString("format")
 	modelPath, _ := cmd.Flags().GetString("model")
 
-	if modelPath == "" {
-		detected, err := model.AutoDetect(".")
-		if err != nil {
-			return exitWithCode(err, 2)
-		}
-		modelPath = detected
+	modelPath, err := resolveModelPath(modelPath)
+	if err != nil {
+		return err
 	}
 
 	m, err := model.Load(modelPath)

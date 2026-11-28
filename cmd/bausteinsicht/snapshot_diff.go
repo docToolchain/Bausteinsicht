@@ -66,8 +66,9 @@ func resolveSecondModel(manager *snapshot.Manager, args []string, modelPath stri
 	if len(args) == 2 {
 		return loadSnapshotModel(manager, args[1])
 	}
-	if modelPath == "" {
-		modelPath = "architecture.jsonc"
+	modelPath, err := resolveModelPath(modelPath)
+	if err != nil {
+		return nil, err
 	}
 	m, err := model.Load(modelPath)
 	if err != nil {

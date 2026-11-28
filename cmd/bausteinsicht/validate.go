@@ -35,12 +35,9 @@ func runValidate(cmd *cobra.Command, args []string) error {
 	modelPath, _ := cmd.Flags().GetString("model")
 	verbose, _ := cmd.Flags().GetBool("verbose")
 
-	if modelPath == "" {
-		detected, err := model.AutoDetect(".")
-		if err != nil {
-			return exitWithCode(err, 2)
-		}
-		modelPath = detected
+	modelPath, err := resolveModelPath(modelPath)
+	if err != nil {
+		return err
 	}
 
 	m, err := model.Load(modelPath)

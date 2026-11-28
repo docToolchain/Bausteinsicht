@@ -16,7 +16,7 @@ func newSnapshotSaveCmd() *cobra.Command {
 		RunE:  runSnapshotSave,
 	}
 
-	cmd.Flags().String("model", "architecture.jsonc", "Model file path")
+	cmd.Flags().String("model", "", "Model file path (default: auto-detect)")
 	cmd.Flags().String("message", "", "Optional message describing the snapshot")
 
 	return cmd
@@ -26,6 +26,10 @@ func runSnapshotSave(cmd *cobra.Command, _ []string) error {
 	modelPath, _ := cmd.Flags().GetString("model")
 	message, _ := cmd.Flags().GetString("message")
 
+	modelPath, err := resolveModelPath(modelPath)
+	if err != nil {
+		return err
+	}
 	// Load current model
 	m, err := model.Load(modelPath)
 	if err != nil {
