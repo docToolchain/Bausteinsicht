@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"strings"
 
 	"github.com/docToolchain/Bausteinsicht/internal/model"
 	"github.com/spf13/cobra"
@@ -114,18 +116,9 @@ func runAddView(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("encoding result: %w", err)
 		}
-		fmt.Println(string(jsonBytes))
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), string(jsonBytes))
 	} else {
-		fmt.Printf("View '%s' added to model\n", viewKey)
-		if title != "" {
-			fmt.Printf("  Title: %s\n", title)
-		}
-		if scope != "" {
-			fmt.Printf("  Scope: %s\n", scope)
-		}
-		if len(includes) > 0 {
-			fmt.Printf("  Includes: %v\n", includes)
-		}
+		printAddViewText(cmd.OutOrStdout(), viewKey, viewExists, m.Views[viewKey], title, scope, includes, added)
 	}
 
 	return nil
@@ -221,4 +214,50 @@ func patchView(data []byte, key string, exists bool, final, requested model.View
 		}
 	}
 	return data, nil
+}
+
+// printAddViewText reports what "add view" did: a new view is "added to model", an
+// existing one is "updated", with what the include list gained, what was already in
+// it, and the include list as it is now (#704).
+func printAddViewText(w io.Writer, key string, existed bool, final model.View, title, scope string, requested, added []string) {
+	if !existed {
+		_, _ = fmt.Fprintf(w, "View '%s' added to model\n", key)
+	} else if len(added) > 0 {
+		plus := make([]string, len(added))
+		for i, id := range added {
+			plus[i] = "+" + id
+		}
+		_, _ = fmt.Fprintf(w, "View '%s' updated (include: %s)\n", key, strings.Join(plus, ", "))
+	} else {
+		_, _ = fmt.Fprintf(w, "View '%s' updated (include list unchanged)\n", key)
+	}
+	if title != "" {
+		_, _ = fmt.Fprintf(w, "  Title: %s\n", title)
+	}
+	if scope != "" {
+		_, _ = fmt.Fprintf(w, "  Scope: %s\n", scope)
+	}
+	if existed {
+		if already := skippedIncludes(requested, added); len(already) > 0 {
+			_, _ = fmt.Fprintf(w, "  Already included: %v\n", already)
+		}
+	}
+	if len(final.Include) > 0 {
+		_, _ = fmt.Fprintf(w, "  Includes: %v\n", final.Include)
+	}
+}
+
+// skippedIncludes returns the requested includes that were not added because the view had them.
+func skippedIncludes(requested, added []string) []string {
+	isAdded := make(map[string]bool, len(added))
+	for _, id := range added {
+		isAdded[id] = true
+	}
+	var skipped []string
+	for _, id := range requested {
+		if id != "" && !isAdded[id] {
+			skipped = append(skipped, id)
+		}
+	}
+	return skipped
 }

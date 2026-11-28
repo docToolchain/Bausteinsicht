@@ -592,6 +592,7 @@ Dots are not allowed -- they are reserved as element-hierarchy separators.
   - `--include` elements are appended to the existing include list (deduplicated); the order of the existing entries is kept
 * Validates that scope element exists (if specified).
 * Validates that all include elements exist (if specified, excluding wildcard patterns).
+* The text output says what happened: `View '<key>' added to model` for a new view, `View '<key>' updated (include: +<id>, ...)` for an existing one (`include list unchanged` if nothing was added), the entries that were already in the list (`Already included`), and the include list as it is now (#704). The JSON output has `created` and `added` for the same.
 * Uses comment-preserving updates for the JSONC file (#635): a new view is inserted into `views`; for an existing view only the given fields are replaced and new include entries are appended. Comments, key order and the formatting of everything else stay as they are. If patching fails it falls back to a full save and prints `note: model rewritten, comments and formatting were not preserved` to stderr.
 
 **Exit codes:**
