@@ -1511,7 +1511,7 @@ Starts an interactive shell for editing the model.
 
 **Flags:** none beyond the global flags.
 
-**Behavior:** keeps the model in memory; supports `add`/`remove`/`list`/`show`/`validate`/`undo`/`save` (plus `help` and `exit`). Pure additions are patched comment-preserving; modifications/deletions fall back to a full rewrite (with a warning). `exit` with unsaved changes prompts for confirmation before quitting; `Ctrl-D` (EOF) warns about unsaved changes and exits cleanly.
+**Behavior:** keeps the model in memory; supports `add`/`remove`/`list`/`show`/`validate`/`undo`/`save` (plus `help` and `exit`). The start line names the number of all elements, nested ones included. `remove element <id> [--cascade]` takes a dot path and works like the `remove element` command: the element and its children go; relationships, view entries and dynamic view steps that refer to it block the removal unless `--cascade` drops them too, and a view scope or constraint that names it always blocks it (#695). Pure additions are patched comment-preserving; modifications/deletions fall back to a full rewrite (with a warning). `exit` with unsaved changes prompts for confirmation before quitting; `Ctrl-D` (EOF) warns about unsaved changes and exits cleanly.
 
 **Validate-before-save gate:** `save` runs validation and aborts if the in-memory model has more errors than the on-disk model had at load time. This allows saving valid edits even when the on-disk model already contains validation errors (e.g. a broken view reference that cannot be fixed via REPL commands). If the error count would increase, save is aborted and all errors are listed.
 
