@@ -90,3 +90,27 @@ func TestImportCmd_GenerateTemplate(t *testing.T) {
 		}
 	})
 }
+
+// A template.drawio that is a dangling symbolic link looks absent to a plain
+// existence check, but creating the file would write through the link. The
+// template is created exclusively, so the import is refused and neither the
+// link target nor the model is written (CodeRabbit finding on #775).
+func TestImportCmd_GenerateTemplateRefusesADanglingLink(t *testing.T) {
+	dsl := absDSL(t, "internal", "importer", "structurizr", "testdata", "simple.dsl")
+	dir := t.TempDir()
+	target := filepath.Join(dir, "elsewhere.drawio")
+	if err := os.Symlink(target, filepath.Join(dir, "template.drawio")); err != nil {
+		t.Skipf("symbolic links are not available: %v", err)
+	}
+	out := filepath.Join(dir, "m.jsonc")
+	_, err := executeImportCmd("import", "--from", "structurizr", "--generate-template", "--output", out, dsl)
+	if err == nil || exitCodeOf(t, err) != 2 {
+		t.Fatalf("want exit code 2, got %v", err)
+	}
+	if _, err := os.Stat(target); err == nil {
+		t.Error("the import wrote through the dangling link")
+	}
+	if _, err := os.Stat(out); err == nil {
+		t.Error("the model must not be written when the template is refused")
+	}
+}

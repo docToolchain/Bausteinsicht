@@ -515,3 +515,69 @@ func TestImport_TagsSelectKindsAndAreKept(t *testing.T) {
 		t.Errorf("the imported model must validate, got %v", errs)
 	}
 }
+
+// An External system with containers, or a Database container with
+// components, cannot become external_system/datastore: those kinds have no
+// children in the default specification and the model would not validate.
+// The element keeps its kind and its tag then (CodeRabbit finding on #775).
+func TestImport_TagKindsNeedLeafElements(t *testing.T) {
+	src := `workspace {
+  model {
+    ext = softwareSystem "Mail" "ext" "External" {
+      smtp = container "SMTP"
+    }
+    ss = softwareSystem "Bank" {
+      db = container "DB" "" "Postgres" "Database" {
+        tbl = component "Table"
+      }
+      cache = container "Cache" "" "Redis" "Database"
+    }
+  }
+}`
+	result, err := structurizr.ImportSource(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := result.Model
+	if got := m.Model["ext"]; got.Kind != "system" || len(got.Tags) != 1 || got.Tags[0] != "External" {
+		t.Errorf("an External system with children keeps kind system and its tag, got kind %q tags %v", got.Kind, got.Tags)
+	}
+	if got := m.Model["ss"].Children["db"]; got.Kind != "container" || len(got.Tags) != 1 || got.Tags[0] != "Database" {
+		t.Errorf("a Database container with children keeps kind container and its tag, got kind %q tags %v", got.Kind, got.Tags)
+	}
+	if got := m.Model["ss"].Children["cache"].Kind; got != "datastore" {
+		t.Errorf("a leaf Database container is a datastore, got %q", got)
+	}
+	if errs := model.Validate(m); len(errs) > 0 {
+		t.Errorf("the imported model must validate, got %v", errs)
+	}
+}
+
+// Fallback keys (the scope, then scope_1, ...) must not take a key that a later
+// view writes explicitly, so explicit keys do not depend on the DSL order
+// (CodeRabbit finding on #775).
+func TestImport_ExplicitViewKeysAreReservedFirst(t *testing.T) {
+	src := `workspace {
+  model {
+    s = softwareSystem "S" {
+      c = container "C"
+    }
+  }
+  views {
+    systemContext s { include * }
+    container s { include * }
+    systemLandscape "s_1" "Landscape" { include * }
+  }
+}`
+	result, err := structurizr.ImportSource(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	v := result.Model.Views
+	if got, ok := v["s_1"]; !ok || got.Title != "Landscape" {
+		t.Errorf("the explicit key s_1 must keep its view, got %v", v)
+	}
+	if len(v) != 3 {
+		t.Errorf("want 3 views, got %d: %v", len(v), v)
+	}
+}

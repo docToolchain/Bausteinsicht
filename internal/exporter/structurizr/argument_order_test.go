@@ -143,3 +143,37 @@ func TestRoundtrip_KeepsDescriptionTechnologyAndViews(t *testing.T) {
 		}
 	}
 }
+
+// The kinds external_system and datastore and the tags of an element survive
+// export and import again: the exporter writes the tags argument, with the tag
+// that selects the kind (CodeRabbit finding on #775).
+func TestExport_KindsAndTagsSurviveReimport(t *testing.T) {
+	m := &model.BausteinsichtModel{Model: map[string]model.Element{
+		"ext": {Kind: "external_system", Title: "Mail", Description: "d", Tags: []string{"Vendor"}},
+		"s": {Kind: "system", Title: "S", Children: map[string]model.Element{
+			"db": {Kind: "datastore", Title: "DB", Technology: "Postgres", Tags: []string{"Critical", "Internal"}},
+			"c":  {Kind: "container", Title: "C", Tags: []string{"Edge"}},
+		}},
+	}}
+	out := structurizr.Export(m)
+	for _, want := range []string{
+		`ext = softwareSystem "Mail" "d" "External,Vendor"`,
+		`db = container "DB" "" "Postgres" "Database,Critical,Internal"`,
+		`c = container "C" "" "" "Edge"`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("want %q in:\n%s", want, out)
+		}
+	}
+	back, err := importer.ImportSource(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := back.Model.Model["ext"]; got.Kind != "external_system" || len(got.Tags) != 1 || got.Tags[0] != "Vendor" {
+		t.Errorf("ext after re-import: kind %q tags %v", got.Kind, got.Tags)
+	}
+	db := back.Model.Model["s"].Children["db"]
+	if db.Kind != "datastore" || strings.Join(db.Tags, ",") != "Critical,Internal" {
+		t.Errorf("db after re-import: kind %q tags %v", db.Kind, db.Tags)
+	}
+}
