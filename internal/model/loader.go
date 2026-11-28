@@ -132,10 +132,16 @@ func Save(path string, model *BausteinsichtModel) error {
 		return fmt.Errorf("marshaling model: %w", err)
 	}
 
-	// Preserve preamble from the existing file (comments before root `{`).
+	// Preserve preamble from the existing file (comments before root `{`), and its
+	// line endings: a file with CRLF line endings stays one (#729). The preamble is
+	// copied, it is a slice of the file's bytes.
 	if existing, readErr := os.ReadFile(path); readErr == nil { // #nosec G304
+		eol := detectLineEnding(existing)
 		if preamble := extractPreamble(existing); len(preamble) > 0 {
-			data = append(preamble, data...)
+			data = append(append([]byte{}, preamble...), data...)
+		}
+		if eol != "\n" {
+			data = []byte(withLineEnding(string(data), eol))
 		}
 	}
 

@@ -1,8 +1,10 @@
 package model
 
 import (
+	"bytes"
 	"fmt"
 	"os"
+	"strings"
 )
 
 // PatchOp describes a single value replacement in a JSONC file.
@@ -303,6 +305,8 @@ func InsertObjectEntry(data []byte, objectPath []string, key, valueJSON string) 
 
 	// Detect indentation from the closing brace line.
 	indent := detectIndent(data, closeBrace)
+	eol := detectLineEnding(data)
+	valueJSON = withLineEnding(valueJSON, eol)
 
 	// Check if the object has existing entries by scanning for non-whitespace
 	// between '{' and '}'.
@@ -332,7 +336,7 @@ func InsertObjectEntry(data []byte, objectPath []string, key, valueJSON string) 
 		if commaAfter > start && data[commaAfter] != ',' {
 			comma = ","
 		}
-		newEntry := fmt.Sprintf("\n%s  %q: %s\n%s", indent, key, valueJSON, indent)
+		newEntry := fmt.Sprintf("%s%s  %q: %s%s%s", eol, indent, key, valueJSON, eol, indent)
 		result := make([]byte, 0, len(data)+len(comma)+len(newEntry))
 		result = append(result, data[:commaAfter+1]...)
 		result = append(result, []byte(comma)...)
@@ -342,7 +346,7 @@ func InsertObjectEntry(data []byte, objectPath []string, key, valueJSON string) 
 		return result, nil
 	}
 
-	insertion := fmt.Sprintf("\n%s  %q: %s\n%s", indent, key, valueJSON, indent)
+	insertion := fmt.Sprintf("%s%s  %q: %s%s%s", eol, indent, key, valueJSON, eol, indent)
 	result := make([]byte, 0, len(data)+len(insertion))
 	result = append(result, data[:closeBrace]...)
 	result = append(result, []byte(insertion)...)
@@ -403,6 +407,8 @@ func AppendArrayEntry(data []byte, arrayPath []string, valueJSON string) ([]byte
 	}
 
 	indent := detectIndent(data, closeBracket)
+	eol := detectLineEnding(data)
+	valueJSON = withLineEnding(valueJSON, eol)
 
 	// Check if the array has existing entries.
 	hasEntries := false
@@ -430,7 +436,7 @@ func AppendArrayEntry(data []byte, arrayPath []string, valueJSON string) ([]byte
 		if commaAfter > start && data[commaAfter] != ',' {
 			comma = ","
 		}
-		newEntry := fmt.Sprintf("\n%s  %s\n%s", indent, valueJSON, indent)
+		newEntry := fmt.Sprintf("%s%s  %s%s%s", eol, indent, valueJSON, eol, indent)
 		result := make([]byte, 0, len(data)+len(comma)+len(newEntry))
 		result = append(result, data[:commaAfter+1]...)
 		result = append(result, []byte(comma)...)
@@ -440,7 +446,7 @@ func AppendArrayEntry(data []byte, arrayPath []string, valueJSON string) ([]byte
 		return result, nil
 	}
 
-	insertion := fmt.Sprintf("\n%s  %s\n%s", indent, valueJSON, indent)
+	insertion := fmt.Sprintf("%s%s  %s%s%s", eol, indent, valueJSON, eol, indent)
 	result := make([]byte, 0, len(data)+len(insertion))
 	result = append(result, data[:closeBracket]...)
 	result = append(result, []byte(insertion)...)
@@ -495,4 +501,26 @@ func skipToChar(data []byte, i, n int, ch byte) int {
 		i++
 	}
 	return i
+}
+
+// detectLineEnding returns the line ending that most lines of data have: "\r\n"
+// if more than half of the line breaks are CRLF, otherwise "\n". Text that is
+// inserted gets the same ending, so that a CRLF file does not become a mixed one
+// (#729).
+func detectLineEnding(data []byte) string {
+	crlf := bytes.Count(data, []byte("\r\n"))
+	lf := bytes.Count(data, []byte("\n"))
+	if crlf > 0 && crlf*2 > lf {
+		return "\r\n"
+	}
+	return "\n"
+}
+
+// withLineEnding gives every line break in text the line ending eol.
+func withLineEnding(text, eol string) string {
+	text = strings.ReplaceAll(text, "\r\n", "\n")
+	if eol == "\n" {
+		return text
+	}
+	return strings.ReplaceAll(text, "\n", eol)
 }
