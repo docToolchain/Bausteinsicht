@@ -159,5 +159,23 @@ func calculateSummary(result *DiffResult) {
 	}
 }
 
-// FilterTo keeps only the changes that concern the elements in ids (stub, filled in by the fix).
-func (r *DiffResult) FilterTo(ids map[string]bool) {}
+// FilterTo keeps only the changes that concern the elements in ids: the element
+// changes of those elements and the relationship changes whose both ends are among
+// them. The summary is counted again (#709).
+func (r *DiffResult) FilterTo(ids map[string]bool) {
+	elements := make([]ElementChange, 0, len(r.Elements))
+	for _, c := range r.Elements {
+		if ids[c.ID] {
+			elements = append(elements, c)
+		}
+	}
+	rels := make([]RelationshipChange, 0, len(r.Relationships))
+	for _, c := range r.Relationships {
+		if ids[c.From] && ids[c.To] {
+			rels = append(rels, c)
+		}
+	}
+	r.Elements, r.Relationships = elements, rels
+	r.Summary = Summary{}
+	calculateSummary(r)
+}

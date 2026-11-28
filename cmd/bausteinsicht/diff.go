@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
+	"strings"
 
 	"github.com/docToolchain/Bausteinsicht/internal/diff"
 	"github.com/docToolchain/Bausteinsicht/internal/model"
@@ -43,6 +45,14 @@ func runDiff(cmd *cobra.Command, _ []string) error {
 
 	result := diff.Compare(m.AsIs, m.ToBe)
 
+	if viewKey, _ := cmd.Flags().GetString("view"); viewKey != "" {
+		ids, err := viewElementIDs(m, viewKey)
+		if err != nil {
+			return exitWithCode(err, 1)
+		}
+		result.FilterTo(ids)
+	}
+
 	switch format {
 	case "json":
 		data, err := json.MarshalIndent(result, "", "  ")
@@ -62,6 +72,51 @@ func runDiff(cmd *cobra.Command, _ []string) error {
 	}
 
 	return nil
+}
+
+// viewElementIDs returns the IDs of the elements that the view shows; an unknown
+// view is an error that lists the known ones (#709).
+func viewElementIDs(m *model.BausteinsichtModel, key string) (map[string]bool, error) {
+	view, ok := m.Views[key]
+	if !ok {
+		known := make([]string, 0, len(m.Views))
+		for k := range m.Views {
+			known = append(known, k)
+		}
+		sort.Strings(known)
+		return nil, fmt.Errorf("unknown view %q (known views: %s)", key, strings.Join(known, ", "))
+	}
+	// An element that exists only in the as-is or to-be state is not in the model,
+	// but a view may still name it: resolve against the elements of all three.
+	merged := *m
+	merged.Model = make(map[string]model.Element, len(m.Model))
+	for _, snap := range []*model.ModelSnapshot{m.AsIs, m.ToBe} {
+		if snap != nil {
+			for id, el := range snap.Elements {
+				merged.Model[id] = el
+			}
+		}
+	}
+	for id, el := range m.Model {
+		merged.Model[id] = el
+	}
+	resolved, err := model.ResolveView(&merged, &view)
+	if err != nil {
+		return nil, fmt.Errorf("resolving view %q: %w", key, err)
+	}
+	ids := make(map[string]bool, len(resolved))
+	for _, id := range resolved {
+		ids[id] = true
+	}
+	return ids, nil
+}
+
+// labelSuffix is the label of a relationship in parentheses, or nothing if it has none.
+func labelSuffix(label string) string {
+	if label == "" {
+		return ""
+	}
+	return " (" + label + ")"
 }
 
 func formatDiffAsText(result *diff.DiffResult) string {
@@ -125,8 +180,8 @@ func formatDiffAsText(result *diff.DiffResult) string {
 		output += fmt.Sprintf("Added Relationships (%d):\n", result.Summary.AddedRelationships)
 		for _, change := range result.Relationships {
 			if change.Type == diff.ChangeAdded && change.ToBe != nil {
-				output += fmt.Sprintf("  + %s → %s (%s)\n",
-					change.From, change.To, change.ToBe.Label)
+				output += fmt.Sprintf("  + %s → %s%s\n",
+					change.From, change.To, labelSuffix(change.ToBe.Label))
 			}
 		}
 		output += "\n"
@@ -136,8 +191,8 @@ func formatDiffAsText(result *diff.DiffResult) string {
 		output += fmt.Sprintf("Removed Relationships (%d):\n", result.Summary.RemovedRelationships)
 		for _, change := range result.Relationships {
 			if change.Type == diff.ChangeRemoved && change.AsIs != nil {
-				output += fmt.Sprintf("  - %s → %s (%s)\n",
-					change.From, change.To, change.AsIs.Label)
+				output += fmt.Sprintf("  - %s → %s%s\n",
+					change.From, change.To, labelSuffix(change.AsIs.Label))
 			}
 		}
 		output += "\n"

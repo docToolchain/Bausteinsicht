@@ -1392,11 +1392,11 @@ Reports the gap between the model's `asIs` and `toBe` sections.
 | Flag | Description | Required | Default
 
 | `--model` | Model file path. | No | (auto-detect)
-| `--view` | Accepted for forward compatibility but currently has **no effect** (per-view diff is not yet implemented). | No | (all)
+| `--view` | Show only the changes that concern the elements of this view (the view of the model, resolved like for the diagrams, against the elements of the model and of both states, so that an element that exists only as-is or only to-be can be named): the changes of those elements and the relationship changes whose both ends are among them; the summary counts only these. An unknown view is an error (exit code `1`) that lists the known ones (#709). | No | (all)
 | `--format` | Output format: `text` or `json`. | No | `text`
 |===
 
-**Behavior:** exits with an error if the model has no `asIs`/`toBe` sections.
+**Behavior:** exits with an error if the model has no `asIs`/`toBe` sections. A relationship without a label is printed as `from → to`, without empty parentheses.
 
 ==== `bausteinsicht changelog`
 
