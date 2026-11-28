@@ -133,3 +133,33 @@ func TestChangelogErrorsAndDefaultSince(t *testing.T) {
 		t.Errorf("the default --since is the previous tag v1, so the added element must show:\n%s", md)
 	}
 }
+
+// #728: a snapshot ID is accepted as --since (and --until), next to git refs.
+func TestChangelogResolvesSnapshotIDs(t *testing.T) {
+	bin := buildBinary(t)
+	dir := t.TempDir()
+	runGit(t, "init", dir)
+	runGit(t, "-C", dir, "config", "user.email", "test@test.com")
+	runGit(t, "-C", dir, "config", "user.name", "Test")
+	runCLI(t, bin, dir, "init")
+	runGit(t, "-C", dir, "add", ".")
+	runGit(t, "-C", dir, "commit", "-m", "initial model")
+
+	saved := runCLI(t, bin, dir, "snapshot", "save", "--message", "a")
+	var id string
+	for _, line := range strings.Split(saved, "\n") {
+		if v, ok := strings.CutPrefix(line, "Snapshot saved: "); ok {
+			id = strings.TrimSpace(v)
+		}
+	}
+	if id == "" {
+		t.Fatalf("no snapshot ID in:\n%s", saved)
+	}
+	runCLI(t, bin, dir, "add", "element", "--id", "newone", "--kind", "actor", "--title", "Brand New")
+	runGit(t, "-C", dir, "commit", "-am", "add newone")
+
+	out := runCLI(t, bin, dir, "changelog", "--since", id)
+	if !strings.Contains(out, "Brand New") && !strings.Contains(out, "newone") {
+		t.Errorf("a snapshot as --since and HEAD as --until must show the added element:\n%s", out)
+	}
+}

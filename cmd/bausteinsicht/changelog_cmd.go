@@ -5,6 +5,8 @@ import (
 	"os"
 
 	"github.com/docToolchain/Bausteinsicht/internal/changelog"
+	"github.com/docToolchain/Bausteinsicht/internal/model"
+	"github.com/docToolchain/Bausteinsicht/internal/snapshot"
 	"github.com/spf13/cobra"
 )
 
@@ -17,8 +19,8 @@ func newChangelogCmd() *cobra.Command {
 	}
 
 	cmd.Flags().String("model", "", "Model file path (default: auto-detect)")
-	cmd.Flags().String("since", "", "Starting git ref (default: the previous tag)")
-	cmd.Flags().String("until", "HEAD", "Ending git ref")
+	cmd.Flags().String("since", "", "Starting git ref or snapshot ID (default: the previous tag)")
+	cmd.Flags().String("until", "HEAD", "Ending git ref or snapshot ID")
 	// Use a dedicated flag name (not the global --format, which only accepts
 	// text|json) so the markdown/asciidoc defaults are not rejected by the
 	// root command's global format validation (#425).
@@ -45,8 +47,13 @@ func runChangelog(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	// The default of --since is the previous tag (#698).
+	snapshots := snapshot.NewManager(".")
+
+	// The default of --since is the previous tag (#698); a snapshot has no tag.
 	if since == "" {
+		if snapshots.Exists(until) {
+			return exitWithCode(fmt.Errorf("--since is required when --until is a snapshot (%s)", until), 2)
+		}
 		tag, err := changelog.PreviousTag(until)
 		if err != nil {
 			return exitWithCode(err, 2)
@@ -54,26 +61,14 @@ func runChangelog(cmd *cobra.Command, _ []string) error {
 		since = tag
 	}
 
-	// Load models at the two refs
-	fromModel, err := changelog.LoadModelAtGitRef(modelPath, since)
+	// Load the models at the two refs: a git ref or a snapshot ID (#728).
+	fromModel, fromRef, err := loadChangelogSide(snapshots, modelPath, since)
 	if err != nil {
 		return exitWithCode(fmt.Errorf("loading model at %q: %w", since, err), 2)
 	}
-
-	toModel, err := changelog.LoadModelAtGitRef(modelPath, until)
+	toModel, toRef, err := loadChangelogSide(snapshots, modelPath, until)
 	if err != nil {
 		return exitWithCode(fmt.Errorf("loading model at %q: %w", until, err), 2)
-	}
-
-	// Get reference info for display
-	fromRef := changelog.Reference{Ref: since}
-	toRef := changelog.Reference{Ref: until}
-
-	if fromInfo, err := changelog.GetCommitInfo(since); err == nil {
-		fromRef.Date = fromInfo.Date
-	}
-	if toInfo, err := changelog.GetCommitInfo(until); err == nil {
-		toRef.Date = toInfo.Date
 	}
 
 	// Generate changelog
@@ -108,4 +103,29 @@ func runChangelog(cmd *cobra.Command, _ []string) error {
 	}
 
 	return nil
+}
+
+// loadChangelogSide loads the model at one end of the changelog: the model of the
+// snapshot with that ID, or the model at the git ref. The reference carries the
+// date of the snapshot or commit for the display.
+func loadChangelogSide(snapshots *snapshot.Manager, modelPath, ref string) (*model.BausteinsichtModel, changelog.Reference, error) {
+	if snapshots.Exists(ref) {
+		snap, err := snapshots.Load(ref)
+		if err != nil {
+			return nil, changelog.Reference{}, err
+		}
+		if snap.Model == nil {
+			return nil, changelog.Reference{}, fmt.Errorf("snapshot %s contains no model data", ref)
+		}
+		return snap.Model, changelog.Reference{Ref: ref, Date: snap.Timestamp}, nil
+	}
+	m, err := changelog.LoadModelAtGitRef(modelPath, ref)
+	if err != nil {
+		return nil, changelog.Reference{}, err
+	}
+	r := changelog.Reference{Ref: ref}
+	if info, err := changelog.GetCommitInfo(ref); err == nil {
+		r.Date = info.Date
+	}
+	return m, r, nil
 }
