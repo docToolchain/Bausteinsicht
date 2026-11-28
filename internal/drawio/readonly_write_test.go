@@ -50,3 +50,27 @@ func TestSaveDocument_KeepsTheMode(t *testing.T) {
 		t.Errorf("want mode 0640 to be kept, got %v", info.Mode().Perm())
 	}
 }
+
+// A diagram in a directory that cannot be searched is an error, not a silent
+// replacement of something else.
+func TestSaveDocument_ErrorWhenTheDirectoryCannotBeSearched(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("needs permission bits that are enforced (not Windows, not root)")
+	}
+	locked := filepath.Join(t.TempDir(), "locked")
+	if err := os.Mkdir(locked, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	doc := NewDocument()
+	doc.AddPage("view-a", "A")
+	if err := SaveDocument(filepath.Join(locked, "a.drawio"), doc); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(locked, 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(locked, 0o750) })
+	if err := SaveDocument(filepath.Join(locked, "a.drawio"), doc); err == nil {
+		t.Error("want an error for a diagram in a directory that cannot be searched")
+	}
+}

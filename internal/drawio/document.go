@@ -2,13 +2,12 @@
 package drawio
 
 import (
-	"errors"
+	"bytes"
 	"fmt"
-	"io/fs"
-	"os"
-	"path/filepath"
 
 	"github.com/beevik/etree"
+
+	"github.com/docToolchain/Bausteinsicht/internal/model"
 )
 
 // Document represents a draw.io file (mxfile).
@@ -54,57 +53,22 @@ func LoadDocument(path string) (*Document, error) {
 }
 
 // SaveDocument writes a Document to disk using an atomic temp-file + rename.
+// A diagram that is a symbolic link is updated in place, the link stays (#723); a
+// diagram that is read-only is not replaced and the replacement keeps the mode of
+// the file (#724).
 func SaveDocument(path string, doc *Document) error {
-	// A diagram that is a symbolic link is updated in place, the link stays (#723).
-	// Any failure other than "does not exist" is an error: replacing the link would
-	// report success and leave the target unchanged.
-	if resolved, err := filepath.EvalSymlinks(path); err == nil {
-		path = resolved
-	} else if !errors.Is(err, fs.ErrNotExist) {
+	path, err := model.ResolveWriteTarget(path)
+	if err != nil {
 		return fmt.Errorf("SaveDocument resolve %s: %w", path, err)
 	}
 	doc.tree.Indent(2)
 
-	// A diagram that is read-only is not replaced, and the replacement keeps the
-	// mode of the file (#724).
-	var mode os.FileMode
-	info, statErr := os.Stat(path)
-	switch {
-	case statErr == nil:
-		if info.Mode().Perm()&0o200 == 0 {
-			return fmt.Errorf("SaveDocument: file is read-only: %s (make it writable to change it)", path)
-		}
-		mode = info.Mode().Perm()
-	case !errors.Is(statErr, fs.ErrNotExist):
-		return fmt.Errorf("SaveDocument stat %s: %w", path, statErr)
-	}
-
-	dir := filepath.Dir(path)
-	tmp, err := os.CreateTemp(dir, ".drawio-tmp-*")
-	if err != nil {
-		return fmt.Errorf("SaveDocument create temp: %w", err)
-	}
-	tmpName := tmp.Name()
-	if statErr == nil {
-		if err := tmp.Chmod(mode); err != nil {
-			_ = tmp.Close()
-			_ = os.Remove(tmpName)
-			return fmt.Errorf("SaveDocument chmod: %w", err)
-		}
-	}
-
-	if _, err := doc.tree.WriteTo(tmp); err != nil {
-		_ = tmp.Close()
-		_ = os.Remove(tmpName)
+	var buf bytes.Buffer
+	if _, err := doc.tree.WriteTo(&buf); err != nil {
 		return fmt.Errorf("SaveDocument write: %w", err)
 	}
-	if err := tmp.Close(); err != nil {
-		_ = os.Remove(tmpName)
-		return fmt.Errorf("SaveDocument close: %w", err)
-	}
-	if err := os.Rename(tmpName, path); err != nil {
-		_ = os.Remove(tmpName)
-		return fmt.Errorf("SaveDocument rename: %w", err)
+	if err := model.WriteFileAtomic(path, ".drawio-tmp-*", buf.Bytes()); err != nil {
+		return fmt.Errorf("SaveDocument: %w", err)
 	}
 	return nil
 }
