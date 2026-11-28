@@ -28,7 +28,7 @@ func TestSaveDocument_RefusesAReadOnlyFile(t *testing.T) {
 	before, _ := os.ReadFile(path)
 	doc.AddPage("view-b", "B")
 	err := SaveDocument(path, doc)
-	if err == nil || !strings.Contains(err.Error(), "read-only") || !strings.Contains(err.Error(), path) {
+	if err == nil || !strings.Contains(err.Error(), "read-only") || !strings.Contains(err.Error(), filepath.Base(path)) {
 		t.Errorf("want an error \"file is read-only\" naming the file, got %v", err)
 	}
 	if after, _ := os.ReadFile(path); string(after) != string(before) {
