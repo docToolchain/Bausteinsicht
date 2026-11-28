@@ -257,6 +257,7 @@ func Sync(ctx context.Context, cfg *Config, configPath string, f *Fetcher, updat
 	for _, id := range lock.sortedIDs() {
 		if !remote[id] {
 			delete(lock.Sources, id)
+			removeCacheFile(baseDir, id)
 			pruned = true
 		}
 	}
@@ -329,4 +330,14 @@ func checkIsModel(source string, data []byte) error {
 		return fmt.Errorf("%s is not a Bausteinsicht model: it has neither a specification nor a model", source)
 	}
 	return nil
+}
+
+// removeCacheFile deletes the cache file of a model that is no longer remote. Only
+// a file named <id>.jsonc in the cache directory is touched: an ID of the lock file
+// that could not be one (a path, say) is ignored (#735).
+func removeCacheFile(baseDir, id string) {
+	if !sourceIDPattern.MatchString(id) {
+		return
+	}
+	_ = os.Remove(CachePath(baseDir, id))
 }

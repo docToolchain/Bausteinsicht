@@ -69,6 +69,12 @@ func LoadLock(path string) (*Lock, error) {
 	if l.Sources == nil {
 		l.Sources = map[string]LockEntry{}
 	}
+	// A hash is a hex number: upper case, as another tool or a hand edit may write
+	// it, is the same hash (#735).
+	for id, entry := range l.Sources {
+		entry.SHA256 = strings.ToLower(strings.TrimSpace(entry.SHA256))
+		l.Sources[id] = entry
+	}
 	return &l, nil
 }
 
