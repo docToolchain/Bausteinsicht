@@ -97,14 +97,11 @@ func TestStructurizrImportPipeline_AutoLayoutAndScopedViews(t *testing.T) {
 		t.Fatalf("sync rejected the imported layout value:\n%s", syncOut)
 	}
 
-	// The importer keys views by scope, suffixing on collision: the
-	// systemContext view (scope "widgets") gets the plain key, the container
-	// view (same scope, second view) becomes "widgets_1", and the component
-	// view (scope "widgets.handlers") keeps its dotted scope as the key.
+	// The importer keys a view by the key written in the DSL (#688).
 	const (
-		systemContextView = "widgets"
-		containersView    = "widgets_1"
-		componentsView    = "widgets.handlers"
+		systemContextView = "SystemContext"
+		containersView    = "Containers"
+		componentsView    = "Components"
 	)
 
 	// ── Step 3: export-diagram — every scoped view must resolve non-empty ──────

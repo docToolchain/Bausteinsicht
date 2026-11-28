@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/docToolchain/Bausteinsicht/internal/importer/structurizr"
+	"github.com/docToolchain/Bausteinsicht/internal/model"
 )
 
 func TestImport_Simple(t *testing.T) {
@@ -399,7 +400,8 @@ func TestImport_RelationshipTechnology(t *testing.T) {
 
 // Structurizr views read `systemContext <scope> <key> <description>`: with two
 // arguments after the scope the first is the key and the second the description
-// (#687); a single one stays the title.
+// (#687); a single one is the key too (#688), and a view without any keeps the
+// scope as its key.
 func TestImport_ViewKeyAndDescription(t *testing.T) {
 	src := `workspace {
   model {
@@ -409,7 +411,8 @@ func TestImport_ViewKeyAndDescription(t *testing.T) {
   }
   views {
     systemContext system "ctx-key" "The context" { include * }
-    container system "Only title" { include * }
+    container system "only-key" { include * }
+    component app { include * }
     systemLandscape "land" "All systems" { include * }
   }
 }`
@@ -421,8 +424,11 @@ func TestImport_ViewKeyAndDescription(t *testing.T) {
 	if got, ok := v["ctx-key"]; !ok || got.Title != "The context" {
 		t.Errorf("want view ctx-key titled %q, got %+v", "The context", v)
 	}
-	if got, ok := v["system"]; !ok || got.Title != "Only title" {
-		t.Errorf("a single argument keeps the old reading (key from the scope, argument as title), got %+v", v)
+	if got, ok := v["only-key"]; !ok || got.Title != "only-key" {
+		t.Errorf("a single argument is the view key (Structurizr: <type> <scope> [key] [description]), got %+v", v)
+	}
+	if _, ok := v["system.app"]; !ok {
+		t.Errorf("a view without key or description is keyed by its scope, got %+v", v)
 	}
 	if got, ok := v["land"]; !ok || got.Title != "All systems" {
 		t.Errorf("want landscape view land titled %q, got %+v", "All systems", v)
@@ -440,9 +446,9 @@ func TestImport_ViewKeysNeverOverwriteEachOther(t *testing.T) {
     }
   }
   views {
-    systemContext s "ctx" { include * }
+    systemContext s { include * }
     systemContext s "s_1" "Second" { include * }
-    container s "cont" { include * }
+    container s { include * }
   }
 }`
 	result, err := structurizr.ImportSource(src)
@@ -454,5 +460,58 @@ func TestImport_ViewKeysNeverOverwriteEachOther(t *testing.T) {
 	}
 	if v := result.Model.Views["s_1"]; v.Title != "Second" {
 		t.Errorf("the explicit key s_1 must keep its view, got %+v", v)
+	}
+}
+
+// A tag in the DSL is not thrown away: "External" on a software system and
+// "Database" on a container select the kinds the default specification has
+// for them, every other tag stays on the element and is defined in the
+// specification, so the model validates (#688).
+func TestImport_TagsSelectKindsAndAreKept(t *testing.T) {
+	src := `workspace {
+  model {
+    ss = softwareSystem "Banking" "Core" {
+      db = container "DB" "store" "Postgres" "Database,Critical"
+      api = container "API" "REST" "Java" {
+        tags "Internal"
+      }
+    }
+    ext = softwareSystem "Mail" "ext" "External"
+  }
+}`
+	result, err := structurizr.ImportSource(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := result.Model
+	if got := m.Model["ext"].Kind; got != "external_system" {
+		t.Errorf("software system tagged External: want kind external_system, got %q", got)
+	}
+	db := m.Model["ss"].Children["db"]
+	if db.Kind != "datastore" {
+		t.Errorf("container tagged Database: want kind datastore, got %q", db.Kind)
+	}
+	if len(db.Tags) != 1 || db.Tags[0] != "Critical" {
+		t.Errorf("tags that do not select a kind stay on the element, want [Critical], got %v", db.Tags)
+	}
+	if got := m.Model["ss"].Children["api"].Tags; len(got) != 1 || got[0] != "Internal" {
+		t.Errorf("tags from a tags statement stay on the element, want [Internal], got %v", got)
+	}
+	for _, kind := range []string{"external_system", "datastore", "system", "container"} {
+		if _, ok := m.Specification.Elements[kind]; !ok {
+			t.Errorf("specification lacks the kind %q: %v", kind, m.Specification.Elements)
+		}
+	}
+	defined := map[string]bool{}
+	for _, td := range m.Specification.Tags {
+		defined[td.ID] = true
+	}
+	for _, tag := range []string{"Critical", "Internal"} {
+		if !defined[tag] {
+			t.Errorf("tag %q is used but not defined in specification.tags: %v", tag, m.Specification.Tags)
+		}
+	}
+	if errs := model.Validate(m); len(errs) > 0 {
+		t.Errorf("the imported model must validate, got %v", errs)
 	}
 }
