@@ -543,3 +543,8 @@ func (s *replState) validateCommand() {
 		fmt.Printf("  %s\n", err.Error())
 	}
 }
+
+// replHeader is the first line of the REPL stub, replaced by the real one in the fix.
+func replHeader(modelPath string, m *model.BausteinsichtModel) string {
+	return fmt.Sprintf("Bausteinsicht REPL — %s (%d elements)", modelPath, len(m.Model))
+}
