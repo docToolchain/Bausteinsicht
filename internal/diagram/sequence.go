@@ -35,8 +35,8 @@ func RenderSequencePlantUML(view model.DynamicView, flat map[string]*model.Eleme
 			depth = writeBlockStep(&b, "", keyword, step, depth)
 			continue
 		}
-		fmt.Fprintf(&b, "%s%s %s %s : %s\n", strings.Repeat("  ", depth),
-			sanitizeID(step.From), plantUMLArrow(step.Type), sanitizeID(step.To), step.Label)
+		fmt.Fprintf(&b, "%s%s %s %s%s\n", strings.Repeat("  ", depth),
+			sanitizeID(step.From), plantUMLArrow(step.Type), sanitizeID(step.To), plantUMLMessageText(step.Label))
 	}
 
 	b.WriteString("\n@enduml\n")
@@ -64,22 +64,56 @@ func RenderSequenceMermaid(view model.DynamicView, flat map[string]*model.Elemen
 	}
 	b.WriteString("\n")
 
+	participants := collectParticipants(steps)
 	depth := 0
 	for _, step := range steps {
 		if keyword, isBlock := blockKeyword(step.Type); isBlock {
+			groupLabel := ""
 			if keyword == "group" {
 				keyword = "rect rgb(240, 240, 240)"
-				step.Label = ""
+				groupLabel, step.Label = step.Label, ""
 			}
 			step.Label = mermaidSequenceText(step.Label)
 			depth = writeBlockStep(&b, "    ", keyword, step, depth)
+			// A Mermaid rect has no title: the label is a note over the participants.
+			if groupLabel != "" && len(participants) > 0 {
+				writeMermaidGroupNote(&b, depth, participants, groupLabel)
+			}
 			continue
 		}
-		fmt.Fprintf(&b, "    %s%s%s%s: %s\n", strings.Repeat("  ", depth),
-			sanitizeID(step.From), mermaidArrow(step.Type), sanitizeID(step.To), mermaidSequenceText(step.Label))
+		fmt.Fprintf(&b, "    %s%s%s%s%s\n", strings.Repeat("  ", depth),
+			sanitizeID(step.From), mermaidArrow(step.Type), sanitizeID(step.To), mermaidMessageText(mermaidSequenceText(step.Label)))
 	}
 
 	return b.String()
+}
+
+// plantUMLMessageText is the text part of a PlantUML message line: a message
+// without a label has none, not a dangling " : " (#711).
+func plantUMLMessageText(label string) string {
+	if label == "" {
+		return ""
+	}
+	return " : " + label
+}
+
+// mermaidMessageText is the text part of a Mermaid message line: without a label
+// the colon stays (the syntax wants it) but not the space after it.
+func mermaidMessageText(label string) string {
+	if label == "" {
+		return ":"
+	}
+	return ": " + label
+}
+
+// writeMermaidGroupNote writes the title of a group as a note over the first and
+// the last participant of the diagram (or the only one).
+func writeMermaidGroupNote(b *strings.Builder, depth int, participants []string, label string) {
+	over := sanitizeID(participants[0])
+	if last := participants[len(participants)-1]; last != participants[0] {
+		over += "," + sanitizeID(last)
+	}
+	fmt.Fprintf(b, "    %sNote over %s: %s\n", strings.Repeat("  ", depth), over, mermaidSequenceText(label))
 }
 
 // mermaidSequenceText makes free text safe inside one statement of a Mermaid
