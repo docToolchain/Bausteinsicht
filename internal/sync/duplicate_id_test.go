@@ -70,4 +70,3 @@ func TestSync_DuplicateBausteinsichtIDOnOnePageIsReportedAndStripped(t *testing.
 		}
 	}
 }
-
