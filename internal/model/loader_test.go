@@ -3,6 +3,7 @@ package model
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -406,5 +407,18 @@ func TestAutoDetect_ErrorOnMultipleFiles(t *testing.T) {
 	_, err := AutoDetect(dir)
 	if err == nil {
 		t.Error("expected error when multiple .jsonc files found without explicit --model")
+	}
+}
+
+// #692: the error names the pattern that was searched and the way out.
+func TestAutoDetect_NoJSONCFileMessageNamesThePattern(t *testing.T) {
+	_, err := AutoDetect(t.TempDir())
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+	for _, want := range []string{"no model file found", "*.jsonc", "--model"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q lacks %q", err.Error(), want)
+		}
 	}
 }
